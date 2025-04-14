@@ -86,13 +86,6 @@ You can test it with a payload like:
 Create a `.env` file in the root directory with the following:
 
 ```env
-# RabbitMQ
-RABBITMQ_HOST=...
-RABBITMQ_PORT=5671
-RABBITMQ_USERNAME=...
-RABBITMQ_PASSWORD=...
-RABBITMQ_QUEUE=...
-
 # AWS
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
@@ -119,7 +112,7 @@ MS_NAME=AI Mining Microservice
 Run the producer test to push messages to MCP:
 
 ```bash
-python app/test/test_endpoint.py
+python -m pytest app/test/test_endpoint.py -v
 ```
 
 You can also add unit tests using `pytest`.

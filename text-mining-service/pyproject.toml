@@ -18,5 +18,7 @@ dependencies = [
     "aiohttp",
     "requests",
     "fastapi",
-    "uvicorn"
+    "uvicorn",
+    "pytest",
+    "pytest-asyncio"
 ]
