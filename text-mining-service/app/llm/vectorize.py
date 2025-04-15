@@ -143,8 +143,22 @@ def get_relevant_chunk(query, db, table_name, document_name):
         query_embedding = get_embedding(query)
         table = db.open_table(table_name)
         result = table.search(query_embedding).where(f'document_name == "{document_name}"').to_pandas()
-        table.delete(f'document_name == "{document_name}"')
         return result["text"].tolist()
     except Exception as e:
         logger.error(f"❌ Error retrieving relevant chunk: {str(e)}")
+        raise
+
+
+def clear_temp_table(document_name, db_path=DB_PATH):
+    try:
+        logger.info("🗑️ Clearing temporary table...")
+        db = lancedb.connect(db_path)
+        
+        if TEMP_TABLE_NAME in db.table_names():
+            table = db.open_table(TEMP_TABLE_NAME)
+            table.delete(f'document_name == "{document_name}"')
+        else:
+            logger.warning("⚠️ Temporary table does not exist!")
+    except Exception as e:
+        logger.error(f"❌ Error clearing temporary table: {str(e)}")
         raise

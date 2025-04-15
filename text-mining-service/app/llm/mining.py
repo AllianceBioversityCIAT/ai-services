@@ -11,7 +11,8 @@ from app.llm.vectorize import (get_embedding,
                                store_reference_embeddings,
                                store_temp_embeddings,
                                get_all_reference_data,
-                               get_relevant_chunk
+                               get_relevant_chunk,
+                               clear_temp_table
                                )
 
 
@@ -148,3 +149,6 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT):
     except Exception as e:
         logger.error(f"❌ Error: {str(e)}")
         raise
+
+    finally:
+        clear_temp_table(document_name)
