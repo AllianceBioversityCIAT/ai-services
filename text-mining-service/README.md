@@ -163,3 +163,113 @@ You can also add unit tests using `pytest`.
     └── README.md
     └── uv.lock
 ```
+
+---
+
+## 🔄 How MCP Works in This Project
+
+### Model Context Protocol (MCP)
+
+MCP is a protocol that enables seamless integration between the service and LLM models. In this project, we use MCP to:
+
+1. **Handle document processing requests**: The MCP server exposes the `process_document` tool that receives parameters like bucket name, document key, and authentication credentials.
+2. **Authenticate users**: All requests are authenticated through the CLARISA service before processing.
+3. **Process documents with LLMs**: Once authenticated, documents are retrieved from S3, processed using LLMs (Claude 3 Sonnet via Bedrock), and the results are returned.
+4. **Notify stakeholders**: The service sends notifications via Slack upon successful processing or failures.
+
+### MCP Architecture
+
+```
+Client Request → FastAPI Endpoint → MCP Client → MCP Server → LLM Processing → Response
+```
+
+The MCP server runs as a separate process and communicates with the main application through a standardized protocol.
+
+---
+
+## 🔌 Consuming the Text Mining Endpoint
+
+### REST API Endpoint
+
+The service exposes a REST API endpoint at `/process` that you can call to process documents:
+
+```bash
+curl -X POST http://localhost:8000/process \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bucketName": "my-bucket",
+    "key": "documents/my-document.pdf",
+    "credentials": {
+      "username": "your-client-id",
+      "password": "your-secret"
+    },
+    "prompt": "Extract key information from this document" # Optional
+  }'
+```
+
+### Python Client Example
+
+```python
+import requests
+import json
+
+url = "http://localhost:8000/process"
+payload = {
+    "bucketName": "my-bucket",
+    "key": "documents/my-document.pdf",
+    "credentials": {
+        "username": "your-client-id",
+        "password": "your-secret"
+    },
+    "prompt": "Extract key information from this document"  # Optional
+}
+
+response = requests.post(url, json=payload)
+result = response.json()
+print(json.dumps(result, indent=2))
+```
+
+### Response Format
+
+The endpoint returns structured information extracted from the document:
+
+```json
+{
+  "title": "Extracted document title",
+  "summary": "Brief summary of the document content",
+  "key_points": [
+    "Important point 1",
+    "Important point 2"
+  ],
+  "entities": {
+    "people": ["Person 1", "Person 2"],
+    "organizations": ["Organization 1", "Organization 2"],
+    "locations": ["Location 1", "Location 2"]
+  },
+  "metadata": {
+    "processing_time": "3.5s",
+    "document_type": "PDF",
+    "page_count": 10
+  }
+}
+```
+
+### Error Handling
+
+If an error occurs during processing, the endpoint returns an HTTP error status code with details:
+
+```json
+{
+  "detail": "Authentication failed: Invalid credentials"
+}
+```
+
+Or:
+
+```json
+{
+  "detail": "Error processing document: File not found in bucket"
+}
+```
+
+---
