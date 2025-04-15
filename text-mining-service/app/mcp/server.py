@@ -53,7 +53,7 @@ async def process_document(bucket: str, key: str, credentials: Any) -> dict:
             color="#36a64f",
             title="Document Processed",
             message=f"Successfully processed document: *{key}*\nRequested by: *{authenticated_user['user']['username']}* ({authenticated_user['user']['environment']})\nBucket: *{bucket}*",
-            time_taken=f"Time taken: *{result['time_taken']}*",
+            time_taken=f"Time taken: *{result['time_taken']}* seconds",
             priority="Low"
         )
 

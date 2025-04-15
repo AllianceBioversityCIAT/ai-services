@@ -1,4 +1,6 @@
 import os
+import ssl
+import certifi
 import logging
 import aiohttp
 from typing import Dict, Any, Optional
@@ -45,12 +47,15 @@ class NotificationService:
                 ]
             }
 
-            async with aiohttp.ClientSession() as session:
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 async with session.post(self.slack_webhook, json=payload) as response:
                     if response.status != 200:
                         self.logger.error(
                             f"Failed to send Slack notification: {response.status}")
                         return False
+                    self.logger.info("✅ Slack notification sent successfully")
                     return True
 
         except Exception as e:
