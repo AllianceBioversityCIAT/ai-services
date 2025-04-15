@@ -1,4 +1,3 @@
-from app.llm.mining import process_document as process_with_llm
 from mcp.server.fastmcp import FastMCP
 import boto3
 from app.middleware.auth_middleware import AuthMiddleware
