@@ -10,7 +10,7 @@ This project is a microservice for intelligent document processing using LLMs (L
 - 🔍 Semantic chunking + vector embedding with LanceDB
 - 🤖 Answer generation using LLM (Claude 3 Sonnet via Bedrock)
 - 🔒 Auth via CLARISA credentials
-- 📦 Async processing via RabbitMQ or sync via MCP
+- 📦 Sync processing via MCP
 - 📤 Slack notifications on success/failure
 
 ---
@@ -124,7 +124,6 @@ You can also add unit tests using `pytest`.
 ```
 └── 📁text-mining-service
     └── 📁app
-        └── .DS_Store
         └── 📁db
             └── 📁miningdb
         └── 📁llm
@@ -156,7 +155,6 @@ You can also add unit tests using `pytest`.
     └── 📁data
         └── 📁logs
             └── app.log
-    └── .DS_Store
     └── .env
     └── .gitignore
     └── .python-version
