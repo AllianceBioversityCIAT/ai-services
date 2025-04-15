@@ -11,8 +11,7 @@ from app.llm.vectorize import (get_embedding,
                                store_reference_embeddings,
                                store_temp_embeddings,
                                get_all_reference_data,
-                               get_relevant_chunk,
-                               clear_lancedb
+                               get_relevant_chunk
                                )
 
 
@@ -120,11 +119,11 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT):
         logger.info("#️⃣ Generating embeddings...")
         embeddings = [get_embedding(chunk) for chunk in chunks]
 
-        db, temp_table_name = store_temp_embeddings(chunks, embeddings)
+        db, temp_table_name, document_name = store_temp_embeddings(chunks, embeddings, file_key)
 
         all_reference_data = get_all_reference_data()
 
-        relevant_chunks = get_relevant_chunk(prompt, db, temp_table_name)
+        relevant_chunks = get_relevant_chunk(prompt, db, temp_table_name, document_name)
 
         context = all_reference_data + relevant_chunks
 
@@ -149,7 +148,3 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT):
     except Exception as e:
         logger.error(f"❌ Error: {str(e)}")
         raise
-
-    finally:
-        if 'db' in locals() and 'temp_table_name' in locals():
-            clear_lancedb(db, temp_table_name)

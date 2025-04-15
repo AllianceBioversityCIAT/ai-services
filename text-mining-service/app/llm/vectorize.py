@@ -1,10 +1,12 @@
+import re
 import json
 import boto3
 import lancedb
+import unicodedata
 from pathlib import Path
+from datetime import datetime
 from app.utils.config.config_util import BR
 from app.utils.logger.logger_util import get_logger
-# from sentence_transformers import SentenceTransformer
 
 
 logger = get_logger()
@@ -14,8 +16,6 @@ DB_PATH = str(BASE_DIR / "app" / "db" / "miningdb")
 
 REFERENCE_TABLE_NAME = "clarisa_reference"
 TEMP_TABLE_NAME = "temp_documents"
-
-# model = SentenceTransformer("intfloat/e5-large-v2")
 
 
 bedrock_runtime = boto3.client(
@@ -41,7 +41,6 @@ def get_embedding(text):
         embeddings = response_body['embedding']
         
         return embeddings
-        #return model.encode(text).tolist()
     except Exception as e:
         logger.error(f"❌ Error generating embedding: {str(e)}")
         raise
@@ -55,6 +54,15 @@ def check_reference_exists(db_path=DB_PATH):
     except Exception as e:
         logger.error(f"❌ Error checking reference table: {str(e)}")
         return False
+
+
+def normalize_filename(filename):
+    filename = unicodedata.normalize('NFKD', filename)
+    filename = filename.encode('ASCII', 'ignore').decode('utf-8')
+    filename = filename.lower().replace(" ", "_")
+    filename = re.sub(r'[^a-z0-9_\-\.]', '', filename)
+    
+    return filename
 
 
 def store_reference_embeddings(chunks, embeddings, db_path=DB_PATH):
@@ -78,22 +86,29 @@ def store_reference_embeddings(chunks, embeddings, db_path=DB_PATH):
         raise
 
 
-def store_temp_embeddings(chunks, embeddings, db_path=DB_PATH):
+def store_temp_embeddings(chunks, embeddings, file_key, db_path=DB_PATH):
     """Store temporary document embeddings"""
     try:
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        
+        s_file_key = normalize_filename(file_key)
+        document_name = f"{s_file_key}_{timestamp}"
+
         logger.info("💾 Storing temporary document embeddings in LanceDB...")
         db = lancedb.connect(db_path)
         
-        data = [{"text": chunk, "vector": embedding, "is_reference": False}
+        data = [{"text": chunk, "vector": embedding, "is_reference": False, "document_name": document_name}
                 for chunk, embedding in zip(chunks, embeddings)]
         
-        if TEMP_TABLE_NAME in db.table_names():
-            db.drop_table(TEMP_TABLE_NAME)
-            
-        table = db.create_table(TEMP_TABLE_NAME, data=data)
-        logger.info(f"✅ Created temporary table with {len(data)} entries")
+        if TEMP_TABLE_NAME not in db.table_names():
+            table = db.create_table(TEMP_TABLE_NAME, data=data)
+            logger.info(f"✅ Created temporary table with {len(data)} entries")
+        else:
+            table = db.open_table(TEMP_TABLE_NAME)
+            table.add(data)
+            logger.info(f"✅ Appended {len(data)} entries to existing temporary table")
         
-        return db, TEMP_TABLE_NAME
+        return db, TEMP_TABLE_NAME, document_name
     except Exception as e:
         logger.error(f"❌ Error storing temporary embeddings: {str(e)}")
         raise
@@ -122,25 +137,14 @@ def get_all_reference_data(db_path=DB_PATH):
         raise
 
 
-def get_relevant_chunk(query, db, table_name):
+def get_relevant_chunk(query, db, table_name, document_name):
     try:
         logger.info("🔍 Searching for relevant fragment...")
         query_embedding = get_embedding(query)
         table = db.open_table(table_name)
-        result = table.search(query_embedding).to_pandas()
+        result = table.search(query_embedding).where(f'document_name == "{document_name}"').to_pandas()
+        table.delete(f'document_name == "{document_name}"')
         return result["text"].tolist()
     except Exception as e:
         logger.error(f"❌ Error retrieving relevant chunk: {str(e)}")
-        raise
-
-
-def clear_lancedb(db, table_name):
-    """Clear only the specified table"""
-    try:
-        logger.info(f"🧹 Clearing the database table {table_name}...")
-        if table_name in db.table_names() and table_name != REFERENCE_TABLE_NAME:
-            db.drop_table(table_name)
-            logger.info(f"✅ Table {table_name} cleared")
-    except Exception as e:
-        logger.error(f"❌ Error clearing LanceDB table {table_name}: {str(e)}")
         raise
