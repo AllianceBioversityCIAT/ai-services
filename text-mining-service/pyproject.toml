@@ -20,5 +20,6 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "pytest",
-    "pytest-asyncio"
+    "pytest-asyncio",
+    "python-crontab"
 ]

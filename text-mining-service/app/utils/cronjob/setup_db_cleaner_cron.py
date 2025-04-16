@@ -1,174 +1,165 @@
 #!/usr/bin/env python
 """
-Script para configurar el cronjob de limpieza de LanceDB
+Script to set up the LanceDB cleanup cronjob
 
-Este script facilita la instalación del script db_cleaner.py como un cronjob
-que se ejecutará diariamente a medianoche. Debe ejecutarse con privilegios
-suficientes para modificar el crontab.
+This script facilitates the installation of the db_cleaner.py script as a cronjob
+that will run daily at midnight. It must be executed with sufficient privileges
+to modify the crontab.
 
-Uso:
-    python setup_db_cleaner_cron.py install   # Instala el cronjob
-    python setup_db_cleaner_cron.py remove    # Elimina el cronjob
-    python setup_db_cleaner_cron.py status    # Muestra el estado del cronjob
+Usage:
+    python setup_db_cleaner_cron.py install   # Install the cronjob
+    python setup_db_cleaner_cron.py remove    # Remove the cronjob
+    python setup_db_cleaner_cron.py status    # Show cronjob status
 """
 
 import os
 import sys
 import subprocess
 from pathlib import Path
-from crontab import CronTab  # Requiere python-crontab: pip install python-crontab
+from crontab import CronTab
 
-# Obtener la ruta absoluta del script de limpieza
+
 CURRENT_DIR = Path(__file__).resolve().parent
 DB_CLEANER_SCRIPT = CURRENT_DIR / "db_cleaner.py"
 PROJECT_ROOT = CURRENT_DIR.parent.parent.parent
 LOG_DIR = PROJECT_ROOT / "data" / "logs"
-CRON_COMMENT = "lancedb_cleaner"  # Identificador para el cronjob
+CRON_COMMENT = "lancedb_cleaner"
 PYTHON_BIN = sys.executable
 
 
 def check_requirements():
-    """Verifica que se cumplan los requisitos para ejecutar el script"""
+    """Checks whether the necessary requirements are met to execute the script"""
     if not DB_CLEANER_SCRIPT.exists():
-        print(f"❌ Error: No se encontró el script db_cleaner.py en {DB_CLEANER_SCRIPT}")
+        print(f"❌ Error: db_cleaner.py script not found at {DB_CLEANER_SCRIPT}")
         return False
     
-    # Asegurarse de que el script sea ejecutable
     try:
         os.chmod(DB_CLEANER_SCRIPT, 0o755)
     except Exception as e:
-        print(f"⚠️ Advertencia: No se pudo hacer ejecutable el script: {e}")
+        print(f"⚠️ Warning: Failed to make script executable: {e}")
     
-    # Verificar que el directorio de logs exista o crearlo
     if not LOG_DIR.exists():
         try:
             LOG_DIR.mkdir(parents=True, exist_ok=True)
-            print(f"✅ Directorio de logs creado: {LOG_DIR}")
+            print(f"✅ Log directory created: {LOG_DIR}")
         except Exception as e:
-            print(f"❌ Error: No se pudo crear el directorio de logs: {e}")
+            print(f"❌ Error: Failed to create log directory: {e}")
             return False
     
     return True
 
 
 def get_cron_command():
-    """Genera el comando cron con rutas absolutas para mayor seguridad"""
+    """Generates the cron command using absolute paths for better reliability"""
     log_file = LOG_DIR / "db_cleaner_cron.log"
     return f"{PYTHON_BIN} {DB_CLEANER_SCRIPT} >> {log_file} 2>&1"
 
 
 def install_cron():
-    """Instala el cronjob para ejecutar el script diariamente a medianoche"""
+    """Installs the cronjob to run the script daily at 7:00 PM"""
     if not check_requirements():
         return False
     
     try:
-        # Acceder al crontab del usuario actual
         cron = CronTab(user=True)
         
-        # Eliminar jobs existentes con el mismo comentario (para evitar duplicados)
         cron.remove_all(comment=CRON_COMMENT)
         
-        # Crear un nuevo job que se ejecute a medianoche
         job = cron.new(command=get_cron_command(), comment=CRON_COMMENT)
-        job.setall('0 0 * * *')  # Medianoche todos los días
+        job.setall('0 19 * * *')
         
-        # Guardar los cambios en el crontab
         cron.write()
         
-        print(f"✅ Cronjob instalado correctamente. Se ejecutará a medianoche.")
-        print(f"   Comando: {job.command}")
-        print(f"   Programación: {job.slices}")
+        print(f"✅ Cronjob successfully installed. It will run at 7:00 PM.")
+        print(f"   Command: {job.command}")
+        print(f"   Schedule: {job.slices}")
         return True
         
     except Exception as e:
-        print(f"❌ Error al instalar el cronjob: {e}")
+        print(f"❌ Error installing cronjob: {e}")
         return False
 
 
 def remove_cron():
-    """Elimina el cronjob del limpiador de LanceDB"""
+    """Removes the LanceDB cleanup cronjob"""
     try:
         cron = CronTab(user=True)
         
-        # Buscar y eliminar el job por su comentario
         if cron.remove_all(comment=CRON_COMMENT):
             cron.write()
-            print("✅ Cronjob eliminado correctamente.")
+            print("✅ Cronjob successfully removed.")
             return True
         else:
-            print("ℹ️ No se encontró ningún cronjob para eliminar.")
+            print("ℹ️ No cronjob found to remove.")
             return False
             
     except Exception as e:
-        print(f"❌ Error al eliminar el cronjob: {e}")
+        print(f"❌ Error deleting cronjob: {e}")
         return False
 
 
 def show_status():
-    """Muestra el estado actual del cronjob"""
+    """Displays the current status of the cronjob"""
     try:
         cron = CronTab(user=True)
         jobs = list(cron.find_comment(CRON_COMMENT))
         
         if not jobs:
-            print("ℹ️ No hay ningún cronjob instalado para la limpieza de LanceDB.")
+            print("ℹ️ No cronjob installed for LanceDB cleanup.")
             return
             
         print(f"✅ Cronjob configurado para la limpieza de LanceDB:")
         for job in jobs:
-            print(f"   Comando: {job.command}")
-            print(f"   Programación: {job.slices}")
-            # Calcular la próxima ejecución
+            print(f"   Command: {job.command}")
             schedule = job.schedule(date_from=job.next())
             next_run = schedule.get_next()
-            print(f"   Próxima ejecución: {next_run}")
+            print(f"   Next run: {next_run}")
             
     except Exception as e:
-        print(f"❌ Error al verificar el estado del cronjob: {e}")
+        print(f"❌ Error when checking the cronjob status: {e}")
 
 
 def test_script():
-    """Ejecuta el script de limpieza en modo de prueba"""
+    """Runs the cleanup script in test mode"""
     if not check_requirements():
         return False
         
-    print(f"🧪 Ejecutando el script db_cleaner.py en modo de prueba...")
+    print(f"🧪 Running db_cleaner.py script in test mode...")
     try:
         result = subprocess.run([PYTHON_BIN, str(DB_CLEANER_SCRIPT)], 
                                capture_output=True, text=True)
         
-        print("\n--- SALIDA DEL SCRIPT ---")
+        print("\n--- SCRIPT OUTPUT ---")
         print(result.stdout)
         
         if result.stderr:
-            print("\n--- ERRORES ---")
+            print("\n--- ERRORS ---")
             print(result.stderr)
             
-        print(f"\n✅ Script ejecutado con código de salida: {result.returncode}")
+        print(f"\n✅ Script executed with exit code: {result.returncode}")
         return result.returncode == 0
         
     except Exception as e:
-        print(f"❌ Error al ejecutar el script: {e}")
+        print(f"❌ Error executing the script: {e}")
         return False
 
 
 def print_usage():
-    """Muestra el mensaje de ayuda"""
+    """Displays the help message"""
     print(f"""
-Uso: {sys.argv[0]} <comando>
+  Usage: {sys.argv[0]} <command>
 
-Comandos disponibles:
-  install   - Instala el cronjob para ejecutar el script diariamente a medianoche
-  remove    - Elimina el cronjob
-  status    - Muestra el estado actual del cronjob
-  test      - Ejecuta el script db_cleaner.py en modo de prueba
-  help      - Muestra este mensaje de ayuda
+  Available commands:
+    install   - Install the cronjob to run the script daily at midnight
+    remove    - Remove the cronjob
+    status    - Show the current status of the cronjob
+    test      - Run the db_cleaner.py script in test mode
+    help      - Show this help message
 """)
 
 
 def main():
-    """Función principal"""
+    """Main function"""
     if len(sys.argv) < 2:
         print_usage()
         return 1
@@ -188,7 +179,7 @@ def main():
         print_usage()
         return 0
     else:
-        print(f"❌ Comando desconocido: {command}")
+        print(f"❌ Unknown command: {command}")
         print_usage()
         return 1
 
