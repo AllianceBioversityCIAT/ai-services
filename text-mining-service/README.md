@@ -64,6 +64,21 @@ This will launch the MCP server and expose the LLM-powered tools (e.g., `process
 
 ---
 
+## 🧹 Setting Up Database Cleanup Cronjob
+
+The service includes a database cleaning utility that removes temporary LanceDB tables to prevent excessive storage usage. You can set up a cronjob to run this cleaner automatically.
+
+### Installing the Cronjob
+
+```bash
+python app/utils/cronjob/setup_db_cleaner_cron.py install
+```
+
+This will install a cronjob that runs daily at 7:00 PM to clean up temporary database files.
+
+
+---
+
 ## 🧪 Example Usage via MCP Tool
 
 You can test it with a payload like:
