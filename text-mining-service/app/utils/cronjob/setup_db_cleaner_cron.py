@@ -66,11 +66,11 @@ def install_cron():
         cron.remove_all(comment=CRON_COMMENT)
         
         job = cron.new(command=get_cron_command(), comment=CRON_COMMENT)
-        job.setall('0 19 * * *')
+        job.setall('0 1 * * *')
         
         cron.write()
         
-        print(f"✅ Cronjob successfully installed. It will run at 7:00 PM.")
+        print(f"✅ Cronjob successfully installed.")
         print(f"   Command: {job.command}")
         print(f"   Schedule: {job.slices}")
         return True
