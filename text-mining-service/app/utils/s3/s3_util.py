@@ -3,6 +3,7 @@ import boto3
 import pandas as pd
 from io import BytesIO
 from PyPDF2 import PdfReader
+from pptx import Presentation
 from app.utils.config.config_util import S3
 from app.utils.logger.logger_util import get_logger
 
@@ -41,6 +42,15 @@ def read_document_from_s3(bucket_name, file_key):
             logger.info("📄 Processing EXCEL file...")
             df = pd.read_excel(BytesIO(file_content))
             return df.to_string()
+        elif file_extension == 'pptx':
+            logger.info("📄 Processing PPTX file...")
+            prs = Presentation(BytesIO(file_content))
+            text = ""
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if hasattr(shape, "text"):
+                        text += shape.text + "\n"
+            return text
         else:
             raise ValueError(f"❌ File format not supported: {file_extension}")
             

@@ -21,5 +21,6 @@ dependencies = [
     "uvicorn",
     "pytest",
     "pytest-asyncio",
-    "python-crontab"
+    "python-crontab",
+    "python-pptx"
 ]
