@@ -42,13 +42,13 @@ async def handle_sampling_message(message: types.CreateMessageRequestParams) -> 
 async def process_document_endpoint(data: dict):
     bucket = data.get("bucketName")
     key = data.get("key")
-    credentials = data.get("credentials")
+    token = data.get("token")
     prompt = data.get("prompt", "Extract key points from this document")
 
-    if not bucket or not key or not credentials:
+    if not bucket or not key or not token:
         raise HTTPException(
             status_code=400,
-            detail="Missing 'bucketName', 'key', or 'credentials'"
+            detail="Missing 'bucketName', 'key', or 'token'"
         )
 
     logger.info(f"Received request to process {key} from bucket {bucket}")
@@ -63,7 +63,7 @@ async def process_document_endpoint(data: dict):
                     arguments={
                         "bucket": bucket,
                         "key": key,
-                        "credentials": json.dumps(credentials),
+                        "token": token,
                         "prompt": prompt
                     }
                 )

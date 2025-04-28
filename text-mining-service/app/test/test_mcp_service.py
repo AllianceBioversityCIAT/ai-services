@@ -9,37 +9,33 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def process_document(bucket_name, file_key, client_id=None, client_secret=None, request_id=None):
+def process_document(bucket_name, file_key, token=None, request_id=None):
     """
     Process a single document through the text mining endpoint
 
     Args:
         bucket_name: The S3 bucket containing the document
         file_key: The path/key to the document in the S3 bucket
-        client_id: CLARISA client ID (will use env vars if not provided)
-        client_secret: CLARISA client secret (will use env vars if not provided)
+        token: Authentication token (will use env vars if not provided)
         request_id: Identifier for this request in concurrent processing
 
     Returns:
         Dictionary with results and performance metrics
     """
-    username = client_id or os.getenv("CLARISA_TEST_CLIENT_ID")
-    password = client_secret or os.getenv("CLARISA_TEST_CLIENT_SECRET")
+    # Use provided token or get from environment
+    # auth_token = token or os.getenv("AUTH_TOKEN")
 
-    if not username or not password:
-        raise ValueError(
-            "Missing credentials. Provide them as arguments or set CLARISA_TEST_CLIENT_ID and CLARISA_TEST_CLIENT_SECRET env vars")
+    # if not auth_token:
+    #     raise ValueError(
+    #         "Missing authentication token. Provide it as an argument or set AUTH_TOKEN env var")
 
     payload = {
         "bucketName": bucket_name,
         "key": file_key,
-        "credentials": {
-            "username": username,
-            "password": password
-        }
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTMsImZpcnN0X25hbWUiOiJMdWxpdG8iLCJsYXN0X25hbWUiOiIxODkiLCJpYXQiOjE3NDU4NTk4MDMsImV4cCI6MTc0NTg2NzAwM30.8TRzSZqdEKpk1r7xR5Ezr9MU5RMRWd1wiWhq4RmRD-U"
     }
 
-    base_url = os.getenv("MINING_SERVICE_URL", "http://mining-load-balancer-232292462.us-east-1.elb.amazonaws.com")
+    base_url = os.getenv("MINING_SERVICE_URL", "http://0.0.0.0:8000")
     url = f"{base_url}/process"
 
     req_id = request_id if request_id is not None else 1
@@ -109,26 +105,25 @@ def process_document(bucket_name, file_key, client_id=None, client_secret=None, 
         }
 
 
-def run_multi_document_tests(documents, client_id=None, client_secret=None):
+def run_multi_document_tests(documents, token=None):
     """
     Run requests for multiple documents simultaneously
 
     Args:
         documents: List of tuples (bucket_name, file_key) for each document
-        client_id: CLARISA client ID (will use env vars if not provided)
-        client_secret: CLARISA client secret (will use env vars if not provided)
+        token: Authentication token (will use env vars if not provided)
     """
     num_documents = len(documents)
     print(f"🚀 Starting tests for {num_documents} different documents...")
     start_time = time.time()
 
-    args = [(bucket, key, client_id, client_secret, i+1)
+    args = [(bucket, key, token, i+1)
             for i, (bucket, key) in enumerate(documents)]
 
     results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=num_documents) as executor:
         future_to_id = {
-            executor.submit(process_document, *arg): arg[4] for arg in args
+            executor.submit(process_document, *arg): arg[3] for arg in args
         }
 
         for future in concurrent.futures.as_completed(future_to_id):
@@ -157,7 +152,7 @@ def run_multi_document_tests(documents, client_id=None, client_secret=None):
     if results:
         avg_time = sum(r.get("time_taken", 0) for r in results) / len(results)
         min_time = min((r.get("time_taken", float('inf'))
-                       for r in results), default=0)
+                        for r in results), default=0)
         max_time = max((r.get("time_taken", 0) for r in results), default=0)
     else:
         avg_time = min_time = max_time = 0
@@ -224,30 +219,26 @@ def run_predefined_tests():
     """
     # Define your documents here
     test_documents = [
-        ("microservice-mining", "G177 - AICCRA 2023 Annual Report.pdf"),
-        ("microservice-mining", "G177 - AICCRA 2022 Annual Report.pdf"),
-        ("microservice-mining", "Guatemala Policy Brief 2024.pdf"),
-        ("microservice-mining", "FiBL Tech Report Jan to Jun 2024.pdf"),
-        ("microservice-mining", "ITR D314 Apr 20 2023.docx")
+        ("microservice-mining", "Guatemala_Policy_Brief_2024-46-1745849681481.pdf")
     ]
 
-    print("🧪 Running predefined test with 10 different documents")
+    print("🧪 Running predefined test with test documents")
     print("📚 Documents to process:")
     for i, (bucket, key) in enumerate(test_documents, 1):
         print(f"  {i}. {bucket}/{key}")
 
-    client_id = os.getenv("API_USERNAME")
-    client_secret = os.getenv("API_PASSWORD")
+    # Get token from environment variable
+    token = os.getenv("AUTH_TOKEN")
 
-    run_multi_document_tests(test_documents, client_id, client_secret)
+    run_multi_document_tests(test_documents, token)
 
 
 def run_same_document_concurrently(num_requests=5):
     """
     Run multiple concurrent requests for the same document
     """
-    bucket_name = "cgiar-csi-pdf-bucket"
-    file_key = "reports/annual_report_2022.pdf"
+    bucket_name = "microservice-mining"
+    file_key = "Guatemala_Policy_Brief_2024-13-1745849915180"
 
     test_documents = [(bucket_name, file_key) for _ in range(num_requests)]
 
@@ -255,10 +246,10 @@ def run_same_document_concurrently(num_requests=5):
         f"🧪 Running concurrency test with {num_requests} simultaneous requests")
     print(f"📚 Document to process: {bucket_name}/{file_key}")
 
-    client_id = os.getenv("CLARISA_TEST_CLIENT_ID")
-    client_secret = os.getenv("CLARISA_TEST_CLIENT_SECRET")
+    # Get token from environment variable
+    token = os.getenv("AUTH_TOKEN")
 
-    run_multi_document_tests(test_documents, client_id, client_secret)
+    run_multi_document_tests(test_documents, token)
 
 
 if __name__ == "__main__":
@@ -278,17 +269,18 @@ if __name__ == "__main__":
                            help="Comma-separated list of document keys/paths in the S3 bucket")
 
     mode_group.add_argument("--predefined", "-p", action="store_true",
-                            help="Run predefined test with 5 different documents")
+                            help="Run predefined test with example documents")
 
     mode_group.add_argument("--concurrency", "-n", type=int, metavar="NUM_REQUESTS",
                             help="Run concurrency test with multiple requests to same document")
 
-    parser.add_argument("--client-id", "-c",
-                        help="CLARISA client ID (optional, can use env var)")
-    parser.add_argument("--client-secret", "-s",
-                        help="CLARISA client secret (optional, can use env var)")
+    parser.add_argument("--token", "-t",
+                        help="Authentication token (optional, can use env var AUTH_TOKEN)")
 
     args = parser.parse_args()
+
+    # Get token from args or environment
+    token = args.token or os.getenv("AUTH_TOKEN")
 
     if args.predefined:
         run_predefined_tests()
@@ -306,6 +298,5 @@ if __name__ == "__main__":
 
         run_multi_document_tests(
             documents=documents,
-            client_id=args.client_id,
-            client_secret=args.client_secret
+            token=token
         )

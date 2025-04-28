@@ -19,12 +19,10 @@ s3_client = boto3.client("s3")
 bedrock_client = boto3.client("bedrock-runtime", region_name="us-west-2")
 
 
-async def authenticate(credentials: Any, key: str, bucket: str):
+async def authenticate(key: str, bucket: str, token: str):
     try:
-        parsed_credentials = credentials
-
         payload = {
-            "credentials": parsed_credentials,
+            "token": token,
             "key": key,
             "bucket": bucket
         }
@@ -35,11 +33,13 @@ async def authenticate(credentials: Any, key: str, bucket: str):
 
 
 @mcp.tool()
-async def process_document(bucket: str, key: str, credentials: Any) -> dict:
+async def process_document(bucket: str, key: str, token: Any) -> dict:
     logger.info("✅ process_document invoked via MCP")
+    
     try:
-        authenticated_user = await authenticate(credentials, key, bucket)
-        if not authenticated_user:
+        is_authenticated = await authenticate(key, bucket, token)
+        print(f"Authenticated: {is_authenticated}")
+        if not is_authenticated:
             raise ValueError("Authentication failed")
 
         logger.info(f"Processing document: {key} from bucket: {bucket}")
@@ -52,7 +52,7 @@ async def process_document(bucket: str, key: str, credentials: Any) -> dict:
             app_name="AI-MCP Mining Service",
             color="#36a64f",
             title="Document Processed",
-            message=f"Successfully processed document: *{key}*\nRequested by: *{authenticated_user['user']['username']}* ({authenticated_user['user']['environment']})\nBucket: *{bucket}*",
+            message=f"Successfully processed document: *{key}*\nBucket: *{bucket}*",
             time_taken=f"Time taken: *{result['time_taken']}* seconds",
             priority="Low"
         )

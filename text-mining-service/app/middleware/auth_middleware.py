@@ -1,102 +1,76 @@
-import json
-import logging
+import requests
 import os
-from typing import Dict, Any, Optional, Callable, Awaitable
-from app.utils.clarisa.clarisa_service import ClarisaService
-from app.utils.clarisa.dto.clarisa_connection_dto import ResClarisaValidateConnectionDto
+from typing import Dict, Any
+from app.utils.logger.logger_util import get_logger
 from app.utils.notification.notification_service import NotificationService
-from app.utils.logger.logger_util import logger
+
+logger = get_logger()
+notification_service = NotificationService()
+
+icon: str = ":ai: :warning:"
 
 
 class AuthMiddleware:
     def __init__(self):
-        """Initialize authentication middleware"""
-        self.clarisa_service = ClarisaService()
-        self.notification_service = NotificationService()
         self.ms_name = os.getenv('MS_NAME', 'Mining Microservice')
 
-    async def authenticate(self, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Authenticate incoming message with CLARISA credentials"""
-        try:
-            credentials = message.get('credentials', '{}')
-            if isinstance(credentials, str):
-                payload = json.loads(credentials)
-            else:
-                payload = credentials
-
-            username = payload.get('username')
-            password = payload.get('password')
-
-            logger.debug(
-                f"Client {username} is trying to access {self.ms_name}")
-
-            auth_data = await self.clarisa_service.authorization(username, password)
-
-            if not auth_data.valid:
-                await self.notification_service.send_slack_notification(
-                    emoji=':alert:',
-                    app_name=self.ms_name,
-                    color='#FF0000',
-                    title='Invalid credentials',
-                    message=f"User {username} tried to access {self.ms_name} with invalid credentials",
-                    priority='Medium'
-                )
-                logger.error(f"Authentication failed for user {username}")
-                return None
-
-            validated_data = auth_data.data
-
-            actual_data = validated_data
-            if isinstance(validated_data, dict) and 'response' in validated_data:
-                actual_data = validated_data['response']
-
-            logger.debug(f"Validated data structure: {actual_data}")
-
-            sender_mis = actual_data.get('sender_mis', {})
-            receiver_mis = actual_data.get('receiver_mis', {})
-
-            new_data = {
-                **message,
-                'user': {
-                    **payload,
-                    'environment': receiver_mis.get('environment'),
-                    'sender': actual_data
-                }
-            }
-
-            logger.info(f"🚀 - Sender info: {sender_mis}")
-            logger.info(f"📡 - Receiver info: {receiver_mis}")
-
-            sender_name = sender_mis.get('name', 'unknown')
-            sender_env = sender_mis.get('environment', 'unknown')
-
-            logger.info(
-                f"Client {sender_name} in {sender_env} "
-                f"environment is authorized to access {self.ms_name}"
-            )
-
-            return new_data
-
-        except Exception as e:
-            logger.error(f"Authentication error: {str(e)}")
-            await self.notification_service.send_slack_notification(
-                emoji=':alert:',
+    async def authenticate(self, message: Dict[str, Any]) -> bool:
+        """Authenticate incoming message with access token"""
+        token = message.get('token')
+        if not token:
+            logger.error("No token provided in the request")
+            await notification_service.send_slack_notification(
+                emoji=icon,
                 app_name=self.ms_name,
-                color='#FF0000',
-                title='Authentication Error',
-                message=f"Error during authentication process: {str(e)}",
-                priority='High'
+                color="#FF0000",
+                title="Authentication Error",
+                message=f"Authentication failed for {self.ms_name}",
+                priority="High"
             )
-            return None
+            return False
 
-    def wrap_handler(self, handler: Callable[[Dict[str, Any]], Awaitable[None]]) -> Callable[[Dict[str, Any]], Awaitable[None]]:
-        """Create a wrapper that authenticates before calling the original handler"""
-        async def wrapped_handler(message: Dict[str, Any]) -> None:
-            authenticated_message = await self.authenticate(message)
-            if authenticated_message:
-                await handler(authenticated_message)
+        logger.debug(f"Validating token for {self.ms_name}")
+        return await self.validate_token(token)
+
+    async def validate_token(self, token: str) -> bool:
+        """Validate the access token using the management API"""
+        url = os.getenv('STAR_ENDPOINT')
+
+        headers = {
+            "access-token": token,
+            "Content-Type": "application/json"
+        }
+
+        try:
+            response = requests.patch(url, headers=headers)
+            logger.debug(
+                f"Response from token validation: {response.status_code}")
+            if response.status_code == 200:
+                data = response.json()
+                is_valid = data.get("data", {}).get("isValid", False)
+                logger.debug(f"Token is valid: {is_valid}")
+                return is_valid
             else:
                 logger.error(
-                    "Authentication failed, message processing skipped")
+                    f"Token validation failed with status: {response.status_code}")
+                await notification_service.send_slack_notification(
+                    emoji=icon,
+                    app_name=self.ms_name,
+                    color="#FF0000",
+                    title="Token Validation Error",
+                    message=f"Token validation failed for {self.ms_name} with status code {response.status_code}",
+                    priority="High"
+                )
+                return False
 
-        return wrapped_handler
+        except Exception as e:
+            logger.error(f"Error validating token: {str(e)}")
+            await notification_service.send_slack_notification(
+                emoji=icon,
+                app_name=self.ms_name,
+                color="#FF0000",
+                title="Token Validation Error",
+                message=f"Error validating token for {self.ms_name}: {str(e)}",
+                priority="High"
+            )
+            return False
