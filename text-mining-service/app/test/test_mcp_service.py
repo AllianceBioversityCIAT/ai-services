@@ -163,7 +163,7 @@ def run_multi_document_tests(documents, client_id=None, client_secret=None):
         avg_time = min_time = max_time = 0
 
     print("\n" + "="*50)
-    print(f"📊 TEST SUMMARY")
+    print("📊 TEST SUMMARY")
     print("="*50)
     print(f"Total documents: {num_documents}")
     print(f"Successful requests: {success_count}")

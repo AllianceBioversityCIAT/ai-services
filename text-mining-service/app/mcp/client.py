@@ -2,6 +2,7 @@ import os
 from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import json
 from app.utils.logger.logger_util import get_logger
@@ -12,10 +13,19 @@ server_params = StdioServerParameters(
     command="python",
     args=[os.path.join(os.path.dirname(__file__), "server.py")],
     cwd=os.path.dirname(os.path.abspath(__file__)),
-    env={"PYTHONPATH": os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))}
+    env={"PYTHONPATH": os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../.."))}
 )
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 async def handle_sampling_message(message: types.CreateMessageRequestParams) -> types.CreateMessageResult:
