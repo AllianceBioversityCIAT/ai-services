@@ -22,5 +22,6 @@ dependencies = [
     "pytest",
     "pytest-asyncio",
     "python-crontab",
-    "python-pptx"
+    "python-pptx",
+    "python-multipart",
 ]
