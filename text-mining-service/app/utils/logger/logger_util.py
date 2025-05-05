@@ -8,10 +8,10 @@ is_prod = os.getenv('IS_PROD', 'false').lower() == 'true'
 
 print(f"Is production: {is_prod}")
 
-if is_prod:
-    logs_dir = Path("/tmp/logs")
-else:
-    logs_dir = Path(__file__).parent.parent.parent.parent / "data" / "logs"
+#if is_prod:
+logs_dir = Path("/tmp/logs")
+#else:
+#    logs_dir = Path(__file__).parent.parent.parent.parent / "data" / "logs"
 
 logs_dir.mkdir(parents=True, exist_ok=True)
 
