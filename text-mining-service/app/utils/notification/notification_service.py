@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional
 class NotificationService:
     def __init__(self):
         """Initialize notification service"""
-        print(os.getenv('SLACK_WEBHOOK_URL'))
+        self.is_prod = os.getenv('IS_PROD', 'false').lower() == 'true'
         self.logger = logging.getLogger(__name__)
         self.slack_webhook = os.getenv('SLACK_WEBHOOK_URL')
 
@@ -30,13 +30,15 @@ class NotificationService:
             return False
 
         try:
+            env_tag = "🚀 Production 🚀" if self.is_prod else "🚧 Development 🚧"
+
             payload = {
                 "blocks": [
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f"{emoji} *{app_name}*\n*{title}*\n{message}\n{time_taken}\n*Priority:* {priority}"
+                            "text": f"{emoji} *{app_name}* | *Environment:* {env_tag}\n*{title}*\n{message}\n{time_taken}\n*Priority:* {priority}"
                         }
                     }
                 ],

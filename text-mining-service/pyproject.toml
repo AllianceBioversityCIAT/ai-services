@@ -24,4 +24,5 @@ dependencies = [
     "python-crontab",
     "python-pptx",
     "python-multipart",
+    "mangum"
 ]
