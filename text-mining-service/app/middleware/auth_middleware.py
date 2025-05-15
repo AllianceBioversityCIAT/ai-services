@@ -13,6 +13,15 @@ icon: str = ":ai: :warning:"
 class AuthMiddleware:
     def __init__(self):
         self.ms_name = os.getenv('MS_NAME', 'Mining Microservice')
+        is_prod = os.getenv('IS_PROD', 'false').lower() == 'true'
+        if is_prod:
+            self.star_endpoint = os.getenv('STAR_ENDPOINT_PROD')
+            logger.info("Using PRODUCTION STAR endpoint")
+        else:
+            self.star_endpoint = os.getenv('STAR_ENDPOINT_TEST')
+            logger.info("Using TEST STAR endpoint")
+        
+        logger.debug(f"STAR endpoint configured: {self.star_endpoint}")
 
     async def authenticate(self, message: Dict[str, Any]) -> bool:
         """Authenticate incoming message with access token"""
@@ -34,7 +43,17 @@ class AuthMiddleware:
 
     async def validate_token(self, token: str) -> bool:
         """Validate the access token using the management API"""
-        url = os.getenv('STAR_ENDPOINT')
+        if not self.star_endpoint:
+            logger.error("STAR endpoint URL is not configured")
+            await notification_service.send_slack_notification(
+                emoji=icon,
+                app_name=self.ms_name,
+                color="#FF0000",
+                title="Configuration Error",
+                message=f"STAR endpoint URL is not configured for {self.ms_name}",
+                priority="High"
+            )
+            return False
 
         headers = {
             "access-token": token,
@@ -42,7 +61,8 @@ class AuthMiddleware:
         }
 
         try:
-            response = requests.patch(url, headers=headers)
+            logger.debug(f"Sending token validation request to: {self.star_endpoint}")
+            response = requests.patch(self.star_endpoint, headers=headers)
             logger.debug(
                 f"Response from token validation: {response.status_code}")
             if response.status_code == 200:
