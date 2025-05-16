@@ -3,9 +3,11 @@ import os
 from typing import Dict, Any
 from app.utils.logger.logger_util import get_logger
 from app.utils.notification.notification_service import NotificationService
+from app.utils.clarisa.clarisa_service import ClarisaService
 
 logger = get_logger()
 notification_service = NotificationService()
+clarisa_service = ClarisaService()
 
 icon: str = ":ai: :warning:"
 
@@ -13,19 +15,18 @@ icon: str = ":ai: :warning:"
 class AuthMiddleware:
     def __init__(self):
         self.ms_name = os.getenv('MS_NAME', 'Mining Microservice')
-        is_prod = os.getenv('IS_PROD', 'false').lower() == 'true'
-        if is_prod:
-            self.star_endpoint = os.getenv('STAR_ENDPOINT_PROD')
-            logger.info("Using PRODUCTION STAR endpoint")
-        else:
-            self.star_endpoint = os.getenv('STAR_ENDPOINT_TEST')
-            logger.info("Using TEST STAR endpoint")
-        
-        logger.debug(f"STAR endpoint configured: {self.star_endpoint}")
+        self.star_endpoint_test = os.getenv('STAR_ENDPOINT_TEST')
+        self.star_endpoint_prod = os.getenv('STAR_ENDPOINT_PROD')
+        self.star_endpoint = self.star_endpoint_prod if is_prod else self.star_endpoint_test
+        logger.info(f"Initial configuration: Using {'PRODUCTION' if is_prod else 'TEST'} STAR endpoint")
+        logger.debug(f"Initial STAR endpoint configured: {self.star_endpoint}")
 
     async def authenticate(self, message: Dict[str, Any]) -> bool:
         """Authenticate incoming message with access token"""
+        client_id = message.get('client_id')
+        client_secret = message.get('client_secret')
         token = message.get('token')
+        
         if not token:
             logger.error("No token provided in the request")
             await notification_service.send_slack_notification(
@@ -37,6 +38,23 @@ class AuthMiddleware:
                 priority="High"
             )
             return False
+
+        if client_id and client_secret:
+            try:
+                auth_result = await clarisa_service.authorization(client_id, client_secret)
+                
+                if auth_result.valid and auth_result.data:
+                    sender_environment = auth_result.data.get("sender_mis", {}).get("environment", "")
+                    logger.info(f"Detected sender environment from CLARISA: {sender_environment}")
+                    
+                    if sender_environment in ["DEV", "TEST"]:
+                        self.star_endpoint = self.star_endpoint_test
+                        logger.info(f"Using TEST STAR endpoint based on sender environment: {sender_environment}")
+                    else:
+                        self.star_endpoint = self.star_endpoint_prod
+                        logger.info(f"Using PRODUCTION STAR endpoint based on sender environment: {sender_environment}")
+            except Exception as e:
+                logger.error(f"Error during CLARISA authentication: {str(e)}")
 
         logger.debug(f"Validating token for {self.ms_name}")
         return await self.validate_token(token)
