@@ -81,18 +81,20 @@ This will install a cronjob that runs daily at 7:00 PM to clean up temporary dat
 
 ## 🧪 Example Usage via MCP Tool
 
-You can test it with a payload like:
+You can now test the service using a **multipart/form-data** request.  
+Below is an example of the expected fields when calling the `/process` endpoint:
 
-```json
-{
-  "key": "my-document.pdf",
-  "bucket": "my-bucket",
-  "credentials": {
-    "username": "your-client-id",
-    "password": "your-secret"
-  }
-}
-```
+| Field       | Type   | Description                     |
+|-------------|--------|---------------------------------|
+| `key`       | string | The name of the document        |
+| `bucketName`| string | The S3 bucket where it resides  |
+| `token`     | string | JWT or token for authentication |
+| `file`      | file   | File to upload                  |
+
+⚠️ Important:
+You must provide either *key* or *file*, but **not both**.
+* If using a file upload, the document will be processed directly.
+* If using a key, the document will be retrieved from S3 using the bucketName.
 
 ---
 
@@ -102,9 +104,11 @@ Create a `.env` file in the root directory with the following:
 
 ```env
 # AWS
+AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
-AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID_BR=...
+AWS_SECRET_ACCESS_KEY_BR=...
 
 # CLARISA Auth
 CLARISA_HOST=https://api.clarisa.cgiar.org
@@ -113,11 +117,18 @@ CLARISA_PASSWORD=...
 CLARISA_MIS=MINING
 CLARISA_MIS_ENV=TEST
 
+# API Configuration
+API_USERNAME=...
+API_PASSWORD=...
+
 # Slack
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 
 # Microservices Configuration
 MS_NAME=AI Mining Microservice
+
+# STAR Endpoint Configuration
+STAR_ENDPOINT=...
 ```
 
 ---
@@ -149,8 +160,6 @@ You can also add unit tests using `pytest`.
             └── server.py
         └── 📁middleware
             └── auth_middleware.py
-        └── 📁test
-            └── test_producer.py
         └── 📁utils
             └── 📁clarisa
                 └── clarisa_connection.py
@@ -159,6 +168,9 @@ You can also add unit tests using `pytest`.
                     └── clarisa_connection_dto.py
             └── 📁config
                 └── config_util.py
+            └── 📁cronjob
+                └── db_cleaner.py
+                └── setup_db_cleaner_cron.py
             └── 📁logger
                 └── logger_util.py
             └── 📁notification
@@ -171,6 +183,7 @@ You can also add unit tests using `pytest`.
         └── 📁logs
             └── app.log
     └── .env
+    └── .venv
     └── .gitignore
     └── .python-version
     └── main.py
@@ -210,38 +223,46 @@ The service exposes a REST API endpoint at `/process` that you can call to proce
 
 ```bash
 curl -X POST http://localhost:8000/process \
-  -H "Content-Type: application/json" \
-  -d '{
-    "bucketName": "my-bucket",
-    "key": "documents/my-document.pdf",
-    "credentials": {
-      "username": "your-client-id",
-      "password": "your-secret"
-    },
-    "prompt": "Extract key information from this document" # Optional
-  }'
+  -F "key=my-document.pdf" \
+  -F "bucketName=my-bucket" \
+  -F "token=auth-token" \
+  -F "file=@/path/to/file.pdf"
 ```
 
 ### Python Client Example
 
 ```python
 import requests
-import json
 
 url = "http://localhost:8000/process"
-payload = {
+
+# Option 1: Using an S3 key instead of uploading a file
+data = {
     "bucketName": "my-bucket",
     "key": "documents/my-document.pdf",
-    "credentials": {
-        "username": "your-client-id",
-        "password": "your-secret"
-    },
-    "prompt": "Extract key information from this document"  # Optional
+    "token": "eyJhbGciOi..."     # Replace with a valid token
 }
+response = requests.post(url, data=data)
 
-response = requests.post(url, json=payload)
-result = response.json()
-print(json.dumps(result, indent=2))
+# Option 2: Using a file upload
+# with open("path/to/your/file.pdf", "rb") as f:
+#     files = {
+#         "file": f
+#     }
+#     data = {
+#         "bucketName": "my-bucket",
+#         "token": "eyJhbGciOi..."
+#     }
+
+#     response = requests.post(url, data=data, files=files)
+
+# Handle response
+if response.ok:
+    result = response.json()
+    print(json.dumps(result, indent=2))
+else:
+    print(f"Error: {response.status_code}")
+    print(response.text)
 ```
 
 ### Response Format
