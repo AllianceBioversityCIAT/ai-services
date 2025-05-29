@@ -42,19 +42,24 @@ INDEX_NAME = OPENSEARCH['index']
 def get_bedrock_embeddings(texts):
     embeddings = []
     for text in texts:
-        response = bedrock_runtime.invoke_model(
-            modelId="amazon.titan-embed-text-v2:0",
-            body=json.dumps({"inputText": text}),
-            contentType="application/json",
-            accept="application/json"
-        )
-        result = json.loads(response["body"].read())
-        embeddings.append(result["embedding"])
+        try:
+            response = bedrock_runtime.invoke_model(
+                modelId="amazon.titan-embed-text-v2:0",
+                body=json.dumps({"inputText": text}),
+                contentType="application/json",
+                accept="application/json"
+            )
+            result = json.loads(response["body"].read())
+            embeddings.append(result["embedding"])
+        except Exception as e:
+            logger.error(f"❌ Error generating embedding for text: {e}")
+            embeddings.append([])
     return embeddings
 
 
 def invoke_model(prompt):
     try:
+        logger.info("✍️  Generating report with LLM...")
         logger.info("🚀 Invoking the model...")
         request_body = {
             "anthropic_version": "bedrock-2023-05-31",
@@ -98,105 +103,121 @@ def invoke_model(prompt):
 
 
 def create_index_if_not_exists(dimension=1024):
-    if not opensearch.indices.exists(INDEX_NAME):
-        logger.info(f"📦 Creating OpenSearch index: {INDEX_NAME}")
-        index_body = {
-            "settings": {
-                "index": {
-                    "knn": True
-                }
-            },
-            "mappings": {
-                "properties": {
-                    "embedding": {
-                        "type": "knn_vector",
-                        "dimension": dimension,
-                        "method": {
-                            "name": "hnsw",
-                            "space_type": "cosinesimil",
-                            "engine": "nmslib"
-                        }
-                    },
-                    "chunk": {"type": "object"},
-                    "source_table": {"type": "keyword"},
-                    "indicator_acronym": {"type": "keyword"}
+    try:
+        if not opensearch.indices.exists(INDEX_NAME):
+            logger.info(f"📦 Creating OpenSearch index: {INDEX_NAME}")
+            index_body = {
+                "settings": {
+                    "index": {
+                        "knn": True
+                    }
+                },
+                "mappings": {
+                    "properties": {
+                        "embedding": {
+                            "type": "knn_vector",
+                            "dimension": dimension,
+                            "method": {
+                                "name": "hnsw",
+                                "space_type": "cosinesimil",
+                                "engine": "nmslib"
+                            }
+                        },
+                        "chunk": {"type": "object"},
+                        "source_table": {"type": "keyword"},
+                        "indicator_acronym": {"type": "keyword"}
+                    }
                 }
             }
-        }
-        opensearch.indices.create(index=INDEX_NAME, body=index_body)
+            opensearch.indices.create(index=INDEX_NAME, body=index_body)
+
+    except Exception as e:
+        logger.error(f"❌ Error creating index: {e}")
 
 
 
 def insert_into_opensearch(df: pd.DataFrame, table_name: str):
-    create_index_if_not_exists()
+    try:
+        create_index_if_not_exists()
 
-    logger.info(f"🔍 Processing table: {table_name}")
+        logger.info(f"🔍 Processing table: {table_name}")
 
-    rows = df.to_dict(orient="records")
-    chunks = [
-        {k: v for k, v in row.items() if pd.notnull(v)}
-        for row in rows
-    ]
-    logger.info(f"🔢 Generating embeddings for {len(chunks)} rows...")
-    texts = [json.dumps(chunk, ensure_ascii=False) for chunk in chunks]
-    embeddings = get_bedrock_embeddings(texts)
+        rows = df.to_dict(orient="records")
+        chunks = [
+            {k: v for k, v in row.items() if pd.notnull(v)}
+            for row in rows
+        ]
+        logger.info(f"🔢 Generating embeddings for {len(chunks)} rows...")
+        texts = [json.dumps(chunk, ensure_ascii=False) for chunk in chunks]
+        embeddings = get_bedrock_embeddings(texts)
 
-    logger.info("📥 Indexing documents in OpenSearch...")
-    for i, (row, embedding, chunk) in enumerate(zip(rows, embeddings, chunks)):
-        doc = {
-            "embedding": embedding,
-            "chunk": chunk,
-            "source_table": table_name,
-            "indicator_acronym": row.get("indicator_acronym")
-        }
-        opensearch.index(index=INDEX_NAME, id=f"{table_name}-{i}", body=doc)
+        logger.info("📥 Indexing documents in OpenSearch...")
+        for i, (row, embedding, chunk) in enumerate(zip(rows, embeddings, chunks)):
+            doc = {
+                "embedding": embedding,
+                "chunk": chunk,
+                "source_table": table_name,
+                "indicator_acronym": row.get("indicator_acronym")
+            }
+            opensearch.index(index=INDEX_NAME, id=f"{table_name}-{i}", body=doc)
 
-    logger.info(f"✅ Vectorization completed for {len(chunks)} rows of {table_name}")
-
-
-def retrieve_context(query, indicator, top_k=100):
-    embedding = get_bedrock_embeddings([query])[0]
+        logger.info(f"✅ Vectorization completed for {len(chunks)} rows of {table_name}")
     
-    knn_query = {
-        "size": top_k,
-        "query": {
-            "bool": {
-                "must": [
-                    {"term": {"indicator_acronym": indicator}},
-                    {
-                        "knn": {
-                            "embedding": {
-                                "vector": embedding,
-                                "k": top_k
+    except Exception as e:
+        logger.error(f"❌ Error inserting into OpenSearch for {table_name}: {e}")
+
+
+def retrieve_context(query, indicator, top_k=200):
+    try:
+        logger.info("📚 Retrieving relevant context from OpenSearch...")
+        embedding = get_bedrock_embeddings([query])[0]
+        
+        knn_query = {
+            "size": top_k,
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"indicator_acronym": indicator}},
+                        {
+                            "knn": {
+                                "embedding": {
+                                    "vector": embedding,
+                                    "k": top_k
+                                }
                             }
                         }
-                    }
-                ]
+                    ]
+                }
             }
         }
-    }
-    response = opensearch.search(index=INDEX_NAME, body=knn_query)
-    return [hit["_source"]["chunk"] for hit in response["hits"]["hits"]]
+        response = opensearch.search(index=INDEX_NAME, body=knn_query)
+        return [hit["_source"]["chunk"] for hit in response["hits"]["hits"]]
+    
+    except Exception as e:
+        logger.error(f"❌ Error retrieving context: {e}")
+        return []
 
 
 def run_pipeline(indicator):
-    logger.info("📂 Loading data from MySQL...")
-    df1 = load_data("vw_ai_deliverables")
-    df2 = load_data("vw_ai_project_contribution")
-    df3 = load_data("vw_ai_questions")
+    try:
+        logger.info("📂 Loading data from MySQL...")
+        df1 = load_data("vw_ai_deliverables")
+        df2 = load_data("vw_ai_project_contribution")
+        df3 = load_data("vw_ai_questions")
 
-    # insert_into_opensearch(df1, "vw_ai_deliverables")
-    # insert_into_opensearch(df2, "vw_ai_project_contribution")
-    # insert_into_opensearch(df3, "vw_ai_questions")
+        insert_into_opensearch(df1, "vw_ai_deliverables")
+        insert_into_opensearch(df2, "vw_ai_project_contribution")
+        insert_into_opensearch(df3, "vw_ai_questions")
+        
+        context = retrieve_context(PROMPT, indicator)
 
-    # logger.info("📚 Retrieving relevant context from OpenSearch...")
-    # context = retrieve_context(PROMPT, indicator)
+        query = f"""
+            Using this information:\n{context}\n\n
+            Do the following:\n{PROMPT}
+            """
+        
+        report = invoke_model(query)
+        # logger.info(report)
 
-    # logger.info("✍️  Generating report with LLM...")
-    # query = f"""
-    #     Using this information:\n{context}\n\n
-    #     Do the following:\n{PROMPT}
-    #     """
-    
-    # report = invoke_model(query)
-    # # logger.info(report)
+    except Exception as e:
+        logger.error(f"❌ Error in pipeline execution: {e}")
