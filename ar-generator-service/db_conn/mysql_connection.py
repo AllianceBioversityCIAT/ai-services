@@ -8,6 +8,7 @@ logger = get_logger()
 
 def load_data(table_name):
     try:
+        logger.info("📂 Loading data from MySQL...")
         engine = create_engine(MYSQL_DATABASE_URL)
         
         logger.info(f"🔍 Inspecting the table: {table_name}")

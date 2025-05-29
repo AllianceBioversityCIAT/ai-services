@@ -200,7 +200,6 @@ def retrieve_context(query, indicator, top_k=200):
 
 def run_pipeline(indicator):
     try:
-        logger.info("📂 Loading data from MySQL...")
         df1 = load_data("vw_ai_deliverables")
         df2 = load_data("vw_ai_project_contribution")
         df3 = load_data("vw_ai_questions")
