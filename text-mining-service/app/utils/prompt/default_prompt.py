@@ -125,8 +125,19 @@ Training Duration Validation
     • Short-term training refers to training that goes for less than 3 months.
     • If the document does not provide enough detail, use "Not collected".
 
-Training Modality
-    • training_modality
+For "Individual training," make a Degree Validation:
+    • degree
+    • Check if the document explicitly mentions that the training led to a degree such as:
+        • "PhD"
+        • "MSc"
+        • "BSc"
+        • "Other" (for any degree not classified under the above)
+    • If a degree is mentioned, return its value.
+    • If the document does not specify a degree, return "Not collected".
+    • If a degree is confirmed, set length_of_training to "Long-term" regardless of the start and end dates.
+
+Delivery Modality
+    • delivery_modality
     • If the document explicitly states how the training was delivered (e.g., "virtual," "in-person," "hybrid"), use that exact term.
     • If not stated, use "Not collected".
 
@@ -191,10 +202,11 @@ Follow this exact structure:
             "male_participants": <number or 'Not collected' (only if group training and indicator is 'Capacity Sharing for Development')>,
             "female_participants": <number or 'Not collected' (only if group training and indicator is 'Capacity Sharing for Development')>,
             "non_binary_participants": <number or 'Not collected' (only if group training and indicator is 'Capacity Sharing for Development')>,
-            "training_modality": "<value or 'Not collected' (only if indicator is 'Capacity Sharing for Development')>",
+            "delivery_modality": "<value or 'Not collected' (only if indicator is 'Capacity Sharing for Development')>",
             "start_date": "<value or 'Not collected' (only if indicator is 'Capacity Sharing for Development')>",
             "end_date": "<value or 'Not collected' (only if indicator is 'Capacity Sharing for Development')>",
             "length_of_training": "<Short-term or Long-term or 'Not collected' (only if indicator is 'Capacity Sharing for Development')>",
+            "degree": "<value or 'Not collected' (only if individual training and indicator is 'Capacity Sharing for Development')>",
             "alliance_main_contact_person_first_name": "<value or 'Not collected'>",
             "alliance_main_contact_person_last_name": "<value or 'Not collected'>",
             "evidence_for_stage": "<value or 'Not collected' (only if indicator is 'Policy Change')>",
