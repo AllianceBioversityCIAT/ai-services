@@ -3,10 +3,10 @@ name: Trigger Jenkins Job AI Text Mining Microservice
 on:
   push:
     branches:
-      - "dev-lambda" # Only on push to main-mining
+      - "main" # Only on push to main-mining
   pull_request:
     branches:
-      - "dev-lambda" # Only on PR to main-mining
+      - "main" # Only on PR to main-mining
   workflow_dispatch: # Allows manual trigger if needed
 
 jobs:
