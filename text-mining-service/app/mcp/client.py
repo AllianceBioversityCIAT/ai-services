@@ -27,6 +27,8 @@ class TextMiningRequest(BaseModel):
     key: Optional[str] = Field(
         None, description="Object key in the S3 bucket. Optional if file is provided")
     token: str = Field(..., description="Authentication token")
+    environmentUrl: str = Field(
+                    ..., description="Environment for the service (e.g., production, test)")
     prompt: Optional[str] = Field("Extract key points from this document",
                                   description="Specific instructions for document processing")
 
@@ -84,7 +86,10 @@ async def process_document_endpoint(
     file: Optional[UploadFile] = File(
         None, description="File to upload and process. Optional if key is provided"),
     prompt: Optional[str] = Form("Extract key points from this document",
-                                 description="Specific instructions for document processing")
+                                 description="Specific instructions for document processing"),
+    environmentUrl: str = Form(
+        ..., description="Environment for the service (e.g., production, test)"
+    )
 ):
     """
     Process a document stored in S3 using text mining techniques.
@@ -95,6 +100,7 @@ async def process_document_endpoint(
     - **key**: Object key in the S3 bucket (required if no file is provided)
     - **file**: File to upload and process (required if no key is provided)
     - **prompt**: Specific instructions for document processing
+    - **environmentUrl**: Environment for the service (e.g., production, test)
 
     Returns:
         dict: Result of the document processing
@@ -149,7 +155,8 @@ async def process_document_endpoint(
                         "bucket": bucketName,
                         "key": key,
                         "token": token,
-                        "prompt": prompt
+                        "prompt": prompt,
+                        "environmentUrl": environmentUrl
                     }
                 )
                 return result

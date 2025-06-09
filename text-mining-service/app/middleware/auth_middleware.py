@@ -9,23 +9,17 @@ notification_service = NotificationService()
 
 icon: str = ":ai: :warning:"
 
-
 class AuthMiddleware:
     def __init__(self):
         self.ms_name = os.getenv('MS_NAME', 'Mining Microservice')
-        is_prod = os.getenv('IS_PROD', 'false').lower() == 'true'
-        if is_prod:
-            self.star_endpoint = os.getenv('STAR_ENDPOINT_PROD')
-            logger.info("Using PRODUCTION STAR endpoint")
-        else:
-            self.star_endpoint = os.getenv('STAR_ENDPOINT_TEST')
-            logger.info("Using TEST STAR endpoint")
-        
-        logger.debug(f"STAR endpoint configured: {self.star_endpoint}")
 
     async def authenticate(self, message: Dict[str, Any]) -> bool:
         """Authenticate incoming message with access token"""
+        logger.debug(f"Authenticating message: {message}")
         token = message.get('token')
+        environmentUrl = message.get('environmentUrl') + 'authorization/validate-token'
+        logger.debug(f"Environment URL: {environmentUrl}")
+
         if not token:
             logger.error("No token provided in the request")
             await notification_service.send_slack_notification(
@@ -39,11 +33,11 @@ class AuthMiddleware:
             return False
 
         logger.debug(f"Validating token for {self.ms_name}")
-        return await self.validate_token(token)
+        return await self.validate_token(token, environmentUrl)
 
-    async def validate_token(self, token: str) -> bool:
+    async def validate_token(self, token: str, environmentUrl: str) -> bool:
         """Validate the access token using the management API"""
-        if not self.star_endpoint:
+        if not environmentUrl:
             logger.error("STAR endpoint URL is not configured")
             await notification_service.send_slack_notification(
                 emoji=icon,
@@ -61,8 +55,8 @@ class AuthMiddleware:
         }
 
         try:
-            logger.debug(f"Sending token validation request to: {self.star_endpoint}")
-            response = requests.patch(self.star_endpoint, headers=headers)
+            logger.debug(f"Sending token validation request to: {environmentUrl}")
+            response = requests.patch(environmentUrl, headers=headers)
             logger.debug(
                 f"Response from token validation: {response.status_code}")
             if response.status_code == 200:

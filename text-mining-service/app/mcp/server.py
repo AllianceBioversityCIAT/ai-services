@@ -19,12 +19,13 @@ s3_client = boto3.client("s3")
 bedrock_client = boto3.client("bedrock-runtime", region_name="us-west-2")
 
 
-async def authenticate(key: str, bucket: str, token: str):
+async def authenticate(key: str, bucket: str, token: str, environmentUrl: str):
     try:
         payload = {
             "token": token,
             "key": key,
-            "bucket": bucket
+            "bucket": bucket,
+            "environmentUrl": environmentUrl
         }
         return await auth_middleware.authenticate(payload)
     except Exception as e:
@@ -33,11 +34,11 @@ async def authenticate(key: str, bucket: str, token: str):
 
 
 @mcp.tool()
-async def process_document(bucket: str, key: str, token: Any) -> dict:
+async def process_document(bucket: str, key: str, token: Any, environmentUrl: str) -> dict:
     logger.info("✅ process_document invoked via MCP")
     
     try:
-        is_authenticated = await authenticate(key, bucket, token)
+        is_authenticated = await authenticate(key, bucket, token, environmentUrl)
         print(f"Authenticated: {is_authenticated}")
         if not is_authenticated:
             raise ValueError("Authentication failed")
