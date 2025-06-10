@@ -125,15 +125,16 @@ Training Duration Validation
     • Short-term training refers to training that goes for less than 3 months.
     • If the document does not provide enough detail, use "Not collected".
 
-    For Long-term training make a Degree Validation:
-        • degree
-        • Check if the document explicitly mentions that the training led to a degree such as:
-            • "PhD"
-            • "MSc"
-            • "BSc"
-            • "Other" (for any degree not classified under the above)
-        • If a degree is mentioned, return its value.
-        • If the document does not specify a degree, return "Not collected".
+Degree Validation (only if length_of_training is Long-term):
+    • Only include the "degree" field **if and only if** length_of_training is "Long-term".
+    • If length_of_training is not "Long-term", **do not include the "degree" field at all** in the output JSON.
+    • When included, check if the document explicitly mentions that the training led to a degree such as:
+        • "PhD"
+        • "MSc"
+        • "BSc"
+        • "Other" (for any degree not classified under the above)
+    • If a degree is mentioned, return its value.
+    • If not specified, return "Not collected".
 
 Delivery Modality
     • delivery_modality
