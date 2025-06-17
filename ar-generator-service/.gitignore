@@ -187,3 +187,11 @@ chroma/
 .chroma/
 faiss/
 .faiss/
+
+# Local files
+vw_ai_deliverables.jsonl
+vw_ai_project_contribution.jsonl
+vw_ai_questions.jsonl
+vw_ai_deliverables.csv
+vw_ai_project_contribution.csv
+vw_ai_questions.csv

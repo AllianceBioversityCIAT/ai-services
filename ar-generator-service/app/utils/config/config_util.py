@@ -9,12 +9,26 @@ BR = {
     "region": os.getenv("AWS_REGION")
 }
 
+S3 = {
+    "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID"),
+    "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY"),
+    "aws_region": os.getenv("AWS_REGION"),
+    "bucket_name": os.getenv("BUCKET_NAME")
+}
+
 SUPABASE = {
     "url": os.getenv("SUPABASE_URL"),
     "collection": os.getenv("COLLECTION_NAME")
 }
 
 MYSQL_DATABASE_URL = os.getenv('MYSQL_DATABASE_URL')
+
+SQL_SERVER = {
+    "server": os.getenv("SERVER"),
+    "database": os.getenv("DATABASE"),
+    "client_id": os.getenv("CLIENT_ID"),
+    "client_secret": os.getenv("CLIENT_SECRET")
+}
 
 OPENSEARCH = {
     "host": os.getenv("OPENSEARCH_HOST"),

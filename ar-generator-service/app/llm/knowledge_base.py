@@ -15,7 +15,7 @@ bedrock_agent_runtime = boto3.client(
 )
 
 
-def query_knowledge_base(query, max_results=5):
+def query_knowledge_base(query, max_results=100):
     """
     Query the knowledge base and return generated text.
     
@@ -23,7 +23,7 @@ def query_knowledge_base(query, max_results=5):
     :param max_results: Maximum number of results to retrieve.
     :return: Generated text from the knowledge base.
     """
-    response = bedrock_agent_runtime.retrieve_and_generate(
+    response = bedrock_agent_runtime.retrieve_and_generate_stream(
         input={
             'text': query
         },
@@ -41,7 +41,7 @@ def query_knowledge_base(query, max_results=5):
                 'generationConfiguration': {
                     'inferenceConfig': {
                         'textInferenceConfig': {
-                            'maxTokens': 1000,
+                            'maxTokens': 4000,
                             'temperature': 0.2,
                             'topP': 0.999
                         }
@@ -54,6 +54,20 @@ def query_knowledge_base(query, max_results=5):
         }
     )
 
-    generated_text = response['output']['text']
+    # generated_text = response['output']['text']
 
-    return generated_text
+    for event in response['stream']:
+        if 'output' in event:
+            yield event['output']['text']
+        elif 'internalServerException' in event:
+            raise RuntimeError(f"Internal server error: {event['internalServerException']['message']}")
+        elif 'validationException' in event:
+            raise ValueError(f"Validation error: {event['validationException']['message']}")
+        elif 'throttlingException' in event:
+            raise RuntimeError(f"Throttling error: {event['throttlingException']['message']}")
+        elif 'resourceNotFoundException' in event:
+            raise RuntimeError(f"Resource not found: {event['resourceNotFoundException']['message']}")
+        elif 'accessDeniedException' in event:
+            raise PermissionError(f"Access denied: {event['accessDeniedException']['message']}")
+
+    # return generated_text
