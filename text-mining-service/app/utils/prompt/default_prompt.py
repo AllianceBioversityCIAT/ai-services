@@ -229,53 +229,34 @@ Who would be the anticipated user(s) of this innovation?
     • If at least one actor is mentioned in the document that fits this definition, select "Users have been determined" and extract the relevant actor(s) under innovation_actors.
 
 Actors involved in the innovation:
-    • innovation_actors
+    • innovation_actors_detailed
     • This field is used ONLY if the anticipated_users is "Users have been determined".
-    • Include the names of all individuals mentioned in the document that are potential or actual users or beneficiaries of the innovation.
     • Do not include organizations, this field is only for individual actors.
-    • This field supports the classification of the innovation_actor_type, which is the only actor-related information displayed in the application interface.
+    • Include the names, types, genres and ages of all individuals mentioned in the document that are potential or actual users or beneficiaries of the innovation.
+    • Return a list of objects. Each object must include:
+        • name: Full name of the actor, or "Not collected" if only the role or type is known.
+        • type: Must be one or more of the following predefined values:
+            • "Farmers / (agro)pastoralist / herders / fishers"
+            • "Researchers"
+            • "Extension agents"
+            • "Policy actors (public or private)"
+            • "Other"
+        • other_actor_type: If the type is "Other", this field must contain information about the type of actor involved in the innovation that does not fit into the predefined values. If the type is not "Other", this field should not be included in the output JSON.
+        • gender_age: Must be a single value or an array with one or more of the following predefined values, which defines the gender and age of the actor:
+            • "Women: Youth"
+            • "Women: Non-youth"
+            • "Men: Youth"
+            • "Men: Non-youth"
+    • For gender_age, use the following definitions:
+        • Youth = 15 to 24 years old
+        • Non-youth = older than 24
+    • If the document provides gender but not age:
+        • Return both youth and non-youth for that gender (e.g., ["Women: Youth", "Women: Non-youth"])
+    • If the document provides age but not gender:
+        • Return both genders for that age group (e.g., ["Men: Youth", "Women: Youth"])
+    • Do NOT create multiple entries for the same actor with different gender/age combinations.
+    • If the document does not provide enough information, you may include partial entries (e.g., name and type only).
     • If anticipated_users is "This is yet to be determined", do not include this field in the output JSON.
-
-Actors types:
-    • innovation_actor_type
-    • This field is used ONLY if the anticipated_users is "Users have been determined".
-    • This field is used to classify the type of actor(s) identified in the innovation_actors field.
-    • Must be one or more of the following predefined values:
-        • "Farmers / (agro)pastoralist / herders / fishers"
-        • "Researchers"
-        • "Extension agents"
-        • "Policy actors (public or private)"
-        • "Other"
-    • If anticipated_users is "This is yet to be determined", do not include this field in the output JSON.
-
-Other actors types:
-    • other_actor_type
-    • This field is used ONLY if the innovation_actor_type is "Other".
-    • If the innovation_actor_type is not "Other", this field should not be included in the output JSON.
-    • This field should contain information about the type of actor involved in the innovation that does not fit into the predefined values.
-
-Sex and age disaggregation does not apply:
-    • sex_age_disaggregation_not_applicable
-    • This field is used ONLY if the anticipated_users is "Users have been determined".
-    • Must be one of the following predefined values:
-        • "True": If you cannot find any information about gender and age disaggregation.
-        • "False": If the document explicitly mentions gender and age disaggregation.
-    • If anticipated_users is "This is yet to be determined", do not include this field in the output JSON.
-
-Gender and age disaggregation:
-    • gender_age_disaggregation
-    • This field is used ONLY if sex_age_disaggregation_not_applicable is "False".
-    • Must be one or more of the following predefined values:
-        • "Women: Youth"
-        • "Women: Non-youth"
-        • "Men: Youth" 
-        • "Men: Non-youth"
-    • Youth is defined as between 15 and 24 years old.
-    • Non-youth is defined as more than 24 years old.
-    • If the document contains information about gender but not age:
-        • Return both youth and non-youth categories for that gender (e.g., "Women: Youth" and "Women: Non-youth").
-    • If the document contains information about age but not gender:
-        • Return both genders for that age category (e.g., "Women: Youth" and "Men: Youth").
 
 Organization(s) involved in the innovation:
     • organizations
@@ -405,11 +386,15 @@ Follow this exact structure:
             "innovation_type": "<value or 'Other' (only if indicator is 'Innovation Development')>",
             "assess_readiness": "<number between 0 and 9 or 'Not collected' (only if indicator is 'Innovation Development')>",
             "anticipated_users": "<This is yet to be determined | Users have been determined (only if indicator is 'Innovation Development')>",
-            "innovation_actors": "<array of actor names or 'Not collected' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
-            "innovation_actor_type": "<value(s) or 'Other' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
-            "other_actor_type": "<value or 'Not collected' (only if innovation_actor_type is 'Other' and indicator is 'Innovation Development')>",
-            "sex_age_disaggregation_not_applicable": "<True | False (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
-            "gender_age_disaggregation": "value(s) (only if sex_age_disaggregation_not_applicable is 'False' and indicator is 'Innovation Development')",
+            "innovation_actors_detailed": [
+                {
+                    "name": "<actor name or 'Not collected' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
+                    "type": "<value or 'Other' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
+                    "other_actor_type": "<value or 'Not collected' (only if type is 'Other' and indicator is 'Innovation Development')>",
+                    "gender": "<value(s) or 'Not collected' (only if indicator is 'Innovation Development')>",
+                    "age_group": "<value(s) or 'Not collected' (only if indicator is 'Innovation Development')>"
+                }
+            ],
             "organizations": "<array of organization names or 'Not collected' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
             "organization_type": "<value(s) or 'Other' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
             "organization_sub_type": "<value or 'Not collected' (only if indicator is 'Innovation Development')>",

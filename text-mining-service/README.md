@@ -135,83 +135,15 @@ STAR_ENDPOINT=...
 
 ## 🧪 Running Tests
 
-Run the producer test to push messages to MCP:
+First, start the text mining service locally:
 
 ```bash
-python -m pytest app/test/test_endpoint.py -v
+uv run python -m app.mcp.client
 ```
+
+This will launch the FastAPI server at `http://localhost:8000` with interactive documentation available at `/docs`. Then, you can test the `/process` endpoint directly uploading files or specifying S3 keys. You will find more information in the following section.
 
 You can also add unit tests using `pytest`.
-
----
-
-## 📂 Project Structure
-
-```
-└── 📁text-mining-service
-    └── 📁app
-        └── 📁db
-            └── 📁miningdb
-        └── 📁llm
-            └── mining.py
-            └── vectorize.py
-        └── 📁mcp
-            └── client.py
-            └── server.py
-        └── 📁middleware
-            └── auth_middleware.py
-        └── 📁utils
-            └── 📁clarisa
-                └── clarisa_connection.py
-                └── clarisa_service.py
-                └── 📁dto
-                    └── clarisa_connection_dto.py
-            └── 📁config
-                └── config_util.py
-            └── 📁cronjob
-                └── db_cleaner.py
-                └── setup_db_cleaner_cron.py
-            └── 📁logger
-                └── logger_util.py
-            └── 📁notification
-                └── notification_service.py
-            └── 📁prompt
-                └── default_prompt.py
-            └── 📁s3
-                └── s3_util.py
-    └── 📁data
-        └── 📁logs
-            └── app.log
-    └── .env
-    └── .venv
-    └── .gitignore
-    └── .python-version
-    └── main.py
-    └── pyproject.toml
-    └── README.md
-    └── uv.lock
-```
-
----
-
-## 🔄 How MCP Works in This Project
-
-### Model Context Protocol (MCP)
-
-MCP is a protocol that enables seamless integration between the service and LLM models. In this project, we use MCP to:
-
-1. **Handle document processing requests**: The MCP server exposes the `process_document` tool that receives parameters like bucket name, document key, and authentication credentials.
-2. **Authenticate users**: All requests are authenticated through the CLARISA service before processing.
-3. **Process documents with LLMs**: Once authenticated, documents are retrieved from S3, processed using LLMs (Claude 3 Sonnet via Bedrock), and the results are returned.
-4. **Notify stakeholders**: The service sends notifications via Slack upon successful processing or failures.
-
-### MCP Architecture
-
-```
-Client Request → FastAPI Endpoint → MCP Client → MCP Server → LLM Processing → Response
-```
-
-The MCP server runs as a separate process and communicates with the main application through a standardized protocol.
 
 ---
 
@@ -226,7 +158,8 @@ curl -X POST http://localhost:8000/process \
   -F "key=my-document.pdf" \
   -F "bucketName=my-bucket" \
   -F "token=auth-token" \
-  -F "file=@/path/to/file.pdf"
+  -F "file=@/path/to/file.pdf" \
+  -F "environmentUrl=test"
 ```
 
 ### Python Client Example
@@ -240,23 +173,22 @@ url = "http://localhost:8000/process"
 data = {
     "bucketName": "my-bucket",
     "key": "documents/my-document.pdf",
-    "token": "eyJhbGciOi..."     # Replace with a valid token
+    "token": "your-auth-token",
+    "environmentUrl": "test"
 }
 response = requests.post(url, data=data)
 
 # Option 2: Using a file upload
-# with open("path/to/your/file.pdf", "rb") as f:
-#     files = {
-#         "file": f
-#     }
-#     data = {
-#         "bucketName": "my-bucket",
-#         "token": "eyJhbGciOi..."
-#     }
+with open("path/to/your/file.pdf", "rb") as f:
+    files = {"file": f}
+    data = {
+        "bucketName": "my-bucket",
+        "token": "your-auth-token",
+        "environmentUrl": "test"
+    }
 
-#     response = requests.post(url, data=data, files=files)
+    response = requests.post(url, data=data, files=files)
 
-# Handle response
 if response.ok:
     result = response.json()
     print(json.dumps(result, indent=2))
@@ -307,5 +239,77 @@ Or:
   "detail": "Error processing document: File not found in bucket"
 }
 ```
+
+---
+
+## 📂 Project Structure
+
+```
+└── 📁text-mining-service
+    └── 📁app
+        └── 📁db
+            └── 📁miningdb
+        └── 📁llm
+            └── mining.py
+            └── vectorize.py
+        └── 📁mcp
+            └── client.py
+            └── server.py
+        └── 📁middleware
+            └── auth_middleware.py
+        └── 📁utils
+            └── 📁clarisa
+                └── clarisa_connection.py
+                └── clarisa_service.py
+                └── 📁dto
+                    └── clarisa_connection_dto.py
+            └── 📁config
+                └── config_util.py
+            └── 📁cronjob
+                └── db_cleaner.py
+                └── setup_db_cleaner_cron.py
+            └── 📁logger
+                └── logger_util.py
+            └── 📁notification
+                └── notification_service.py
+            └── 📁prompt
+                └── default_prompt.py
+            └── 📁s3
+                └── s3_util.py
+    └── 📁data
+        └── 📁logs
+            └── app.log
+    └── .env
+    └── .venv
+    └── .gitignore
+    └── .python-version
+    └── main.py
+    └── pyproject.toml
+    └── requirements.txt
+    └── Dockerfile
+    └── README.md
+    └── uv.lock
+```
+
+---
+
+## 🔄 How MCP Works in This Project
+
+### Model Context Protocol (MCP)
+
+MCP is a protocol that enables seamless integration between the service and LLM models. In this project, we use MCP to:
+
+1. **Handle document processing requests**: The MCP server exposes the `process_document` tool that receives parameters like bucket name, document key, and authentication credentials.
+2. **Authenticate users**: All requests are authenticated through the CLARISA service before processing.
+3. **Process documents with LLMs**: Once authenticated, documents are retrieved from S3, processed using LLMs (Claude 3 Sonnet via Bedrock), and the results are returned.
+4. **Notify stakeholders**: The service sends notifications via Slack upon successful processing or failures.
+
+### MCP Architecture
+
+```
+Client Request → FastAPI Endpoint → MCP Client → MCP Server → LLM Processing → Response
+```
+
+The MCP server runs as a separate process and communicates with the main application through a standardized protocol.
 
 ---
