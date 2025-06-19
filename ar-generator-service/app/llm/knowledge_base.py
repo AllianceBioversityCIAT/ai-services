@@ -15,7 +15,7 @@ bedrock_agent_runtime = boto3.client(
 )
 
 
-def query_knowledge_base(query, max_results=100):
+def query_knowledge_base(query, max_results=200):
     """
     Query the knowledge base and return generated text.
     
@@ -42,7 +42,7 @@ def query_knowledge_base(query, max_results=100):
                     'inferenceConfig': {
                         'textInferenceConfig': {
                             'maxTokens': 4000,
-                            'temperature': 0.2,
+                            'temperature': 0.1,
                             'topP': 0.999
                         }
                     },

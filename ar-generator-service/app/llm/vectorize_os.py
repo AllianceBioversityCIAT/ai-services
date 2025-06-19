@@ -4,10 +4,11 @@ import numpy as np
 import pandas as pd
 from requests_aws4auth import AWS4Auth
 from db_conn.mysql_connection import load_data
-from app.utils.prompts.report_generation_prompt import PROMPT
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import BR, OPENSEARCH
 from opensearchpy import OpenSearch, RequestsHttpConnection
+from app.utils.prompts.kb_generation_prompt import DEFAULT_PROMPT
+from app.utils.prompts.report_generation_prompt import generate_report_prompt
 
 
 logger = get_logger()
@@ -77,25 +78,22 @@ def invoke_model(prompt):
                 }
             ]
         }
-        # response = bedrock_runtime.invoke_model(
         response_stream = bedrock_runtime.invoke_model_with_response_stream(
             modelId="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
             body=json.dumps(request_body),
             contentType="application/json",
             accept="application/json"
         )
-        # return json.loads(response['body'].read())['content'][0]['text']
-        full_response = ""
+
         for event in response_stream["body"]:
             chunk = event.get("chunk")
             if chunk and "bytes" in chunk:
                 bytes_data = chunk["bytes"]
                 parsed = json.loads(bytes_data.decode("utf-8"))
                 part = parsed.get("delta", {}).get("text", "")
-                print(part, end="", flush=True)
-                full_response += part
-
-        return full_response
+                if part:
+                    print(part, end="", flush=True)
+                    yield part                
 
     except Exception as e:
         logger.error(f"❌ Error invoking the model: {str(e)}")
@@ -125,20 +123,28 @@ def create_index_if_not_exists(dimension=1024):
                         },
                         "chunk": {"type": "object"},
                         "source_table": {"type": "keyword"},
-                        "indicator_acronym": {"type": "keyword"}
+                        "indicator_acronym": {"type": "keyword"},
+                        "year": {"type": "keyword"}
                     }
                 }
             }
             opensearch.indices.create(index=INDEX_NAME, body=index_body)
+            return True
+        
+        logger.info(f"📦 Index {INDEX_NAME} already exists. Skipping creation.")
+        return False
 
     except Exception as e:
         logger.error(f"❌ Error creating index: {e}")
-
+        return False
 
 
 def insert_into_opensearch(df: pd.DataFrame, table_name: str):
     try:
-        create_index_if_not_exists()
+        created = create_index_if_not_exists()
+        if not created:
+            logger.info(f"⚠️ Skipping insertion for {table_name} since index already exists.")
+            return
 
         logger.info(f"🔍 Processing table: {table_name}")
 
@@ -157,7 +163,8 @@ def insert_into_opensearch(df: pd.DataFrame, table_name: str):
                 "embedding": embedding,
                 "chunk": chunk,
                 "source_table": table_name,
-                "indicator_acronym": row.get("indicator_acronym")
+                "indicator_acronym": row.get("indicator_acronym"),
+                "year": row.get("year")
             }
             opensearch.index(index=INDEX_NAME, id=f"{table_name}-{i}", body=doc)
 
@@ -167,7 +174,7 @@ def insert_into_opensearch(df: pd.DataFrame, table_name: str):
         logger.error(f"❌ Error inserting into OpenSearch for {table_name}: {e}")
 
 
-def retrieve_context(query, indicator, top_k=200):
+def retrieve_context(query, indicator, year, top_k=200):
     try:
         logger.info("📚 Retrieving relevant context from OpenSearch...")
         embedding = get_bedrock_embeddings([query])[0]
@@ -178,6 +185,7 @@ def retrieve_context(query, indicator, top_k=200):
                 "bool": {
                     "must": [
                         {"term": {"indicator_acronym": indicator}},
+                        {"term": {"year": year}},
                         {
                             "knn": {
                                 "embedding": {
@@ -198,7 +206,7 @@ def retrieve_context(query, indicator, top_k=200):
         return []
 
 
-def run_pipeline(indicator):
+def run_pipeline(indicator, year):
     try:
         df1 = load_data("vw_ai_deliverables")
         df2 = load_data("vw_ai_project_contribution")
@@ -208,15 +216,16 @@ def run_pipeline(indicator):
         insert_into_opensearch(df2, "vw_ai_project_contribution")
         insert_into_opensearch(df3, "vw_ai_questions")
         
-        context = retrieve_context(PROMPT, indicator)
+        PROMPT = generate_report_prompt(indicator, year)
+        context = retrieve_context(PROMPT, indicator, year)
 
         query = f"""
             Using this information:\n{context}\n\n
+            And taking into account this information:\n{DEFAULT_PROMPT}\n\n
             Do the following:\n{PROMPT}
             """
         
-        report = invoke_model(query)
-        # logger.info(report)
+        return invoke_model(query)
 
     except Exception as e:
         logger.error(f"❌ Error in pipeline execution: {e}")
