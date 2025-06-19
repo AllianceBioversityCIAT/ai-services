@@ -16,7 +16,7 @@ bedrock_agent_runtime = boto3.client(
 )
 
 
-def query_knowledge_base(selected_indicator, selected_year, max_results=200):
+def query_knowledge_base(selected_indicator, selected_year, max_results=100):
     """
     Query the knowledge base and return generated text.
     
