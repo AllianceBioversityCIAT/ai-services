@@ -1,6 +1,7 @@
 import boto3
 from app.utils.prompts.kb_generation_prompt import DEFAULT_PROMPT
 from app.utils.config.config_util import KNOWLEDGE_BASE_ID, OPENSEARCH, BR
+from app.utils.prompts.report_generation_prompt import generate_report_prompt
 
 
 model_id = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
@@ -15,7 +16,7 @@ bedrock_agent_runtime = boto3.client(
 )
 
 
-def query_knowledge_base(query, max_results=200):
+def query_knowledge_base(selected_indicator, selected_year, max_results=200):
     """
     Query the knowledge base and return generated text.
     
@@ -23,6 +24,9 @@ def query_knowledge_base(query, max_results=200):
     :param max_results: Maximum number of results to retrieve.
     :return: Generated text from the knowledge base.
     """
+
+    query = generate_report_prompt(selected_indicator, selected_year)
+
     response = bedrock_agent_runtime.retrieve_and_generate_stream(
         input={
             'text': query

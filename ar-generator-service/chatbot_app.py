@@ -1,8 +1,7 @@
 import streamlit as st
 from app.llm.vectorize_db import run_pipeline
-from app.llm.vectorize_os import run_pipeline as run_pipeline_os
 from app.llm.knowledge_base import query_knowledge_base
-from app.utils.prompts.report_generation_prompt import generate_report_prompt
+from app.llm.vectorize_os import run_pipeline as run_pipeline_os
 
 st.set_page_config(page_title="AICCRA App", page_icon="🌍")
 
@@ -76,15 +75,13 @@ elif mode == "AICCRA Report Generator":
     selected_year = st.selectbox("Select a year:", [2021, 2022, 2023, 2024, 2025])
 
     if st.button("Generate report"):
-        prompt = generate_report_prompt(selected_indicator, selected_year)
-
         with st.spinner("Generating report..."):
             try:
-                # response = query_knowledge_base(prompt)
+                # response = query_knowledge_base(selected_indicator, selected_year)
                 
-                ## response_stream = query_knowledge_base(prompt)
+                response_stream = query_knowledge_base(selected_indicator, selected_year)
                 ## response_stream = run_pipeline_os(selected_indicator, selected_year)
-                response_stream = run_pipeline(selected_indicator, selected_year)
+                ## response_stream = run_pipeline(selected_indicator, selected_year)
                 full_response = ""
                 report_placeholder = st.empty()
                 for chunk in response_stream:
