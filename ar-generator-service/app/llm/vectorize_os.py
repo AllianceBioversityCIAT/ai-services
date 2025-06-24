@@ -102,6 +102,7 @@ def invoke_model(prompt):
 
 def create_index_if_not_exists(dimension=1024):
     try:
+        # opensearch.indices.delete(index=INDEX_NAME)
         if not opensearch.indices.exists(INDEX_NAME):
             logger.info(f"📦 Creating OpenSearch index: {INDEX_NAME}")
             index_body = {
@@ -139,8 +140,9 @@ def create_index_if_not_exists(dimension=1024):
         return False
 
 
-def insert_into_opensearch(df: pd.DataFrame, table_name: str):
+def insert_into_opensearch(table_name: str):
     try:
+        # Comment out the next 4 lines if you are going to insert data into the index for the first time
         created = create_index_if_not_exists()
         if not created:
             logger.info(f"⚠️  Skipping insertion for {table_name} since index already exists.")
@@ -148,7 +150,9 @@ def insert_into_opensearch(df: pd.DataFrame, table_name: str):
 
         logger.info(f"🔍 Processing table: {table_name}")
 
+        df = load_data(table_name)
         rows = df.to_dict(orient="records")
+
         date_fields = ["last_updated_altmetric", "last_sync_almetric"]
 
         chunks = []
@@ -216,13 +220,9 @@ def retrieve_context(query, indicator, year, top_k=200):
 
 def run_pipeline(indicator, year):
     try:
-        df1 = load_data("vw_ai_deliverables")
-        df2 = load_data("vw_ai_project_contribution")
-        df3 = load_data("vw_ai_questions")
-
-        insert_into_opensearch(df1, "vw_ai_deliverables")
-        insert_into_opensearch(df2, "vw_ai_project_contribution")
-        insert_into_opensearch(df3, "vw_ai_questions")
+        insert_into_opensearch("vw_ai_deliverables")
+        insert_into_opensearch("vw_ai_project_contribution")
+        insert_into_opensearch("vw_ai_questions")
         
         PROMPT = generate_report_prompt(indicator, year)
         context = retrieve_context(PROMPT, indicator, year)

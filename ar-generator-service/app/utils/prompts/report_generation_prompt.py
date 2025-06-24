@@ -19,7 +19,7 @@ Your goal is to write a well-structured, evidence-based narrative that:
 - Highlights innovations, tools, trainings, dissemination, or policy actions.
 - Reflects on challenges or deviations from the original plan.
 - Emphasizes gender and social inclusion, youth engagement, or vulnerable group targeting, if relevant.
-- Includes links to deliverables such as project pages or DOIs when available.
+- Includes links to deliverables such as DOIs when available.
 - Ends with a paragraph containing data for the relevant table: Baseline | Target {selected_year} | Mid-year progress / Expected.
 - Uses the appropriate tone, structure, and reporting style expected in AICCRA official submissions.
 
@@ -51,7 +51,7 @@ You may also use open-ended responses provided by cluster contributors or leads 
       If the indicator involves hectares, percentages, or beneficiary numbers, include the appropriate units.
    - Integrate specific examples showing tangible outputs (tools, platforms, trainings, innovations).
    - Mention partnerships, institutions, and regional efforts when relevant.
-   - Reference key deliverables using title and either project link or DOI (from `vw_ai_deliverables`), and include them directly in the narrative. The deliverables must support the achievements mentioned and should be referenced naturally (e.g., “...as documented in [title](link) or via DOI: [doi]”). If both project link and DOI exist, prefer the DOI.
+   - Reference key deliverables using title and DOI (from `vw_ai_deliverables`), and include them directly in the narrative. The deliverables must support the achievements mentioned and should be referenced naturally (e.g., “...as documented in [title](doi) via DOI”). If both project link and DOI exist, prefer the DOI.
    - Highlight measurable results (e.g., number of tools developed, policies influenced, hectares covered).
    - Describe how gender, youth, or social inclusion was addressed, if applicable.
    - Do not group clusters. Each must be clearly and separately described.
@@ -73,7 +73,7 @@ You may also use open-ended responses provided by cluster contributors or leads 
   - “AICCRA expects to exceed the target…”  
   - “Projected year-end delivery is expected to reach…”  
 - Use “By mid-year {selected_year}…” or “As of June {selected_year}…” for temporal framing.
-- When referring to deliverables, include the title and either the project link or DOI (whichever is most reliable). Format links as markdown-style hyperlinks or “DOI: [value]”.
+- When referring to deliverables, include the title and DOI. Format links as markdown-style hyperlinks or “DOI: [value]”.
 - Never cite filenames, JSON, or input schema; use only the content.
 
 ------
@@ -86,7 +86,7 @@ You may also use open-ended responses provided by cluster contributors or leads 
 2. **Indicator Narrative**  
    [Detailed narrative following structure above.]
    - Cluster names must be **bolded** in the output.
-   - All links to deliverables (project pages, DOIs) must be active and accessible; format them as markdown hyperlinks.
+   - All links to deliverables (DOIs) must be active and accessible; format them as markdown hyperlinks.
 
 3. **Data for Summary Table**  
    [One-paragraph summary with Baseline | Target {selected_year} | Mid-year progress / Expected values.]

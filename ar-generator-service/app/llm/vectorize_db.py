@@ -90,6 +90,7 @@ def insert_into_supabase(table_name: str, batch_size: int):
 
         existing_collections = [c.name for c in client.list_collections()]
         
+        # Comment out the next 3 lines if you are going to insert data into the collection for the first time
         if SUPABASE_COLLECTION in existing_collections:
             logger.info(f"⚠️  Collection {SUPABASE_COLLECTION} already exists. Skipping insertion.")
             return
