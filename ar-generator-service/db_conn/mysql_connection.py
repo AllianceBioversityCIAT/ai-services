@@ -68,6 +68,7 @@ def load_data(table_name):
             df.drop(['contribution_pk', 'Indicator', 'indicator_code', 'DLV_planned', 'image_small', 'updated_date'], axis=1, inplace=True)
 
         df.to_json(f'{table_name}.jsonl', orient='records', lines=True, force_ascii=False)
+        df.to_csv(f'{table_name}.csv', index=False)
 
         file_key = f'aiccra/{table_name}.jsonl'
         if not s3_file_exists(file_key):

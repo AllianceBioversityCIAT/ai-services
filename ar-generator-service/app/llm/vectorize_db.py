@@ -84,47 +84,54 @@ def invoke_model(prompt):
         raise
 
 
-def insert_into_supabase(df: pd.DataFrame, table_name: str):
+def insert_into_supabase(table_name: str, batch_size: int):
     try:
         client = vecs.create_client(SUPABASE_URL)
 
-        if SUPABASE_COLLECTION in client.list_collections():
-            logger.info(f"⚠️ Collection {SUPABASE_COLLECTION} already exists. Skipping insertion.")
+        existing_collections = [c.name for c in client.list_collections()]
+        
+        if SUPABASE_COLLECTION in existing_collections:
+            logger.info(f"⚠️  Collection {SUPABASE_COLLECTION} already exists. Skipping insertion.")
             return
-            
-        docs = client.get_or_create_collection(SUPABASE_COLLECTION, dimension=1024)
 
+        docs = client.get_or_create_collection(SUPABASE_COLLECTION, dimension=1024)
         logger.info(f"🔍 Processing table: {table_name}")
 
+        df = load_data(table_name)
         rows = df.to_dict(orient="records")
-        chunks = [
-            {k: v for k, v in row.items() if pd.notnull(v)}
-            for row in rows
-        ]
-        logger.info(f"🔢 Generating embeddings for {len(chunks)} rows...")
-        text = [json.dumps(chunk, ensure_ascii=False) for chunk in chunks]
-        embeddings = get_bedrock_embeddings(text)
 
-        logger.info("📄 Generating metadata...")
-        all_metadata = [
-            {
-                "chunk": chunk,
-                "source_table": table_name,
-                "indicator_acronym": row.get("indicator_acronym"),
-                "year": row.get("year")
-            }
-            for row, chunk in zip(rows, chunks)
-        ]
+        total = len(rows)
+        for batch_start in range(0, total, batch_size):
+            batch_end = min(batch_start + batch_size, total)
+            batch_rows = rows[batch_start:batch_end]
+            chunks = [
+                {k: v for k, v in row.items() if pd.notnull(v)}
+                for row in batch_rows
+            ]
+            logger.info(f"🔢 Generating embeddings for rows {batch_start} to {batch_end}...")
+            text = [json.dumps(chunk, ensure_ascii=False) for chunk in chunks]
+            embeddings = get_bedrock_embeddings(text)
 
-        logger.info("📥 Inserting in Supabase...")
-        docs.upsert([
-            (f"{table_name}-{i}", embedding, metadata)
-            for i, (embedding, metadata) in enumerate(zip(embeddings, all_metadata))
-        ])
+            logger.info("📄 Generating metadata...")
+            all_metadata = [
+                {
+                    "chunk": chunk,
+                    "source_table": table_name,
+                    "indicator_acronym": row.get("indicator_acronym"),
+                    "year": row.get("year")
+                }
+                for row, chunk in zip(batch_rows, chunks)
+            ]
+
+            logger.info("📥 Inserting in Supabase...")
+            docs.upsert([
+                (f"{table_name}-{i + batch_start}", embedding, metadata)
+                for i, (embedding, metadata) in enumerate(zip(embeddings, all_metadata))
+            ])
 
         docs.create_index(measure=vecs.IndexMeasure.cosine_distance)
-        logger.info(f"✅ Vectorization completed for {len(chunks)} rows of {table_name}")
-    
+        logger.info(f"✅ Vectorization completed for {total} rows of {table_name}")
+
     except Exception as e:
         logger.error(f"❌ Error inserting into Supabase for {table_name}: {e}")
 
@@ -159,13 +166,9 @@ def retrieve_context(query, indicator, year, top_k=200):
 
 def run_pipeline(indicator, year):
     try:
-        df1 = load_data("vw_ai_deliverables")
-        df2 = load_data("vw_ai_project_contribution")
-        df3 = load_data("vw_ai_questions")
-
-        insert_into_supabase(df1, "vw_ai_deliverables")
-        insert_into_supabase(df2, "vw_ai_project_contribution")
-        insert_into_supabase(df3, "vw_ai_questions")
+        insert_into_supabase("vw_ai_deliverables", 200)
+        insert_into_supabase("vw_ai_project_contribution", 700)
+        insert_into_supabase("vw_ai_questions", 600)
 
         PROMPT = generate_report_prompt(indicator, year)
         context = retrieve_context(PROMPT, indicator, year)

@@ -79,9 +79,9 @@ elif mode == "AICCRA Report Generator":
             try:
                 # response = query_knowledge_base(selected_indicator, selected_year)
                 
-                response_stream = query_knowledge_base(selected_indicator, selected_year)
+                ## response_stream = query_knowledge_base(selected_indicator, selected_year)
                 ## response_stream = run_pipeline_os(selected_indicator, selected_year)
-                ## response_stream = run_pipeline(selected_indicator, selected_year)
+                response_stream = run_pipeline(selected_indicator, selected_year)
                 full_response = ""
                 report_placeholder = st.empty()
                 for chunk in response_stream:

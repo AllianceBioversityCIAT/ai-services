@@ -143,16 +143,24 @@ def insert_into_opensearch(df: pd.DataFrame, table_name: str):
     try:
         created = create_index_if_not_exists()
         if not created:
-            logger.info(f"⚠️ Skipping insertion for {table_name} since index already exists.")
+            logger.info(f"⚠️  Skipping insertion for {table_name} since index already exists.")
             return
 
         logger.info(f"🔍 Processing table: {table_name}")
 
         rows = df.to_dict(orient="records")
-        chunks = [
-            {k: v for k, v in row.items() if pd.notnull(v)}
-            for row in rows
-        ]
+        date_fields = ["last_updated_altmetric", "last_sync_almetric"]
+
+        chunks = []
+        for row in rows:
+            chunk = {}
+            for k, v in row.items():
+                if k in date_fields and v == "":
+                    continue
+                if pd.notnull(v):
+                    chunk[k] = v
+            chunks.append(chunk)
+
         logger.info(f"🔢 Generating embeddings for {len(chunks)} rows...")
         texts = [json.dumps(chunk, ensure_ascii=False) for chunk in chunks]
         embeddings = get_bedrock_embeddings(texts)
