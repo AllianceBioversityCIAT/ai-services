@@ -106,7 +106,7 @@ def insert_into_supabase(table_name: str, batch_size: int):
             batch_end = min(batch_start + batch_size, total)
             batch_rows = rows[batch_start:batch_end]
             chunks = [
-                {k: v for k, v in row.items() if pd.notnull(v)}
+                {k: v for k, v in row.items() if pd.notnull(v) and v != ""}
                 for row in batch_rows
             ]
             logger.info(f"🔢 Generating embeddings for rows {batch_start} to {batch_end}...")
