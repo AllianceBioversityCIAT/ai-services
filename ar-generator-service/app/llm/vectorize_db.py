@@ -137,7 +137,7 @@ def insert_into_supabase(table_name: str, batch_size: int):
         logger.error(f"❌ Error inserting into Supabase for {table_name}: {e}")
 
 
-def retrieve_context(query, indicator, year, top_k=200):
+def retrieve_context(query, indicator, year, top_k=300):
     try:
         logger.info("📚 Retrieving relevant context from Supabase...")
         embedding = get_bedrock_embeddings([query])[0]

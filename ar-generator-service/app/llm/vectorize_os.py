@@ -187,7 +187,7 @@ def insert_into_opensearch(table_name: str):
         logger.error(f"❌ Error inserting into OpenSearch for {table_name}: {e}")
 
 
-def retrieve_context(query, indicator, year, top_k=200):
+def retrieve_context(query, indicator, year, top_k=400):
     try:
         logger.info("📚 Retrieving relevant context from OpenSearch...")
         embedding = get_bedrock_embeddings([query])[0]
@@ -207,7 +207,16 @@ def retrieve_context(query, indicator, year, top_k=200):
                                 }
                             }
                         }
-                    ]
+                    ],
+                    "filter": {
+                        "bool": {
+                            "should": [
+                                {"term": {"source_table": "vw_ai_deliverables"}},
+                                {"term": {"source_table": "vw_ai_project_contribution"}}
+                            ],
+                            "minimum_should_match": 1
+                        }
+                    }
                 }
             }
         }
@@ -230,10 +239,10 @@ def run_pipeline(indicator, year):
 
         query = f"""
             Using this information:\n{context}\n\n
-            And taking into account this information:\n{DEFAULT_PROMPT}\n\n
             Do the following:\n{PROMPT}
             """
-        
+        # And taking into account this information:\n{DEFAULT_PROMPT}\n\n
+
         return invoke_model(query)
 
     except Exception as e:
