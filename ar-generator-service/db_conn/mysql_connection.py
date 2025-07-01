@@ -66,6 +66,14 @@ def load_data(table_name):
             df.drop('contribution_pk', axis=1, inplace=True)
         else:
             df.drop(['contribution_pk', 'Indicator', 'indicator_code', 'DLV_planned', 'image_small', 'updated_date'], axis=1, inplace=True)
+            id_column = df.columns[0]
+            indicator_column = 'indicator_acronym'
+            cluster_column = 'cluster_acronym'
+
+            df_grouped = df.groupby([id_column, indicator_column, cluster_column]).agg(
+                lambda x: ', '.join(sorted(set(str(v) for v in x if pd.notnull(v) and v != "")))
+            )
+            df = df_grouped.reset_index()
 
         df.to_json(f'{table_name}.jsonl', orient='records', lines=True, force_ascii=False)
         df.to_csv(f'{table_name}.csv', index=False)
