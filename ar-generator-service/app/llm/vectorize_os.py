@@ -187,7 +187,7 @@ def insert_into_opensearch(table_name: str):
         logger.error(f"❌ Error inserting into OpenSearch for {table_name}: {e}")
 
 
-def retrieve_context(query, indicator, year, top_k=400):
+def retrieve_context(query, indicator, year, top_k=10000):
     try:
         logger.info("📚 Retrieving relevant context from OpenSearch...")
         embedding = get_bedrock_embeddings([query])[0]
@@ -196,9 +196,20 @@ def retrieve_context(query, indicator, year, top_k=400):
             "size": top_k,
             "query": {
                 "bool": {
-                    "must": [
+                    "filter": [
                         {"term": {"indicator_acronym": indicator}},
                         {"term": {"year": year}},
+                        {
+                            "bool": {
+                                "should": [
+                                    {"term": {"source_table": "vw_ai_deliverables"}},
+                                    {"term": {"source_table": "vw_ai_project_contribution"}}
+                                ],
+                                "minimum_should_match": 1
+                            }
+                        }
+                    ],
+                    "must": [
                         {
                             "knn": {
                                 "embedding": {
@@ -207,21 +218,44 @@ def retrieve_context(query, indicator, year, top_k=400):
                                 }
                             }
                         }
-                    ],
-                    "filter": {
-                        "bool": {
-                            "should": [
-                                {"term": {"source_table": "vw_ai_deliverables"}},
-                                {"term": {"source_table": "vw_ai_project_contribution"}}
-                            ],
-                            "minimum_should_match": 1
-                        }
-                    }
+                    ]
                 }
             }
         }
-        response = opensearch.search(index=INDEX_NAME, body=knn_query)
-        return [hit["_source"]["chunk"] for hit in response["hits"]["hits"]]
+
+        knn_response = opensearch.search(index=INDEX_NAME, body=knn_query)
+        knn_chunks = [hit["_source"]["chunk"] for hit in knn_response["hits"]["hits"]]
+
+        doi_query = {
+            "size": 10000,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"term": {"indicator_acronym": indicator}},
+                        {"term": {"year": year}},
+                        {"exists": {"field": "chunk.doi"}},
+                        {"term": {"source_table": "vw_ai_deliverables"}}
+                    ]
+                }
+            }
+        }
+
+        doi_response = opensearch.search(index=INDEX_NAME, body=doi_query)
+        doi_chunks = [hit["_source"]["chunk"] for hit in doi_response["hits"]["hits"]]
+
+        seen_dois = set()
+        combined_chunks = []
+
+        for chunk in knn_chunks + doi_chunks:
+            doi = chunk.get("doi")
+            if doi:
+                if doi not in seen_dois:
+                    seen_dois.add(doi)
+                    combined_chunks.append(chunk)
+            else:
+                combined_chunks.append(chunk)
+
+        return combined_chunks
     
     except Exception as e:
         logger.error(f"❌ Error retrieving context: {e}")
@@ -236,6 +270,11 @@ def run_pipeline(indicator, year):
         
         PROMPT = generate_report_prompt(indicator, year)
         context = retrieve_context(PROMPT, indicator, year)
+
+        output_path = f"context_{indicator}_{year}.json"
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(context, f, indent=2, ensure_ascii=False)
+        logger.info(f"📝 Context saved to {output_path}")
 
         query = f"""
             Using this information:\n{context}\n\n

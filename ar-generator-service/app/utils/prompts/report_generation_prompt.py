@@ -26,9 +26,8 @@ Your goal is to write a well-structured, evidence-based narrative that:
 # INPUT
 The narrative must be built using the structured data extracted from AICCRA's internal reporting system. You will receive data from the following sources:
 
-- `vw_ai_project_contribution`: Contributions submitted by clusters. Includes indicator codes, milestone expected values, reported values, contribution narratives, project links, cluster names, and reporting phase.
-- `vw_ai_questions`: Open-ended narrative responses from cluster contributors, tied to indicators and phases. May include additional details on contributions, gender strategies, dissemination methods, innovations, or policy impact.
-- `vw_ai_deliverables`: List of supporting evidence including deliverable titles, project links, DOIs, dissemination formats.
+- "vw_ai_project_contribution": Contributions submitted by clusters. Includes indicator codes, milestone expected values, reported values, contribution narratives, project links, cluster names, and reporting phase.
+- "vw_ai_deliverables": List of supporting evidence including deliverable titles, project links, DOIs, dissemination formats.
 
 Focus only on contributions, deliverables, and narratives from the selected year: `year = {selected_year}` and selected indicator: `indicator_acronym = {selected_indicator}`. Do not use content from other years. 
 This ensures the narrative reflects only mid-year data for the given year and indicator.
@@ -42,21 +41,22 @@ This ensures the narrative reflects only mid-year data for the given year and in
    - `{{total_achieved}}` = sum of "Milestone reported value" from `vw_ai_project_contribution` for the selected indicator.
    - `{{total_target}}` = sum of "Milestone expected value" from `vw_ai_project_contribution` for the selected indicator.
    - `{{overall_percentage}}` = calculated as `{{total_achieved}} / {{total_target}} * 100`, rounded to two decimal places.
-- Per cluster:
+- Per cluster_acronym:
    - Describe activities planned under the indicator and their current status ("On Going", "Extended", "Completed" or "Cancelled").
    - State the achieved value as of mid-year and compare it to the annual target. Include the percentage progress. Example:
       “By mid-year {selected_year}, AICCRA has achieved {{Milestone reported value}} out of the annual target of {{Milestone expected value}} for {selected_indicator} and cluster, representing {{percentage}}% progress.”
       - If the indicator involves hectares, number of tools developed, policies influenced, percentages, or beneficiary numbers, include the appropriate units.
       - Do not fabricate progress data if it is not explicitly available in the input.
-   - About doi field:
-      - For each cluster, include all dois from `vw_ai_deliverables` that match:
-            - `cluster_acronym` of the current cluster
-            - `indicator_acronym = {selected_indicator}`
-            - `year = {selected_year}`
-      - Use the `doi` field directly as provided, without modifying or guessing it.
-      - When a deliverable contains both a `doi` and a `dissemination_URL`, always prefer the `doi` field.
-      - Deliverables must be formatted in markdown link style.
-      - Do not exclude deliverables with valid DOIs, regardless of their status ("Completed", "On Going").
+   - From "vw_ai_deliverables", include only the deliverables with available "doi" field:
+      - Use the "doi" field from "vw_ai_deliverables" to include links to deliverables.
+      - Include all dois that match:
+         - `cluster_acronym` of the current cluster
+         - `indicator_acronym = {selected_indicator}`
+         - `year = {selected_year}`
+         - `status` of "Completed", "On Going" or "Extended".
+      - Use the "doi" field directly as provided, without modifying or guessing it.
+      - All dois must be formatted in markdown link style.
+      - Do not repeat the same "doi" multiple times for the same cluster.
    - Integrate specific examples showing tangible outputs (tools, platforms, trainings, innovations).
    - Describe how gender, youth, or social inclusion was addressed, if applicable.
    - Do not group clusters. Each must be clearly and separately described.
@@ -73,7 +73,7 @@ This ensures the narrative reflects only mid-year data for the given year and in
 - Do not speculate, report only on what has been achieved by mid-year.
 - Quantitative values must be naturally embedded in the narrative. Use percentages in parentheses when helpful (e.g., 38 out of 80, or 48%).
 - Use “By mid-year {selected_year}…” or “As of July {selected_year}…” for temporal framing.
-- When referring to deliverables, include the title and doi. Format links as markdown-style hyperlinks or “doi: [value]”.
+- When referring to deliverables, include the title and "doi". Format links as markdown-style hyperlinks or “doi: [value]”.
 - Never cite filenames, JSON, or input schema; use only the content.
 
 ------
@@ -86,7 +86,7 @@ This ensures the narrative reflects only mid-year data for the given year and in
 2. **Indicator Narrative**  
    [Detailed narrative following structure above.]
    - Cluster names must be **bolded** in the output.
-   - All links to deliverables (doi) must be active and accessible; format them as markdown hyperlinks.
+   - All links to deliverables ("doi") must be active and accessible; format them as markdown hyperlinks.
    - Keep the narrative concise and focused. Avoid overly long paragraphs. Prioritize clarity and brevity.
 
 3. **Data for Summary Table**  
