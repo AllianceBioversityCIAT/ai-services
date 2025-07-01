@@ -137,7 +137,7 @@ def insert_into_supabase(table_name: str, batch_size: int):
         logger.error(f"❌ Error inserting into Supabase for {table_name}: {e}")
 
 
-def retrieve_context(query, indicator, year, top_k=300):
+def retrieve_context(query, indicator, year, top_k=1000):
     try:
         logger.info("📚 Retrieving relevant context from Supabase...")
         embedding = get_bedrock_embeddings([query])[0]
@@ -152,7 +152,13 @@ def retrieve_context(query, indicator, year, top_k=300):
             filters={
                 "$and": [
                     {"indicator_acronym": {"$eq": f"{indicator}"}},
-                    {"year": {"$eq": year}}
+                    {"year": {"$eq": year}},
+                    {
+                        "$or": [
+                            {"source_table": {"$eq": "vw_ai_deliverables"}},
+                            {"source_table": {"$eq": "vw_ai_project_contribution"}}
+                        ]
+                    }
                 ]
             },
             include_value=True,
@@ -174,12 +180,17 @@ def run_pipeline(indicator, year):
         PROMPT = generate_report_prompt(indicator, year)
         context = retrieve_context(PROMPT, indicator, year)
 
+        output_path = f"context_{indicator}_{year}.json"
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(context, f, indent=2, ensure_ascii=False)
+        logger.info(f"📝 Context saved to {output_path}")
+
         query = f"""
             Using this information:\n{context}\n\n
-            And taking into account this information:\n{DEFAULT_PROMPT}\n\n
             Do the following:\n{PROMPT}
             """
-        
+        # And taking into account this information:\n{DEFAULT_PROMPT}\n\n
+
         return invoke_model(query)
     
     except Exception as e:
