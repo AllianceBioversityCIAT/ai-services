@@ -64,7 +64,7 @@ def invoke_model(prompt):
         logger.info("🚀 Invoking the model...")
         request_body = {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 4000,
+            "max_tokens": 8000,
             "temperature": 0.1,
             "top_k": 250,
             "top_p": 0.999,
@@ -80,6 +80,7 @@ def invoke_model(prompt):
         }
         response_stream = bedrock_runtime.invoke_model_with_response_stream(
             modelId="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+            # modelId="us.anthropic.claude-sonnet-4-20250514-v1:0",
             body=json.dumps(request_body),
             contentType="application/json",
             accept="application/json"
@@ -243,14 +244,18 @@ def retrieve_context(query, indicator, year, top_k=10000):
         doi_response = opensearch.search(index=INDEX_NAME, body=doi_query)
         doi_chunks = [hit["_source"]["chunk"] for hit in doi_response["hits"]["hits"]]
 
-        seen_dois = set()
+        seen_keys = set()
         combined_chunks = []
 
         for chunk in knn_chunks + doi_chunks:
             doi = chunk.get("doi")
+            cluster = chunk.get("cluster_acronym")
+            indicator_code = chunk.get("indicator_acronym")
+
             if doi:
-                if doi not in seen_dois:
-                    seen_dois.add(doi)
+                key = (doi, cluster, indicator_code)
+                if key not in seen_keys:
+                    seen_keys.add(key)
                     combined_chunks.append(chunk)
             else:
                 combined_chunks.append(chunk)
