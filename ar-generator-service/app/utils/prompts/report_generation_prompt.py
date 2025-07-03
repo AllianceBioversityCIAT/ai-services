@@ -1,4 +1,4 @@
-def generate_report_prompt(selected_indicator, selected_year):
+def generate_report_prompt(selected_indicator, selected_year, total_expected, total_achieved, progress):
   return f"""
 # ROLE & CONTEXT
 You are a reporting assistant specialized in AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa). 
@@ -15,7 +15,8 @@ The data you receive is structured and extracted from AICCRA's internal reportin
 Your goal is to write a well-structured, evidence-based narrative that:
 - Describes what has been achieved as of mid-year for the {selected_indicator}.
 - Summarizes numerical progress relative to the annual target.
-- Details key outputs, deliverables, and measurable results.
+- Details key outputs, deliverables, tangible results and measurable outcomes.
+- Includes any deviations from the planned activities and challenges.
 - Presents contributions from each cluster individually and concretely.
 - Highlights innovations, tools, trainings, dissemination, or policy actions.
 - Emphasizes gender and social inclusion, youth engagement, or vulnerable group targeting, if relevant.
@@ -37,24 +38,21 @@ This ensures the narrative reflects only mid-year data for the given year and in
 # OUTPUT STRUCTURE
 
 ## 1. Indicator Narrative
-- Start with a strong opening summarizing overall mid-year progress. Sum the achievements across all clusters for the selected indicator when possible. Example: “By mid-year {selected_year}, AICCRA had already achieved {{total_achieved}} out of {{total_target}}, representing {{overall_percentage}}% progress for indicator {selected_indicator}.”
-   - `{{total_achieved}}` = sum of "Milestone reported value" from `vw_ai_project_contribution` for the selected indicator.
-   - `{{total_target}}` = sum of "Milestone expected value" from `vw_ai_project_contribution` for the selected indicator.
-   - `{{overall_percentage}}` = calculated as `{{total_achieved}} / {{total_target}} * 100`, rounded to two decimal places.
 - Per cluster_acronym:
-   - Describe activities planned under the indicator and their current status ("On Going", "Extended", "Completed" or "Cancelled").
+   - Describe activities planned under the indicator and their current status.
    - State the achieved value as of mid-year and compare it to the annual target. Include the percentage progress. Example:
       “By mid-year {selected_year}, AICCRA has achieved {{Milestone reported value}} out of the annual target of {{Milestone expected value}} for {selected_indicator} and cluster, representing {{percentage}}% progress.”
       - If the indicator involves hectares, number of tools developed, policies influenced, percentages, or beneficiary numbers, include the appropriate units.
       - Do not fabricate progress data if it is not explicitly available in the input.
-   - From "vw_ai_deliverables", include only the deliverables with available "doi" field:
+   - From "vw_ai_deliverables", include only the deliverables with an available "doi" field:
       - Use the "doi" field from "vw_ai_deliverables" to include links to deliverables.
       - Include all dois that match:
          - `cluster_acronym` of the current cluster
          - `indicator_acronym = {selected_indicator}`
          - `year = {selected_year}`
-         - `status` of "Completed", "On Going" or "Extended".
+         - `status` = "Completed", "On Going", "Extended".
       - Use the "doi" field directly as provided, without modifying or guessing it.
+      - This doi field may contain formal DOIs (e.g., doi.org, hdl.handle.net) or other evidence links (e.g., alliancebioversityciat.org, cgspace.cgiar.org, linkedin.com, youtu.be). All are valid and should be included.
       - All dois must be formatted in markdown link style.
       - Do not repeat the same "doi" multiple times for the same cluster.
    - Integrate specific examples showing tangible outputs (tools, platforms, trainings, innovations).
@@ -62,9 +60,10 @@ This ensures the narrative reflects only mid-year data for the given year and in
    - Do not group clusters. Each must be clearly and separately described.
    
 ## 2. End-of-Narrative Data Paragraph for Table Reference
-- Include a final paragraph with the structure:
-  “For indicator {selected_indicator}, the baseline was [X], the {selected_year} target is [Y], and mid-year progress stands at [Z], with an expected total of [W] by end of year.”
-
+- Begin with some context about the indicator and its progress by mid-year.
+- Then, summarize overall mid-year progress across all clusters for the {selected_indicator}. Use the following structure:
+  “By mid-year {selected_year}, AICCRA had already achieved {total_achieved} out of {total_expected}, representing {progress}% progress for indicator {selected_indicator}.”
+  
 ------
 
 # STYLE GUIDE
@@ -73,7 +72,7 @@ This ensures the narrative reflects only mid-year data for the given year and in
 - Do not speculate, report only on what has been achieved by mid-year.
 - Quantitative values must be naturally embedded in the narrative. Use percentages in parentheses when helpful (e.g., 38 out of 80, or 48%).
 - Use “By mid-year {selected_year}…” or “As of July {selected_year}…” for temporal framing.
-- When referring to deliverables, include the title and "doi". Format links as markdown-style hyperlinks or “doi: [value]”.
+- When referring to deliverables, include the "doi". Format links as markdown-style hyperlinks or “[doi]: (value)”. Display the full DOI link, and include some context about the deliverable.
 - Never cite filenames, JSON, or input schema; use only the content.
 
 ------
@@ -91,6 +90,6 @@ This ensures the narrative reflects only mid-year data for the given year and in
 
 3. **Data for Summary Table**  
    - Subtitle for this section: "Information for Summary Table"
-   [One-paragraph with Baseline | Target {selected_year} | Mid-year progress / Expected values.]
+   - This section (paragraph) includes a concise summary of the indicator's progress, across all clusters, following the instructions detailed above. 
 
 """
