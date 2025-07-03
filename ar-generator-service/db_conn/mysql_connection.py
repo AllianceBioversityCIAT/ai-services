@@ -16,7 +16,7 @@ client_secret = SQL_SERVER['client_secret']
 
 def load_data(table_name):
     try:
-        logger.info("📂 Loading data from MySQL...")
+        logger.info("📂 Loading data...")
 
         ## SQL Server
         # conn_str = (
@@ -30,18 +30,43 @@ def load_data(table_name):
         #     f"PWD={client_secret};"
         # )
 
-        # logger.info(f"🔍 Inspecting the table: {table_name}")
-        # conn = pyodbc.connect(conn_str, timeout=10)
+        # CREATE_VIEW_QUERIES = {
+        #     "vw_aiccra_project_contribution": """
+        #         CREATE OR ALTER VIEW vw_aiccra_project_contribution AS
+        #         SELECT pc.*, cl.acronym AS cluster_acronym, cl.title AS cluster_name, ind.acronym AS indicator_acronym, ind.title AS indicator_title
+        #         FROM AICCRA_fact_project_contribution pc
+        #         LEFT JOIN AICCRA_dim_clusters cl ON cl.id = pc.cluster_id
+        #         LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = pc.indicator_pk;
+        #     """,
+        #     "vw_aiccra_question": """
+        #         CREATE OR ALTER VIEW vw_aiccra_question AS
+        #         SELECT fq.*, cl.acronym AS cluster_acronym, cl.title AS cluster_name, ind.acronym AS indicator_acronym, ind.title AS indicator_title
+        #         FROM AICCRA_fact_indicator_questions fq
+        #         LEFT JOIN AICCRA_dim_clusters cl ON cl.id = fq.project_id
+        #         LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = fq.indicator_pk;
+        #     """,
+        #     "vw_aiccra_deliverables": """
+        #         CREATE OR ALTER VIEW vw_aiccra_deliverables AS
+        #         SELECT fd.*, cl.acronym AS cluster_acronym, cl.title AS cluster_name, ind.acronym AS indicator_acronym, ind.title AS indicator_title, ins.acronym AS institution_acronym, ins.name, ins.typeG AS institution_type, loc.country_name, loc.region_name  
+        #         FROM AICCRA_fact_deliverables fd
+        #         LEFT JOIN AICCRA_dim_clusters cl ON cl.id = fd.cluster_id
+        #         LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = fd.indicator_pk
+        #         LEFT JOIN AICCRA_dim_institutions ins ON ins.id = fd.institution_id 
+        #         LEFT JOIN AICCRA_dim_locations loc ON loc.id = fd.location_id;
+        #     """
+        # }
 
-        # cur = conn.cursor()
-        # result = cur.execute(text(f"SELECT COUNT(*) FROM {table_name};"))
-        # count = result.scalar()
-        # logger.info(f"📊 Number of records: {count}")
-
-        # df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
-        
-        # cur.close()
-        # conn.close()
+        # with pyodbc.connect(conn_str, timeout=10) as conn:
+        #     cursor = conn.cursor()
+        #     for view_name, view_sql in CREATE_VIEW_QUERIES.items():
+        #         logger.info(f"🛠️ Creating or altering view: {view_name}")
+        #         cursor.execute(view_sql)
+        #     cursor.commit()
+        #     logger.info(f"🔍 Inspecting the table: {table_name}")
+        #     result = cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+        #     count = result.fetchone()[0]
+        #     logger.info(f"📊 Number of records: {count}")
+        #     df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
 
         ## MySQL
         engine = create_engine(MYSQL_DATABASE_URL)
