@@ -78,7 +78,8 @@ def invoke_model(prompt):
                 }
             ]
         }
-        response_stream = bedrock_runtime.invoke_model_with_response_stream(
+        # response_stream = bedrock_runtime.invoke_model_with_response_stream(
+        response = bedrock_runtime.invoke_model(
             modelId="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
             # modelId="us.anthropic.claude-sonnet-4-20250514-v1:0",
             body=json.dumps(request_body),
@@ -86,15 +87,17 @@ def invoke_model(prompt):
             accept="application/json"
         )
 
-        for event in response_stream["body"]:
-            chunk = event.get("chunk")
-            if chunk and "bytes" in chunk:
-                bytes_data = chunk["bytes"]
-                parsed = json.loads(bytes_data.decode("utf-8"))
-                part = parsed.get("delta", {}).get("text", "")
-                if part:
-                    print(part, end="", flush=True)
-                    yield part                
+        return json.loads(response['body'].read())['content'][0]['text']
+
+        # for event in response_stream["body"]:
+        #     chunk = event.get("chunk")
+        #     if chunk and "bytes" in chunk:
+        #         bytes_data = chunk["bytes"]
+        #         parsed = json.loads(bytes_data.decode("utf-8"))
+        #         part = parsed.get("delta", {}).get("text", "")
+        #         if part:
+        #             print(part, end="", flush=True)
+        #             yield part                
 
     except Exception as e:
         logger.error(f"❌ Error invoking the model: {str(e)}")
@@ -267,13 +270,31 @@ def retrieve_context(query, indicator, year, top_k=10000):
         return []
 
 
+def calculate_summary(indicator, year):
+            df_contributions = load_data("vw_ai_project_contribution")
+            df_filtered = df_contributions[
+                (df_contributions["indicator_acronym"] == indicator) &
+                (df_contributions["year"] == year)
+            ]
+            total_expected = df_filtered["Milestone expected value"].sum()
+            total_achieved = df_filtered["Milestone reported value"].sum()
+            progress = round((total_achieved / total_expected) * 100, 2) if total_expected > 0 else 0
+
+            def clean_number(n):
+                return int(n) if float(n).is_integer() else round(n, 2)
+
+            return clean_number(total_expected), clean_number(total_achieved), clean_number(progress)
+
+
 def run_pipeline(indicator, year):
     try:
         insert_into_opensearch("vw_ai_deliverables")
         insert_into_opensearch("vw_ai_project_contribution")
         insert_into_opensearch("vw_ai_questions")
         
-        PROMPT = generate_report_prompt(indicator, year)
+        total_expected, total_achieved, progress = calculate_summary(indicator, year)
+
+        PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
         context = retrieve_context(PROMPT, indicator, year)
 
         output_path = f"context_{indicator}_{year}.json"
@@ -285,7 +306,6 @@ def run_pipeline(indicator, year):
             Using this information:\n{context}\n\n
             Do the following:\n{PROMPT}
             """
-        # And taking into account this information:\n{DEFAULT_PROMPT}\n\n
 
         return invoke_model(query)
 
