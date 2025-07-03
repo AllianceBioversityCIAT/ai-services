@@ -72,13 +72,12 @@ elif mode == "AICCRA Report Generator":
     ]
 
     selected_indicator = st.selectbox("Select an indicator:", indicators)
-    selected_year = st.selectbox("Select a year:", [2021, 2022, 2023, 2024, 2025])
+    selected_year = st.selectbox("Select a year:", [2024, 2025])
 
     if st.button("Generate report"):
         with st.spinner("Generating report..."):
             try:
                 response = run_pipeline_os(selected_indicator, selected_year)
-
                 st.markdown(response)
                 
                 # response_stream = run_pipeline_os(selected_indicator, selected_year)
@@ -90,6 +89,5 @@ elif mode == "AICCRA Report Generator":
             except Exception as e:
                 response = f"⚠️ An error occurred: {e}"
                 
-                # full_response = f"⚠️ Ocurrió un error: {e}"
                 # report_placeholder = st.empty()
-                # report_placeholder.markdown(full_response)
+                # report_placeholder.markdown(response)
