@@ -78,8 +78,7 @@ def invoke_model(prompt):
                 }
             ]
         }
-        # response_stream = bedrock_runtime.invoke_model_with_response_stream(
-        response = bedrock_runtime.invoke_model(
+        response_stream = bedrock_runtime.invoke_model_with_response_stream(
             modelId="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
             # modelId="us.anthropic.claude-sonnet-4-20250514-v1:0",
             body=json.dumps(request_body),
@@ -87,17 +86,19 @@ def invoke_model(prompt):
             accept="application/json"
         )
 
-        return json.loads(response['body'].read())['content'][0]['text']
+        full_response = ""
+        for event in response_stream["body"]:
+            chunk = event.get("chunk")
+            if chunk and "bytes" in chunk:
+                bytes_data = chunk["bytes"]
+                parsed = json.loads(bytes_data.decode("utf-8"))
+                part = parsed.get("delta", {}).get("text", "")
+                if part:
+                    full_response += part
+                    # print(part, end="", flush=True)
+                    # yield part           
 
-        # for event in response_stream["body"]:
-        #     chunk = event.get("chunk")
-        #     if chunk and "bytes" in chunk:
-        #         bytes_data = chunk["bytes"]
-        #         parsed = json.loads(bytes_data.decode("utf-8"))
-        #         part = parsed.get("delta", {}).get("text", "")
-        #         if part:
-        #             print(part, end="", flush=True)
-        #             yield part                
+        return full_response     
 
     except Exception as e:
         logger.error(f"❌ Error invoking the model: {str(e)}")
