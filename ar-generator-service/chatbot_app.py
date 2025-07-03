@@ -77,20 +77,19 @@ elif mode == "AICCRA Report Generator":
     if st.button("Generate report"):
         with st.spinner("Generating report..."):
             try:
-                # response = query_knowledge_base(selected_indicator, selected_year)
-                
-                ## response_stream = query_knowledge_base(selected_indicator, selected_year)
-                response_stream = run_pipeline_os(selected_indicator, selected_year)
-                ## response_stream = run_pipeline(selected_indicator, selected_year)
-                full_response = ""
-                report_placeholder = st.empty()
-                for chunk in response_stream:
-                    full_response += chunk
-                    report_placeholder.markdown(full_response)
-            except Exception as e:
-                # response = f"⚠️ Ocurrió un error: {e}"
-                full_response = f"⚠️ Ocurrió un error: {e}"
-                report_placeholder = st.empty()
-                report_placeholder.markdown(full_response)
+                response = run_pipeline_os(selected_indicator, selected_year)
 
-        # st.markdown(response)
+                st.markdown(response)
+                
+                # response_stream = run_pipeline_os(selected_indicator, selected_year)
+                # full_response = ""
+                # report_placeholder = st.empty()
+                # for chunk in response_stream:
+                #     full_response += chunk
+                #     report_placeholder.markdown(full_response)
+            except Exception as e:
+                response = f"⚠️ An error occurred: {e}"
+                
+                # full_response = f"⚠️ Ocurrió un error: {e}"
+                # report_placeholder = st.empty()
+                # report_placeholder.markdown(full_response)
