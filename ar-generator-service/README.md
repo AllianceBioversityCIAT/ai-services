@@ -17,7 +17,7 @@ An AI-powered service for generating comprehensive annual reports for AICCRA (Ac
 
 ## 🏗️ Architecture
 
-The service consists of two main components:
+The service consists of three main components:
 
 ### 1. Chatbot Interface (`chatbot_app.py`)
 - Interactive Streamlit web application
@@ -25,7 +25,14 @@ The service consists of two main components:
 - Real-time streaming responses
 - User-friendly interface for data exploration
 
-### 2. Core Processing Engine
+### 2. REST API Service (`app/api/`)
+- FastAPI-based REST API with OpenAPI documentation
+- HTTP endpoints for programmatic access
+- Request/response validation with Pydantic models
+- Comprehensive error handling and logging
+- CORS support for web applications
+
+### 3. Core Processing Engine
 - **Vector Database Options** (choose one):
   - `app/llm/knowledge_base.py` - AWS Bedrock Knowledge Base integration
   - `app/llm/vectorize_os.py` - OpenSearch vector processing
@@ -38,6 +45,7 @@ The service consists of two main components:
 ## 🛠️ Technology Stack
 
 - **Frontend**: Streamlit
+- **REST API**: FastAPI, Uvicorn, Pydantic
 - **AI/ML**: AWS Bedrock (Claude 3 Sonnet), LangChain
 - **Vector Database**: OpenSearch, Supabase
 - **Traditional Database**: MySQL
@@ -134,6 +142,29 @@ The application will start on `http://localhost:8501` and provide two main modes
 - Choose reporting year (2021-2025)
 - Generate comprehensive reports with one click
 
+### Running the REST API Server
+
+The service now provides a REST API for programmatic access to the AI chatbot functionality:
+
+```bash
+python3 api_server.py
+```
+
+The API server will start on `http://localhost:8000` with the following endpoints:
+- `POST /api/generate` - Generate AICCRA report
+- `POST /api/chat` - Chat with AICCRA assistant (alias for /api/generate)
+- `GET /docs` - Interactive API documentation
+- `GET /health` - Health check endpoint
+
+**Example API Usage:**
+```bash
+curl -X POST http://localhost:8000/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{"indicator": "IPI 1.1", "year": 2024}'
+```
+
+For detailed API documentation, see [API_README.md](./API_README.md).
+
 ### Running CLI Mode
 
 For direct indicator processing:
@@ -181,10 +212,18 @@ To switch between vector databases, modify the import and function call in `main
 ar-generator-service/
 ├── chatbot_app.py                 # Main Streamlit application
 ├── main.py                        # CLI entry point
+├── api_server.py                  # REST API server entry point
 ├── pyproject.toml                 # Project dependencies
 ├── uv.lock                        # Dependency lock file
+├── API_README.md                  # REST API documentation
+├── .env.example                   # Environment variables template
 ├── *.jsonl                        # Training/reference data files
 ├── app/
+│   ├── api/                       # REST API modules
+│   │   ├── __init__.py            # API package initialization
+│   │   ├── main.py                # FastAPI application
+│   │   ├── models.py              # Pydantic request/response models
+│   │   └── routes.py              # API endpoint routes
 │   ├── llm/                       # LLM processing modules
 │   │   ├── knowledge_base.py      # AWS Bedrock KB integration
 │   │   ├── vectorize_db.py        # Supabase vector operations
