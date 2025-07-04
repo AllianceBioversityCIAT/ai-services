@@ -12,7 +12,7 @@ logger = get_logger()
 # Create FastAPI application
 app = FastAPI(
     title="AICCRA Report Generator API",
-    description="REST API for AICCRA AI chatbot service with AWS Bedrock integration",
+    description="REST API for AICCRA AI report generator service with AWS Bedrock integration",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -37,11 +37,10 @@ async def root():
     return {
         "service": "AICCRA Report Generator API",
         "version": "1.0.0",
-        "description": "REST API for AICCRA AI chatbot service with AWS Bedrock integration",
+        "description": "REST API for AICCRA AI report generator service with AWS Bedrock integration",
         "docs": "/docs",
         "endpoints": [
-            "POST /api/generate - Generate AICCRA report",
-            "POST /api/chat - Chat with AICCRA assistant (alias for /api/generate)"
+            "POST /api/generate - Generate AICCRA report"
         ]
     }
 

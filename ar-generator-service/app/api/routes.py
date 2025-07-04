@@ -13,18 +13,18 @@ logger = get_logger()
 router = APIRouter()
 
 
-def _get_knowledge_base_function():
-    """Lazy import of knowledge_base function to avoid initialization issues."""
+def _run_pipeline_opensearch():
+    """Lazy import of opensearch function to avoid initialization issues."""
     try:
-        from app.llm.knowledge_base import query_knowledge_base
-        return query_knowledge_base
+        from app.llm.vectorize_os import run_pipeline
+        return run_pipeline
     except Exception as e:
-        logger.error(f"Failed to import knowledge_base: {e}")
+        logger.error(f"Failed to import opensearch: {e}")
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "Service configuration error",
-                "details": "Knowledge base service is not properly configured. Please check AWS credentials and configuration.",
+                "details": "Opensearch service is not properly configured. Please check AWS credentials and configuration.",
                 "status": "error"
             }
         )
@@ -62,11 +62,11 @@ async def generate_report(request: ChatRequest) -> ChatResponse:
     try:
         logger.info(f"Generating report for indicator: {request.indicator}, year: {request.year}")
         
-        # Lazy import the knowledge base function
-        query_knowledge_base = _get_knowledge_base_function()
+        # Lazy import the opensearch function
+        query_opensearch = _run_pipeline_opensearch()
         
-        # Call the existing knowledge base function
-        response_stream = query_knowledge_base(request.indicator, request.year)
+        # Call the existing opensearch function
+        response_stream = query_opensearch(request.indicator, request.year)
         
         # Collect the streaming response into a single string
         full_response = ""
@@ -106,18 +106,3 @@ async def generate_report(request: ChatRequest) -> ChatResponse:
             status_code=500,
             detail={"error": "Internal server error", "details": str(e), "status": "error"}
         )
-
-
-@router.post(
-    "/api/chat",
-    response_model=ChatResponse,
-    summary="Chat with AICCRA assistant", 
-    description="Alternative endpoint name for chat-style interaction with the same functionality as /api/generate"
-)
-async def chat(request: ChatRequest) -> ChatResponse:
-    """
-    Chat with the AICCRA assistant to generate reports.
-    
-    This is an alias for the /api/generate endpoint with the same functionality.
-    """
-    return await generate_report(request)
