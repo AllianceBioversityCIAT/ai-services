@@ -5,7 +5,7 @@ from app.llm.vectorize_os import run_pipeline as run_pipeline_os
 indicator = "IPI 1.1"
 year = "2025"
 
-vector_database = "knowledgebase"  # Options: "knowledgebase", "opensearch", "supabase"
+vector_database = "opensearch"  # Options: "knowledgebase", "opensearch", "supabase"
 
 if __name__ == "__main__":
     if vector_database == "knowledgebase":
