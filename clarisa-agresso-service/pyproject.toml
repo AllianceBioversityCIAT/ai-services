@@ -1,0 +1,14 @@
+[project]
+name = "clarisa-agresso_mapping"
+version = "0.1.0"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pandas",
+    "boto3",
+    "python-dotenv",
+    "openpyxl",
+    "requests",
+    "vecs",
+    "supabase"
+]
