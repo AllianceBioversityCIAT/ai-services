@@ -19,66 +19,66 @@ def load_data(table_name):
         logger.info("📂 Loading data...")
 
         ## SQL Server
-        # conn_str = (
-        #     "DRIVER={ODBC Driver 18 for SQL Server};"
-        #     f"SERVER={server};"
-        #     f"DATABASE={database};"
-        #     "Encrypt=yes;"
-        #     "TrustServerCertificate=yes;"
-        #     "Authentication=ActiveDirectoryServicePrincipal;"
-        #     f"UID={client_id};"
-        #     f"PWD={client_secret};"
-        # )
+        conn_str = (
+            "DRIVER={ODBC Driver 18 for SQL Server};"
+            f"SERVER={server};"
+            f"DATABASE={database};"
+            "Encrypt=yes;"
+            "TrustServerCertificate=yes;"
+            "Authentication=ActiveDirectoryServicePrincipal;"
+            f"UID={client_id};"
+            f"PWD={client_secret};"
+        )
 
-        # CREATE_VIEW_QUERIES = {
-        #     "vw_aiccra_project_contribution": """
-        #         CREATE OR ALTER VIEW vw_aiccra_project_contribution AS
-        #         SELECT pc.*, cl.acronym AS cluster_acronym, cl.title AS cluster_name, ind.acronym AS indicator_acronym, ind.title AS indicator_title
-        #         FROM AICCRA_fact_project_contribution pc
-        #         LEFT JOIN AICCRA_dim_clusters cl ON cl.id = pc.cluster_id
-        #         LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = pc.indicator_pk;
-        #     """,
-        #     "vw_aiccra_question": """
-        #         CREATE OR ALTER VIEW vw_aiccra_question AS
-        #         SELECT fq.*, cl.acronym AS cluster_acronym, cl.title AS cluster_name, ind.acronym AS indicator_acronym, ind.title AS indicator_title
-        #         FROM AICCRA_fact_indicator_questions fq
-        #         LEFT JOIN AICCRA_dim_clusters cl ON cl.id = fq.project_id
-        #         LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = fq.indicator_pk;
-        #     """,
-        #     "vw_aiccra_deliverables": """
-        #         CREATE OR ALTER VIEW vw_aiccra_deliverables AS
-        #         SELECT fd.*, cl.acronym AS cluster_acronym, cl.title AS cluster_name, ind.acronym AS indicator_acronym, ind.title AS indicator_title, ins.acronym AS institution_acronym, ins.name, ins.typeG AS institution_type, loc.country_name, loc.region_name  
-        #         FROM AICCRA_fact_deliverables fd
-        #         LEFT JOIN AICCRA_dim_clusters cl ON cl.id = fd.cluster_id
-        #         LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = fd.indicator_pk
-        #         LEFT JOIN AICCRA_dim_institutions ins ON ins.id = fd.institution_id 
-        #         LEFT JOIN AICCRA_dim_locations loc ON loc.id = fd.location_id;
-        #     """
-        # }
+        CREATE_VIEW_QUERIES = {
+            "vw_aiccra_project_contribution": """
+                CREATE OR ALTER VIEW vw_aiccra_project_contribution AS
+                SELECT pc.*, cl.acronym AS cluster_acronym, cl.title AS cluster_name, ind.acronym AS indicator_acronym, ind.title AS indicator_title
+                FROM AICCRA_fact_project_contribution pc
+                LEFT JOIN AICCRA_dim_clusters cl ON cl.id = pc.cluster_id
+                LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = pc.indicator_pk;
+            """,
+            "vw_aiccra_question": """
+                CREATE OR ALTER VIEW vw_aiccra_question AS
+                SELECT fq.*, cl.acronym AS cluster_acronym, cl.title AS cluster_name, ind.acronym AS indicator_acronym, ind.title AS indicator_title
+                FROM AICCRA_fact_indicator_questions fq
+                LEFT JOIN AICCRA_dim_clusters cl ON cl.id = fq.project_id
+                LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = fq.indicator_pk;
+            """,
+            "vw_aiccra_deliverables": """
+                CREATE OR ALTER VIEW vw_aiccra_deliverables AS
+                SELECT fd.*, cl.acronym AS cluster_acronym, cl.title AS cluster_name, ind.acronym AS indicator_acronym, ind.title AS indicator_title, ins.acronym AS institution_acronym, ins.name, ins.typeG AS institution_type, loc.country_name, loc.region_name  
+                FROM AICCRA_fact_deliverables fd
+                LEFT JOIN AICCRA_dim_clusters cl ON cl.id = fd.cluster_id
+                LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = fd.indicator_pk
+                LEFT JOIN AICCRA_dim_institutions ins ON ins.id = fd.institution_id 
+                LEFT JOIN AICCRA_dim_locations loc ON loc.id = fd.location_id;
+            """
+        }
 
-        # with pyodbc.connect(conn_str, timeout=10) as conn:
-        #     cursor = conn.cursor()
-        #     for view_name, view_sql in CREATE_VIEW_QUERIES.items():
-        #         logger.info(f"🛠️ Creating or altering view: {view_name}")
-        #         cursor.execute(view_sql)
-        #     cursor.commit()
-        #     logger.info(f"🔍 Inspecting the table: {table_name}")
-        #     result = cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-        #     count = result.fetchone()[0]
-        #     logger.info(f"📊 Number of records: {count}")
-        #     df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
+        with pyodbc.connect(conn_str, timeout=10) as conn:
+            cursor = conn.cursor()
+            for view_name, view_sql in CREATE_VIEW_QUERIES.items():
+                logger.info(f"🛠️ Creating or altering view: {view_name}")
+                cursor.execute(view_sql)
+            cursor.commit()
+            logger.info(f"🔍 Inspecting the table: {table_name}")
+            result = cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+            count = result.fetchone()[0]
+            logger.info(f"📊 Number of records: {count}")
+            df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
 
         ## MySQL
-        engine = create_engine(MYSQL_DATABASE_URL)
+        # engine = create_engine(MYSQL_DATABASE_URL)
         
-        logger.info(f"🔍 Inspecting the table: {table_name}")
+        # logger.info(f"🔍 Inspecting the table: {table_name}")
         
-        with engine.connect() as conn:
-            result = conn.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
-            count = result.scalar()
-            logger.info(f"📊 Number of records: {count}")
+        # with engine.connect() as conn:
+        #     result = conn.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
+        #     count = result.scalar()
+        #     logger.info(f"📊 Number of records: {count}")
 
-        df = pd.read_sql(f"SELECT * FROM {table_name}", engine)
+        # df = pd.read_sql(f"SELECT * FROM {table_name}", engine)
 
         ## General processing
         logger.info(f"Columns in {table_name}: {df.columns.tolist()}")
