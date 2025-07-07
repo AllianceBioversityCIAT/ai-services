@@ -319,11 +319,8 @@ def run_pipeline(indicator, year):
         logger.info("📍 Adding missed links to the report...")
         context_dois = {chunk.get("doi") for chunk in context if "doi" in chunk and chunk["doi"]}
         used_dois = extract_dois_from_text(generated_report)
-        logger.info(f"Used DOIs: {used_dois}")
-        logger.info(f"Context DOIs: {context_dois}")
-
         missed_dois = context_dois - used_dois
-        logger.info(f"Missed DOIs: {missed_dois}")
+
         if missed_dois:
             missed_section = "\n\n## Missed links\nThe following references were part of the context but not explicitly included:\n"
             doi_to_cluster = {chunk["doi"]: chunk.get("cluster_acronym", "N/A") for chunk in context if "doi" in chunk and chunk["doi"]}
