@@ -1,0 +1,13 @@
+pandas
+boto3
+python-dotenv
+vecs
+supabase
+sqlalchemy
+mysql-connector-python
+openpyxl
+requests-aws4auth
+opensearch-py
+streamlit
+fastapi
+uvicorn
