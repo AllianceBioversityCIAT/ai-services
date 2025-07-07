@@ -123,7 +123,6 @@ COLLECTION_NAME=collection_name
 ### 1. Start the API Server
 
 ```bash
-cd ar-generator-service
 python3 api_server.py
 ```
 
