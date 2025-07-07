@@ -16,5 +16,6 @@ dependencies = [
     "opensearch-py",
     "streamlit",
     "fastapi",
-    "uvicorn"
+    "uvicorn",
+    "mangum"
 ]

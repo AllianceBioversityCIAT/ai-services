@@ -1,3 +1,4 @@
+import re
 import json
 import boto3
 import numpy as np
@@ -287,6 +288,11 @@ def calculate_summary(indicator, year):
             return clean_number(total_expected), clean_number(total_achieved), clean_number(progress)
 
 
+def extract_dois_from_text(text):
+    pattern = r"https?://\S+"
+    return {match.rstrip(".,)];") for match in re.findall(pattern, text)}
+
+
 def run_pipeline(indicator, year):
     try:
         insert_into_opensearch("vw_ai_deliverables")
@@ -308,7 +314,24 @@ def run_pipeline(indicator, year):
             Do the following:\n{PROMPT}
             """
 
-        return invoke_model(query)
+        generated_report = invoke_model(query)
+
+        logger.info("📍 Adding missed links to the report...")
+        context_dois = {chunk.get("doi") for chunk in context if "doi" in chunk and chunk["doi"]}
+        used_dois = extract_dois_from_text(generated_report)
+        logger.info(f"Used DOIs: {used_dois}")
+        logger.info(f"Context DOIs: {context_dois}")
+
+        missed_dois = context_dois - used_dois
+        logger.info(f"Missed DOIs: {missed_dois}")
+        if missed_dois:
+            missed_section = "\n\n## Missed links\nThe following references were part of the context but not explicitly included:\n"
+            doi_to_cluster = {chunk["doi"]: chunk.get("cluster_acronym", "N/A") for chunk in context if "doi" in chunk and chunk["doi"]}
+            missed_section += "\n".join(f"- {doi} (Cluster: {doi_to_cluster.get(doi, 'N/A')})" for doi in sorted(missed_dois))
+            generated_report += missed_section
+
+        logger.info("✅ Report generation completed successfully.")
+        return generated_report
 
     except Exception as e:
         logger.error(f"❌ Error in pipeline execution: {e}")
