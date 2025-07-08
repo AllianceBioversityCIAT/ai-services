@@ -29,22 +29,22 @@ def load_data(table_name):
         )
 
         CREATE_VIEW_QUERIES = {
-            "vw_aiccra_project_contribution": """
-                CREATE OR ALTER VIEW vw_aiccra_project_contribution AS
+            "vw_ai_project_contribution": """
+                CREATE OR ALTER VIEW vw_ai_project_contribution AS
                 SELECT pc.*, cl.acronym AS cluster_acronym, cl.title AS cluster_name, ind.acronym AS indicator_acronym, ind.title AS indicator_title
                 FROM AICCRA_fact_project_contribution pc
                 LEFT JOIN AICCRA_dim_clusters cl ON cl.id = pc.cluster_id
                 LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = pc.indicator_pk;
             """,
-            "vw_aiccra_question": """
-                CREATE OR ALTER VIEW vw_aiccra_question AS
+            "vw_ai_questions": """
+                CREATE OR ALTER VIEW vw_ai_questions AS
                 SELECT fq.*, cl.acronym AS cluster_acronym, cl.title AS cluster_name, ind.acronym AS indicator_acronym, ind.title AS indicator_title
                 FROM AICCRA_fact_indicator_questions fq
                 LEFT JOIN AICCRA_dim_clusters cl ON cl.id = fq.project_id
                 LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = fq.indicator_pk;
             """,
-            "vw_aiccra_deliverables": """
-                CREATE OR ALTER VIEW vw_aiccra_deliverables AS
+            "vw_ai_deliverables": """
+                CREATE OR ALTER VIEW vw_ai_deliverables AS
                 SELECT fd.*, cl.acronym AS cluster_acronym, cl.title AS cluster_name, ind.acronym AS indicator_acronym, ind.title AS indicator_title, ins.acronym AS institution_acronym, ins.name, ins.typeG AS institution_type, loc.country_name, loc.region_name  
                 FROM AICCRA_fact_deliverables fd
                 LEFT JOIN AICCRA_dim_clusters cl ON cl.id = fd.cluster_id
