@@ -11,3 +11,6 @@ opensearch-py
 streamlit
 fastapi
 uvicorn
+pymssql
+requests
+mangum
