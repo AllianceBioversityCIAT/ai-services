@@ -1,4 +1,4 @@
-import pymssql
+import pyodbc
 import pandas as pd
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import SQL_SERVER
@@ -17,13 +17,15 @@ def load_data(table_name):
         logger.info("📂 Loading data...")
 
         ## SQL Server
-        conn = pymssql.connect(
-            server=server,
-            user=client_id,
-            password=client_secret,
-            database=database,
-            timeout=30,
-            login_timeout=30
+        conn_str = (
+            "DRIVER={ODBC Driver 18 for SQL Server};"
+            f"SERVER={server};"
+            f"DATABASE={database};"
+            "Encrypt=yes;"
+            "TrustServerCertificate=yes;"
+            "Authentication=ActiveDirectoryServicePrincipal;"
+            f"UID={client_id};"
+            f"PWD={client_secret};"
         )
 
         CREATE_VIEW_QUERIES = {
@@ -52,22 +54,22 @@ def load_data(table_name):
             """
         }
 
-        cursor = conn.cursor()
+        with pyodbc.connect(conn_str, timeout=10) as conn:
+            cursor = conn.cursor()
         
-        for view_name, view_sql in CREATE_VIEW_QUERIES.items():
-            logger.info(f"🛠️ Creating or altering view: {view_name}")
-            cursor.execute(view_sql)
-        
-        conn.commit()
-        
-        logger.info(f"🔍 Inspecting the table: {table_name}")
-        cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-        count = cursor.fetchone()[0]
-        logger.info(f"📊 Number of records: {count}")
-        
-        df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
-        
-        conn.close()
+            for view_name, view_sql in CREATE_VIEW_QUERIES.items():
+                logger.info(f"🛠️ Creating or altering view: {view_name}")
+                cursor.execute(view_sql)
+            
+            conn.commit()
+            logger.info("✅ All views created successfully")
+            
+            logger.info(f"🔍 Inspecting the table: {table_name}")
+            cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+            count = cursor.fetchone()[0]
+            logger.info(f"📊 Number of records: {count}")
+            
+            df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
 
         ## General processing
         logger.info(f"Columns in {table_name}: {df.columns.tolist()}")
