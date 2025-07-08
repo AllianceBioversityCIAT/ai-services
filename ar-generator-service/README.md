@@ -7,9 +7,9 @@ An AI-powered service for generating comprehensive annual reports for AICCRA (Ac
 ## 🌟 Features
 
 - **📊 Automated Report Generation**: AI-generated reports for various performance indicators
-- **🔍 Vector Search**: Integration with AWS Bedrock Knowledge Base and OpenSearch
+- **🔍 Vector Search**: Integration with Amazon OpenSearch Service
 - **📈 Multi-Indicator Support**: Handles both IPI (Intermediate Performance Indicators) and PDO (Project Development Objective) indicators
-- **💾 Database Integration**: MySQL or SQL Server connectivity for retrieving structured data
+- **💾 Database Integration**: SQL Server connectivity for retrieving structured data
 
 ---
 
@@ -25,25 +25,22 @@ The service consists of two main components:
 - CORS support for web applications
 
 ### 2. Core Processing Engine
-- **Vector Database Options** (choose one):
-  - `app/llm/knowledge_base.py` - AWS Bedrock Knowledge Base integration
+- **Vector Database Options**:
   - `app/llm/vectorize_os.py` - OpenSearch vector processing
-  - `app/llm/vectorize_db.py` - Supabase vector processing
 - **Prompt Engineering**: Custom prompts for report generation
-- **Database Connectivity**: MySQL or SQL Server integration for data retrieval
+- **Database Connectivity**: SQL Server integration for data retrieval
 
 ---
 
 ## 🛠️ Technology Stack
 
 - **REST API**: FastAPI, Uvicorn, Pydantic
-- **AI/ML**: AWS Bedrock (Claude 3 Sonnet)
-- **Vector Database**: OpenSearch, Supabase
-- **Traditional Database**: MySQL, SQL Server
+- **AI/ML**: AWS Bedrock (Claude 3.7 Sonnet)
+- **Vector Database**: OpenSearch
+- **Traditional Database**: SQL Server
 - **Cloud Services**: AWS S3, AWS Bedrock Knowledge Base
 - **Data Processing**: Pandas, NumPy
 - **Authentication**: AWS4Auth
-- **Package Management**: uv
 
 ---
 
@@ -51,8 +48,8 @@ The service consists of two main components:
 
 - Python 3.13+
 - AWS account with Bedrock access
-- MySQL database or direct connection to the Lakehouse (SQL Server)
-- OpenSearch or Supabase instance
+- Credentials for direct connection to Lakehouse (SQL Server)
+- OpenSearch instance
 
 ---
 
@@ -87,27 +84,17 @@ AWS_ACCESS_KEY_ID=your_aws_access_key
 AWS_SECRET_ACCESS_KEY=your_aws_secret_key
 BUCKET_NAME=bucket_name
 
-# AWS Bedrock Knowledge Base
-KNOWLEDGE_BASE_ID=your_knowledge_base_id
-
 # OpenSearch Configuration
 OPENSEARCH_HOST=your_opensearch_host
 OPENSEARCH_INDEX_NAME=index_name
 AWS_ACCESS_KEY_ID_OS=your_opensearch_access_key
 AWS_SECRET_ACCESS_KEY_OS=your_opensearch_secret_key
 
-# MySQL Configuration
-MYSQL_DATABASE_URL=your_mysql_connection_url
-
 # SqlServer Configuration
 CLIENT_ID=your_client_id
 CLIENT_SECRET=your_client_secret_key
 SERVER=your_server_url
 DATABASE=lakehouse_name
-
-# Supabase Configuration (if using)
-SUPABASE_URL=your_supabase_url
-COLLECTION_NAME=collection_name
 ```
 
 ---
@@ -271,6 +258,7 @@ ar-generator-service/
 ├── api_server.py                  # REST API server entry point
 ├── requirements.txt               # Project dependencies
 ├── .env.example                   # Environment variables template
+├── .gitignore                     
 ├── *.jsonl                        # Training/reference data files
 ├── app/
 │   ├── api/                       # REST API modules
@@ -286,8 +274,9 @@ ar-generator-service/
 │       ├── prompts/               # Prompt templates
 │       └── s3/                    # S3 integration
 ├── data/logs/                     # Application logs
-├── db_conn/                       # Database connections
-└── lakehouse_integration/         # Data warehouse integration
+└── db_conn/                       
+    └── mysql_connection.py        # Lakehouse connection
+
 ```
 
 ---
@@ -309,7 +298,6 @@ The API returns appropriate HTTP status codes:
 
 1. **Vector Processing** (`app/llm/`):
    - Handles embedding generation and vector search
-   - Integrates with multiple vector databases
    - Supports hybrid search capabilities
 
 2. **Prompt Engineering** (`app/utils/prompts/`):
@@ -318,7 +306,7 @@ The API returns appropriate HTTP status codes:
    - Context-aware response generation
 
 3. **Database Integration** (`db_conn/`):
-   - MySQL or SQL Server connectivity for structured data
+   - SQL Server connectivity for structured data
    - Data loading and preprocessing utilities
 
 ### Customizing Prompts
@@ -357,12 +345,12 @@ Logs are automatically generated in `data/logs/app.log` with information about:
    - Check IAM permissions for Bedrock and Knowledge Base access
 
 2. **Database Connection Errors**
-   - Verify MySQL credentials and host accessibility
+   - Verify Lakehouse credentials and host accessibility
    - Check network connectivity and firewall settings
    - Ensure database exists and user has appropriate permissions
 
 3. **Vector Database Issues**
-   - Confirm OpenSearch/Supabase endpoints and credentials
+   - Confirm OpenSearch endpoints and credentials
    - Verify index exists and is properly configured
    - Check vector dimensions and embedding model compatibility
 
