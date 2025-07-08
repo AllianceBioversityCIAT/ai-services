@@ -50,7 +50,6 @@ The service consists of two main components:
 ## 📋 Prerequisites
 
 - Python 3.13+
-- [uv](https://github.com/astral-sh/uv) package manager
 - AWS account with Bedrock access
 - MySQL database or direct connection to the Lakehouse (SQL Server)
 - OpenSearch or Supabase instance
@@ -59,21 +58,16 @@ The service consists of two main components:
 
 ## 🚀 Installation
 
-### 1. Install uv package manager
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-### 2. Set up virtual environment
+### 1. Set up virtual environment
 ```bash
 cd ar-generator-service
-uv venv
+python3 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-### 3. Install dependencies
+### 2. Install dependencies
 ```bash
-uv pip install -r pyproject.toml
+pip install -r requirements.txt
 ```
 
 ---
@@ -213,7 +207,7 @@ import requests
 # Make API request
 response = requests.post(
     "http://localhost:8000/api/generate",
-    json={"indicator": "IPI 1.1", "year": 2024}
+    json={"indicator": "IPI 1.1", "year": 2025}
 )
 
 if response.status_code == 200:
@@ -234,7 +228,7 @@ fetch('http://localhost:8000/api/generate', {
     },
     body: JSON.stringify({
         indicator: 'IPI 1.1',
-        year: 2024
+        year: 2025
     })
 })
 .then(response => response.json())
@@ -265,7 +259,7 @@ fetch('http://localhost:8000/api/generate', {
 - **IPI 3.4**: Partnership building
 
 ### Project Development Objective (PDO) Indicators
-- **PDO 1-5**: Various project outcome metrics
+- **PDO Indicator 1-5**: Various project outcome metrics
 
 ---
 
@@ -273,12 +267,9 @@ fetch('http://localhost:8000/api/generate', {
 
 ```
 ar-generator-service/
-├── chatbot_app.py                 # Main Streamlit application
 ├── main.py                        # CLI entry point
 ├── api_server.py                  # REST API server entry point
-├── pyproject.toml                 # Project dependencies
-├── uv.lock                        # Dependency lock file
-├── API_README.md                  # REST API documentation
+├── requirements.txt               # Project dependencies
 ├── .env.example                   # Environment variables template
 ├── *.jsonl                        # Training/reference data files
 ├── app/
@@ -288,8 +279,6 @@ ar-generator-service/
 │   │   ├── models.py              # Pydantic request/response models
 │   │   └── routes.py              # API endpoint routes
 │   ├── llm/                       # LLM processing modules
-│   │   ├── knowledge_base.py      # AWS Bedrock KB integration
-│   │   ├── vectorize_db.py        # Supabase vector operations
 │   │   └── vectorize_os.py        # OpenSearch vector operations
 │   └── utils/                     # Utility modules
 │       ├── config/                # Configuration management
