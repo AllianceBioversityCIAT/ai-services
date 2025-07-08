@@ -9,4 +9,3 @@ uvicorn
 pyodbc
 requests
 mangum
-sqlalchemy
