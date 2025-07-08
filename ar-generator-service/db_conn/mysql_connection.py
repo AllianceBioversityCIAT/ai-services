@@ -1,9 +1,7 @@
-import re
 import pymssql
 import pandas as pd
-from sqlalchemy import create_engine, inspect, text
 from app.utils.logger.logger_util import get_logger
-from app.utils.config.config_util import MYSQL_DATABASE_URL, SQL_SERVER
+from app.utils.config.config_util import SQL_SERVER
 from app.utils.s3.upload_file_to_s3 import upload_file_to_s3, s3_file_exists
 
 logger = get_logger()
@@ -56,23 +54,19 @@ def load_data(table_name):
 
         cursor = conn.cursor()
         
-        # Create or alter views
         for view_name, view_sql in CREATE_VIEW_QUERIES.items():
             logger.info(f"🛠️ Creating or altering view: {view_name}")
             cursor.execute(view_sql)
         
         conn.commit()
         
-        # Check record count
         logger.info(f"🔍 Inspecting the table: {table_name}")
         cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
         count = cursor.fetchone()[0]
         logger.info(f"📊 Number of records: {count}")
         
-        # Load data using pandas
         df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
         
-        # Close connection
         conn.close()
 
         ## General processing
