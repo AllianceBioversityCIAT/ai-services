@@ -1,5 +1,7 @@
 import pyodbc
 import pandas as pd
+from sqlalchemy.engine import URL
+from sqlalchemy import create_engine, text
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import SQL_SERVER
 from app.utils.s3.upload_file_to_s3 import upload_file_to_s3, s3_file_exists
@@ -17,16 +19,32 @@ def load_data(table_name):
         logger.info("📂 Loading data...")
 
         ## SQL Server
-        conn_str = (
-            "DRIVER={ODBC Driver 18 for SQL Server};"
-            f"SERVER={server};"
-            f"DATABASE={database};"
-            "Encrypt=yes;"
-            "TrustServerCertificate=yes;"
-            "Authentication=ActiveDirectoryServicePrincipal;"
-            f"UID={client_id};"
-            f"PWD={client_secret};"
+        # conn_str = (
+        #     "DRIVER={ODBC Driver 18 for SQL Server};"
+        #     f"SERVER={server};"
+        #     f"DATABASE={database};"
+        #     "Encrypt=yes;"
+        #     "TrustServerCertificate=yes;"
+        #     "Authentication=ActiveDirectoryServicePrincipal;"
+        #     f"UID={client_id};"
+        #     f"PWD={client_secret};"
+        # )
+
+        connection_url = URL.create(
+            "mssql+pyodbc",
+            username=client_id,
+            password=client_secret,
+            host=server,
+            database=database,
+            query={
+                "driver": "ODBC Driver 18 for SQL Server",
+                "authentication": "ActiveDirectoryServicePrincipal",
+                "Encrypt": "yes",
+                "TrustServerCertificate": "yes"
+            }
         )
+
+        engine = create_engine(connection_url)
 
         CREATE_VIEW_QUERIES = {
             "vw_ai_project_contribution": """
@@ -54,22 +72,36 @@ def load_data(table_name):
             """
         }
 
-        with pyodbc.connect(conn_str, timeout=10) as conn:
-            cursor = conn.cursor()
-        
+        with engine.begin() as conn:
             for view_name, view_sql in CREATE_VIEW_QUERIES.items():
                 logger.info(f"🛠️ Creating or altering view: {view_name}")
-                cursor.execute(view_sql)
-            
-            conn.commit()
+                conn.execute(text(view_sql))
             logger.info("✅ All views created successfully")
-            
+
+        with engine.connect() as conn:
             logger.info(f"🔍 Inspecting the table: {table_name}")
-            cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-            count = cursor.fetchone()[0]
+            result = conn.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
+            count = result.fetchone()[0]
             logger.info(f"📊 Number of records: {count}")
             
             df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
+
+        # with pyodbc.connect(conn_str, timeout=10) as conn:
+        #     cursor = conn.cursor()
+        
+        #     for view_name, view_sql in CREATE_VIEW_QUERIES.items():
+        #         logger.info(f"🛠️ Creating or altering view: {view_name}")
+        #         cursor.execute(view_sql)
+            
+        #     conn.commit()
+        #     logger.info("✅ All views created successfully")
+            
+        #     logger.info(f"🔍 Inspecting the table: {table_name}")
+        #     cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+        #     count = cursor.fetchone()[0]
+        #     logger.info(f"📊 Number of records: {count}")
+            
+        #     df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
 
         ## General processing
         logger.info(f"Columns in {table_name}: {df.columns.tolist()}")
