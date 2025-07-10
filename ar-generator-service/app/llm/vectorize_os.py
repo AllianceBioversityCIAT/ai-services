@@ -105,7 +105,6 @@ def invoke_model(prompt):
 
 def create_index_if_not_exists(dimension=1024):
     try:
-        # opensearch.indices.delete(index=INDEX_NAME)
         if not opensearch.indices.exists(index=INDEX_NAME):
             logger.info(f"📦 Creating OpenSearch index: {INDEX_NAME}")
             index_body = {
