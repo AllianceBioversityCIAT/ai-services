@@ -56,6 +56,7 @@ async def generate_report(request: ChatRequest) -> ChatResponse:
     
     - **indicator**: The indicator to generate a report for (e.g., "IPI 1.1", "PDO Indicator 1")
     - **year**: The year for the report (must be between 2020 and 2030)
+    - **insert_data**: Optional flag to insert fresh data into OpenSearch (default is False)
     
     Returns the generated report content.
     """
@@ -66,7 +67,7 @@ async def generate_report(request: ChatRequest) -> ChatResponse:
         query_opensearch = _run_pipeline_opensearch()
         
         # Call the existing opensearch function
-        response_stream = query_opensearch(request.indicator, request.year)
+        response_stream = query_opensearch(request.indicator, request.year, insert_data=request.insert_data)
         
         # Collect the streaming response into a single string
         full_response = ""

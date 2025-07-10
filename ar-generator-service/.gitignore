@@ -192,3 +192,4 @@ faiss/
 # Local files
 *.csv
 *.jsonl
+*.json
