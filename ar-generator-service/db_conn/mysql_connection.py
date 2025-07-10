@@ -62,11 +62,10 @@ def load_data(table_name):
             """,
             "vw_ai_innovations": """
                 CREATE OR ALTER VIEW vw_ai_innovations AS
-                SELECT inno.*, ind.title AS indicator_title, ind.acronym AS indicator_acronym, loc.country_name AS country_name, ins.name AS institution_name, ins.short_name AS institution_short_name
+                SELECT inno.*, ind.title AS indicator_title, ind.acronym AS indicator_acronym, loc.country_name AS country_name
                 FROM AICCRA_aiccrabi_aiccra_innovations inno
                 LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = inno.indicator_pk
-                LEFT JOIN AICCRA_dim_locations loc ON loc.id = inno.country_id 
-                LEFT JOIN AICCRA_dim_institutions ins ON ins.id = inno.institution_id;
+                LEFT JOIN AICCRA_dim_locations loc ON loc.id = inno.country_id;
             """
         }
 

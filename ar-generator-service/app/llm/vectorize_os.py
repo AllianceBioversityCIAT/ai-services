@@ -105,7 +105,7 @@ def invoke_model(prompt):
 
 def create_index_if_not_exists(dimension=1024):
     try:
-        opensearch.indices.delete(index=INDEX_NAME)
+        # opensearch.indices.delete(index=INDEX_NAME)
         if not opensearch.indices.exists(index=INDEX_NAME):
             logger.info(f"📦 Creating OpenSearch index: {INDEX_NAME}")
             index_body = {
@@ -286,6 +286,8 @@ def run_pipeline(indicator, year):
         insert_into_opensearch("vw_ai_deliverables")
         insert_into_opensearch("vw_ai_project_contribution")
         insert_into_opensearch("vw_ai_questions")
+        insert_into_opensearch("vw_ai_oicrs")
+        insert_into_opensearch("vw_ai_innovations")
         
         total_expected, total_achieved, progress = calculate_summary(indicator, year)
 
