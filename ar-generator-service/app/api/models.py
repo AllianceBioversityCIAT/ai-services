@@ -18,6 +18,11 @@ class ChatRequest(BaseModel):
         le=2030,
         examples=[2024, 2025]
     )
+    insert_data: Optional[bool] = Field(
+        default=False,
+        description="Whether to insert fresh data into OpenSearch (use True to refresh index)",
+        examples=[True, False]
+    )
 
 
 class ChatResponse(BaseModel):
