@@ -118,7 +118,7 @@ Visit `http://localhost:8000/docs` for interactive API documentation.
 ```bash
 curl -X POST http://localhost:8000/api/generate \
   -H "Content-Type: application/json" \
-  -d '{"indicator": "IPI 1.1", "year": 2025}'
+  -d '{"indicator": "IPI 1.1", "year": 2025, "insert_data": "False"}'
 ```
 
 ---
@@ -133,13 +133,15 @@ Generate an AICCRA report for the specified indicator and year.
 ```json
 {
   "indicator": "IPI 1.1",
-  "year": 2025
+  "year": 2025,
+  "insert_data": "False"
 }
 ```
 
 **Parameters:**
 - `indicator` (string, required): Indicator name (e.g., "IPI 1.1", "PDO Indicator 1")
 - `year` (integer, required): Year for report generation
+- `insert_data` (bool, optional): Whether to insert fresh data into OpenSearch
 
 **Response (200 OK):**
 ```json
@@ -194,7 +196,7 @@ import requests
 # Make API request
 response = requests.post(
     "http://localhost:8000/api/generate",
-    json={"indicator": "IPI 1.1", "year": 2025}
+    json={"indicator": "IPI 1.1", "year": 2025, "insert_data": "False"}
 )
 
 if response.status_code == 200:
@@ -215,7 +217,8 @@ fetch('http://localhost:8000/api/generate', {
     },
     body: JSON.stringify({
         indicator: 'IPI 1.1',
-        year: 2025
+        year: 2025,
+        insert_data: 'False'
     })
 })
 .then(response => response.json())
