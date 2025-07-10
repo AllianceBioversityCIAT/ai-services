@@ -144,15 +144,6 @@ def create_index_if_not_exists(dimension=1024):
 
 def insert_into_opensearch(table_name: str):
     try:
-        ## Comment out the next 4 lines if you are going to insert data into the index for the first time
-        created = create_index_if_not_exists()
-        if not created:
-            logger.info(f"⚠️  Skipping insertion for {table_name} since index already exists.")
-            return
-
-        ## Uncomment out the next line if you are going to insert data into the index for the first time
-        # create_index_if_not_exists()
-
         logger.info(f"🔍 Processing table: {table_name}")
 
         df = load_data(table_name)
@@ -282,13 +273,18 @@ def extract_dois_from_text(text):
     return set(markdown_links + plain_links)
 
 
-def run_pipeline(indicator, year):
+def run_pipeline(indicator, year, insert_data=False):
     try:
-        insert_into_opensearch("vw_ai_deliverables")
-        insert_into_opensearch("vw_ai_project_contribution")
-        insert_into_opensearch("vw_ai_questions")
-        insert_into_opensearch("vw_ai_oicrs")
-        insert_into_opensearch("vw_ai_innovations")
+        if insert_data:
+            if opensearch.indices.exists(index=INDEX_NAME):
+                logger.info(f"🗑️ Deleting existing index: {INDEX_NAME}")
+                opensearch.indices.delete(index=INDEX_NAME)
+            create_index_if_not_exists()
+            insert_into_opensearch("vw_ai_deliverables")
+            insert_into_opensearch("vw_ai_project_contribution")
+            insert_into_opensearch("vw_ai_questions")
+            insert_into_opensearch("vw_ai_oicrs")
+            insert_into_opensearch("vw_ai_innovations")
         
         total_expected, total_achieved, progress = calculate_summary(indicator, year)
 
