@@ -277,8 +277,10 @@ def calculate_summary(indicator, year):
 
 
 def extract_dois_from_text(text):
-    pattern = r"https?://\S+"
-    return {match.rstrip(".,)];") for match in re.findall(pattern, text)}
+    markdown_links = re.findall(r"\[.*?\]\((https?://[^\s)]+)\)", text)
+    plain_links = re.findall(r"(?<!\()https?://[^\s\]\)]+", text)
+
+    return set(markdown_links + plain_links)
 
 
 def run_pipeline(indicator, year):
