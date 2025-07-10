@@ -51,6 +51,22 @@ def load_data(table_name):
                 LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = fd.indicator_pk
                 LEFT JOIN AICCRA_dim_institutions ins ON ins.id = fd.institution_id 
                 LEFT JOIN AICCRA_dim_locations loc ON loc.id = fd.location_id;
+            """,
+            "vw_ai_oicrs": """
+                CREATE OR ALTER VIEW vw_ai_oicrs AS
+                SELECT oicrs.*, ind.title AS indicator_title, ind.acronym AS indicator_acronym, loc.country_name AS country_name, ins.name AS institution_name, ins.short_name AS institution_short_name
+                FROM AICCRA_aiccrabi_aiccra_oicrs oicrs
+                LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = oicrs.indicator_pk
+                LEFT JOIN AICCRA_dim_locations loc ON loc.id = oicrs.country_id 
+                LEFT JOIN AICCRA_dim_institutions ins ON ins.id = oicrs.institution_id;
+            """,
+            "vw_ai_innovations": """
+                CREATE OR ALTER VIEW vw_ai_innovations AS
+                SELECT inno.*, ind.title AS indicator_title, ind.acronym AS indicator_acronym, loc.country_name AS country_name, ins.name AS institution_name, ins.short_name AS institution_short_name
+                FROM AICCRA_aiccrabi_aiccra_innovations inno
+                LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = inno.indicator_pk
+                LEFT JOIN AICCRA_dim_locations loc ON loc.id = inno.country_id 
+                LEFT JOIN AICCRA_dim_institutions ins ON ins.id = inno.institution_id;
             """
         }
 
@@ -76,16 +92,37 @@ def load_data(table_name):
 
         if table_name == "vw_ai_project_contribution":
             df.rename(columns={'Phase name': 'phase_name', 'Phase year': 'year'}, inplace=True)
-            df.drop(['Milestone expected unit', 'Outcome Comunication', 'pk', 'contribution_pk'], axis=1, inplace=True)
+            df.drop(['Milestone expected unit', 'Outcome Comunication', 'pk', 'contribution_pk', 'Project Link'], axis=1, inplace=True)
+        
         elif table_name == "vw_ai_questions":
             df.rename(columns={'project_id': 'cluster_id'}, inplace=True)
             df.drop('contribution_pk', axis=1, inplace=True)
-        else:
-            df.drop(['contribution_pk', 'Indicator', 'indicator_code', 'DLV_planned', 'image_small', 'updated_date'], axis=1, inplace=True)
+
+        elif table_name == "vw_ai_deliverables":
+            df.drop(['contribution_pk', 'Indicator', 'indicator_code', 'DLV_planned', 'image_small', 'updated_date', 'indicator_pk', 'indicator_id', 'activity_id', 'Link', 'cluster_owner_id', 'institution_id', 'location_id', 'cluster_id'], axis=1, inplace=True)
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
             cluster_column = 'cluster_acronym'
-
+            df_grouped = df.groupby([id_column, indicator_column, cluster_column]).agg(
+                lambda x: ', '.join(sorted(set(str(v) for v in x if pd.notnull(v) and v != "")))
+            )
+            df = df_grouped.reset_index()
+        
+        elif table_name == "vw_ai_oicrs":
+            df.drop(['parameter_value', 'link_cluster_id', 'link_oicr_id', 'outcome_communication', 'srf_target', 'top_level_comment', 'country_iso_alpha3', 'contributing_crp', 'updated_date', 'indicator_pk', 'contribution_pk'], axis=1, inplace=True)
+            id_column = df.columns[0]
+            indicator_column = 'indicator_acronym'
+            cluster_column = 'cluster_acronym'
+            df_grouped = df.groupby([id_column, indicator_column, cluster_column]).agg(
+                lambda x: ', '.join(sorted(set(str(v) for v in x if pd.notnull(v) and v != "")))
+            )
+            df = df_grouped.reset_index()
+        
+        else:
+            df.drop(['link_innovation', 'indicator_pk', 'contribution_pk', 'cluster_id', 'cluster_owner_id', 'updated_date', 'institution_id', 'is_scaling_partner'], axis=1, inplace=True)
+            id_column = df.columns[0]
+            indicator_column = 'indicator_acronym'
+            cluster_column = 'cluster_acronym'
             df_grouped = df.groupby([id_column, indicator_column, cluster_column]).agg(
                 lambda x: ', '.join(sorted(set(str(v) for v in x if pd.notnull(v) and v != "")))
             )

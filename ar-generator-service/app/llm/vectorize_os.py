@@ -81,7 +81,6 @@ def invoke_model(prompt):
         }
         response_stream = bedrock_runtime.invoke_model_with_response_stream(
             modelId="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-            # modelId="us.anthropic.claude-sonnet-4-20250514-v1:0",
             body=json.dumps(request_body),
             contentType="application/json",
             accept="application/json"
@@ -106,7 +105,7 @@ def invoke_model(prompt):
 
 def create_index_if_not_exists(dimension=1024):
     try:
-        # opensearch.indices.delete(index=INDEX_NAME)
+        opensearch.indices.delete(index=INDEX_NAME)
         if not opensearch.indices.exists(index=INDEX_NAME):
             logger.info(f"📦 Creating OpenSearch index: {INDEX_NAME}")
             index_body = {
@@ -147,13 +146,13 @@ def create_index_if_not_exists(dimension=1024):
 def insert_into_opensearch(table_name: str):
     try:
         ## Comment out the next 4 lines if you are going to insert data into the index for the first time
-        created = create_index_if_not_exists()
-        if not created:
-            logger.info(f"⚠️  Skipping insertion for {table_name} since index already exists.")
-            return
+        # created = create_index_if_not_exists()
+        # if not created:
+        #     logger.info(f"⚠️  Skipping insertion for {table_name} since index already exists.")
+        #     return
 
         ## Uncomment out the next line if you are going to insert data into the index for the first time
-        # create_index_if_not_exists()
+        create_index_if_not_exists()
 
         logger.info(f"🔍 Processing table: {table_name}")
 
@@ -202,16 +201,7 @@ def retrieve_context(query, indicator, year, top_k=10000):
                 "bool": {
                     "filter": [
                         {"term": {"indicator_acronym": indicator}},
-                        {"term": {"year": year}},
-                        {
-                            "bool": {
-                                "should": [
-                                    {"term": {"source_table": "vw_ai_deliverables"}},
-                                    {"term": {"source_table": "vw_ai_project_contribution"}}
-                                ],
-                                "minimum_should_match": 1
-                            }
-                        }
+                        {"term": {"year": year}}
                     ],
                     "must": [
                         {
