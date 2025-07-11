@@ -34,14 +34,16 @@ def load_data(table_name):
                 SELECT pc.*, cl.acronym AS cluster_acronym, cl.title AS cluster_name, ind.acronym AS indicator_acronym, ind.title AS indicator_title
                 FROM AICCRA_fact_project_contribution pc
                 LEFT JOIN AICCRA_dim_clusters cl ON cl.id = pc.cluster_id
-                LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = pc.indicator_pk;
+                LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = pc.indicator_pk
+                WHERE pc.`Phase year` = 2025;
             """,
             "vw_ai_questions": """
                 CREATE OR ALTER VIEW vw_ai_questions AS
                 SELECT fq.*, cl.acronym AS cluster_acronym, cl.title AS cluster_name, ind.acronym AS indicator_acronym, ind.title AS indicator_title
                 FROM AICCRA_fact_indicator_questions fq
                 LEFT JOIN AICCRA_dim_clusters cl ON cl.id = fq.project_id
-                LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = fq.indicator_pk;
+                LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = fq.indicator_pk
+                WHERE year = 2025;
             """,
             "vw_ai_deliverables": """
                 CREATE OR ALTER VIEW vw_ai_deliverables AS
@@ -50,7 +52,8 @@ def load_data(table_name):
                 LEFT JOIN AICCRA_dim_clusters cl ON cl.id = fd.cluster_id
                 LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = fd.indicator_pk
                 LEFT JOIN AICCRA_dim_institutions ins ON ins.id = fd.institution_id 
-                LEFT JOIN AICCRA_dim_locations loc ON loc.id = fd.location_id;
+                LEFT JOIN AICCRA_dim_locations loc ON loc.id = fd.location_id
+                WHERE fd.year = 2025;
             """,
             "vw_ai_oicrs": """
                 CREATE OR ALTER VIEW vw_ai_oicrs AS
@@ -58,14 +61,16 @@ def load_data(table_name):
                 FROM AICCRA_aiccrabi_aiccra_oicrs oicrs
                 LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = oicrs.indicator_pk
                 LEFT JOIN AICCRA_dim_locations loc ON loc.id = oicrs.country_id 
-                LEFT JOIN AICCRA_dim_institutions ins ON ins.id = oicrs.institution_id;
+                LEFT JOIN AICCRA_dim_institutions ins ON ins.id = oicrs.institution_id
+                WHERE oicr_year = 2025;
             """,
             "vw_ai_innovations": """
                 CREATE OR ALTER VIEW vw_ai_innovations AS
                 SELECT inno.*, ind.title AS indicator_title, ind.acronym AS indicator_acronym, loc.country_name AS country_name
                 FROM AICCRA_aiccrabi_aiccra_innovations inno
                 LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = inno.indicator_pk
-                LEFT JOIN AICCRA_dim_locations loc ON loc.id = inno.country_id;
+                LEFT JOIN AICCRA_dim_locations loc ON loc.id = inno.country_id
+                WHERE year = 2025;
             """
         }
 
@@ -94,8 +99,7 @@ def load_data(table_name):
             df.drop(['Milestone expected unit', 'Outcome Comunication', 'pk', 'contribution_pk', 'Project Link'], axis=1, inplace=True)
         
         elif table_name == "vw_ai_questions":
-            df.rename(columns={'project_id': 'cluster_id'}, inplace=True)
-            df.drop('contribution_pk', axis=1, inplace=True)
+            df.drop(['contribution_pk', 'indicator_pk', 'project_id', 'Project Link'], axis=1, inplace=True)
 
         elif table_name == "vw_ai_deliverables":
             df.drop(['contribution_pk', 'Indicator', 'indicator_code', 'DLV_planned', 'image_small', 'updated_date', 'indicator_pk', 'indicator_id', 'activity_id', 'Link', 'cluster_owner_id', 'institution_id', 'location_id', 'cluster_id'], axis=1, inplace=True)
