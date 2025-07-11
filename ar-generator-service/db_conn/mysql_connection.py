@@ -35,7 +35,7 @@ def load_data(table_name):
                 FROM AICCRA_fact_project_contribution pc
                 LEFT JOIN AICCRA_dim_clusters cl ON cl.id = pc.cluster_id
                 LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = pc.indicator_pk
-                WHERE pc.`Phase year` = 2025;
+                WHERE pc.[Phase year] = 2025;
             """,
             "vw_ai_questions": """
                 CREATE OR ALTER VIEW vw_ai_questions AS
