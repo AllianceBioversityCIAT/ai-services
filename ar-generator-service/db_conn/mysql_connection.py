@@ -115,6 +115,7 @@ def load_data(table_name):
             df["table_type"] = "deliverables"
         
         elif table_name == "vw_ai_oicrs":
+            df.rename(columns={'link_pdf_file': 'link_pdf_oicr'}, inplace=True)
             df.drop(['parameter_value', 'link_cluster_id', 'link_oicr_id', 'outcome_communication', 'srf_target', 'top_level_comment', 'country_iso_alpha3', 'contributing_crp', 'updated_date', 'indicator_pk', 'contribution_pk'], axis=1, inplace=True)
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
@@ -126,6 +127,7 @@ def load_data(table_name):
             df["table_type"] = "oicrs"
         
         else:
+            df.rename(columns={'link_pdf_file': 'link_pdf_innovation'}, inplace=True)
             df.drop(['link_innovation', 'indicator_pk', 'contribution_pk', 'cluster_id', 'cluster_owner_id', 'updated_date', 'institution_id', 'is_scaling_partner'], axis=1, inplace=True)
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
