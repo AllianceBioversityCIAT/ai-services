@@ -194,16 +194,7 @@ def retrieve_context(query, indicator, year, top_k=10000):
                 "bool": {
                     "filter": [
                         {"term": {"indicator_acronym": indicator}},
-                        {"term": {"year": year}},
-                        {
-                            "bool": {
-                                "should": [
-                                    {"term": {"source_table": "vw_ai_deliverables"}},
-                                    {"term": {"source_table": "vw_ai_project_contribution"}}
-                                ],
-                                "minimum_should_match": 1
-                            }
-                        }
+                        {"term": {"year": year}}
                     ],
                     "must": [
                         {
