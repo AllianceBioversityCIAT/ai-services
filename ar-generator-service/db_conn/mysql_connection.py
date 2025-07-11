@@ -97,9 +97,11 @@ def load_data(table_name):
         if table_name == "vw_ai_project_contribution":
             df.rename(columns={'Phase name': 'phase_name', 'Phase year': 'year'}, inplace=True)
             df.drop(['Milestone expected unit', 'Outcome Comunication', 'pk', 'contribution_pk', 'Project Link'], axis=1, inplace=True)
+            df["table_type"] = "contributions"
         
         elif table_name == "vw_ai_questions":
             df.drop(['contribution_pk', 'indicator_pk', 'project_id', 'Project Link'], axis=1, inplace=True)
+            df["table_type"] = "questions"
 
         elif table_name == "vw_ai_deliverables":
             df.drop(['contribution_pk', 'Indicator', 'indicator_code', 'DLV_planned', 'image_small', 'updated_date', 'indicator_pk', 'indicator_id', 'activity_id', 'Link', 'cluster_owner_id', 'institution_id', 'location_id', 'cluster_id'], axis=1, inplace=True)
@@ -110,6 +112,7 @@ def load_data(table_name):
                 lambda x: ', '.join(sorted(set(str(v) for v in x if pd.notnull(v) and v != "")))
             )
             df = df_grouped.reset_index()
+            df["table_type"] = "deliverables"
         
         elif table_name == "vw_ai_oicrs":
             df.drop(['parameter_value', 'link_cluster_id', 'link_oicr_id', 'outcome_communication', 'srf_target', 'top_level_comment', 'country_iso_alpha3', 'contributing_crp', 'updated_date', 'indicator_pk', 'contribution_pk'], axis=1, inplace=True)
@@ -120,6 +123,7 @@ def load_data(table_name):
                 lambda x: ', '.join(sorted(set(str(v) for v in x if pd.notnull(v) and v != "")))
             )
             df = df_grouped.reset_index()
+            df["table_type"] = "oicrs"
         
         else:
             df.drop(['link_innovation', 'indicator_pk', 'contribution_pk', 'cluster_id', 'cluster_owner_id', 'updated_date', 'institution_id', 'is_scaling_partner'], axis=1, inplace=True)
@@ -130,6 +134,7 @@ def load_data(table_name):
                 lambda x: ', '.join(sorted(set(str(v) for v in x if pd.notnull(v) and v != "")))
             )
             df = df_grouped.reset_index()
+            df["table_type"] = "innovations"
 
         df.to_json(f'{table_name}.jsonl', orient='records', lines=True, force_ascii=False)
         df.to_csv(f'{table_name}.csv', index=False)
