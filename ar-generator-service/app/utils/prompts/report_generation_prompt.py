@@ -36,15 +36,15 @@ Your goal is to write a well-structured, evidence-based narrative that:
 ------
 
 # INPUT
-The narrative must be built using the structured data extracted from AICCRA's internal reporting system. You will receive records from various sources, each identifiable by the field `"table_type"` in the input data. These include:
+The narrative must be built using the structured data extracted from AICCRA's internal reporting system. You will receive records from various sources, each identifiable by the field "table_type" in the input data. These include:
 
-- `"contributions"`: Cluster-submitted contributions that contain milestone targets and results, descriptive narratives, project links, cluster names, and indicator names.
-- `"deliverables"`: Records of project outputs and evidence products. These include deliverable titles, project links, DOIs, and dissemination formats.
-- `"questions"`: Responses to indicator-specific questions that contextualize each cluster's planned activities, gender and inclusion considerations, targeted technologies, estimated beneficiary reach, and bundling strategies. These help explain the rationale or expectations behind quantitative targets or implementation choices.
-- `"oicrs"`: Documented Outcome Impact Case Reports (OICRs) that capture how AICCRA-supported innovations or partnerships led to real-world results. These may include impact narratives, geographic and institutional context, partnerships, and links to PDF official reports. Use OICRs to highlight validated outcomes, partnerships, and scaling evidence where relevant.
-- `"innovations"`: Records of climate-relevant innovations (tools, platforms, practices, etc.) developed or enhanced by AICCRA. Each record includes the innovation title, type, readiness level, involved institutions, and thematic focus. Use these entries to substantiate claims about technical or policy innovations, tool readiness, or gender/youth relevance.
+- "contributions": Cluster-submitted contributions that contain milestone targets and results, descriptive narratives, project links, cluster names, and indicator names.
+- "deliverables": Records of project outputs and evidence products. These include deliverable titles, project links, DOIs, and dissemination formats.
+- "questions": Responses to indicator-specific questions that contextualize each cluster's planned activities, gender and inclusion considerations, targeted technologies, estimated beneficiary reach, and bundling strategies. These help explain the rationale or expectations behind quantitative targets or implementation choices.
+- "oicrs": Documented Outcome Impact Case Reports (OICRs) that capture how AICCRA-supported innovations or partnerships led to real-world results. These may include impact narratives, geographic and institutional context, partnerships, and links to PDF official reports. Use OICRs to highlight validated outcomes, partnerships, and scaling evidence where relevant.
+- "innovations": Records of climate-relevant innovations (tools, platforms, practices, etc.) developed or enhanced by AICCRA. Each record includes the innovation title, type, readiness level, involved institutions, and thematic focus. Use these entries to substantiate claims about technical or policy innovations, tool readiness, or gender/youth relevance.
 
-Only use records where `year = {selected_year}` and `indicator_acronym = {selected_indicator}`. Do not use content from other years. 
+Only use records where "year" = {selected_year} and "indicator_acronym" = {selected_indicator}. Do not use content from other years. 
 This ensures that all evidence and content corresponds to mid-year progress in the selected year and indicator.
 
 ------
@@ -54,54 +54,77 @@ This ensures that all evidence and content corresponds to mid-year progress in t
 ## 1. Indicator Narrative
 - Per cluster_acronym:
    - Two paragraphs:
-      - **First paragraph**: Based on the records from `"contributions"`, `"deliverables"`, `"oicrs"`, and `"innovations"`. Include achieved values, evidence links, brief summaries of innovations or OICRs, and mention of progress with supporting data as described below.
-         - In this paragraph, DONT'T INCLUDE anything from `"questions" table type.
+      - **First paragraph**: Based on the records from "contributions", "deliverables", "oicrs", and "innovations". Include achieved values, doi links, brief summaries of innovations or OICRs, and mention of progress with supporting data as described below.
+         - Follow this order to build the paragraph:
+            1. Start with data from "contributions":
+               - Include mid-year achieved vs. expected values, and percentage progress.
+            2. Then include data from "deliverables":
+               - List all valid DOIs as markdown hyperlinks.
+            3. Depending on the indicator:
+               - If it is one of the PDO indicators, include oicrs.
+               - If it is one of the IPI indicators, include innovations.
+         - In this paragraph, DONT'T INCLUDE ANYTHING FROM "questions" table type.
          - Describe activities planned under the indicator and their current status.
-         - From 'table_type' = 'contributions':
+         - Integrate specific examples showing tangible outputs (tools, platforms, trainings, innovations).
+         - Describe how gender, youth, or social inclusion was addressed, if applicable.
+         
+         - From "table_type" = "contributions":
             - State the achieved value as of mid-year and compare it to the annual target. Include the percentage progress. Example:
                “By mid-year {selected_year}, AICCRA has achieved {{Milestone reported value}} out of the annual target of {{Milestone expected value}} for {selected_indicator} and cluster, representing {{percentage}}% progress.”
                - If the indicator involves hectares, number of tools developed, policies influenced, percentages, or beneficiary numbers, include the appropriate units.
                - Do not fabricate progress data if it is not explicitly available in the input.
-         - From 'table_type' = 'deliverables':
+        
+         - From "table_type" = "deliverables":
             - Use the "doi" field from "vw_ai_deliverables" to include links to deliverables, when available.
-            - Include all dois that match:
-               - `cluster_acronym` of the current cluster
-               - `indicator_acronym = {selected_indicator}`
-               - `year = {selected_year}`
-               - `status` = "Completed", "On Going", "Extended".
+            - Include all deliverables that match:
+               - "cluster_acronym" of the current cluster
+               - "indicator_acronym" = {selected_indicator}
+               - "year" = {selected_year}
+               - "status" = "Completed", "On Going", "Extended".
             - Use the "doi" field directly as provided, without modifying or guessing it.
             - This doi field may contain formal DOIs (e.g., doi.org, hdl.handle.net) or other evidence links (e.g., alliancebioversityciat.org, cgspace.cgiar.org, linkedin.com, youtu.be). All are valid and should be included.
             - All dois must be formatted in markdown link style.
+            - Refer to each deliverable according to its "status" field:
+               - If "status" is "Completed", use past tense (e.g., "was completed", "was developed", "was delivered").
+               - If "status" is "On Going" or "Extended", use present tense (e.g., "is being developed", "is under preparation", "is ongoing").
+               - The choice of verb tense should reflect whether the deliverable is finalized or still in progress.
             - Do not repeat the same "doi" multiple times for the same cluster.
-         - From 'table_type' = 'oicrs':
-            - Include relevant OICRs that match:
-               - `cluster_acronym` of the current cluster
-               - `indicator_acronym = {selected_indicator}` if it is equal to: PDO Indicator 1, PDO Indicator 2, PDO Indicator 3, PDO Indicator 4 or PDO Indicator 5.
-            - Use the "link_pdf_file" field to include links to OICRs as markdown hyperlinks.
-            - Include a brief description of the OICR, as evidence of the impact achieved by the cluster.
-         - From 'table_type' = 'innovations':
-            - Include relevant innovations that match:
-               - `cluster_acronym` of the current cluster
-               - `indicator_acronym = {selected_indicator}` if it is equal to: IPI 1.1, IPI 1.2, IPI 1.3, IPI 1.4, IPI 2.1, IPI 2.2, IPI 2.3, IPI 3.1, IPI 3.2, IPI 3.3, or IPI 3.4.
-            - Use the "link_pdf_file" field to include links to innovations as markdown hyperlinks.
-            - Include a brief description of the innovation, as evidence of the impact achieved by the cluster.
-         - If no deliverables, OICRs, or innovations are available for a cluster, state:
-            “As of mid-year {selected_year}, deliverables, OICRs, or innovations were reported for the {selected_indicator} in the {{cluster_acronym}} cluster.”
-         - Integrate specific examples showing tangible outputs (tools, platforms, trainings, innovations).
-         - Describe how gender, youth, or social inclusion was addressed, if applicable.
+            - PRIORITIZATION LOGIC:
+               - First, prioritize deliverables explicitly mentioned in the "Milestone expected narrative" text from "contributions".
+                 - These may appear as IDs like "D26603" or "deliverable 26603", or be listed with numbers or line breaks.
+                 - If a deliverable is referenced in that narrative, highlight it first in the paragraph.
+               - Then, include other deliverables (even if not mentioned in the narrative).
+               - Always include all DOIs you find, regardless of whether they were mentioned in the milestone narrative.
+               - If there are too many deliverables, group them logically (e.g., by type or theme), but still ensure all DOIs are listed.
+               - If a deliverable is mentioned in the "Milestone expected narrative" and it has a DOI, ensure the DOI markdown link is included exactly at the point where the deliverable is mentioned in the narrative.
+               - Always attach the DOI immediately after the deliverable reference so the reader can directly access it.
+            - Do **NOT OMIT** this even if other sources (like oicrs or innovations) are also present.
+         
+         - Only if indicator is "PDO Indicator 1", "PDO Indicator 2", "PDO Indicator 3", "PDO Indicator 4", or "PDO Indicator 5" include:
+            - From "table_type" = "oicrs":
+               - Filter by "cluster_acronym" = current cluster.
+               - Always include the "link_pdf_oicr" as a markdown-style hyperlink.
+               - Write a concise summary of the OICR.
+               - These reports validate impact and should be prioritized when available.
+         
+         - Only if indicator is "IPI 2.1", "IPI 2.2", "IPI 2.3", "IPI 3.1", "IPI 3.2", "IPI 3.3", or "IPI 3.4", include:
+            - From "table_type" = "innovations":
+               - Filter by "cluster_acronym" = current cluster.
+               - Always include the "link_pdf_innovation" as a markdown hyperlink.
+               - Briefly describe the innovation.
+               - Keep the synthesis short and focused on what makes this innovation important for the current cluster.
       
       - **Second paragraph**: 
-         - From 'table_type' = 'questions':
-            - Craft a concise narrative that naturally integrates the themes of the `"questions"` and the corresponding `"narrative"` responses, without explicitly restating either. 
+         - In this paragraph, DONT'T INCLUDE ANYTHING FROM "contributions", "deliverables", "oicrs", or "innovations" table types.
+         - From "table_type" = "questions":
+            - Craft a concise narrative that naturally integrates the themes of the "questions" and the corresponding "narrative" responses, without explicitly restating either. 
             - Synthesize the content to highlight key elements such as implementation context, inclusion strategies, technologies, expected outcomes, or rationale behind planned targets. 
-            - Only include entries where `indicator_acronym` = `{selected_indicator}`, `cluster_acronym` matches the current cluster, and `phase_name` = `"Progress"`. 
+            - Only include entries that match:
+               - "indicator_acronym" = {selected_indicator}
+               - "cluster_acronym" = current cluster
             - Disregard any responses that are empty or marked as "NA".
 
-   - If no deliverables, OICRs, or innovations are available for a cluster, state:
-      “As of mid-year {selected_year}, deliverables, OICRs, or innovations were reported for the {selected_indicator} in the {{cluster_acronym}} cluster.”
-   - Integrate specific examples showing tangible outputs (tools, platforms, trainings, innovations).
-   - Describe how gender, youth, or social inclusion was addressed, if applicable.
-   - Do not group clusters. Each must be clearly and separately described.
+- Do not group clusters. Each must be clearly and separately described.
    
 ## 2. End-of-Narrative Data Paragraph for Table Reference
 - Begin with some context about the indicator and its progress by mid-year.
@@ -117,6 +140,8 @@ This ensures that all evidence and content corresponds to mid-year progress in t
 - Quantitative values must be naturally embedded in the narrative. Use percentages in parentheses when helpful (e.g., 38 out of 80, or 48%).
 - Use “By mid-year {selected_year}…” or “As of July {selected_year}…” for temporal framing.
 - When referring to deliverables, include the "doi". Format links as markdown-style hyperlinks or “[doi]: (value)”. Display the full DOI link, and include some context about the deliverable.
+- When referring to oicrs, include the "link_pdf_oicr". Format links as markdown-style hyperlinks or “[link_pdf_oicr]: (value)”. Display the full link, and include some context about the oicr.
+- When referring to innovations, include the "link_pdf_innovation". Format links as markdown-style hyperlinks or “[link_pdf_innovation]: (value)”. Display the full link, and include some context about the innovation.
 - Never cite filenames, JSON, or input schema; use only the content.
 
 ------
@@ -124,12 +149,12 @@ This ensures that all evidence and content corresponds to mid-year progress in t
 # FINAL OUTPUT FORMAT
 
 1. **Title** 
-   - indicator_title for `indicator_acronym = {selected_indicator}`.
+   - indicator_title for "indicator_acronym" = {selected_indicator}.
 
 2. **Indicator Narrative**  
    [Detailed narrative following structure above.]
    - Cluster names must be **bolded** in the output.
-   - All links to deliverables ("doi"), oicrs ("link_pdf_file") and innovations ("link_pdf_file") must be active and accessible; format them as markdown hyperlinks.
+   - All links to deliverables ("doi"), oicrs ("link_pdf_oicr") and innovations ("link_pdf_innovation") must be active and accessible; format them as markdown-style hyperlinks.
    - Keep the narrative concise and focused. Avoid overly long paragraphs. Prioritize clarity and brevity.
 
 3. **Data for Summary Table**  
