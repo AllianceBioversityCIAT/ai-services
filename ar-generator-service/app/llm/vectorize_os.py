@@ -188,6 +188,7 @@ def retrieve_context(query, indicator, year, top_k=10000):
         logger.info("📚 Retrieving relevant context from OpenSearch...")
         embedding = get_bedrock_embeddings([query])[0]
         
+        ## VECTOR SEARCH
         knn_query = {
             "size": top_k,
             "query": {
@@ -213,6 +214,7 @@ def retrieve_context(query, indicator, year, top_k=10000):
         knn_response = opensearch.search(index=INDEX_NAME, body=knn_query)
         knn_chunks = [hit["_source"]["chunk"] for hit in knn_response["hits"]["hits"]]
 
+        ## DOI SEARCH
         doi_query = {
             "size": 10000,
             "query": {
@@ -230,6 +232,7 @@ def retrieve_context(query, indicator, year, top_k=10000):
         doi_response = opensearch.search(index=INDEX_NAME, body=doi_query)
         doi_chunks = [hit["_source"]["chunk"] for hit in doi_response["hits"]["hits"]]
 
+        ## COMBINE CHUNKS
         seen_keys = set()
         combined_chunks = []
 
@@ -246,7 +249,18 @@ def retrieve_context(query, indicator, year, top_k=10000):
             else:
                 combined_chunks.append(chunk)
 
-        return combined_chunks
+        filtered_chunks = [
+            chunk for chunk in combined_chunks
+            if not (
+                (chunk.get("table_type") == "questions" and chunk.get("phase_name") == "AWPB")
+                or
+                (chunk.get("table_type") == "deliverables" and chunk.get("cluster_role") == "Shared")
+                or
+                (chunk.get("table_type") == "innovations" and chunk.get("cluster_role") == "Shared")
+            )
+        ]
+
+        return filtered_chunks
     
     except Exception as e:
         logger.error(f"❌ Error retrieving context: {e}")
@@ -254,19 +268,19 @@ def retrieve_context(query, indicator, year, top_k=10000):
 
 
 def calculate_summary(indicator, year):
-            df_contributions = load_data("vw_ai_project_contribution")
-            df_filtered = df_contributions[
-                (df_contributions["indicator_acronym"] == indicator) &
-                (df_contributions["year"] == year)
-            ]
-            total_expected = df_filtered["Milestone expected value"].sum()
-            total_achieved = df_filtered["Milestone reported value"].sum()
-            progress = round((total_achieved / total_expected) * 100, 2) if total_expected > 0 else 0
+    df_contributions = load_data("vw_ai_project_contribution")
+    df_filtered = df_contributions[
+        (df_contributions["indicator_acronym"] == indicator) &
+        (df_contributions["year"] == year)
+    ]
+    total_expected = df_filtered["Milestone expected value"].sum()
+    total_achieved = df_filtered["Milestone reported value"].sum()
+    progress = round((total_achieved / total_expected) * 100, 2) if total_expected > 0 else 0
 
-            def clean_number(n):
-                return int(n) if float(n).is_integer() else round(n, 2)
+    def clean_number(n):
+        return int(n) if float(n).is_integer() else round(n, 2)
 
-            return clean_number(total_expected), clean_number(total_achieved), clean_number(progress)
+    return clean_number(total_expected), clean_number(total_achieved), clean_number(progress)
 
 
 def extract_dois_from_text(text):
