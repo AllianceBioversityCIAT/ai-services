@@ -272,6 +272,7 @@ def extract_dois_from_text(text):
 
     return set(markdown_links + plain_links)
 
+
 def add_missed_links(report, context):
     logger.info("📍 Adding missed links to the report...")
     context_dois = {chunk.get("doi") for chunk in context if "doi" in chunk and chunk["doi"]}
@@ -325,6 +326,7 @@ def run_pipeline(indicator, year, insert_data=False):
                 Using this information:\n{questions}\n\n
                 Do the following:\n{TARGET_PROMPT}
                 """
+            
             logger.info("☑️  Starting disaggregated targets report generation...")
             targets_report = invoke_model(query_questions)
             
