@@ -40,7 +40,6 @@ The narrative must be built using the structured data extracted from AICCRA's in
 
 - "contributions": Cluster-submitted contributions that contain milestone targets and results, descriptive narratives, project links, cluster names, and indicator names.
 - "deliverables": Records of project outputs and evidence products. These include deliverable titles, project links, DOIs, and dissemination formats.
-- "questions": Responses to indicator-specific questions that contextualize each cluster's planned activities, gender and inclusion considerations, targeted technologies, estimated beneficiary reach, and bundling strategies. These help explain the rationale or expectations behind quantitative targets or implementation choices.
 - "oicrs": Documented Outcome Impact Case Reports (OICRs) that capture how AICCRA-supported innovations or partnerships led to real-world results. These may include impact narratives, geographic and institutional context, partnerships, and links to PDF official reports. Use OICRs to highlight validated outcomes, partnerships, and scaling evidence where relevant.
 - "innovations": Records of climate-relevant innovations (tools, platforms, practices, etc.) developed or enhanced by AICCRA. Each record includes the innovation title, type, readiness level, involved institutions, and thematic focus. Use these entries to substantiate claims about technical or policy innovations, tool readiness, or gender/youth relevance.
 
@@ -53,76 +52,50 @@ This ensures that all evidence and content corresponds to mid-year progress in t
 
 ## 1. Indicator Narrative
 - Per cluster_acronym:
-   - Two paragraphs:
-      - **First paragraph**: Based on the records from "contributions", "deliverables", "oicrs", and "innovations". Include achieved values, doi links, brief summaries of innovations or OICRs, and mention of progress with supporting data as described below.
-         - Follow this order to build the paragraph:
-            1. Start with data from "contributions":
-               - Include mid-year achieved vs. expected values, and percentage progress.
-            2. Then include data from "deliverables":
-               - List all valid DOIs as markdown hyperlinks.
-            3. Depending on the indicator:
-               - If it is one of the PDO indicators, include oicrs.
-               - If it is one of the IPI indicators, include innovations.
-         - In this paragraph, DONT'T INCLUDE ANYTHING FROM "questions" table type.
-         - Describe activities planned under the indicator and their current status.
-         - Integrate specific examples showing tangible outputs (tools, platforms, trainings, innovations).
-         - Describe how gender, youth, or social inclusion was addressed, if applicable.
-         
-         - From "table_type" = "contributions":
-            - State the achieved value as of mid-year and compare it to the annual target. Include the percentage progress. Example:
-               “By mid-year {selected_year}, AICCRA has achieved {{Milestone reported value}} out of the annual target of {{Milestone expected value}} for {selected_indicator} and cluster, representing {{percentage}}% progress.”
-               - If the indicator involves hectares, number of tools developed, policies influenced, percentages, or beneficiary numbers, include the appropriate units.
-               - Do not fabricate progress data if it is not explicitly available in the input.
-        
-         - From "table_type" = "deliverables":
-            - Use the "doi" field from "vw_ai_deliverables" to include links to deliverables, when available.
-            - Include all deliverables that match:
-               - "cluster_acronym" of the current cluster
-               - "indicator_acronym" = {selected_indicator}
-               - "year" = {selected_year}
-               - "status" = "Completed", "On Going", "Extended".
-            - Use the "doi" field directly as provided, without modifying or guessing it.
-            - This doi field may contain formal DOIs (e.g., doi.org, hdl.handle.net) or other evidence links (e.g., alliancebioversityciat.org, cgspace.cgiar.org, linkedin.com, youtu.be). All are valid and should be included.
-            - All dois must be formatted in markdown link style.
-            - Refer to each deliverable according to its "status" field:
-               - If "status" is "Completed", use past tense (e.g., "was completed", "was developed", "was delivered").
-               - If "status" is "On Going" or "Extended", use present tense (e.g., "is being developed", "is under preparation", "is ongoing").
-               - The choice of verb tense should reflect whether the deliverable is finalized or still in progress.
-            - Do not repeat the same "doi" multiple times for the same cluster.
-            - PRIORITIZATION LOGIC:
-               - First, prioritize deliverables explicitly mentioned in the "Milestone expected narrative" text from "contributions".
-                 - These may appear as IDs like "D26603" or "deliverable 26603", or be listed with numbers or line breaks.
-                 - If a deliverable is referenced in that narrative, highlight it first in the paragraph.
-               - Then, include other deliverables (even if not mentioned in the narrative).
-               - Always include all DOIs you find, regardless of whether they were mentioned in the milestone narrative.
-               - If there are too many deliverables, group them logically (e.g., by type or theme), but still ensure all DOIs are listed.
-               - If a deliverable is mentioned in the "Milestone expected narrative" and it has a DOI, ensure the DOI markdown link is included exactly at the point where the deliverable is mentioned in the narrative.
-               - Always attach the DOI immediately after the deliverable reference so the reader can directly access it.
-            - Do **NOT OMIT** this even if other sources (like oicrs or innovations) are also present.
-         
-         - Only if indicator is "PDO Indicator 1", "PDO Indicator 2", "PDO Indicator 3", "PDO Indicator 4", or "PDO Indicator 5" include:
-            - From "table_type" = "oicrs":
-               - Filter by "cluster_acronym" = current cluster.
-               - Always include the "link_pdf_oicr" as a markdown-style hyperlink.
-               - Write a concise summary of the OICR.
-               - These reports validate impact and should be prioritized when available.
-         
-         - Only if indicator is "IPI 2.1", "IPI 2.2", "IPI 2.3", "IPI 3.1", "IPI 3.2", "IPI 3.3", or "IPI 3.4", include:
-            - From "table_type" = "innovations":
-               - Filter by "cluster_acronym" = current cluster.
-               - Always include the "link_pdf_innovation" as a markdown hyperlink.
-               - Briefly describe the innovation.
-               - Keep the synthesis short and focused on what makes this innovation important for the current cluster.
-      
-      - **Second paragraph**: 
-         - In this paragraph, DONT'T INCLUDE ANYTHING FROM "contributions", "deliverables", "oicrs", or "innovations" table types.
-         - From "table_type" = "questions":
-            - Craft a concise narrative that naturally integrates the themes of the "questions" and the corresponding "narrative" responses, without explicitly restating either. 
-            - Synthesize the content to highlight key elements such as implementation context, inclusion strategies, technologies, expected outcomes, or rationale behind planned targets. 
-            - Only include entries that match:
-               - "indicator_acronym" = {selected_indicator}
-               - "cluster_acronym" = current cluster
-            - Disregard any responses that are empty or marked as "NA".
+   - Include achieved values, doi links, brief summaries of innovations or OICRs, and mention of progress with supporting data as described below.
+   - Describe activities planned under the indicator and their current status.
+   - Integrate specific examples showing tangible outputs (tools, platforms, trainings, innovations).
+   - Describe how gender, youth, or social inclusion was addressed, if applicable.
+   
+   - From "table_type" = "contributions":
+      - State the achieved value as of mid-year and compare it to the annual target. Include the percentage progress. Example:
+         “By mid-year {selected_year}, AICCRA has achieved {{Milestone reported value}} out of the annual target of {{Milestone expected value}} for {selected_indicator} and cluster, representing {{percentage}}% progress.”
+         - If the indicator involves hectares, number of tools developed, policies influenced, percentages, or beneficiary numbers, include the appropriate units.
+         - Do not fabricate progress data if it is not explicitly available in the input.
+   
+   - From "table_type" = "deliverables":
+      - Use the "doi" field from "vw_ai_deliverables" to include links to deliverables, when available.
+      - Include all deliverables that match:
+         - "cluster_acronym" of the current cluster
+         - "indicator_acronym" = {selected_indicator}
+         - "year" = {selected_year}
+         - "status" = "Completed", "On Going", "Extended".
+      - Use the "doi" field directly as provided, without modifying or guessing it.
+      - This doi field may contain formal DOIs (e.g., doi.org, hdl.handle.net) or other evidence links (e.g., alliancebioversityciat.org, cgspace.cgiar.org, linkedin.com, youtu.be). All are valid and should be included.
+      - All dois must be formatted in markdown link style.
+      - Refer to each deliverable according to its "status" field:
+         - If "status" is "Completed", use past tense (e.g., "was completed", "was developed", "was delivered").
+         - If "status" is "On Going" or "Extended", use present tense (e.g., "is being developed", "is under preparation", "is ongoing").
+         - The choice of verb tense should reflect whether the deliverable is finalized or still in progress.
+      - Do not repeat the same "doi" multiple times for the same cluster.
+      - Try to relate the deliverables with the narrative mentioned in "Milestone expected narrative" from "table_type" = "contributions".
+      - Do **NOT OMIT** these dois even if other sources (like oicrs or innovations) are also present.
+   
+   - ONLY if indicator is one of: "PDO Indicator 1", "PDO Indicator 2", "PDO Indicator 3", "PDO Indicator 4", or "PDO Indicator 5" include:
+      - From "table_type" = "oicrs":
+         - Filter by "cluster_acronym" = current cluster.
+         - Always include the "link_pdf_oicr" as a markdown-style hyperlink.
+         - Write a concise summary of the OICR.
+         - These reports validate impact and should be prioritized when available.
+         - For PDO indicators, it is not necessary to include innovations, as OICRs are more relevant.
+   
+   - ONLY if indicator is one of: "IPI 2.1", "IPI 2.2", "IPI 2.3", "IPI 3.1", "IPI 3.2", "IPI 3.3", or "IPI 3.4", include:
+      - From "table_type" = "innovations":
+         - Filter by "cluster_acronym" = current cluster.
+         - Always include the "link_pdf_innovation" as a markdown hyperlink.
+         - Briefly describe the innovation.
+         - Keep the synthesis short and focused on what makes this innovation important for the current cluster.
+         - For IPI indicators, it is not necessary to include OICRs, as innovations are more relevant.
 
 - Do not group clusters. Each must be clearly and separately described.
    
@@ -157,8 +130,8 @@ This ensures that all evidence and content corresponds to mid-year progress in t
    - All links to deliverables ("doi"), oicrs ("link_pdf_oicr") and innovations ("link_pdf_innovation") must be active and accessible; format them as markdown-style hyperlinks.
    - Keep the narrative concise and focused. Avoid overly long paragraphs. Prioritize clarity and brevity.
 
-3. **Data for Summary Table**  
-   - Subtitle for this section: "Information for Summary Table"
+3. **Summary data**  
+   - Subtitle for this section: "Summary"
    - This section (paragraph) includes a concise summary of the indicator's progress, across all clusters, following the instructions detailed above. 
 
 """
