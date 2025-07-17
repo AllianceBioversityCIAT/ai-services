@@ -8,18 +8,12 @@ from db_conn.mysql_connection import load_data
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import BR, OPENSEARCH
 from opensearchpy import OpenSearch, RequestsHttpConnection
+from app.llm.invoke_llm import invoke_model, get_bedrock_embeddings
 from app.utils.prompts.diss_targets_prompt import generate_target_prompt
 from app.utils.prompts.report_generation_prompt import generate_report_prompt
 
 
 logger = get_logger()
-
-bedrock_runtime = boto3.client(
-    service_name='bedrock-runtime',
-    aws_access_key_id=BR['aws_access_key'],
-    aws_secret_access_key=BR['aws_secret_key'],
-    region_name=BR['region']
-)
 
 credentials = boto3.Session(
     aws_access_key_id=OPENSEARCH['aws_access_key'],
@@ -39,71 +33,6 @@ opensearch = OpenSearch(
 )
 
 INDEX_NAME = OPENSEARCH['index']
-
-
-def get_bedrock_embeddings(texts):
-    embeddings = []
-    for text in texts:
-        try:
-            response = bedrock_runtime.invoke_model(
-                modelId="amazon.titan-embed-text-v2:0",
-                body=json.dumps({"inputText": text}),
-                contentType="application/json",
-                accept="application/json"
-            )
-            result = json.loads(response["body"].read())
-            embeddings.append(result["embedding"])
-        except Exception as e:
-            logger.error(f"❌ Error generating embedding for text: {e}")
-            embeddings.append([])
-    return embeddings
-
-
-def invoke_model(prompt):
-    try:
-        logger.info("✍️  Generating report with LLM...")
-        logger.info("🚀 Invoking the model...")
-        request_body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 8000,
-            "temperature": 0.1,
-            "top_k": 250,
-            "top_p": 0.999,
-            "stop_sequences": [],
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": f"{prompt}"}
-                    ]
-                }
-            ]
-        }
-        response_stream = bedrock_runtime.invoke_model_with_response_stream(
-            modelId="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-            # modelId="us.anthropic.claude-sonnet-4-20250514-v1:0",
-            body=json.dumps(request_body),
-            contentType="application/json",
-            accept="application/json"
-        )
-
-        full_response = ""
-        for event in response_stream["body"]:
-            chunk = event.get("chunk")
-            if chunk and "bytes" in chunk:
-                bytes_data = chunk["bytes"]
-                parsed = json.loads(bytes_data.decode("utf-8"))
-                part = parsed.get("delta", {}).get("text", "")
-                if part:
-                    full_response += part
-                    # print(part, end="", flush=True)
-                    # yield part           
-
-        return full_response     
-
-    except Exception as e:
-        logger.error(f"❌ Error invoking the model: {str(e)}")
-        raise
 
 
 def create_index_if_not_exists(dimension=1024):
@@ -343,6 +272,20 @@ def extract_dois_from_text(text):
 
     return set(markdown_links + plain_links)
 
+def add_missed_links(report, context):
+    logger.info("📍 Adding missed links to the report...")
+    context_dois = {chunk.get("doi") for chunk in context if "doi" in chunk and chunk["doi"]}
+    used_dois = extract_dois_from_text(report)
+    missed_dois = context_dois - used_dois
+
+    if missed_dois:
+        missed_section = "\n\n## Missed links\nThe following references were part of the context but not explicitly included:\n"
+        doi_to_cluster = {chunk["doi"]: chunk.get("cluster_acronym", "N/A") for chunk in context if "doi" in chunk and chunk["doi"]}
+        missed_section += "\n".join(f"- {doi} (Cluster: {doi_to_cluster.get(doi, 'N/A')})" for doi in sorted(missed_dois))
+        report += missed_section
+    
+    return report
+
 
 def run_pipeline(indicator, year, insert_data=False):
     try:
@@ -377,14 +320,12 @@ def run_pipeline(indicator, year, insert_data=False):
 
         if indicator in accepted_indicators:
             TARGET_PROMPT = generate_target_prompt(indicator)
-
-            save_context_to_file(questions, "targets", indicator, year)
             
             query_questions = f"""
                 Using this information:\n{questions}\n\n
                 Do the following:\n{TARGET_PROMPT}
                 """
-
+            logger.info("☑️  Starting disaggregated targets report generation...")
             targets_report = invoke_model(query_questions)
             
             ## Combine both reports
@@ -392,19 +333,10 @@ def run_pipeline(indicator, year, insert_data=False):
             generated_report += targets_section
         
         ## Part 3: Add missed links section
-        logger.info("📍 Adding missed links to the report...")
-        context_dois = {chunk.get("doi") for chunk in context if "doi" in chunk and chunk["doi"]}
-        used_dois = extract_dois_from_text(generated_report)
-        missed_dois = context_dois - used_dois
-
-        if missed_dois:
-            missed_section = "\n\n## Missed links\nThe following references were part of the context but not explicitly included:\n"
-            doi_to_cluster = {chunk["doi"]: chunk.get("cluster_acronym", "N/A") for chunk in context if "doi" in chunk and chunk["doi"]}
-            missed_section += "\n".join(f"- {doi} (Cluster: {doi_to_cluster.get(doi, 'N/A')})" for doi in sorted(missed_dois))
-            generated_report += missed_section
+        final_report = add_missed_links(generated_report, context)
 
         logger.info("✅ Report generation completed successfully.")
-        return generated_report
+        return final_report
 
     except Exception as e:
         logger.error(f"❌ Error in pipeline execution: {e}")
