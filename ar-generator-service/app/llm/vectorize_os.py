@@ -282,7 +282,10 @@ def add_missed_links(report, context):
     if missed_dois:
         missed_section = "\n\n## Missed links\nThe following references were part of the context but not explicitly included:\n"
         doi_to_cluster = {chunk["doi"]: chunk.get("cluster_acronym", "N/A") for chunk in context if "doi" in chunk and chunk["doi"]}
-        missed_section += "\n".join(f"- {doi} (Cluster: {doi_to_cluster.get(doi, 'N/A')})" for doi in sorted(missed_dois))
+        missed_section += "\n".join(
+            f"- [{doi}]({doi}) (Cluster: {doi_to_cluster.get(doi, 'N/A')})"
+            for doi in sorted(missed_dois)
+        )
         report += missed_section
     
     return report
@@ -326,7 +329,6 @@ def run_pipeline(indicator, year, insert_data=False):
                 Using this information:\n{questions}\n\n
                 Do the following:\n{TARGET_PROMPT}
                 """
-
             logger.info("☑️  Starting disaggregated targets report generation...")
             targets_report = invoke_model(query_questions)
             
