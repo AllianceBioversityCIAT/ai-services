@@ -138,7 +138,6 @@ def load_data(table_name):
             df = df_grouped.reset_index()
             df["table_type"] = "innovations"
 
-        df.to_json(f'{table_name}.jsonl', orient='records', lines=True, force_ascii=False)
         df.to_csv(f'{table_name}.csv', index=False)
 
         file_key = f'aiccra/{table_name}.jsonl'
