@@ -278,6 +278,7 @@ def add_missed_links(report, context):
     context_dois = {chunk.get("doi") for chunk in context if "doi" in chunk and chunk["doi"]}
     used_dois = extract_dois_from_text(report)
     missed_dois = context_dois - used_dois
+    missed_dois = {doi for doi in missed_dois if doi and doi.strip().lower() != "confidential"}
 
     if missed_dois:
         missed_section = "\n\n## Missed links\nThe following references were part of the context but not explicitly included:\n"
