@@ -46,17 +46,14 @@ Write a single, well-structured paragraph that:
    “By mid-year {selected_year}, AICCRA had already achieved {total_achieved} out of the annual target of {total_expected}, representing {progress}% progress for indicator {selected_indicator}.”
    - Include appropriate units when the indicator involves hectares, number of tools developed, policies influenced, percentages, or beneficiary numbers.
 - Summarizes key achievements for more relevant **cluster_acronym** contributing to this indicator, focusing on mid-year accomplishments.
-- From "table_type" = "deliverables", mention completed deliverables and include doi links for the most important or impactful ones. Try to relate deliverables with the narrative mentioned in "Milestone expected narrative" from "contributions".
-- Format links as markdown-style hyperlinks or “[doi]: (value)”.
+- From "table_type" = "deliverables", mention only completed deliverables and include doi links for the most important or impactful ones. Try to relate deliverables with the narrative mentioned in "Milestone expected narrative" from "contributions".
+- Format deliverables as [title](doi). Include the full title.
 - Keep the narrative cohesive and concise without unnecessary detail.
 - Integrate specific examples showing tangible outputs such as tools, platforms, trainings, and innovations.
 - Describe how gender, youth, or social inclusion was addressed, if applicable.
 - Do not fabricate progress data if not explicitly available in the input.
 - Use the "doi" field directly as provided, without modifying or guessing it.
-- Refer to each deliverable according to its "status" field:
-   - If "status" is "Completed", use past tense (e.g., "was completed", "was developed", "was delivered").
-   - If "status" is "On Going" or "Extended", use present tense (e.g., "is being developed", "is under preparation", "is ongoing").
-   - The choice of verb tense should reflect whether the deliverable is finalized or still in progress.
+- Do not include deliverables with "status" other than "Completed".
 
 ------
 
@@ -88,6 +85,7 @@ Write a single, well-structured paragraph that:
 - When referring to OICRs, include the "link_pdf_oicr" formatted as markdown links with full URL and context.
 - When referring to innovations, include the "link_pdf_innovation" formatted as markdown links with full URL and context.
 - Never cite filenames, JSON, or input schema; use only the content.
+- The narrative must be fluent and naturally flowing, ensuring smooth transitions between ideas.
 
 ------
 
@@ -98,6 +96,7 @@ Write a single, well-structured paragraph that:
 - Keep the narrative concise and focused. Avoid overly long paragraphs. Prioritize clarity and brevity.
 - The paragraph must not exceed 250 words and must include at least 5 links to deliverables, OICRs, or innovations.
 - Do not repeat the same DOI multiple times for the same indicator.
+- The narrative must maintain a fluent, cohesive flow, avoiding abrupt or disjointed sentences.
 
 ------
 
@@ -116,10 +115,12 @@ Write a single, well-structured paragraph that:
 - [ ] Ensure the narrative is based strictly on mid-year progress data for {selected_year} and {selected_indicator}.
 - [ ] Include the progress summary with total achieved vs. total expected and progress percentage.
 - [ ] Summarize key achievements for contributing clusters, with cluster names bolded.
-- [ ] Mention completed and ongoing deliverables with correct verb tense and markdown DOI links.
+- [ ] Only include deliverables with "status" = "Completed".
+- [ ] Format deliverables as [deliverable title](doi link) instead of showing the link directly.
 - [ ] Include OICRs for PDO indicators and innovations for IPI indicators only, with proper markdown links.
 - [ ] Maintain a formal, fluent, and informative tone throughout.
 - [ ] Avoid repeating DOIs or links and keep the narrative concise.
 - [ ] Format all links as markdown-style hyperlinks and ensure clarity and readability.
+- [ ] Ensure the narrative is fluent and naturally flowing, with smooth transitions.
 
 """

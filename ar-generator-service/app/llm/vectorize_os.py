@@ -248,7 +248,7 @@ def run_pipeline(indicator, year, insert_data=False):
 
         PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
         
-        context, questions = retrieve_context(PROMPT, indicator, year)
+        context = retrieve_context(PROMPT, indicator, year)
         save_context_to_file(context, "context", indicator, year)
 
         query = f"""
