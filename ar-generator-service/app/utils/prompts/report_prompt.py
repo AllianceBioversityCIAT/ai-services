@@ -73,7 +73,7 @@ Write a single, well-structured paragraph that:
 ------
 
 # OUTPUT REQUIREMENTS
-- The final paragraph must be a single cohesive narrative with a maximum length of 800 words.
+- The final paragraph must be a single cohesive narrative with a maximum length of 250 words.
 - The final paragraph must include at least 5 active links to deliverables, OICRs, or innovations, formatted as markdown-style hyperlinks.
 - Ensure clarity and conciseness while meeting the word and link requirements.
 
@@ -96,7 +96,7 @@ Write a single, well-structured paragraph that:
 - All links to deliverables, OICRs, and innovations must be active and accessible; format them as markdown-style hyperlinks.
 - Cluster names must be **bolded** in the output.
 - Keep the narrative concise and focused. Avoid overly long paragraphs. Prioritize clarity and brevity.
-- The paragraph must not exceed 800 words and must include at least 5 links to deliverables, OICRs, or innovations.
+- The paragraph must not exceed 250 words and must include at least 5 links to deliverables, OICRs, or innovations.
 - Do not repeat the same DOI multiple times for the same indicator.
 
 ------
