@@ -278,7 +278,7 @@ ar-generator-service/
 │       └── s3/                    # S3 integration
 ├── data/logs/                     # Application logs
 └── db_conn/                       
-    └── mysql_connection.py        # Lakehouse connection
+    └── sql_connection.py        # Lakehouse connection
 
 ```
 
