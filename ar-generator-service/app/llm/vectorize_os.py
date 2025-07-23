@@ -4,10 +4,10 @@ import boto3
 import numpy as np
 import pandas as pd
 from requests_aws4auth import AWS4Auth
-from db_conn.sql_connection import load_data
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import BR, OPENSEARCH
 from opensearchpy import OpenSearch, RequestsHttpConnection
+from db_conn.sql_connection import load_data, load_full_data
 from app.utils.prompts.report_prompt import generate_report_prompt
 from app.llm.invoke_llm import invoke_model, get_bedrock_embeddings
 from app.utils.prompts.diss_targets_prompt import generate_target_prompt
@@ -31,7 +31,8 @@ opensearch = OpenSearch(
     connection_class=RequestsHttpConnection
 )
 
-INDEX_NAME = OPENSEARCH['index']
+# INDEX_NAME = OPENSEARCH['index']
+INDEX_NAME = "aiccra-chatbot-index"
 
 
 def create_index_if_not_exists(dimension=1024):
@@ -73,11 +74,15 @@ def create_index_if_not_exists(dimension=1024):
         return False
 
 
-def insert_into_opensearch(table_name: str):
+def insert_into_opensearch(table_name: str, mode: str):
     try:
         logger.info(f"🔍 Processing table: {table_name}")
 
-        df = load_data(table_name)
+        if mode == "generator":
+            df = load_data(table_name)
+        else:
+            df = load_full_data(table_name)
+        
         rows = df.to_dict(orient="records")
 
         date_fields = ["last_updated_altmetric", "last_sync_almetric"]
@@ -238,27 +243,32 @@ def run_pipeline(indicator, year, insert_data=False):
                 logger.info(f"🗑️ Deleting existing index: {INDEX_NAME}")
                 opensearch.indices.delete(index=INDEX_NAME)
             create_index_if_not_exists()
-            insert_into_opensearch("vw_ai_deliverables")
-            insert_into_opensearch("vw_ai_project_contribution")
-            insert_into_opensearch("vw_ai_questions")
-            insert_into_opensearch("vw_ai_oicrs")
-            insert_into_opensearch("vw_ai_innovations")
+            # insert_into_opensearch("vw_ai_deliverables", mode="generator")
+            # insert_into_opensearch("vw_ai_project_contribution", mode="generator")
+            # insert_into_opensearch("vw_ai_questions", mode="generator")
+            # insert_into_opensearch("vw_ai_oicrs", mode="generator")
+            # insert_into_opensearch("vw_ai_innovations", mode="generator")
+            insert_into_opensearch("vw_ai_deliverables", mode="chatbot")
+            insert_into_opensearch("vw_ai_project_contribution", mode="chatbot")
+            insert_into_opensearch("vw_ai_questions", mode="chatbot")
+            insert_into_opensearch("vw_ai_oicrs", mode="chatbot")
+            insert_into_opensearch("vw_ai_innovations", mode="chatbot")
+
+        # total_expected, total_achieved, progress = calculate_summary(indicator, year)
+
+        # PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
         
-        total_expected, total_achieved, progress = calculate_summary(indicator, year)
+        # context = retrieve_context(PROMPT, indicator, year)
 
-        PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
-        
-        context = retrieve_context(PROMPT, indicator, year)
+        # query = f"""
+        #     Using this information:\n{context}\n\n
+        #     Do the following:\n{PROMPT}
+        #     """
 
-        query = f"""
-            Using this information:\n{context}\n\n
-            Do the following:\n{PROMPT}
-            """
+        # final_report = invoke_model(query)
 
-        final_report = invoke_model(query)
-
-        logger.info("✅ Report generation completed successfully.")
-        return final_report
+        # logger.info("✅ Report generation completed successfully.")
+        # return final_report
 
     except Exception as e:
         logger.error(f"❌ Error in pipeline execution: {e}")

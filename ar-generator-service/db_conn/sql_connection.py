@@ -138,6 +138,93 @@ def load_data(table_name):
             )
             df = df_grouped.reset_index()
             df["table_type"] = "innovations"
+                        
+        return df
+
+    except Exception as e:
+        logger.error(f"❌ Error while loading data from table {table_name}: {e}")
+        return pd.DataFrame()
+
+
+def load_full_data():
+    try:
+        logger.info("📂 Loading full data...")
+
+        ## SQL Server
+        conn_str = (
+            "DRIVER={ODBC Driver 18 for SQL Server};"
+            f"SERVER={server};"
+            f"DATABASE={database};"
+            "Encrypt=yes;"
+            "TrustServerCertificate=yes;"
+            "Authentication=ActiveDirectoryServicePrincipal;"
+            f"UID={client_id};"
+            f"PWD={client_secret};"
+        )
+
+        with pyodbc.connect(conn_str, timeout=10) as conn:
+            cursor = conn.cursor()
+        
+            for view_name, view_sql in CREATE_VIEW_QUERIES.items():
+                logger.info(f"🛠️ Creating or altering view: {view_name}")
+                cursor.execute(view_sql)
+            
+            conn.commit()
+            logger.info("✅ All views created successfully")
+            
+            logger.info(f"🔍 Inspecting the table: {table_name}")
+            cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+            count = cursor.fetchone()[0]
+            logger.info(f"📊 Number of records: {count}")
+            
+            df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
+
+        ## General processing
+        logger.info(f"Columns in {table_name}: {df.columns.tolist()}")
+
+        if table_name == "vw_ai_project_contribution":
+            df.rename(columns={'Phase name': 'phase_name', 'Phase year': 'year'}, inplace=True)
+            df = df.dropna(axis=1, how='all')
+            df["table_type"] = "contributions"
+        
+        elif table_name == "vw_ai_questions":
+            df = df.dropna(axis=1, how='all')
+            df["table_type"] = "questions"
+
+        elif table_name == "vw_ai_deliverables":
+            df = df.dropna(axis=1, how='all')
+            id_column = df.columns[0]
+            indicator_column = 'indicator_acronym'
+            cluster_column = 'cluster_acronym'
+            df_grouped = df.groupby([id_column, indicator_column, cluster_column]).agg(
+                lambda x: ', '.join(sorted(set(str(v) for v in x if pd.notnull(v) and v != "")))
+            )
+            df = df_grouped.reset_index()
+            df["table_type"] = "deliverables"
+        
+        elif table_name == "vw_ai_oicrs":
+            df.rename(columns={'link_pdf_file': 'link_pdf_oicr', 'oicr_year': 'year'}, inplace=True)
+            df = df.dropna(axis=1, how='all')
+            id_column = df.columns[0]
+            indicator_column = 'indicator_acronym'
+            cluster_column = 'cluster_acronym'
+            df_grouped = df.groupby([id_column, indicator_column, cluster_column]).agg(
+                lambda x: ', '.join(sorted(set(str(v) for v in x if pd.notnull(v) and v != "")))
+            )
+            df = df_grouped.reset_index()
+            df["table_type"] = "oicrs"
+        
+        else:
+            df.rename(columns={'link_pdf_file': 'link_pdf_innovation'}, inplace=True)
+            df = df.dropna(axis=1, how='all')
+            id_column = df.columns[0]
+            indicator_column = 'indicator_acronym'
+            cluster_column = 'cluster_acronym'
+            df_grouped = df.groupby([id_column, indicator_column, cluster_column]).agg(
+                lambda x: ', '.join(sorted(set(str(v) for v in x if pd.notnull(v) and v != "")))
+            )
+            df = df_grouped.reset_index()
+            df["table_type"] = "innovations"
 
         df.to_json(f'{table_name}.jsonl', orient='records', lines=True, force_ascii=False)
         df.to_csv(f'{table_name}.csv', index=False)
@@ -151,5 +238,5 @@ def load_data(table_name):
         return df
 
     except Exception as e:
-        logger.error(f"❌ Error while loading data from table {table_name}: {e}")
+        logger.error(f"❌ Error while loading full data from table {table_name}: {e}")
         return pd.DataFrame()
