@@ -146,7 +146,7 @@ def load_data(table_name):
         return pd.DataFrame()
 
 
-def load_full_data():
+def load_full_data(table_name):
     try:
         logger.info("📂 Loading full data...")
 
