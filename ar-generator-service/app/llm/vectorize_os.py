@@ -32,7 +32,7 @@ opensearch = OpenSearch(
 )
 
 # INDEX_NAME = OPENSEARCH['index']
-INDEX_NAME = "aiccra-chatbot-index"
+INDEX_NAME = "aiccra-indicators"
 
 
 def create_index_if_not_exists(dimension=1024):
@@ -242,17 +242,17 @@ def run_pipeline(indicator, year, insert_data=False):
             if opensearch.indices.exists(index=INDEX_NAME):
                 logger.info(f"🗑️ Deleting existing index: {INDEX_NAME}")
                 opensearch.indices.delete(index=INDEX_NAME)
-            create_index_if_not_exists()
+            # create_index_if_not_exists()
             # insert_into_opensearch("vw_ai_deliverables", mode="generator")
             # insert_into_opensearch("vw_ai_project_contribution", mode="generator")
             # insert_into_opensearch("vw_ai_questions", mode="generator")
             # insert_into_opensearch("vw_ai_oicrs", mode="generator")
             # insert_into_opensearch("vw_ai_innovations", mode="generator")
-            insert_into_opensearch("vw_ai_deliverables", mode="chatbot")
-            insert_into_opensearch("vw_ai_project_contribution", mode="chatbot")
-            insert_into_opensearch("vw_ai_questions", mode="chatbot")
-            insert_into_opensearch("vw_ai_oicrs", mode="chatbot")
-            insert_into_opensearch("vw_ai_innovations", mode="chatbot")
+            # insert_into_opensearch("vw_ai_deliverables", mode="chatbot")
+            # insert_into_opensearch("vw_ai_project_contribution", mode="chatbot")
+            # insert_into_opensearch("vw_ai_questions", mode="chatbot")
+            # insert_into_opensearch("vw_ai_oicrs", mode="chatbot")
+            # insert_into_opensearch("vw_ai_innovations", mode="chatbot")
 
         # total_expected, total_achieved, progress = calculate_summary(indicator, year)
 
