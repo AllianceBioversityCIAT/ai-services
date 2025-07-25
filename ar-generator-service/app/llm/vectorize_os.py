@@ -10,7 +10,6 @@ from opensearchpy import OpenSearch, RequestsHttpConnection
 from db_conn.sql_connection import load_data, load_full_data
 from app.utils.prompts.report_prompt import generate_report_prompt
 from app.llm.invoke_llm import invoke_model, get_bedrock_embeddings
-from app.utils.prompts.diss_targets_prompt import generate_target_prompt
 
 logger = get_logger()
 
