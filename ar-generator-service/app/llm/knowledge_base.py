@@ -16,7 +16,7 @@ bedrock_agent_runtime = boto3.client(
 )
 
 
-def query_knowledge_base(selected_indicator, selected_year, max_results=100):
+def query_knowledge_base(query, max_results=100):
     """
     Query the knowledge base and return generated text.
     
@@ -25,7 +25,7 @@ def query_knowledge_base(selected_indicator, selected_year, max_results=100):
     :return: Generated text from the knowledge base.
     """
 
-    query = generate_report_prompt(selected_indicator, selected_year)
+    #query = generate_report_prompt(selected_indicator, selected_year)
 
     response = bedrock_agent_runtime.retrieve_and_generate_stream(
         input={
@@ -39,7 +39,7 @@ def query_knowledge_base(selected_indicator, selected_year, max_results=100):
                 'retrievalConfiguration': {
                     'vectorSearchConfiguration': {
                         'numberOfResults': max_results,
-                        # 'overrideSearchType': 'HYBRID'|'SEMANTIC',
+                        # 'overrideSearchType': 'HYBRID',
                     }
                 },
                 'generationConfiguration': {
