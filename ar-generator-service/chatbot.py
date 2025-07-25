@@ -1,6 +1,9 @@
+import os
 import streamlit as st
+from datetime import datetime, timezone
 from app.llm.vectorize_os import run_chatbot
 from app.llm.knowledge_base import query_knowledge_base
+from app.utils.s3.upload_file_to_s3 import upload_file_to_s3
 
 st.set_page_config(page_title="AICCRA chatbot", page_icon="🤖", layout="wide")
 st.title("🤖 AICCRA Assistant")
@@ -38,10 +41,6 @@ if user_input:
     ## --- Save user message ---
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-    ## --- Log user input to a file ---
-    with open("user_inputs.log", "a", encoding="utf-8") as f:
-        f.write(user_input + "\n")
-
     with st.chat_message("user"):
         st.markdown(user_input)
     
@@ -69,6 +68,18 @@ if user_input:
 
             ## --- Save assistant response ---
             st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+            # --- Save interaction to S3 ---
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            file_name = f"interaction_{timestamp}.txt"
+            local_path = os.path.join("/tmp", file_name)
+
+            with open(local_path, "w", encoding="utf-8") as f:
+                f.write(f"User:\n{user_input}\n\nAssistant:\n{full_response}")
+
+            s3_key = f"aiccra/chatbot/chat_logs/{file_name}"
+            upload_file_to_s3(s3_key, local_path)
+            os.remove(local_path)
         
         except Exception as e:
             full_response = f"⚠️ An error occurred: {e}"
