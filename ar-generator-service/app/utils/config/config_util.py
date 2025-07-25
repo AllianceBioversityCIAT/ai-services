@@ -33,6 +33,7 @@ SQL_SERVER = {
 OPENSEARCH = {
     "host": os.getenv("OPENSEARCH_HOST"),
     "index": os.getenv("OPENSEARCH_INDEX_NAME"),
+    "index_chatbot": os.getenv("OPENSEARCH_INDEX_NAME_CHATBOT"),
     "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID_OS"),
     "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY_OS")
 }
