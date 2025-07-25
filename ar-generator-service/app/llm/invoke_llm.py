@@ -31,7 +31,7 @@ def get_bedrock_embeddings(texts):
     return embeddings
 
 
-def invoke_model(prompt):
+def invoke_model(prompt, mode):
     try:
         logger.info("✍️  Generating report with LLM...")
         logger.info("🚀 Invoking the model...")
@@ -59,19 +59,31 @@ def invoke_model(prompt):
             accept="application/json"
         )
 
-        full_response = ""
-        for event in response_stream["body"]:
-            chunk = event.get("chunk")
-            if chunk and "bytes" in chunk:
-                bytes_data = chunk["bytes"]
-                parsed = json.loads(bytes_data.decode("utf-8"))
-                part = parsed.get("delta", {}).get("text", "")
-                if part:
-                    full_response += part
-                    # print(part, end="", flush=True)
-                    # yield part           
+        if mode == "generator":
+            full_response = ""
+            for event in response_stream["body"]:
+                chunk = event.get("chunk")
+                if chunk and "bytes" in chunk:
+                    bytes_data = chunk["bytes"]
+                    parsed = json.loads(bytes_data.decode("utf-8"))
+                    part = parsed.get("delta", {}).get("text", "")
+                    if part:
+                        full_response += part
+            return full_response
 
-        return full_response     
+        elif mode == "chatbot":
+            for event in response_stream["body"]:
+                chunk = event.get("chunk")
+                if chunk and "bytes" in chunk:
+                    bytes_data = chunk["bytes"]
+                    parsed = json.loads(bytes_data.decode("utf-8"))
+                    part = parsed.get("delta", {}).get("text", "")
+                    if part:
+                        # print(part, end="", flush=True)
+                        yield part
+
+        else:
+            raise ValueError(f"Unknown mode: {mode}") 
 
     except Exception as e:
         logger.error(f"❌ Error invoking the model: {str(e)}")
