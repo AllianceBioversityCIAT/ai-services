@@ -41,6 +41,9 @@ if user_input:
     ## --- Save user message ---
     st.session_state.messages.append({"role": "user", "content": user_input})
 
+    if phase == "All phases" or indicator == "All indicators" or section == "All sections":
+        st.toast("💡 Tip: Your answers will be more precise if you apply filters from the sidebar.")
+
     with st.chat_message("user"):
         st.markdown(user_input)
     
