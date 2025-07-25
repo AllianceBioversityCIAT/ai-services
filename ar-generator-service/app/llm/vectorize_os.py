@@ -211,7 +211,7 @@ def retrieve_context(query, indicator, year, top_k=10000):
         return []
 
 
-def retrieve_context_chatbot(query, phase=None, indicator=None, section=None, top_k=300):
+def retrieve_context_chatbot(query, phase=None, indicator=None, section=None):
     """
     Retrieve context for the chatbot dynamically filtering by phase, indicator, and section (source_table).
     - phase: e.g., "Progress 2025", "AWPB 2025", "AR 2025", or "All phases"
@@ -220,6 +220,21 @@ def retrieve_context_chatbot(query, phase=None, indicator=None, section=None, to
     """
     try:
         logger.info("📚 Retrieving relevant context from OpenSearch with dynamic filters...")
+
+        selected_filters_count = 0
+        if phase and phase != "All phases":
+            selected_filters_count += 1
+        if indicator and indicator != "All indicators":
+            selected_filters_count += 1
+        if section and section != "All sections":
+            selected_filters_count += 1
+
+        # Adjust top_k based on filters
+        if selected_filters_count >= 2:
+            top_k = 10000
+        else:
+            top_k = 300
+
         embedding = get_bedrock_embeddings([query])[0]
 
         selected_year = None
