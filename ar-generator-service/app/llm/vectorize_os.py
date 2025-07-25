@@ -396,8 +396,7 @@ def run_chatbot(user_input, phase=None, indicator=None, section=None, insert_dat
             insert_into_opensearch("vw_ai_oicrs", mode="chatbot")
             insert_into_opensearch("vw_ai_innovations", mode="chatbot")
 
-        enriched_input = f"{user_input}. Context: AICCRA projects, deliverables, contributions, innovations, OICRs, clusters, indicators"
-        context = retrieve_context_chatbot(enriched_input, phase=phase, indicator=indicator, section=section)
+        context = retrieve_context_chatbot(user_input, phase=phase, indicator=indicator, section=section)
         # save_context_to_file(context, "context", indicator, phase)
 
         CHATBOT_PROMPT = generate_chatbot_prompt(phase, indicator, section)
