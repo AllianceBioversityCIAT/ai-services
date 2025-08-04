@@ -93,21 +93,37 @@ if user_input:
 
 
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
-    with st.form("feedback_form", clear_on_submit=True):
-        feedback = st.text_area("Give feedback on this response👇", placeholder="Was this helpful? Any suggestions or issues?")
-        submitted = st.form_submit_button("Submit feedback", type="primary")
-        if feedback and submitted:
-            try:
-                st.session_state.feedback_submitted = True
-                with open(st.session_state.feedback_local_path, "w", encoding="utf-8") as f:
-                    f.write(
-                        f"User:\n{st.session_state.messages[-2]['content']}\n\nAssistant:\n{st.session_state.messages[-1]['content']}\n\nFeedback:\n{feedback}"
-                    )
-                upload_file_to_s3(st.session_state.feedback_s3_key, st.session_state.feedback_local_path)
-                os.remove(st.session_state.feedback_local_path)
+    if "show_feedback_area" not in st.session_state:
+        st.session_state.show_feedback_area = False
+    
+    st.markdown("***Give feedback on this response*** :white_check_mark:")
+    feedback_ack = st.empty()
+    col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12, col13, col14 = st.columns([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+    with col1:
+        if st.button("👍", key="thumbs_up"):
+            st.session_state.show_feedback_area = False
+            feedback_ack.success("Thanks for your feedback!")
+    with col2:
+        if st.button("👎", key="thumbs_down"):
+            st.session_state.show_feedback_area = True
 
-                st.success("✅ Feedback submitted and saved.")
-                
-            except Exception as e:
-                st.error("❌ Failed to save feedback.")
-                logger.error(f"Failed to save feedback: {e}")
+    if st.session_state.show_feedback_area:
+        with st.form("feedback_form", clear_on_submit=True):
+            feedback = st.text_area("Tell us what went wrong 👇", placeholder="Any suggestions or issues?")
+            submitted = st.form_submit_button("Submit feedback", type="primary")
+            if submitted and feedback:
+                try:
+                    st.session_state.feedback_submitted = True
+                    with open(st.session_state.feedback_local_path, "w", encoding="utf-8") as f:
+                        f.write(
+                            f"User:\n{st.session_state.messages[-2]['content']}\n\nAssistant:\n{st.session_state.messages[-1]['content']}\n\nFeedback:\n{feedback}"
+                        )
+                    upload_file_to_s3(st.session_state.feedback_s3_key, st.session_state.feedback_local_path)
+                    os.remove(st.session_state.feedback_local_path)
+
+                    st.success("✅ Feedback submitted and saved.")
+                    st.session_state.show_feedback_area = False
+
+                except Exception as e:
+                    st.error("❌ Failed to save feedback.")
+                    logger.error(f"Failed to save feedback: {e}")
