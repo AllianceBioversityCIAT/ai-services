@@ -233,7 +233,7 @@ def retrieve_context_chatbot(query, phase=None, indicator=None, section=None):
         if selected_filters_count >= 2:
             top_k = 10000
         else:
-            top_k = 300
+            top_k = 100
 
         embedding = get_bedrock_embeddings([query])[0]
 

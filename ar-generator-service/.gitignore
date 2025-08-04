@@ -193,3 +193,7 @@ faiss/
 *.csv
 *.jsonl
 *.json
+
+# Chat and data logs
+chat_logs/
+data/logs/
