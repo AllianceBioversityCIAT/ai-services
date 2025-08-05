@@ -2,6 +2,7 @@ import pyodbc
 import pandas as pd
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import SQL_SERVER
+from app.utils.s3.divide_jsonl_files import split_jsonl_to_individual_files
 from app.utils.s3.upload_file_to_s3 import upload_file_to_s3, s3_file_exists
 
 logger = get_logger()
@@ -186,10 +187,12 @@ def load_full_data(table_name):
             df.rename(columns={'Phase name': 'phase_name', 'Phase year': 'year'}, inplace=True)
             df = df.dropna(axis=1, how='all')
             df["table_type"] = "contributions"
+            s3_folder = "contributions"
         
         elif table_name == "vw_ai_questions":
             df = df.dropna(axis=1, how='all')
             df["table_type"] = "questions"
+            s3_folder = "questions"
 
         elif table_name == "vw_ai_deliverables":
             df = df.dropna(axis=1, how='all')
@@ -201,6 +204,7 @@ def load_full_data(table_name):
             )
             df = df_grouped.reset_index()
             df["table_type"] = "deliverables"
+            s3_folder = "deliverables"
         
         elif table_name == "vw_ai_oicrs":
             df.rename(columns={'link_pdf_file': 'link_pdf_oicr', 'oicr_year': 'year'}, inplace=True)
@@ -213,6 +217,7 @@ def load_full_data(table_name):
             )
             df = df_grouped.reset_index()
             df["table_type"] = "oicrs"
+            s3_folder = "oicrs"
         
         else:
             df.rename(columns={'link_pdf_file': 'link_pdf_innovation'}, inplace=True)
@@ -225,16 +230,13 @@ def load_full_data(table_name):
             )
             df = df_grouped.reset_index()
             df["table_type"] = "innovations"
+            s3_folder = "innovations"
 
         df.to_json(f'{table_name}.jsonl', orient='records', lines=True, force_ascii=False)
         df.to_csv(f'{table_name}.csv', index=False)
 
-        file_key = f'aiccra/{table_name}.jsonl'
-        if not s3_file_exists(file_key):
-            upload_file_to_s3(file_key, f"{table_name}.jsonl")
-        else:
-            logger.info(f"⏭️  The file already exists in S3, it was not necessary to upload it: {file_key}")
-                        
+        split_jsonl_to_individual_files(f'{table_name}.jsonl', s3_folder)
+        
         return df
 
     except Exception as e:
