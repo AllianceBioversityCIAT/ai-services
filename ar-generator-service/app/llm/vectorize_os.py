@@ -411,7 +411,18 @@ def run_chatbot(user_input, phase=None, indicator=None, section=None, insert_dat
             insert_into_opensearch("vw_ai_oicrs", mode="chatbot")
             insert_into_opensearch("vw_ai_innovations", mode="chatbot")
 
-        context = retrieve_context_chatbot(user_input, phase=phase, indicator=indicator, section=section)
+        input_text = f"""{user_input}
+
+        [User-selected filters]
+        - Phase: {phase}
+        - Indicator: {indicator}
+        - Section: {section}
+
+        Instructions:
+        If these filters are not "All", you must strictly focus on them.
+        If any of these are set to "All", interpret the user's question contextually and include the most relevant records dynamically across phases, indicators, and sections."""
+
+        context = retrieve_context_chatbot(input_text, phase=phase, indicator=indicator, section=section)
         # save_context_to_file(context, "context", indicator, phase)
 
         CHATBOT_PROMPT = generate_chatbot_prompt(phase, indicator, section)
