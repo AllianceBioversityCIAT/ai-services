@@ -10,7 +10,8 @@ from app.utils.config.config_util import KNOWLEDGE_BASE
 from app.utils.s3.upload_file_to_s3 import upload_file_to_s3
 
 
-MEMORY_ID = KNOWLEDGE_BASE['memory_id']
+memory_id = KNOWLEDGE_BASE['memory_id']
+MEMORY_ID = hashlib.sha256(memory_id.encode()).hexdigest()
 
 logger = get_logger()
 
