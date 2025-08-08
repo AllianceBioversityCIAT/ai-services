@@ -38,4 +38,9 @@ OPENSEARCH = {
     "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY_OS")
 }
 
-KNOWLEDGE_BASE_ID = os.getenv("KNOWLEDGE_BASE_ID")
+KNOWLEDGE_BASE = {
+    "knowledge_base_id": os.getenv("KNOWLEDGE_BASE_ID"),
+    "agent_id": os.getenv("AGENT_ID"),
+    "agent_alias_id": os.getenv("AGENT_ALIAS_ID"),
+    "memory_id": os.getenv("MEMORY_ID")
+}
