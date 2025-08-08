@@ -197,3 +197,4 @@ faiss/
 # Chat and data logs
 chat_logs/
 data/logs/
+csv_files/
