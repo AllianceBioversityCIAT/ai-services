@@ -1,19 +1,30 @@
 import os
+import uuid
+import hashlib
 import streamlit as st
 from datetime import datetime, timezone
 from app.llm.vectorize_os import run_chatbot
+from app.llm.agents import run_agent_chatbot
 from app.utils.logger.logger_util import get_logger
-from app.llm.knowledge_base import query_knowledge_base
+from app.utils.config.config_util import KNOWLEDGE_BASE
 from app.utils.s3.upload_file_to_s3 import upload_file_to_s3
+
+
+MEMORY_ID = KNOWLEDGE_BASE['memory_id']
 
 logger = get_logger()
 
 st.set_page_config(page_title="AICCRA chatbot", page_icon="🤖", layout="wide")
 st.title("🤖 AICCRA Assistant")
+mode = st.radio("Choose chatbot mode:", ["Agents (with memory)", "OpenSearch (basic functionality)"], index=0)
 
 ## --- Initial status of messages ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+## --- Session ID for agents ---
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
 
 ## --- Status to show/hide filters ---
 if "show_filters" not in st.session_state:
@@ -58,7 +69,17 @@ if user_input:
     
     with st.spinner("Thinking..."):
         try:
-            response_stream = run_chatbot(user_input, phase=phase, indicator=indicator, section=section)
+            if mode == "OpenSearch (basic functionality)":
+                response_stream = run_chatbot(user_input, phase=phase, indicator=indicator, section=section)
+            elif mode == "Agents (with memory)":
+                response_stream = run_agent_chatbot(
+                    user_input,
+                    phase=phase,
+                    indicator=indicator,
+                    section=section,
+                    session_id=st.session_state.session_id,
+                    memory_id=MEMORY_ID
+                )
     
             full_response = ""
             first_chunk = True
