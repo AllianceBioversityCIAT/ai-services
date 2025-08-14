@@ -33,8 +33,38 @@ def _process_file_content(file_extension, file_content):
         return file_content.decode('utf-8')
     elif file_extension in ('xls', 'xlsx'):
         logger.info("📄 Processing EXCEL file...")
-        df = pd.read_excel(BytesIO(file_content))
-        return df.to_string()
+        df = pd.read_excel(BytesIO(file_content), header=0)
+        
+        df = df.dropna(axis=1, how='all')        
+        df = df.dropna(axis=0, how='all')
+        df = df[~df.apply(lambda row: all(str(val).strip() == '' or pd.isna(val) for val in row), axis=1)]
+        df = df.drop_duplicates()
+        df = df.reset_index(drop=True)
+    
+        try:
+            structured_rows = []
+            for index, row in df.iterrows():
+                row_parts = []
+                for col in df.columns:
+                    value = str(row[col]).strip()
+                    if value and value != 'nan' and value != 'None':
+                        row_parts.append(f"{col}: {value}")
+                
+                if row_parts:
+                    row_text = ", ".join(row_parts)
+                    structured_rows.append(row_text)
+            
+            if structured_rows:
+                for i, row in enumerate(structured_rows[:3]):
+                    logger.info(f"  Row {i+1}: {row}")
+            
+            return {"type": "excel", "chunks": structured_rows}
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Excel processing failed, falling back to CSV: {e}")
+            df = df.to_csv(index=False, header=True)
+            return df
+
     elif file_extension == 'pptx':
         logger.info("📄 Processing PPTX file...")
         prs = Presentation(BytesIO(file_content))

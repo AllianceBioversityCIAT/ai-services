@@ -187,3 +187,12 @@ chroma/
 .chroma/
 faiss/
 .faiss/
+
+# Data files
+*.json
+*.csv
+*.jsonl
+*.xlsx
+
+# Data logs
+data/logs/
