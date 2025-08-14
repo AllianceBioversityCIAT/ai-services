@@ -4,7 +4,8 @@ import boto3
 from app.utils.config.config_util import BR
 from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
-from app.utils.prompt.default_prompt import DEFAULT_PROMPT
+from app.utils.prompt.prompt_star import DEFAULT_PROMPT_STAR
+from app.utils.prompt.prompt_prms import DEFAULT_PROMPT_PRMS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from app.llm.vectorize_supabase import (get_embedding,
                                store_reference_embeddings,
@@ -109,7 +110,7 @@ def initialize_reference_data(bucket_name, file_key_regions, file_key_countries)
         raise
 
 
-def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT):
+def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR):
     start_time = time.time()
     print(prompt)
 
@@ -154,4 +155,54 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT):
 
     except Exception as e:
         logger.error(f"❌ Error: {str(e)}")
+        raise
+
+
+def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS):
+    """Process document for PRMS project using Supabase - identical functionality to process_document"""
+    start_time = time.time()
+    print(f"PRMS Supabase Processing: {prompt}")
+
+    try:
+        reference_file_regions = "clarisa_regions.xlsx"
+        reference_file_countries = "clarisa_countries.xlsx"
+        initialize_supabase_tables()
+        initialize_reference_data(
+            bucket_name, reference_file_regions, reference_file_countries)
+
+        document_content = read_document_from_s3(bucket_name, file_key)
+        chunks = split_text(document_content)
+
+        logger.info("#️⃣ Generating embeddings for PRMS...")
+        embeddings = [get_embedding(chunk) for chunk in chunks]
+
+        document_name = store_temp_embeddings(chunks, embeddings, file_key)
+
+        all_reference_data = get_all_reference_data()
+
+        relevant_chunks = get_relevant_chunk(prompt, document_name)
+
+        context = all_reference_data + relevant_chunks
+
+        query = f"""
+        Based on this context:\n{context}\n\n
+        Answer the question:\n{prompt}
+        """
+
+        response_text = invoke_model(query)
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        logger.info(f"✅ Successfully generated PRMS response:\n{response_text}")
+        logger.info(f"⏱️ PRMS Response time: {elapsed_time:.2f} seconds")
+
+        return {
+            "content": response_text,
+            "time_taken": f"{elapsed_time:.2f}",
+            "json_content": json.loads(response_text) if is_valid_json(response_text) else {"text": response_text},
+            "project": "PRMS"
+        }
+
+    except Exception as e:
+        logger.error(f"❌ PRMS Error: {str(e)}")
         raise

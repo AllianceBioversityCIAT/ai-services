@@ -1,11 +1,13 @@
-from mcp.server.fastmcp import FastMCP
 import boto3
-from app.middleware.auth_middleware import AuthMiddleware
-from app.utils.notification.notification_service import NotificationService
 from typing import Any
 from dotenv import load_dotenv
-from app.llm.mining import process_document as process_with_llm
+from mcp.server.fastmcp import FastMCP
 from app.utils.logger.logger_util import get_logger
+from app.middleware.auth_middleware import AuthMiddleware
+from app.llm.mining import process_document as process_with_llm
+from app.llm.mining import process_document_prms as process_with_llm_prms
+from app.utils.notification.notification_service import NotificationService
+
 
 load_dotenv()
 logger = get_logger()
@@ -50,7 +52,7 @@ async def process_document(bucket: str, key: str, token: Any, environmentUrl: st
 
         await notification_service.send_slack_notification(
             emoji=":ai: :pick:",
-            app_name="AI-MCP Mining Service",
+            app_name="AI-MCP Mining Service (STAR)",
             color="#36a64f",
             title="Document Processed",
             message=f"Successfully processed document: *{key}*\nBucket: *{bucket}*",
@@ -64,7 +66,7 @@ async def process_document(bucket: str, key: str, token: Any, environmentUrl: st
         logger.error(f"Unexpected error: {str(e)}")
         await notification_service.send_slack_notification(
             emoji=":ai: :pick: :alert:",
-            app_name="AI-MCP Mining Service",
+            app_name="AI-MCP Mining Service (STAR)",
             color="#FF0000",
             title="Document Processing Failed",
             message=f"Error processing document: *{key}*\nError: *{str(e)}*",
@@ -72,6 +74,48 @@ async def process_document(bucket: str, key: str, token: Any, environmentUrl: st
             priority="High"
         )
         return {"status": "error", "key": key, "error": str(e)}
+
+
+@mcp.tool()
+async def process_document_prms(bucket: str, key: str, token: Any, environmentUrl: str) -> dict:
+    logger.info("✅ process_document_prms invoked via MCP")
+    
+    try:
+        is_authenticated = await authenticate(key, bucket, token, environmentUrl)
+        print(f"PRMS Authenticated: {is_authenticated}")
+        if not is_authenticated:
+            raise ValueError("PRMS Authentication failed")
+
+        logger.info(f"Processing document for PRMS: {key} from bucket: {bucket}")
+
+        result = process_with_llm_prms(
+            bucket_name=bucket, file_key=key)
+
+        await notification_service.send_slack_notification(
+            emoji=":ai: :pick:",
+            app_name="AI-MCP Mining Service (PRMS)",
+            color="#36a64f",
+            title="PRMS Document Processed",
+            message=f"Successfully processed document for PRMS: *{key}*\nBucket: *{bucket}*",
+            time_taken=f"Time taken: *{result['time_taken']}* seconds",
+            priority="Low"
+        )
+
+        return result["json_content"]
+
+    except Exception as e:
+        logger.error(f"Unexpected error in PRMS processing: {str(e)}")
+        await notification_service.send_slack_notification(
+            emoji=":ai: :pick: :alert:",
+            app_name="AI-MCP Mining Service (PRMS)",
+            color="#FF0000",
+            title="PRMS Document Processing Failed",
+            message=f"Error processing document for PRMS: *{key}*\nError: *{str(e)}*",
+            time_taken="Time taken: *N/A*",
+            priority="High"
+        )
+        return {"status": "error", "key": key, "error": str(e), "project": "PRMS"}
+
 
 if __name__ == "__main__":
     mcp.run()

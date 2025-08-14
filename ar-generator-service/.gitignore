@@ -196,3 +196,5 @@ vw_ai_deliverables.csv
 vw_ai_project_contribution.csv
 vw_ai_questions.csv
 *.json
+*.csv
+*.jsonl
