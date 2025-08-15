@@ -2,6 +2,10 @@
 
 This project is a microservice for intelligent document processing using LLMs (Large Language Models). It extracts structured information from documents using techniques like vector search, RAG, and prompt engineering — all powered by AWS Bedrock and other AI services.
 
+The service supports multiple projects:
+- **STAR**: Uses the `/process` endpoint
+- **PRMS**: Uses the `/prms/text_mining` endpoint
+
 ---
 
 ## 🚀 Features
@@ -12,6 +16,8 @@ This project is a microservice for intelligent document processing using LLMs (L
 - 🔒 Auth via CLARISA credentials
 - 📦 Sync processing via MCP
 - 📤 Slack notifications on success/failure
+- 🏢 Multi-project support (STAR and PRMS)
+- 📊 Excel processing with row-level chunking
 
 ---
 
@@ -81,8 +87,20 @@ This will install a cronjob that runs daily at 7:00 PM to clean up temporary dat
 
 ## 🧪 Example Usage via MCP Tool
 
-You can now test the service using a **multipart/form-data** request.  
+You can now test the service using **multipart/form-data** requests for both projects.
+
+### For STAR Project
 Below is an example of the expected fields when calling the `/process` endpoint:
+
+| Field       | Type   | Description                     |
+|-------------|--------|---------------------------------|
+| `key`       | string | The name of the document        |
+| `bucketName`| string | The S3 bucket where it resides  |
+| `token`     | string | JWT or token for authentication |
+| `file`      | file   | File to upload                  |
+
+### For PRMS Project
+Below is an example of the expected fields when calling the `/prms/text_mining` endpoint:
 
 | Field       | Type   | Description                     |
 |-------------|--------|---------------------------------|
@@ -147,14 +165,25 @@ You can also add unit tests using `pytest`.
 
 ---
 
-## 🔌 Consuming the Text Mining Endpoint
+## 🔌 Consuming the Text Mining Endpoints
 
-### REST API Endpoint
+### REST API Endpoints
 
-The service exposes a REST API endpoint at `/process` that you can call to process documents:
+The service exposes two REST API endpoints:
 
+#### For STAR Project
 ```bash
 curl -X POST http://localhost:8000/process \
+  -F "key=my-document.pdf" \
+  -F "bucketName=my-bucket" \
+  -F "token=auth-token" \
+  -F "file=@/path/to/file.pdf" \
+  -F "environmentUrl=test"
+```
+
+#### For PRMS Project
+```bash
+curl -X POST http://localhost:8000/prms/text_mining \
   -F "key=my-document.pdf" \
   -F "bucketName=my-bucket" \
   -F "token=auth-token" \
@@ -167,7 +196,11 @@ curl -X POST http://localhost:8000/process \
 ```python
 import requests
 
-url = "http://localhost:8000/process"
+# For STAR Project
+star_url = "http://localhost:8000/process"
+
+# For PRMS Project  
+prms_url = "http://localhost:8000/prms/text_mining"
 
 # Option 1: Using an S3 key instead of uploading a file
 data = {
@@ -176,7 +209,12 @@ data = {
     "token": "your-auth-token",
     "environmentUrl": "test"
 }
-response = requests.post(url, data=data)
+
+# Process with STAR
+star_response = requests.post(star_url, data=data)
+
+# Process with PRMS
+prms_response = requests.post(prms_url, data=data)
 
 # Option 2: Using a file upload
 with open("path/to/your/file.pdf", "rb") as f:
@@ -187,24 +225,29 @@ with open("path/to/your/file.pdf", "rb") as f:
         "environmentUrl": "test"
     }
 
-    response = requests.post(url, data=data, files=files)
+    # Process with STAR
+    star_response = requests.post(star_url, data=data, files=files)
+    
+    # Process with PRMS  
+    prms_response = requests.post(prms_url, data=data, files=files)
 
-if response.ok:
-    result = response.json()
-    print(json.dumps(result, indent=2))
-else:
-    print(f"Error: {response.status_code}")
-    print(response.text)
+if star_response.ok:
+    result = star_response.json()
+    print("STAR Result:", json.dumps(result, indent=2))
+
+if prms_response.ok:
+    result = prms_response.json()
+    print("PRMS Result:", json.dumps(result, indent=2))
 ```
 
 ### Response Format
 
-The endpoint returns structured information extracted from the document:
+Both endpoints return the same structured information extracted from the document, with an additional `project` field indicating which system processed it:
 
 ```json
 {
   "title": "Extracted document title",
-  "summary": "Brief summary of the document content",
+  "summary": "Brief summary of the document content", 
   "key_points": [
     "Important point 1",
     "Important point 2"
@@ -217,14 +260,15 @@ The endpoint returns structured information extracted from the document:
   "metadata": {
     "processing_time": "3.5s",
     "document_type": "PDF",
-    "page_count": 10
+    "page_count": 10,
+    "project": "STAR" // or "PRMS"
   }
 }
 ```
 
 ### Error Handling
 
-If an error occurs during processing, the endpoint returns an HTTP error status code with details:
+If an error occurs during processing, both endpoints return an HTTP error status code with details:
 
 ```json
 {
@@ -236,7 +280,8 @@ Or:
 
 ```json
 {
-  "detail": "Error processing document: File not found in bucket"
+  "detail": "Error processing document: File not found in bucket",
+  "project": "PRMS"
 }
 ```
 
@@ -299,17 +344,26 @@ Or:
 
 MCP is a protocol that enables seamless integration between the service and LLM models. In this project, we use MCP to:
 
-1. **Handle document processing requests**: The MCP server exposes the `process_document` tool that receives parameters like bucket name, document key, and authentication credentials.
+1. **Handle document processing requests**: The MCP server exposes both `process_document` (for STAR) and `process_document_prms` (for PRMS) tools that receive parameters like bucket name, document key, and authentication credentials.
 2. **Authenticate users**: All requests are authenticated through the CLARISA service before processing.
 3. **Process documents with LLMs**: Once authenticated, documents are retrieved from S3, processed using LLMs (Claude 3 Sonnet via Bedrock), and the results are returned.
-4. **Notify stakeholders**: The service sends notifications via Slack upon successful processing or failures.
+4. **Notify stakeholders**: The service sends notifications via Slack upon successful processing or failures, with project-specific messaging.
 
 ### MCP Architecture
 
 ```
-Client Request → FastAPI Endpoint → MCP Client → MCP Server → LLM Processing → Response
+STAR Client Request → FastAPI /process → MCP Client → MCP Server → process_document → LLM Processing → Response
+PRMS Client Request → FastAPI /prms/text_mining → MCP Client → MCP Server → process_document_prms → LLM Processing → Response
 ```
 
-The MCP server runs as a separate process and communicates with the main application through a standardized protocol.
+The MCP server runs as a separate process and communicates with the main application through a standardized protocol, supporting both STAR and PRMS workflows.
+
+### Excel File Processing
+
+For Excel files (.xlsx, .xls), the service:
+1. Cleans the data by removing empty rows and columns
+2. Converts each row into a structured format: `column_name: value, column_name2: value2`
+3. Treats each row as an individual chunk for processing
+4. Maintains compatibility with other document formats (PDF, DOCX, TXT, PPTX)
 
 ---
