@@ -88,15 +88,25 @@ def initialize_reference_data(bucket_name, file_key_regions, file_key_countries)
 
         logger.info("🔄 Initializing reference data...")
 
-        document_content_regions = read_document_from_s3(
-            bucket_name, file_key_regions)
-        regions_embeddings = get_embedding(document_content_regions)
+        document_content_regions = read_document_from_s3(bucket_name, file_key_regions)
+        document_content_countries = read_document_from_s3(bucket_name, file_key_countries)
 
-        document_content_countries = read_document_from_s3(
-            bucket_name, file_key_countries)
-        countries_embeddings = get_embedding(document_content_countries)
+        if isinstance(document_content_regions, dict) and document_content_regions.get("type") == "excel":
+            regions_chunks = document_content_regions["chunks"]
+        else:
+            regions_chunks = [document_content_regions]
+         
+        if isinstance(document_content_countries, dict) and document_content_countries.get("type") == "excel":
+            countries_chunks = document_content_countries["chunks"]
+        else:
+            countries_chunks = [document_content_countries]
 
-        all_content = document_content_regions + document_content_countries
+        logger.info(f"📊 Generating embeddings for {len(regions_chunks)} region chunks and {len(countries_chunks)} country chunks...")
+        
+        regions_embeddings = [get_embedding(chunk) for chunk in regions_chunks]
+        countries_embeddings = [get_embedding(chunk) for chunk in countries_chunks]
+
+        all_content = regions_chunks + countries_chunks
         all_embeddings = regions_embeddings + countries_embeddings
 
         store_reference_embeddings(all_content, all_embeddings)

@@ -34,12 +34,14 @@ def _process_file_content(file_extension, file_content):
     elif file_extension in ('xls', 'xlsx'):
         logger.info("📄 Processing EXCEL file...")
         df = pd.read_excel(BytesIO(file_content), header=0)
+        logger.info(f"📊 Original DataFrame shape: {df.shape}")
         
         df = df.dropna(axis=1, how='all')        
         df = df.dropna(axis=0, how='all')
         df = df[~df.apply(lambda row: all(str(val).strip() == '' or pd.isna(val) for val in row), axis=1)]
         df = df.drop_duplicates()
         df = df.reset_index(drop=True)
+        logger.info(f"📊 Cleaned DataFrame shape: {df.shape}")
     
         try:
             structured_rows = []
@@ -54,7 +56,10 @@ def _process_file_content(file_extension, file_content):
                     row_text = ", ".join(row_parts)
                     structured_rows.append(row_text)
             
+            logger.info(f"📊 Processed {len(structured_rows)} meaningful Excel rows as individual chunks")
+            
             if structured_rows:
+                logger.info("📝 Sample rows:")
                 for i, row in enumerate(structured_rows[:3]):
                     logger.info(f"  Row {i+1}: {row}")
             
