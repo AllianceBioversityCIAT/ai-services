@@ -17,3 +17,4 @@ python-crontab
 mangum
 python-pptx
 python-multipart
+pyarrow==19.0.1
