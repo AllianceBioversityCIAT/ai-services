@@ -38,6 +38,21 @@ bedrock_runtime = boto3.client(
 
 def get_embedding(text):
     try:
+        # Ensure text is a string, not a dict or other object
+        if isinstance(text, dict):
+            # If it's an Excel structure, convert to string representation
+            if text.get("type") == "excel":
+                text = "\n".join(text.get("chunks", []))
+            else:
+                text = str(text)
+        elif not isinstance(text, str):
+            text = str(text)
+        
+        # Ensure text is not empty
+        if not text.strip():
+            logger.warning("⚠️ Empty text provided for embedding, using placeholder")
+            text = "Empty document"
+        
         request_body = {
             "inputText": text
         }
