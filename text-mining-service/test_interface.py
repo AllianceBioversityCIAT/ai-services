@@ -237,14 +237,6 @@ def post_to_api(
     - Otherwise, send 'key'
     """
     url = base_url.rstrip("/") + "/prms/text_mining"
-    
-    headers = {
-        'User-Agent': 'StreamlitApp/1.0',
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive',
-    }
-
     data = {
         "bucketName": bucket,
         "token": token,
@@ -260,7 +252,7 @@ def post_to_api(
     else:
         data["key"] = key or ""
 
-    resp = requests.post(url, data=data, files=files, headers=headers, timeout=900)
+    resp = requests.post(url, data=data, files=files, timeout=900)
     if resp.status_code != 200:
         raise RuntimeError(f"API error {resp.status_code}: {resp.text}")
     return resp.json()
