@@ -1,24 +1,17 @@
+import re
 import json
 import boto3
 import numpy as np
 import pandas as pd
 from requests_aws4auth import AWS4Auth
-from db_conn.mysql_connection import load_data
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import BR, OPENSEARCH
 from opensearchpy import OpenSearch, RequestsHttpConnection
-from app.utils.prompts.kb_generation_prompt import DEFAULT_PROMPT
-from app.utils.prompts.report_generation_prompt import generate_report_prompt
-
+from db_conn.sql_connection import load_data, load_full_data
+from app.utils.prompts.report_prompt import generate_report_prompt
+from app.llm.invoke_llm import invoke_model, get_bedrock_embeddings
 
 logger = get_logger()
-
-bedrock_runtime = boto3.client(
-    service_name='bedrock-runtime',
-    aws_access_key_id=BR['aws_access_key'],
-    aws_secret_access_key=BR['aws_secret_key'],
-    region_name=BR['region']
-)
 
 credentials = boto3.Session(
     aws_access_key_id=OPENSEARCH['aws_access_key'],
@@ -40,75 +33,9 @@ opensearch = OpenSearch(
 INDEX_NAME = OPENSEARCH['index']
 
 
-def get_bedrock_embeddings(texts):
-    embeddings = []
-    for text in texts:
-        try:
-            response = bedrock_runtime.invoke_model(
-                modelId="amazon.titan-embed-text-v2:0",
-                body=json.dumps({"inputText": text}),
-                contentType="application/json",
-                accept="application/json"
-            )
-            result = json.loads(response["body"].read())
-            embeddings.append(result["embedding"])
-        except Exception as e:
-            logger.error(f"❌ Error generating embedding for text: {e}")
-            embeddings.append([])
-    return embeddings
-
-
-def invoke_model(prompt):
-    try:
-        logger.info("✍️  Generating report with LLM...")
-        logger.info("🚀 Invoking the model...")
-        request_body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 8000,
-            "temperature": 0.1,
-            "top_k": 250,
-            "top_p": 0.999,
-            "stop_sequences": [],
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": f"{prompt}"}
-                    ]
-                }
-            ]
-        }
-        response_stream = bedrock_runtime.invoke_model_with_response_stream(
-            modelId="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-            # modelId="us.anthropic.claude-sonnet-4-20250514-v1:0",
-            body=json.dumps(request_body),
-            contentType="application/json",
-            accept="application/json"
-        )
-
-        full_response = ""
-        for event in response_stream["body"]:
-            chunk = event.get("chunk")
-            if chunk and "bytes" in chunk:
-                bytes_data = chunk["bytes"]
-                parsed = json.loads(bytes_data.decode("utf-8"))
-                part = parsed.get("delta", {}).get("text", "")
-                if part:
-                    full_response += part
-                    # print(part, end="", flush=True)
-                    # yield part           
-
-        return full_response     
-
-    except Exception as e:
-        logger.error(f"❌ Error invoking the model: {str(e)}")
-        raise
-
-
 def create_index_if_not_exists(dimension=1024):
     try:
-        # opensearch.indices.delete(index=INDEX_NAME)
-        if not opensearch.indices.exists(INDEX_NAME):
+        if not opensearch.indices.exists(index=INDEX_NAME):
             logger.info(f"📦 Creating OpenSearch index: {INDEX_NAME}")
             index_body = {
                 "settings": {
@@ -145,20 +72,15 @@ def create_index_if_not_exists(dimension=1024):
         return False
 
 
-def insert_into_opensearch(table_name: str):
+def insert_into_opensearch(table_name: str, mode: str):
     try:
-        ## Comment out the next 4 lines if you are going to insert data into the index for the first time
-        created = create_index_if_not_exists()
-        if not created:
-            logger.info(f"⚠️  Skipping insertion for {table_name} since index already exists.")
-            return
-
-        ## Uncomment out the next line if you are going to insert data into the index for the first time
-        # create_index_if_not_exists()
-
         logger.info(f"🔍 Processing table: {table_name}")
 
-        df = load_data(table_name)
+        if mode == "generator":
+            df = load_data(table_name)
+        else:
+            df = load_full_data(table_name)
+        
         rows = df.to_dict(orient="records")
 
         date_fields = ["last_updated_altmetric", "last_sync_almetric"]
@@ -197,6 +119,7 @@ def retrieve_context(query, indicator, year, top_k=10000):
         logger.info("📚 Retrieving relevant context from OpenSearch...")
         embedding = get_bedrock_embeddings([query])[0]
         
+        ## VECTOR SEARCH
         knn_query = {
             "size": top_k,
             "query": {
@@ -208,7 +131,9 @@ def retrieve_context(query, indicator, year, top_k=10000):
                             "bool": {
                                 "should": [
                                     {"term": {"source_table": "vw_ai_deliverables"}},
-                                    {"term": {"source_table": "vw_ai_project_contribution"}}
+                                    {"term": {"source_table": "vw_ai_project_contribution"}},
+                                    {"term": {"source_table": "vw_ai_oicrs"}},
+                                    {"term": {"source_table": "vw_ai_innovations"}}
                                 ],
                                 "minimum_should_match": 1
                             }
@@ -231,6 +156,7 @@ def retrieve_context(query, indicator, year, top_k=10000):
         knn_response = opensearch.search(index=INDEX_NAME, body=knn_query)
         knn_chunks = [hit["_source"]["chunk"] for hit in knn_response["hits"]["hits"]]
 
+        ## DOI SEARCH
         doi_query = {
             "size": 10000,
             "query": {
@@ -248,6 +174,7 @@ def retrieve_context(query, indicator, year, top_k=10000):
         doi_response = opensearch.search(index=INDEX_NAME, body=doi_query)
         doi_chunks = [hit["_source"]["chunk"] for hit in doi_response["hits"]["hits"]]
 
+        ## COMBINE KNN AND DOI CHUNKS
         seen_keys = set()
         combined_chunks = []
 
@@ -264,7 +191,17 @@ def retrieve_context(query, indicator, year, top_k=10000):
             else:
                 combined_chunks.append(chunk)
 
-        return combined_chunks
+        ## FILTER KNN CHUNKS
+        filtered_knn_chunks = [
+            chunk for chunk in combined_chunks
+            if not (
+                (chunk.get("table_type") == "deliverables" and chunk.get("cluster_role") == "Shared")
+                or
+                (chunk.get("table_type") == "innovations" and chunk.get("cluster_role") == "Shared")
+            )
+        ]
+
+        return filtered_knn_chunks
     
     except Exception as e:
         logger.error(f"❌ Error retrieving context: {e}")
@@ -272,43 +209,59 @@ def retrieve_context(query, indicator, year, top_k=10000):
 
 
 def calculate_summary(indicator, year):
-            df_contributions = load_data("vw_ai_project_contribution")
-            df_filtered = df_contributions[
-                (df_contributions["indicator_acronym"] == indicator) &
-                (df_contributions["year"] == year)
-            ]
-            total_expected = df_filtered["Milestone expected value"].sum()
-            total_achieved = df_filtered["Milestone reported value"].sum()
-            progress = round((total_achieved / total_expected) * 100, 2) if total_expected > 0 else 0
+    df_contributions = load_data("vw_ai_project_contribution")
+    df_filtered = df_contributions[
+        (df_contributions["indicator_acronym"] == indicator) &
+        (df_contributions["year"] == year)
+    ]
+    total_expected = df_filtered["Milestone expected value"].sum()
+    total_achieved = df_filtered["Milestone reported value"].sum()
+    progress = round((total_achieved / total_expected) * 100, 2) if total_expected > 0 else 0
 
-            def clean_number(n):
-                return int(n) if float(n).is_integer() else round(n, 2)
+    def clean_number(n):
+        return int(n) if float(n).is_integer() else round(n, 2)
 
-            return clean_number(total_expected), clean_number(total_achieved), clean_number(progress)
+    return clean_number(total_expected), clean_number(total_achieved), clean_number(progress)
 
 
-def run_pipeline(indicator, year):
+def save_context_to_file(context, filename, indicator, year):
     try:
-        insert_into_opensearch("vw_ai_deliverables")
-        insert_into_opensearch("vw_ai_project_contribution")
-        insert_into_opensearch("vw_ai_questions")
-        
-        total_expected, total_achieved, progress = calculate_summary(indicator, year)
-
-        PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
-        context = retrieve_context(PROMPT, indicator, year)
-
-        output_path = f"context_{indicator}_{year}.json"
+        output_path = f"{filename}_{indicator}_{year}.json"
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(context, f, indent=2, ensure_ascii=False)
         logger.info(f"📝 Context saved to {output_path}")
+    except Exception as e:
+        logger.error(f"❌ Error saving context to file: {e}")
+
+
+def run_pipeline(indicator, year, insert_data=False):
+    try:
+        if insert_data:
+            if opensearch.indices.exists(index=INDEX_NAME):
+                logger.info(f"🗑️ Deleting existing index: {INDEX_NAME}")
+                opensearch.indices.delete(index=INDEX_NAME)
+            create_index_if_not_exists()
+            insert_into_opensearch("vw_ai_deliverables", mode="generator")
+            insert_into_opensearch("vw_ai_project_contribution", mode="generator")
+            insert_into_opensearch("vw_ai_questions", mode="generator")
+            insert_into_opensearch("vw_ai_oicrs", mode="generator")
+            insert_into_opensearch("vw_ai_innovations", mode="generator")
+
+        total_expected, total_achieved, progress = calculate_summary(indicator, year)
+
+        PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
+        
+        context = retrieve_context(PROMPT, indicator, year)
 
         query = f"""
             Using this information:\n{context}\n\n
             Do the following:\n{PROMPT}
             """
 
-        return invoke_model(query)
+        final_report = invoke_model(query)
+
+        logger.info("✅ Report generation completed successfully.")
+        return final_report
 
     except Exception as e:
         logger.error(f"❌ Error in pipeline execution: {e}")

@@ -134,6 +134,7 @@ celerybeat.pid
 
 # Environments
 myenv/
+.myenv/
 .env
 .venv
 env/
@@ -189,9 +190,9 @@ faiss/
 .faiss/
 
 # Local files
-*.json
 *.csv
 *.jsonl
-*.xlsx
+*.json
 
+# Data logs
 data/logs/
