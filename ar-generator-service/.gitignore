@@ -198,3 +198,5 @@ vw_ai_questions.csv
 *.json
 *.csv
 *.jsonl
+
+data/logs
