@@ -1,4 +1,4 @@
-DEFAULT_PROMPT = """
+DEFAULT_PROMPT_PRMS = """
 Analyze the provided document(s) and extract all results related only to these indicators:
     • "Capacity Sharing for Development"
     • "Policy Change"
@@ -391,8 +391,7 @@ Follow this exact structure:
                     "name": "<actor name or 'Not collected' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
                     "type": "<value or 'Other' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
                     "other_actor_type": "<value or 'Not collected' (only if type is 'Other' and indicator is 'Innovation Development')>",
-                    "gender": "<value(s) or 'Not collected' (only if indicator is 'Innovation Development')>",
-                    "age_group": "<value(s) or 'Not collected' (only if indicator is 'Innovation Development')>"
+                    "gender_age:": "<value(s) or 'Not collected' (only if indicator is 'Innovation Development')>"
                 }
             ],
             "organizations": "<array of organization names or 'Not collected' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
