@@ -3,10 +3,10 @@ name: Trigger Jenkins Job AR Generator Service
 on:
   push:
     branches:
-      - "dev-ar-generator-service-test"
+      - "main-ar-generator"
   pull_request:
     branches:
-      - "dev-ar-generator-service-test"
+      - "main-ar-generator"
   workflow_dispatch:
 
 jobs:
