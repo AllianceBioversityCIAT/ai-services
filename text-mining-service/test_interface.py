@@ -237,6 +237,14 @@ def post_to_api(
     - Otherwise, send 'key'
     """
     url = base_url.rstrip("/") + "/prms/text_mining"
+    
+    headers = {
+        'User-Agent': 'StreamlitApp/1.0',
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'keep-alive',
+    }
+
     data = {
         "bucketName": bucket,
         "token": token,
@@ -252,7 +260,7 @@ def post_to_api(
     else:
         data["key"] = key or ""
 
-    resp = requests.post(url, data=data, files=files, timeout=900)
+    resp = requests.post(url, data=data, files=files, headers=headers, timeout=900)
     if resp.status_code != 200:
         raise RuntimeError(f"API error {resp.status_code}: {resp.text}")
     return resp.json()
@@ -263,8 +271,8 @@ def post_to_api(
 st.sidebar.title("⚙️ Settings")
 api_base_url = st.sidebar.text_input(
     "FastAPI Base URL",
-    value="http://localhost:8000",
-    help="Your FastAPI service URL (defaults to http://localhost:8000)."
+    value="https://d3djd7q7g7v7di.cloudfront.net",
+    help="Your FastAPI service URL (defaults to https://d3djd7q7g7v7di.cloudfront.net)."
 )
 bucket = st.sidebar.text_input("S3 Bucket", value="microservice-mining")
 token = st.sidebar.text_input("Auth Token", value="", type="password")
