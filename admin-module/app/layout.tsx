@@ -1,7 +1,9 @@
-import type { Metadata } from 'next'
-import { GeistSans } from 'geist/font/sans'
-import { GeistMono } from 'geist/font/mono'
-import './globals.css'
+import type { Metadata } from 'next';
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
+import './globals.css';
+import Navbar from '@/components/navbar';
+import { getSession } from '@/lib/auth';
 
 export const metadata: Metadata = {
   title: 'v0 App',
@@ -9,11 +11,19 @@ export const metadata: Metadata = {
   generator: 'v0.app',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // Detectar si el usuario es admin (server component)
+  // NOTA: Si el layout no puede ser async, se puede usar un Client Component wrapper para Navbar
+  let isAdmin = false;
+  try {
+    const session = await getSession();
+    isAdmin = session?.role === 'admin';
+  } catch {}
+
   return (
     <html lang="en">
       <head>
@@ -25,7 +35,10 @@ html {
 }
         `}</style>
       </head>
-      <body>{children}</body>
+      <body>
+        <Navbar isAdmin={isAdmin} />
+        {children}
+      </body>
     </html>
-  )
+  );
 }

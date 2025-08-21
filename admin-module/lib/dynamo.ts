@@ -1,4 +1,4 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, ScanCommand } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
   PutCommand,
@@ -10,8 +10,8 @@ import { env } from "process";
 const client = new DynamoDBClient({
   region: env.AWS_REGION,
   credentials: {
-    accessKeyId: env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: env.AWS_SECRET_ACCESS_KEY || '',
+    accessKeyId: env.AWS_ACCESS_KEY_ID || "",
+    secretAccessKey: env.AWS_SECRET_ACCESS_KEY || "",
   },
 });
 
@@ -59,5 +59,27 @@ export async function createUser(user: User): Promise<boolean> {
     }
     console.error("Error creating user:", error);
     throw error;
+  }
+}
+function normalizeUser(item: any): User {
+  return {
+    email: item.email.S,
+    passwordHash: item.passwordHash.S,
+    role: item.role.S,
+    createdAt: item.createdAt.S,
+  };
+}
+
+export async function listUsers(): Promise<User[]> {
+  try {
+    const command = new ScanCommand({
+      TableName: env.DYNAMO_DB_USERS_TABLE!,
+    });
+    const result = await dynamoDb.send(command);
+    console.log("🚀 ~ listUsers ~ result:", result);
+    return (result.Items || []).map(normalizeUser);
+  } catch (error) {
+    console.error("Error listing users:", error);
+    return [];
   }
 }

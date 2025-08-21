@@ -36,28 +36,8 @@ export function DashboardContent({ user }: DashboardContentProps) {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Shield className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-bold text-foreground">Dashboard</h1>
-            </div>
-            <Button
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              variant="outline"
-              className="flex items-center gap-2 bg-transparent"
-            >
-              <LogOut className="h-4 w-4" />
-              {isLoggingOut ? "Logging out..." : "Logout"}
-            </Button>
-          </div>
-        </div>
-      </header>
+    return (
+      <div className="min-h-screen bg-background">
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
@@ -110,7 +90,7 @@ export function DashboardContent({ user }: DashboardContentProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">
+                <p className="text-muted-foreground mb-4">
                   You have administrator privileges. Additional admin features can be added here.
                 </p>
               </CardContent>
