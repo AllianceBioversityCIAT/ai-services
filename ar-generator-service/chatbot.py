@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import hashlib
 import streamlit as st
@@ -34,6 +35,47 @@ if "show_filters" not in st.session_state:
 def toggle_filters():
     st.session_state.show_filters = not st.session_state.show_filters
 
+
+def get_year_from_phase(phase_label: str):
+    """Extract year from phase label like 'AWPB 2024'. Returns int year or None for 'All phases'."""
+    if phase_label == "All phases":
+        return None
+    match = re.search(r"(20\d{2})$", phase_label)
+    return int(match.group(1)) if match else None
+
+
+def get_indicator_options(year: int | None):
+    """Return the indicator options according to the specified year.
+    If year is None (All phases), return the union of all indicators across years.
+    """
+    base = ["All indicators"]
+
+    if year in (2021, 2022, 2023):
+        pdo = [f"PDO Indicator {i}" for i in range(1, 4)]
+        ipi = [
+            "IPI 1.1", "IPI 1.2", "IPI 1.3",
+            "IPI 2.1", "IPI 2.2", "IPI 2.3", "IPI 2.4",
+            "IPI 3.1", "IPI 3.2", "IPI 3.3", "IPI 3.4", "IPI 3.5",
+        ]
+    elif year in (2024, 2025):
+        pdo = [f"PDO Indicator {i}" for i in range(1, 6)]
+        ipi = [
+            "IPI 1.1", "IPI 1.2", "IPI 1.3", "IPI 1.4",
+            "IPI 2.1", "IPI 2.2", "IPI 2.3",
+            "IPI 3.1", "IPI 3.2", "IPI 3.3", "IPI 3.4",
+        ]
+    else:
+        # Union of all indicators when year is None (All phases) or unknown
+        pdo = [f"PDO Indicator {i}" for i in range(1, 6)]
+        ipi = [
+            "IPI 1.1", "IPI 1.2", "IPI 1.3", "IPI 1.4",
+            "IPI 2.1", "IPI 2.2", "IPI 2.3", "IPI 2.4",
+            "IPI 3.1", "IPI 3.2", "IPI 3.3", "IPI 3.4", "IPI 3.5",
+        ]
+
+    return base + pdo + ipi
+
+
 phase, indicator, section = "All phases", "All indicators", "All sections"
 
 ## --- HISTORY ---
@@ -44,7 +86,8 @@ for msg in st.session_state.messages:
 with st.sidebar:
     st.subheader("Filters")
     phase = st.selectbox("Phase", ["All phases", "AWPB 2021", "Progress 2021", "AR 2021", "AWPB 2022", "Progress 2022", "AR 2022", "AWPB 2023", "Progress 2023", "AR 2023", "AWPB 2024", "Progress 2024", "AR 2024", "AWPB 2025", "Progress 2025", "AR 2025"])
-    indicator = st.selectbox("Indicator", ["All indicators", "PDO Indicator 1", "PDO Indicator 2", "PDO Indicator 3", "PDO Indicator 4", "PDO Indicator 5", "IPI 1.1", "IPI 1.2", "IPI 1.3", "IPI 1.4", "IPI 2.1", "IPI 2.2", "IPI 2.3", "IPI 3.1", "IPI 3.2", "IPI 3.3", "IPI 3.4"])
+    indicator_options = get_indicator_options(get_year_from_phase(phase))
+    indicator = st.selectbox("Indicator", indicator_options, index=0)
     section = st.selectbox("Section", ["All sections", "Deliverables", "OICRs", "Innovations", "Contributions"])
     st.caption("Apply filters to focus the AI assistant on specific data subsets.")
 
