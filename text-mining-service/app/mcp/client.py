@@ -24,31 +24,59 @@ server_params = StdioServerParameters(
 
 class TextMiningRequest(BaseModel):
     bucketName: str = Field(
-        ..., description="Name of the S3 bucket where the document is located")
+        ..., description="Name of the S3 bucket where the document is located", examples=["my-documents-bucket"])
     key: Optional[str] = Field(
-        None, description="Object key in the S3 bucket. Optional if file is provided")
-    token: str = Field(..., description="Authentication token")
+        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["reports/annual-report-2024.pdf"])
+    token: str = Field(
+        ..., description="Authentication token", examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."])
     environmentUrl: str = Field(
-                    ..., description="Environment for the service (e.g., production, test)")
-    prompt: Optional[str] = Field("Extract key points from this document",
-                                  description="Specific instructions for document processing")
+        ..., description="Environment for the service (e.g., production, test)")
+    prompt: Optional[str] = Field(
+        "Extract key points from this document", description="Specific instructions for document processing", examples=["Extract capacity development activities and their impact metrics"])
 
 
 class UploadResponse(BaseModel):
-    bucket: str = Field(...,
-                        description="S3 bucket where the file was uploaded")
+    bucket: str = Field(..., description="S3 bucket where the file was uploaded")
     key: str = Field(..., description="Key (path) of the uploaded file in S3")
     status: str = Field(..., description="Status of the upload operation")
-    message: str = Field(...,
-                         description="Detailed message about the upload operation")
+    message: str = Field(..., description="Detailed message about the upload operation")
 
 
 app = FastAPI(
     title="CGIAR Text Mining Service API",
-    description="API for processing and text mining of documents stored in S3",
+    description="""
+    AI-Powered Document Processing Service:
+    
+    This service provides intelligent document analysis using Large Language Models (LLMs) 
+    for extracting structured information from various document formats.
+    
+    Supported Projects:
+    - STAR
+    - PRMS
+
+    Key Features:
+    - 📄 Multi-format document support (PDF, DOCX, Excel, PowerPoint, TXT)
+    - 🔍 Semantic content extraction with vector embeddings
+    - 🤖 AI-powered analysis using AWS Bedrock (Claude 3 Sonnet)
+    - 🔐 Authentication integration
+    - 📊 Excel row-level processing for structured data
+    - 🚀 Real-time processing with MCP protocol
+    - 📱 Slack notifications for processing status
+
+    Authentication:
+    All requests require a valid token for authentication.
+    """,
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    license_info={
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT"
+    },
+    servers=[
+        {"url": "http://localhost:8000", "description": "Development server"},
+        {"url": "https://d3djd7q7g7v7di.cloudfront.net", "description": "Production server"}
+    ]
 )
 
 app.add_middleware(
@@ -71,37 +99,58 @@ async def handle_sampling_message(message: types.CreateMessageRequestParams) -> 
 
 
 @app.post("/process",
-          summary="Process document for STAR",
-          description="Process a document stored in S3 using text mining techniques for STAR project. You can either provide an S3 key for an existing document or upload a new file",
+          summary="Process Document for STAR Project",
+          description="""
+          Process a document using AI text mining techniques for the STAR project.
+          
+          Processing Flow:
+          1. Document validation and upload (if file provided)
+          2. Authentication verification  
+          3. Document chunking and vectorization
+          4. AI analysis using Claude 3 Sonnet
+          5. Structured data extraction
+          
+          Supported File Types:
+          - PDF documents (.pdf)
+          - Microsoft Word (.docx, .doc)
+          - Excel spreadsheets (.xlsx, .xls)
+          - PowerPoint presentations (.pptx, .ppt)
+          - Plain text files (.txt)
+          
+          Note: You must provide either `key` (for existing S3 documents) or `file` (for upload), but not both.
+          """,
           responses={
               200: {"description": "Document processed successfully"},
-              400: {"description": "Missing or invalid parameters"},
-              500: {"description": "Error processing document"}
-          })
+              400: {"description": "Bad Request - Missing or invalid parameters"},
+              401: {"description": "Unauthorized - Invalid or missing authentication token"},
+              500: {"description": "Internal Server Error - Error processing document"}
+          },
+          tags=["STAR Project"])
 async def process_document_endpoint(
     bucketName: str = Form(
-        ..., description="Name of the S3 bucket where the document is/will be located"),
-    token: str = Form(..., description="Authentication token"),
+        ..., description="Name of the S3 bucket where the document is/will be located", examples=["cgiar-documents"]),
+    token: str = Form(
+        ..., description="Authentication token", examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."]),
     key: Optional[str] = Form(
-        None, description="Object key in the S3 bucket. Optional if file is provided"),
+        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["reports/training-report-2024.pdf"]),
     file: Optional[UploadFile] = File(
-        None, description="File to upload and process. Optional if key is provided"),
-    prompt: Optional[str] = Form("Extract key points from this document",
-                                 description="Specific instructions for document processing"),
+        None, description="Document file to upload and process. Optional if key is provided", examples=["training-report-2024.pdf"]),
+    prompt: Optional[str] = Form(
+        "Extract key points from this document", description="Custom processing instructions for the AI model", examples=["Extract all capacity development activities, participant demographics, and training outcomes"]),
     environmentUrl: str = Form(
-        ..., description="Environment for the service (e.g., production, test)"
+        ..., description="Target environment URL for authentication"
     )
 ):
     """
     Process a document stored in S3 using text mining techniques.
     You can either provide a key to an existing document in S3 or upload a new file.
 
-    - **bucketName**: Name of the S3 bucket where the document is/will be located
-    - **token**: Authentication token
-    - **key**: Object key in the S3 bucket (required if no file is provided)
-    - **file**: File to upload and process (required if no key is provided)
-    - **prompt**: Specific instructions for document processing
-    - **environmentUrl**: Environment for the service (e.g., production, test)
+    - bucketName: Name of the S3 bucket where the document is/will be located
+    - token: Authentication token
+    - key: Object key in the S3 bucket (required if no file is provided)
+    - file: File to upload and process (required if no key is provided)
+    - prompt: Specific instructions for document processing
+    - environmentUrl: Environment for the service (e.g., production, test)
 
     Returns:
         dict: Result of the document processing
@@ -168,37 +217,56 @@ async def process_document_endpoint(
     
 
 @app.post("/prms/text_mining",
-          summary="Process document for PRMS",
-          description="Process a document stored in S3 using text mining techniques for PRMS project. You can either provide an S3 key for an existing document or upload a new file",
+          summary="Process document for PRMS Project",
+          description="""
+          Process a document using AI text mining techniques for the PRMS (Policy Research and Management Systems) project.
+          
+          PRMS-Specific Features:
+          - Policy change analysis and classification
+          - Innovation development assessment
+          - Capacity sharing evaluation with detailed demographics
+          - Stakeholder identification and categorization
+          
+          Processing Capabilities:
+          - Extract policy interventions and their stages
+          - Identify innovation readiness levels (0-9 scale)
+          - Analyze training programs and participant demographics
+          - Classify organization types and roles
+          
+          Note: You must provide either `key` (for existing S3 documents) or `file` (for upload), but not both.
+          """,
           responses={
               200: {"description": "Document processed successfully for PRMS"},
-              400: {"description": "Missing or invalid parameters"},
-              500: {"description": "Error processing document for PRMS"}
-          })
+              400: {"description": "Bad Request - Missing or invalid parameters"},
+              401: {"description": "Unauthorized - Authentication failed"},
+              500: {"description": "Internal Server Error - Error processing document for PRMS"}
+          },
+          tags=["PRMS Project"])
 async def process_document_prms_endpoint(
     bucketName: str = Form(
-        ..., description="Name of the S3 bucket where the document is/will be located"),
-    token: str = Form(..., description="Authentication token"),
+        ..., description="Name of the S3 bucket where the document is/will be located", examples=["prms-policy-documents"]),
+    token: str = Form(
+        ..., description="Authentication token for PRMS access", examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."]),
     key: Optional[str] = Form(
-        None, description="Object key in the S3 bucket. Optional if file is provided"),
+        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["policies/climate-policy-2024.docx"]),
     file: Optional[UploadFile] = File(
-        None, description="File to upload and process. Optional if key is provided"),
-    prompt: Optional[str] = Form("Extract key points from this document",
-                                 description="Specific instructions for document processing"),
+        None, description="File to upload and process. Optional if key is provided", examples=["climate-policy-2024.docx"]),
+    prompt: Optional[str] = Form(
+        "Extract key points from this document", description="Specific instructions for document processing", examples=["Analyze policy changes, innovation developments, and capacity building activities with stakeholder details"]),
     environmentUrl: str = Form(
-        ..., description="Environment for the service (e.g., production, test)"
+        ..., description="Target environment URL for PRMS authentication"
     )
 ):
     """
     Process a document stored in S3 using text mining techniques for PRMS project.
     You can either provide a key to an existing document in S3 or upload a new file.
 
-    - **bucketName**: Name of the S3 bucket where the document is/will be located
-    - **token**: Authentication token
-    - **key**: Object key in the S3 bucket (required if no file is provided)
-    - **file**: File to upload and process (required if no key is provided)
-    - **prompt**: Specific instructions for document processing
-    - **environmentUrl**: Environment for the service (e.g., production, test)
+    - bucketName: Name of the S3 bucket where the document is/will be located
+    - token: Authentication token
+    - key: Object key in the S3 bucket (required if no file is provided)
+    - file: File to upload and process (required if no key is provided)
+    - prompt: Specific instructions for document processing
+    - environmentUrl: Environment for the service (e.g., production, test)
 
     Returns:
         dict: Result of the document processing for PRMS
