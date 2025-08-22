@@ -6,50 +6,67 @@ An AI-powered service for generating comprehensive annual reports for AICCRA (Ac
 
 ## 🌟 Features
 
-- **📊 Automated Report Generation**: AI-generated reports for various performance indicators
-- **🔍 Vector Search**: Integration with Amazon OpenSearch Service
-- **📈 Multi-Indicator Support**: Handles both IPI (Intermediate Performance Indicators) and PDO (Project Development Objective) indicators
-- **💾 Database Integration**: SQL Server connectivity for retrieving structured data
+- **📊 AI-Powered Report Generation**: Automated reports using AWS Bedrock Claude 3.7 Sonnet
+- **🔍 Vector Search Integration**: Advanced context retrieval using OpenSearch with hybrid search capabilities
+- **📈 Multi-Indicator Support**: Comprehensive support for IPI and PDO indicators (2020-2030)
+- **💾 Database Integration**: SQL Server connectivity for retrieving structured AICCRA data
+- **🚀 REST API**: FastAPI-based service with comprehensive OpenAPI documentation
+- **⚡ High Performance**: Optimized processing with configurable data refresh options
+- **📋 Structured Responses**: Pydantic models for request/response validation
+- **🔒 Enterprise Security**: AWS IAM authentication and secure credential management
 
 ---
 
 ## 🏗️ Architecture
 
-The service consists of two main components:
+The service is built as a REST API service with the following components:
 
-### 1. REST API Service (`app/api/`)
-- FastAPI-based REST API with OpenAPI documentation
-- HTTP endpoints for programmatic access
-- Request/response validation with Pydantic models
-- Comprehensive error handling and logging
-- CORS support for web applications
+### Core Components
 
-### 2. Core Processing Engine
-- **Vector Database Options**:
-  - `app/llm/vectorize_os.py` - OpenSearch vector processing
-- **Prompt Engineering**: Custom prompts for report generation
-- **Database Connectivity**: SQL Server integration for data retrieval
+1. **REST API Service** (`app/api/`)
+   - FastAPI-based REST API with comprehensive OpenAPI documentation
+   - HTTP endpoints for programmatic report generation
+   - Request/response validation with Pydantic models
+   - Comprehensive error handling and structured logging
+   - CORS support for web applications
+
+2. **AI Processing Engine** (`app/llm/`)
+   - **Vector Processing**: `vectorize_os.py` - OpenSearch integration with hybrid search
+   - **LLM Integration**: `invoke_llm.py` - AWS Bedrock Claude 3.7 Sonnet integration
+   - **Agents**: `agents.py` - Advanced conversational AI with memory (future use)
+
+3. **Utilities & Configuration** (`app/utils/`)
+   - **Prompt Engineering**: Custom templates for report generation
+   - **Configuration Management**: Environment-based configuration
+   - **Logging**: Structured logging with file and console output
+   - **S3 Integration**: File storage and management utilities
+
+4. **Database Connectivity** (`db_conn/`)
+   - SQL Server integration for structured AICCRA data retrieval
+   - Data loading and preprocessing utilities
 
 ---
 
 ## 🛠️ Technology Stack
 
-- **REST API**: FastAPI, Uvicorn, Pydantic
+- **REST API**: FastAPI, Pydantic
 - **AI/ML**: AWS Bedrock (Claude 3.7 Sonnet)
-- **Vector Database**: OpenSearch
-- **Traditional Database**: SQL Server
-- **Cloud Services**: AWS S3, AWS Bedrock Knowledge Base
+- **Vector Database**: Amazon OpenSearch Service
+- **Traditional Database**: SQL Server (via `pyodbc`)
+- **Cloud Services**: AWS S3, AWS Bedrock Knowledge Base, AWS IAM
 - **Data Processing**: Pandas, NumPy
-- **Authentication**: AWS4Auth
+- **Authentication**: AWS4Auth, boto3
+- **Development**: Python 3.13+
 
 ---
 
 ## 📋 Prerequisites
 
-- Python 3.13+
-- AWS account with Bedrock access
-- Credentials for direct connection to Lakehouse (SQL Server)
-- OpenSearch instance
+- **Python 3.13+** (recommended)
+- **AWS Account** with Bedrock access and appropriate IAM permissions
+- **SQL Server** database or connection to AICCRA Lakehouse
+- **Amazon OpenSearch Service** instance
+- **Environment Configuration**: `.env` file with required credentials
 
 ---
 
@@ -125,9 +142,11 @@ curl -X POST http://localhost:8000/api/generate \
 
 ## API Endpoints
 
-### `POST /api/generate`
+### Generate Report
 
-Generate an AICCRA report for the specified indicator and year.
+**POST** `/api/generate`
+
+Generate an AI-powered AICCRA report for a specific indicator and year.
 
 **Request Body:**
 ```json
@@ -148,7 +167,7 @@ Generate an AICCRA report for the specified indicator and year.
 {
   "indicator": "IPI 1.1",
   "year": 2025,
-  "content": "Generated report content...",
+  "content": "By mid-year 2025, AICCRA had already achieved...",
   "status": "success"
 }
 ```
@@ -162,13 +181,28 @@ Generate an AICCRA report for the specified indicator and year.
 }
 ```
 
-### `GET /`
+### Health Check
+
+**GET** `/health`
+
+Check the health status of the API service.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "AICCRA Report Generator API",
+  "version": "1.0.0"
+}
+```
+
+### API information
+
+**GET** `/`
 
 Root endpoint providing API information.
 
-### `GET /health`
-
-Health check endpoint.
+---
 
 ## Server Configuration
 
@@ -270,7 +304,8 @@ ar-generator-service/
 │   │   ├── models.py              # Pydantic request/response models
 │   │   └── routes.py              # API endpoint routes
 │   ├── llm/                       # LLM processing modules
-│   │   └── vectorize_os.py        # OpenSearch vector operations
+│   │   ├── vectorize_os.py        # OpenSearch vector operations
+│   │   └── invoke_llm.py          # AWS Bedrock integration
 │   └── utils/                     # Utility modules
 │       ├── config/                # Configuration management
 │       ├── logger/                # Logging utilities
@@ -286,45 +321,68 @@ ar-generator-service/
 
 ## Error Handling
 
-The API returns appropriate HTTP status codes:
-- `200`: Success
-- `400`: Bad Request (validation errors)
-- `403`: Forbidden (access denied)
-- `422`: Unprocessable Entity (validation errors)
-- `500`: Internal Server Error
+The API provides comprehensive error handling with structured responses:
+
+### HTTP Status Codes
+- **200**: Success - Report generated successfully
+- **400**: Bad Request - Invalid parameters (e.g., unsupported indicator)
+- **403**: Forbidden - Authentication/authorization issues
+- **422**: Unprocessable Entity - Request validation errors
+- **500**: Internal Server Error - Service or infrastructure issues
+
+### Error Response Format
+```json
+{
+  "error": "Brief error description",
+  "status": "error",
+  "details": "Detailed error information",
+  "error_code": "MACHINE_READABLE_CODE",
+  "support": "aiccra-support@cgiar.org"
+}
+```
 
 ---
 
 ## 🔧 Development
 
-### Key Components
+### Key Development Components
 
-1. **Vector Processing** (`app/llm/`):
-   - Handles embedding generation and vector search
-   - Supports hybrid search capabilities
+1. **Report Generation Pipeline** (`app/llm/vectorize_os.py`):
+   - Processes AICCRA data from SQL Server
+   - Creates vector embeddings using AWS Bedrock
+   - Performs hybrid search in OpenSearch
+   - Generates reports using Claude 3.7 Sonnet
 
-2. **Prompt Engineering** (`app/utils/prompts/`):
-   - Custom prompts for report generation
-   - Knowledge base query optimization
-   - Context-aware response generation
+2. **API Layer** (`app/api/`):
+   - FastAPI implementation with automatic OpenAPI documentation
+   - Pydantic models for type safety and validation
+   - Comprehensive error handling and logging
 
-3. **Database Integration** (`db_conn/`):
-   - SQL Server connectivity for structured data
-   - Data loading and preprocessing utilities
+3. **Configuration Management** (`app/utils/config/`):
+   - Environment-based configuration
+   - Separate configs for different services (AWS, databases, etc.)
 
 ### Customizing Prompts
 
 Edit the prompt template in `app/utils/prompts/`:
-- `report_generation_prompt.py`: Report generation template
+- `report_prompt.py`: Report generation template
 
 ---
 
 ## 📝 Logging
 
-Logs are automatically generated in `data/logs/app.log` with information about:
-- Application startup and shutdown
-- Database connections
-- API calls to AWS services
+The service provides comprehensive logging:
+
+- **Log Location**: `data/logs/app.log`
+- **Log Levels**: DEBUG, INFO, WARNING, ERROR, CRITICAL
+- **Log Format**: Timestamp, level, module, message
+- **Rotation**: Automatic log rotation to prevent large files
+
+**Log Categories:**
+- Application startup and configuration
+- Database connections and queries  
+- AWS service interactions (Bedrock, OpenSearch, S3)
+- API request/response cycles
 - Error handling and debugging information
 
 ---
@@ -370,19 +428,35 @@ Logs are automatically generated in `data/logs/app.log` with information about:
 
 ## 🤝 Contributing
 
+We welcome contributions to improve the AICCRA Report Generator Service!
+
+### Development Setup
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/new-indicator`)
-3. Make your changes
-4. Add tests if applicable
-5. Commit your changes (`git commit -m 'Add new indicator support'`)
-6. Push to the branch (`git push origin feature/new-indicator`)
-7. Create a Pull Request
+2. Create a feature branch (`git checkout -b feature/enhancement-name`)
+3. Set up development environment
+4. Make your changes following the existing code style
+5. Test your changes thoroughly
+6. Update documentation as needed
+7. Commit changes (`git commit -m 'Add enhancement description'`)
+8. Push to your branch (`git push origin feature/enhancement-name`)
+9. Create a Pull Request
+
+### Contribution Guidelines
+- Follow Python PEP 8 style guidelines
+- Add appropriate error handling and logging
+- Update documentation for new features
+- Include examples for new API endpoints
+- Test with multiple indicators and years
 
 ---
 
 ## 🔄 Version History
 
-- **v0.1.0**: Initial release with basic chatbot and report generation
-- Features in development: Enhanced analytics, multi-language support, advanced visualization
+- **v1.0.0**: Production-ready REST API service
+  - FastAPI-based REST API with OpenAPI documentation
+  - AWS Bedrock Claude 3.7 Sonnet integration
+  - OpenSearch vector database support
+  - Comprehensive error handling and logging
+  - Support for all IPI and PDO indicators (2021-2025)
 
 ---
