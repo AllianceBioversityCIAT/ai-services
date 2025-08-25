@@ -170,8 +170,8 @@ async def process_document_endpoint(
 
             # Use the filename as the key in S3
             filename = file.filename
-            key = f"star/text-mining/files/{filename}"
-            # key = filename
+            #key = f"star/text-mining/files/{filename}"
+            key = filename
 
             # Determine content type from file
             content_type = file.content_type
