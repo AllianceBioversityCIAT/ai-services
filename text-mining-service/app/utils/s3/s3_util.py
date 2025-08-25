@@ -87,7 +87,8 @@ def read_document_from_s3(bucket_name, file_key):
     try:
         logger.info(
             f"📂 Downloading the {file_key} file from the bucket {bucket_name}...")
-        response = s3_client.get_object(Bucket=bucket_name, Key=file_key)
+        key = f"star/text-mining/files/{file_key}"
+        response = s3_client.get_object(Bucket=bucket_name, Key=key)
         file_content = response['Body'].read()
         file_extension = file_key.lower().split('.')[-1]
 
