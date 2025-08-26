@@ -217,7 +217,7 @@ async def process_document_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
     
 
-@app.post("/prms/text_mining",
+@app.post("/prms/text-mining",
           summary="Process document for PRMS Project",
           description="""
           Process a document using AI text mining techniques for the PRMS (Policy Research and Management Systems) project.
