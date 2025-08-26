@@ -7,26 +7,41 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  async function fetchProjects() {
+    setLoading(true);
+    const res = await fetch("/api/projects/list");
+    const data = await res.json();
+    setProjects(data.projects || []);
+    setLoading(false);
+  }
+
+  async function handleDelete(id: string) {
+    await fetch("/api/projects/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    fetchProjects();
+  }
+
   useEffect(() => {
-    fetch("/api/projects/list")
-      .then(res => res.json())
-      .then(data => {
-        setProjects(data.projects || []);
-        setLoading(false);
-      });
+    fetchProjects();
   }, []);
 
   return (
-    <div className="max-w-5xl mx-auto py-8">
-      <h2 className="text-2xl font-bold mb-6">Gestión de Proyectos</h2>
-      <ProjectForm onCreated={() => window.location.reload()} />
-      <div className="mt-8">
-        {loading ? (
-          <div className="text-muted-foreground">Cargando proyectos...</div>
-        ) : (
-          <ProjectsTable projects={projects} />
-        )}
+    <div className="container mx-auto py-8">
+      <h2 className="text-2xl font-bold mb-6">Projects Management</h2>
+      <div className="max-w-xl mx-auto">
+        <div className="mb-8">
+          <ProjectForm onCreated={fetchProjects} />
+        </div>
+        <ProjectsTable projects={projects} onDelete={handleDelete} />
       </div>
+      {loading && (
+        <div className="text-center py-8 text-muted-foreground">
+          Loading projects...
+        </div>
+      )}
     </div>
   );
 }

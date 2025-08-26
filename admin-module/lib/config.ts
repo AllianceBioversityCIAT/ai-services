@@ -13,7 +13,6 @@ import { dynamoDb } from "./dynamo";
 
 // PRODUCT CRUD
 export async function createProduct(product: any) {
-  console.log("🚀 ~ createProduct ~ product:", product);
   const id = uuidv4();
   const PK = `PRODUCT#${id}`;
   const SK = "METADATA";
@@ -28,7 +27,6 @@ export async function createProduct(product: any) {
     status: product.status || "active",
     created_at: new Date().toISOString(),
   };
-  console.log("🚀 ~ createProduct ~ item:", item);
   const newProduct = await dynamoDb.send(
     new PutCommand({
       TableName: env.DYNAMO_DB_CONFIG_TABLE,
@@ -36,7 +34,6 @@ export async function createProduct(product: any) {
       ConditionExpression: "attribute_not_exists(PK)",
     })
   );
-  console.log("🚀 ~ createProduct ~ newProduct:", newProduct);
   return item;
 }
 
@@ -94,7 +91,6 @@ export async function listProducts() {
       ExpressionAttributeValues: { ":type": "PRODUCT" },
     })
   );
-  console.log("🚀 ~ listProducts ~ result:", result);
   return result.Items || [];
 }
 
@@ -177,7 +173,26 @@ export async function listProjects() {
       ExpressionAttributeValues: { ":type": "PROJECT" },
     })
   );
-  return result.Items || [];
+  const projects = result.Items || [];
+
+  const productsResult = await dynamoDb.send(
+    new ScanCommand({
+      TableName: env.DYNAMO_DB_CONFIG_TABLE,
+      FilterExpression: "entity_type = :type",
+      ExpressionAttributeValues: { ":type": "PRODUCT" },
+    })
+  );
+  const products = productsResult.Items || [];
+
+  const projectsWithProductName = projects.map((project) => {
+    const product = products.find((p) => p.id === project.product_id);
+    return {
+      ...project,
+      product_name: product ? product.name : "",
+    };
+  });
+
+  return projectsWithProductName;
 }
 
 // PROMPT VERSIONING CRUD
