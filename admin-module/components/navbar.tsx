@@ -51,6 +51,36 @@ export default function Navbar({ isAdmin }: { isAdmin: boolean }) {
           >
             Dashboard
           </button>
+          <button
+            style={{
+              background: pathname === "/products" ? "#1a2a6c" : "#fff",
+              color: pathname === "/products" ? "#fff" : "#1a2a6c",
+              boxShadow:
+                pathname === "/products"
+                  ? "0 2px 8px rgba(26,42,108,0.12)"
+                  : "none",
+              border: "1px solid #d1d9e6",
+            }}
+            className="px-4 py-2 rounded font-medium transition"
+            onClick={() => router.push("/products")}
+          >
+            Products
+          </button>
+          <button
+            style={{
+              background: pathname === "/projects" ? "#1a2a6c" : "#fff",
+              color: pathname === "/projects" ? "#fff" : "#1a2a6c",
+              boxShadow:
+                pathname === "/projects"
+                  ? "0 2px 8px rgba(26,42,108,0.12)"
+                  : "none",
+              border: "1px solid #d1d9e6",
+            }}
+            className="px-4 py-2 rounded font-medium transition"
+            onClick={() => router.push("/projects")}
+          >
+            Projects
+          </button>
           {isAdmin && (
             <button
               style={{

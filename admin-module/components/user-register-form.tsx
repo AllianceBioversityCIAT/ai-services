@@ -36,46 +36,27 @@ export default function UserRegisterForm({ isAdmin }: { isAdmin: boolean }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label>Email</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="border px-2 py-1 w-full"
-        />
+    <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-lg p-8 max-w-md mx-auto mb-8 border border-border">
+      <h3 className="text-xl font-bold mb-6 text-primary">Register New User</h3>
+      <div className="mb-4">
+        <label className="block text-sm font-medium mb-1">Email</label>
+        <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="border px-3 py-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-primary" />
       </div>
-      <div>
-        <label>Password</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="border px-2 py-1 w-full"
-        />
+      <div className="mb-4">
+        <label className="block text-sm font-medium mb-1">Password</label>
+        <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="border px-3 py-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-primary" />
       </div>
-      <div>
-        <label>Rol</label>
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          className="border px-2 py-1 w-full"
-        >
+      <div className="mb-4">
+        <label className="block text-sm font-medium mb-1">Role</label>
+        <select value={role} onChange={e => setRole(e.target.value)} className="border px-3 py-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-primary">
           <option value="user">User</option>
           <option value="admin">Admin</option>
         </select>
       </div>
-      <button
-        type="submit"
-        disabled={loading}
-        className="bg-blue-600 text-white px-4 py-2 rounded"
-      >
-        {loading ? "Creando..." : "Registrar Usuario"}
+      <button type="submit" disabled={loading} className="bg-primary text-white px-5 py-2 rounded font-semibold shadow">
+        {loading ? "Creating..." : "Register User"}
       </button>
-      {message && <div className="mt-2 text-sm text-red-600">{message}</div>}
+      {message && <div className="mt-3 text-sm text-blue-600">{message}</div>}
     </form>
   );
 }
