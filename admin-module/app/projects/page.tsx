@@ -35,7 +35,11 @@ export default function ProjectsPage() {
         <div className="mb-8">
           <ProjectForm onCreated={fetchProjects} />
         </div>
-        <ProjectsTable projects={projects} onDelete={handleDelete} />
+        <ProjectsTable
+          projects={projects}
+          onDelete={handleDelete}
+          onEdit={fetchProjects}
+        />
       </div>
       {loading && (
         <div className="text-center py-8 text-muted-foreground">
