@@ -1,13 +1,18 @@
-
 "use client";
 import { useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, MoreHorizontal } from "lucide-react";
 
-export default function ProductsTable({ products }: { products: any[] }) {
+export default function ProductsTable({
+  products,
+  onRefresh,
+}: {
+  products: any[];
+  onRefresh?: () => void;
+}) {
   const [editing, setEditing] = useState<any | null>(null);
   const [editValues, setEditValues] = useState<Record<string, any>>({});
   const [editLoading, setEditLoading] = useState(false);
-  const [editMsg, setEditMsg] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   function openEdit(product: any) {
     setEditing(product);
@@ -17,82 +22,139 @@ export default function ProductsTable({ products }: { products: any[] }) {
       image_url: product.image_url || "",
       status: product.status,
     });
-    setEditMsg("");
   }
 
   function closeEdit() {
     setEditing(null);
     setEditValues({});
-    setEditMsg("");
   }
 
   async function handleEditSubmit(e: React.FormEvent) {
     e.preventDefault();
     setEditLoading(true);
-    setEditMsg("");
+
     const res = await fetch("/api/products/update", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: editing.id || editing.PK.split('#')[1], updates: editValues }),
+      body: JSON.stringify({
+        id: editing.id || editing.PK.split("#")[1],
+        updates: editValues,
+      }),
     });
-    const data = await res.json();
+
     if (res.ok) {
-      setEditMsg("Producto actualizado");
-      window.location.reload();
-    } else {
-      setEditMsg(data.error || "Error al actualizar producto");
+      closeEdit();
+      if (onRefresh) onRefresh();
     }
     setEditLoading(false);
   }
+
   async function handleDelete(id: string) {
     await fetch("/api/products/delete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
-    window.location.reload();
+    setConfirmDelete(null);
+    if (onRefresh) onRefresh();
   }
 
   return (
-    <div className="shadow-lg rounded-xl bg-white p-8 border border-border">
-      <h3 className="text-2xl font-bold mb-6 text-primary">Registered Products</h3>
+    <div className="bg-card border border-border rounded-lg">
+      <div className="p-6 border-b border-border">
+        <h3 className="text-lg font-medium text-foreground">Products</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          {products.length} product{products.length !== 1 ? "s" : ""} registered
+        </p>
+      </div>
+
       <div className="overflow-x-auto">
-        <table className="min-w-full text-sm border rounded-lg">
+        <table className="w-full">
           <thead>
-            <tr className="bg-muted">
-              <th className="p-3 text-left">Name</th>
-              <th className="p-3 text-left">Description</th>
-              <th className="p-3 text-left">Status</th>
-              <th className="p-3 text-left">Created At</th>
-              <th className="p-3 text-left">Actions</th>
+            <tr className="border-b border-border">
+              <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
+                Name
+              </th>
+              <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
+                Description
+              </th>
+              <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
+                Status
+              </th>
+              <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
+                Created
+              </th>
+              <th className="text-right py-3 px-6 text-sm font-medium text-muted-foreground">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
             {products.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-3 text-center text-muted-foreground">
-                  No products found.
+                <td
+                  colSpan={5}
+                  className="text-center py-12 text-muted-foreground"
+                >
+                  <div className="flex flex-col items-center space-y-2">
+                    <div className="text-sm">No products found</div>
+                    <div className="text-xs">
+                      Create your first product to get started
+                    </div>
+                  </div>
                 </td>
               </tr>
             ) : (
-              products.map((p) => (
-                <tr key={p.PK} className="border-b hover:bg-blue-50 transition">
-                  <td className="p-3 font-semibold text-primary">{p.name}</td>
-                  <td className="p-3 text-gray-700">{p.description}</td>
-                  <td className="p-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold capitalize ${p.status === "active" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"}`}>
-                      {p.status === "active" ? <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> : <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />}
-                      {p.status}
+              products.map((product) => (
+                <tr
+                  key={product.PK}
+                  className="border-b border-border hover:bg-muted/50 transition-colors"
+                >
+                  <td className="py-3 px-6">
+                    <div className="font-medium text-foreground">
+                      {product.name}
+                    </div>
+                  </td>
+                  <td className="py-3 px-6">
+                    <div className="text-sm text-muted-foreground max-w-xs truncate">
+                      {product.description}
+                    </div>
+                  </td>
+                  <td className="py-3 px-6">
+                    <span
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        product.status === "active"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-gray-100 text-gray-700"
+                      }`}
+                    >
+                      {product.status}
                     </span>
                   </td>
-                  <td className="p-3 text-gray-500">{new Date(p.created_at).toLocaleString()}</td>
-                  <td className="p-3 flex gap-2">
-                    <button title="Edit" className="bg-blue-100 hover:bg-blue-200 text-blue-700 p-2 rounded transition flex items-center" onClick={() => openEdit(p)}>
-                      <Pencil size={16} />
-                    </button>
-                    <button title="Delete" className="bg-red-100 hover:bg-red-200 text-red-700 p-2 rounded transition flex items-center" onClick={() => handleDelete(p.id || p.PK.split('#')[1])}>
-                      <Trash2 size={16} />
-                    </button>
+                  <td className="py-3 px-6">
+                    <div className="text-sm text-muted-foreground">
+                      {new Date(product.created_at).toLocaleDateString()}
+                    </div>
+                  </td>
+                  <td className="py-3 px-6">
+                    <div className="flex items-center justify-end space-x-2">
+                      <button
+                        onClick={() => openEdit(product)}
+                        className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        onClick={() =>
+                          setConfirmDelete(
+                            product.id || product.PK.split("#")[1]
+                          )
+                        }
+                        className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -101,38 +163,134 @@ export default function ProductsTable({ products }: { products: any[] }) {
         </table>
       </div>
 
-      {/* Improved edit modal */}
+      {/* Edit Modal */}
       {editing && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fadein">
-          <form onSubmit={handleEditSubmit} className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md border border-border">
-            <h3 className="text-xl font-bold mb-4 text-primary">Edit Product</h3>
-            <div className="mb-3">
-              <label className="block text-sm font-medium mb-1">Name</label>
-              <input type="text" value={editValues.name} onChange={e => setEditValues((v: Record<string, any>) => ({ ...v, name: e.target.value }))} required className="border px-3 py-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-primary" />
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-lg shadow-lg w-full max-w-md mx-4">
+            <form onSubmit={handleEditSubmit}>
+              <div className="p-6 border-b border-border">
+                <h3 className="text-lg font-medium text-foreground">
+                  Edit Product
+                </h3>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editValues.name}
+                    onChange={(e) =>
+                      setEditValues((v) => ({ ...v, name: e.target.value }))
+                    }
+                    required
+                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Description
+                  </label>
+                  <textarea
+                    value={editValues.description}
+                    onChange={(e) =>
+                      setEditValues((v) => ({
+                        ...v,
+                        description: e.target.value,
+                      }))
+                    }
+                    required
+                    rows={3}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Image URL
+                  </label>
+                  <input
+                    type="url"
+                    value={editValues.image_url}
+                    onChange={(e) =>
+                      setEditValues((v) => ({
+                        ...v,
+                        image_url: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Status
+                  </label>
+                  <select
+                    value={editValues.status}
+                    onChange={(e) =>
+                      setEditValues((v) => ({ ...v, status: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-border flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={closeEdit}
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editLoading}
+                  className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                >
+                  {editLoading ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-lg shadow-lg w-full max-w-sm mx-4">
+            <div className="p-6">
+              <h3 className="text-lg font-medium text-foreground mb-2">
+                Delete Product
+              </h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                This action cannot be undone. Are you sure you want to delete
+                this product?
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setConfirmDelete(null)}
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(confirmDelete)}
+                  className="px-4 py-2 text-sm font-medium bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
-            <div className="mb-3">
-              <label className="block text-sm font-medium mb-1">Description</label>
-              <textarea value={editValues.description} onChange={e => setEditValues((v: Record<string, any>) => ({ ...v, description: e.target.value }))} required className="border px-3 py-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-primary" />
-            </div>
-            <div className="mb-3">
-              <label className="block text-sm font-medium mb-1">Image (URL)</label>
-              <input type="text" value={editValues.image_url} onChange={e => setEditValues((v: Record<string, any>) => ({ ...v, image_url: e.target.value }))} className="border px-3 py-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-primary" />
-            </div>
-            <div className="mb-3">
-              <label className="block text-sm font-medium mb-1">Status</label>
-              <select value={editValues.status} onChange={e => setEditValues((v: Record<string, any>) => ({ ...v, status: e.target.value }))} className="border px-3 py-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-primary">
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-            <div className="flex gap-2 mt-6">
-              <button type="submit" disabled={editLoading} className="bg-primary text-white px-5 py-2 rounded font-semibold shadow">
-                {editLoading ? "Saving..." : "Save"}
-              </button>
-              <button type="button" onClick={closeEdit} className="bg-gray-200 px-5 py-2 rounded font-semibold">Cancel</button>
-            </div>
-            {editMsg && <div className="mt-3 text-sm text-blue-600">{editMsg}</div>}
-          </form>
+          </div>
         </div>
       )}
     </div>

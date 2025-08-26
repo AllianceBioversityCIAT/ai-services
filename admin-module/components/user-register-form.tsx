@@ -1,7 +1,13 @@
 "use client";
 import { useState } from "react";
 
-export default function UserRegisterForm({ isAdmin }: { isAdmin: boolean }) {
+export default function UserRegisterForm({
+  isAdmin,
+  onUserCreated,
+}: {
+  isAdmin: boolean;
+  onUserCreated?: () => void;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("user");
@@ -14,49 +20,100 @@ export default function UserRegisterForm({ isAdmin }: { isAdmin: boolean }) {
     e.preventDefault();
     setLoading(true);
     setMessage("");
+
     const res = await fetch("/api/users/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email,
-        passwordHash: password, // Hash en backend
+        passwordHash: password,
         role,
       }),
     });
+
     const data = await res.json();
     if (res.ok) {
-      setMessage("Usuario creado exitosamente");
+      setMessage("User created successfully");
       setEmail("");
       setPassword("");
       setRole("user");
+      // Refrescar la tabla
+      if (onUserCreated) onUserCreated();
     } else {
-      setMessage(data.error || "Error al crear usuario");
+      setMessage(data.error || "Error creating user");
     }
     setLoading(false);
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-lg p-8 max-w-md mx-auto mb-8 border border-border">
-      <h3 className="text-xl font-bold mb-6 text-primary">Register New User</h3>
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1">Email</label>
-        <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="border px-3 py-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-primary" />
-      </div>
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1">Password</label>
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="border px-3 py-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-primary" />
-      </div>
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1">Role</label>
-        <select value={role} onChange={e => setRole(e.target.value)} className="border px-3 py-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-primary">
-          <option value="user">User</option>
-          <option value="admin">Admin</option>
-        </select>
-      </div>
-      <button type="submit" disabled={loading} className="bg-primary text-white px-5 py-2 rounded font-semibold shadow">
-        {loading ? "Creating..." : "Register User"}
-      </button>
-      {message && <div className="mt-3 text-sm text-blue-600">{message}</div>}
-    </form>
+    <div className="bg-card border border-border rounded-lg p-6">
+      <h3 className="text-lg font-medium mb-6 text-foreground">
+        Register New User
+      </h3>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">
+            Email
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+            placeholder="Enter user email"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">
+            Password
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+            placeholder="Enter password"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">
+            Role
+          </label>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+          >
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-primary text-primary-foreground py-2 px-4 rounded-md text-sm font-medium hover:bg-primary/90 focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {loading ? "Creating..." : "Register User"}
+        </button>
+
+        {message && (
+          <div
+            className={`text-sm p-3 rounded-md ${
+              message.includes("Error")
+                ? "bg-destructive/10 text-destructive border border-destructive/20"
+                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+            }`}
+          >
+            {message}
+          </div>
+        )}
+      </form>
+    </div>
   );
 }

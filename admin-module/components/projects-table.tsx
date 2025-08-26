@@ -30,6 +30,7 @@ export default function ProjectsTable({
       status: project.status,
     });
   }
+
   function closeEdit() {
     setEditing(null);
     setEditValues({});
@@ -52,19 +53,33 @@ export default function ProjectsTable({
   }
 
   return (
-    <div className="shadow-lg rounded-xl bg-white p-8 border border-border">
-      <h3 className="text-2xl font-bold mb-6 text-primary">
-        Registered Projects
-      </h3>
+    <div className="bg-card border border-border rounded-lg">
+      <div className="p-6 border-b border-border">
+        <h3 className="text-lg font-medium text-foreground">Projects</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          {projects.length} project{projects.length !== 1 ? "s" : ""} registered
+        </p>
+      </div>
+
       <div className="overflow-x-auto">
-        <table className="min-w-full text-sm border rounded-lg">
+        <table className="w-full">
           <thead>
-            <tr className="bg-muted">
-              <th className="p-3 text-left">Name</th>
-              <th className="p-3 text-left">Description</th>
-              <th className="p-3 text-left">Product</th>
-              <th className="p-3 text-left">Status</th>
-              <th className="p-3 text-left">Actions</th>
+            <tr className="border-b border-border">
+              <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
+                Name
+              </th>
+              <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
+                Description
+              </th>
+              <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
+                Product
+              </th>
+              <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
+                Status
+              </th>
+              <th className="text-right py-3 px-6 text-sm font-medium text-muted-foreground">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -72,48 +87,63 @@ export default function ProjectsTable({
               <tr>
                 <td
                   colSpan={5}
-                  className="p-3 text-center text-muted-foreground"
+                  className="text-center py-12 text-muted-foreground"
                 >
-                  No projects found.
+                  <div className="flex flex-col items-center space-y-2">
+                    <div className="text-sm">No projects found</div>
+                    <div className="text-xs">
+                      Create your first project to get started
+                    </div>
+                  </div>
                 </td>
               </tr>
             ) : (
-              projects.map((p) => (
-                <tr key={p.PK} className="border-b hover:bg-blue-50 transition">
-                  <td className="p-3 font-semibold text-primary">{p.name}</td>
-                  <td className="p-3 text-gray-700">{p.description}</td>
-                  <td className="p-3 text-gray-700">{p.product_name || "-"}</td>
-                  <td className="p-3">
+              projects.map((project) => (
+                <tr
+                  key={project.PK}
+                  className="border-b border-border hover:bg-muted/50 transition-colors"
+                >
+                  <td className="py-3 px-6">
+                    <div className="font-medium text-foreground">
+                      {project.name}
+                    </div>
+                  </td>
+                  <td className="py-3 px-6">
+                    <div className="text-sm text-muted-foreground max-w-xs truncate">
+                      {project.description}
+                    </div>
+                  </td>
+                  <td className="py-3 px-6">
+                    <div className="text-sm text-muted-foreground">
+                      {project.product_name || "-"}
+                    </div>
+                  </td>
+                  <td className="py-3 px-6">
                     <span
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold capitalize ${
-                        p.status === "active"
-                          ? "bg-blue-100 text-blue-700"
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        project.status === "active"
+                          ? "bg-emerald-100 text-emerald-700"
                           : "bg-gray-100 text-gray-700"
                       }`}
                     >
-                      {p.status === "active" ? (
-                        <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-                      ) : (
-                        <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />
-                      )}
-                      {p.status}
+                      {project.status}
                     </span>
                   </td>
-                  <td className="p-3 flex gap-2">
-                    <button
-                      title="Edit"
-                      className="bg-blue-100 hover:bg-blue-200 text-blue-700 p-2 rounded transition flex items-center"
-                      onClick={() => openEdit(p)}
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      title="Delete"
-                      className="bg-red-100 hover:bg-red-200 text-red-700 p-2 rounded transition flex items-center"
-                      onClick={() => setConfirmId(p.PK.split("#")[1])}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                  <td className="py-3 px-6">
+                    <div className="flex items-center justify-end space-x-2">
+                      <button
+                        onClick={() => openEdit(project)}
+                        className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        onClick={() => setConfirmId(project.PK.split("#")[1])}
+                        className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -121,117 +151,119 @@ export default function ProjectsTable({
           </tbody>
         </table>
       </div>
-      {/* Confirmation Modal */}
-      {confirmId && (
-        <>
-          {/* Overlay */}
-          <div className="fixed inset-0 z-50 bg-black/70" />
 
-          {/* Contenido del modal */}
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full border">
-              <h4 className="text-lg font-bold mb-4 text-primary">
-                ¿Delete Project?
-              </h4>
-              <p className="mb-6 text-gray-700">
+      {/* Delete Confirmation Modal */}
+      {confirmId && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-lg shadow-lg w-full max-w-sm mx-4">
+            <div className="p-6">
+              <h3 className="text-lg font-medium text-foreground mb-2">
+                Delete Project
+              </h3>
+              <p className="text-sm text-muted-foreground mb-6">
                 This action cannot be undone. Are you sure you want to delete
                 this project?
               </p>
-              <div className="flex justify-end gap-3">
+              <div className="flex justify-end space-x-3">
                 <button
-                  className="px-4 py-2 rounded bg-muted text-primary font-semibold"
                   onClick={() => setConfirmId(null)}
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  className="px-4 py-2 rounded bg-red-600 text-white font-semibold"
                   onClick={handleConfirm}
+                  className="px-4 py-2 text-sm font-medium bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors"
                 >
                   Delete
                 </button>
               </div>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* Edit Modal */}
       {editing && (
-        <>
-          {/* Overlay */}
-          <div className="fixed inset-0 z-50 bg-black/70" />
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-lg shadow-lg w-full max-w-md mx-4">
+            <form onSubmit={handleEditSubmit}>
+              <div className="p-6 border-b border-border">
+                <h3 className="text-lg font-medium text-foreground">
+                  Edit Project
+                </h3>
+              </div>
 
-          {/* Contenido del modal */}
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <form
-              onSubmit={handleEditSubmit}
-              className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full border border-border"
-            >
-              <h4 className="text-lg font-bold mb-4 text-primary">
-                Edit Project
-              </h4>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">Name</label>
-                <input
-                  type="text"
-                  value={editValues.name}
-                  onChange={(e) =>
-                    setEditValues((v) => ({ ...v, name: e.target.value }))
-                  }
-                  required
-                  className="border px-3 py-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editValues.name}
+                    onChange={(e) =>
+                      setEditValues((v) => ({ ...v, name: e.target.value }))
+                    }
+                    required
+                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Description
+                  </label>
+                  <textarea
+                    value={editValues.description}
+                    onChange={(e) =>
+                      setEditValues((v) => ({
+                        ...v,
+                        description: e.target.value,
+                      }))
+                    }
+                    required
+                    rows={3}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Status
+                  </label>
+                  <select
+                    value={editValues.status}
+                    onChange={(e) =>
+                      setEditValues((v) => ({ ...v, status: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={editValues.description}
-                  onChange={(e) =>
-                    setEditValues((v) => ({
-                      ...v,
-                      description: e.target.value,
-                    }))
-                  }
-                  required
-                  className="border px-3 py-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">Status</label>
-                <select
-                  value={editValues.status}
-                  onChange={(e) =>
-                    setEditValues((v) => ({ ...v, status: e.target.value }))
-                  }
-                  className="border px-3 py-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-              <div className="flex justify-end gap-3">
+
+              <div className="p-6 border-t border-border flex justify-end space-x-3">
                 <button
                   type="button"
-                  className="px-4 py-2 rounded bg-muted text-primary font-semibold"
                   onClick={closeEdit}
-                  disabled={editLoading}
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded bg-primary text-white font-semibold"
                   disabled={editLoading}
+                  className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 >
                   {editLoading ? "Saving..." : "Save"}
                 </button>
               </div>
             </form>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

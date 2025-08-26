@@ -5,11 +5,14 @@ import { Trash2 } from "lucide-react";
 export default function UsersTable({
   users,
   currentUserEmail,
+  onUserDeleted,
 }: {
   users: any[];
   currentUserEmail: string;
+  onUserDeleted?: () => void;
 }) {
   const [loading, setLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   async function handleDelete(email: string) {
     setLoading(true);
@@ -18,46 +21,93 @@ export default function UsersTable({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
     });
-    window.location.reload();
+    setConfirmDelete(null);
+    setLoading(false);
+    // Refrescar la tabla
+    if (onUserDeleted) onUserDeleted();
   }
 
   return (
-    <div className="shadow-lg rounded-xl bg-white p-8 border border-border">
-      <h3 className="text-2xl font-bold mb-6 text-primary">Registered Users</h3>
+    <div className="bg-card border border-border rounded-lg">
+      <div className="p-6 border-b border-border">
+        <h3 className="text-lg font-medium text-foreground">Users</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          {users.length} user{users.length !== 1 ? "s" : ""} registered
+        </p>
+      </div>
+
       <div className="overflow-x-auto">
-        <table className="min-w-full text-sm border rounded-lg">
+        <table className="w-full">
           <thead>
-            <tr className="bg-muted">
-              <th className="p-3 text-left">Email</th>
-              <th className="p-3 text-left">Role</th>
-              <th className="p-3 text-left">Created At</th>
-              <th className="p-3 text-left">Actions</th>
+            <tr className="border-b border-border">
+              <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
+                Email
+              </th>
+              <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
+                Role
+              </th>
+              <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
+                Created
+              </th>
+              <th className="text-right py-3 px-6 text-sm font-medium text-muted-foreground">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
             {users.length === 0 ? (
               <tr>
-                <td colSpan={4} className="p-3 text-center text-muted-foreground">
-                  No users found.
+                <td
+                  colSpan={4}
+                  className="text-center py-12 text-muted-foreground"
+                >
+                  <div className="flex flex-col items-center space-y-2">
+                    <div className="text-sm">No users found</div>
+                    <div className="text-xs">
+                      Register your first user to get started
+                    </div>
+                  </div>
                 </td>
               </tr>
             ) : (
-              users.map((u) => (
-                <tr key={u.email} className="border-b hover:bg-blue-50 transition">
-                  <td className="p-3 font-semibold text-primary">{u.email}</td>
-                  <td className="p-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold capitalize ${u.role === "admin" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"}`}>
-                      {u.role === "admin" ? <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> : <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />}
-                      {u.role}
+              users.map((user) => (
+                <tr
+                  key={user.email}
+                  className="border-b border-border hover:bg-muted/50 transition-colors"
+                >
+                  <td className="py-3 px-6">
+                    <div className="font-medium text-foreground">
+                      {user.email}
+                    </div>
+                  </td>
+                  <td className="py-3 px-6">
+                    <span
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        user.role === "admin"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-gray-100 text-gray-700"
+                      }`}
+                    >
+                      {user.role}
                     </span>
                   </td>
-                  <td className="p-3 text-gray-500">{new Date(u.createdAt).toLocaleString()}</td>
-                  <td className="p-3 flex gap-2">
-                    {u.email !== currentUserEmail && (
-                      <button title="Delete" className="bg-red-100 hover:bg-red-200 text-red-700 p-2 rounded transition flex items-center" onClick={() => handleDelete(u.email)} disabled={loading}>
+                  <td className="py-3 px-6">
+                    <div className="text-sm text-muted-foreground">
+                      {new Date(user.createdAt).toLocaleDateString()}
+                    </div>
+                  </td>
+                  <td className="py-3 px-6">
+                    <div className="flex items-center justify-end">
+                      {user.email !== currentUserEmail && (
+                        <button
+                          onClick={() => setConfirmDelete(user.email)}
+                          disabled={loading}
+                          className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+                        >
                           <Trash2 size={16} />
                         </button>
-                    )}
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -65,6 +115,38 @@ export default function UsersTable({
           </tbody>
         </table>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-lg shadow-lg w-full max-w-sm mx-4">
+            <div className="p-6">
+              <h3 className="text-lg font-medium text-foreground mb-2">
+                Delete User
+              </h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                This action cannot be undone. Are you sure you want to delete
+                this user?
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setConfirmDelete(null)}
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => confirmDelete && handleDelete(confirmDelete)}
+                  disabled={loading}
+                  className="px-4 py-2 text-sm font-medium bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+                >
+                  {loading ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

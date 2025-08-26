@@ -36,7 +36,6 @@ export async function getUserByEmail(email: string): Promise<User | null> {
     const result = await dynamoDb.send(command);
     return result.Item as User | null;
   } catch (error) {
-    console.error("Error getting user:", error);
     return null;
   }
 }
@@ -49,7 +48,6 @@ export async function createUser(user: User): Promise<boolean> {
       Item: user,
       ConditionExpression: "attribute_not_exists(email)",
     });
-    console.log("🚀 ~ createUser ~ command:", command);
 
     await dynamoDb.send(command);
     return true;
@@ -57,7 +55,6 @@ export async function createUser(user: User): Promise<boolean> {
     if ((error as any).name === "ConditionalCheckFailedException") {
       return false; // User already exists
     }
-    console.error("Error creating user:", error);
     throw error;
   }
 }
@@ -76,10 +73,8 @@ export async function listUsers(): Promise<User[]> {
       TableName: env.DYNAMO_DB_USERS_TABLE!,
     });
     const result = await dynamoDb.send(command);
-    console.log("🚀 ~ listUsers ~ result:", result);
     return (result.Items || []).map(normalizeUser);
   } catch (error) {
-    console.error("Error listing users:", error);
     return [];
   }
 }
