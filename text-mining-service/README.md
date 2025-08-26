@@ -4,7 +4,7 @@ This project is a microservice for intelligent document processing using LLMs (L
 
 The service supports multiple projects:
 - **STAR**: Uses the `/process` endpoint
-- **PRMS**: Uses the `/prms/text_mining` endpoint
+- **PRMS**: Uses the `/prms/text-mining` endpoint
 
 ---
 
@@ -100,7 +100,7 @@ Below is an example of the expected fields when calling the `/process` endpoint:
 | `file`      | file   | File to upload                  |
 
 ### For PRMS Project
-Below is an example of the expected fields when calling the `/prms/text_mining` endpoint:
+Below is an example of the expected fields when calling the `/prms/text-mining` endpoint:
 
 | Field       | Type   | Description                     |
 |-------------|--------|---------------------------------|
@@ -183,7 +183,7 @@ curl -X POST http://localhost:8000/process \
 
 #### For PRMS Project
 ```bash
-curl -X POST http://localhost:8000/prms/text_mining \
+curl -X POST http://localhost:8000/prms/text-mining \
   -F "key=my-document.pdf" \
   -F "bucketName=my-bucket" \
   -F "token=auth-token" \
@@ -200,7 +200,7 @@ import requests
 star_url = "http://localhost:8000/process"
 
 # For PRMS Project  
-prms_url = "http://localhost:8000/prms/text_mining"
+prms_url = "http://localhost:8000/prms/text-mining"
 
 # Option 1: Using an S3 key instead of uploading a file
 data = {
@@ -353,7 +353,7 @@ MCP is a protocol that enables seamless integration between the service and LLM 
 
 ```
 STAR Client Request → FastAPI /process → MCP Client → MCP Server → process_document → LLM Processing → Response
-PRMS Client Request → FastAPI /prms/text_mining → MCP Client → MCP Server → process_document_prms → LLM Processing → Response
+PRMS Client Request → FastAPI /prms/text-mining → MCP Client → MCP Server → process_document_prms → LLM Processing → Response
 ```
 
 The MCP server runs as a separate process and communicates with the main application through a standardized protocol, supporting both STAR and PRMS workflows.
