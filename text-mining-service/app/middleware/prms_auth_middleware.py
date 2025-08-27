@@ -52,14 +52,14 @@ class AuthMiddleware:
             return False
 
         headers = {
-            "access-token": token,
+            "auth": token,
             "Content-Type": "application/json"
         }
 
         try:
             logger.debug(
                 f"Sending token validation request to: {environmentUrl}")
-            response = requests.patch(environmentUrl, headers=headers)
+            response = requests.post(environmentUrl, headers=headers)
             logger.debug(
                 f"Response from token validation: {response.status_code}")
             if response.status_code == 200:
