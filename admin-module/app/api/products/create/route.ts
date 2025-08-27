@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createProduct } from "@/lib/config";
+import { createProduct } from "@/lib/database/products";
 
 export async function POST(req: Request) {
   try {
@@ -7,6 +7,9 @@ export async function POST(req: Request) {
     const product = await createProduct(body);
     return NextResponse.json({ product });
   } catch (error) {
-    return NextResponse.json({ error: "Error al crear producto" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error al crear producto" },
+      { status: 500 }
+    );
   }
 }

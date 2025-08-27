@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { listUsers } from "../../lib/dynamo";
+import { listUsers } from "../../lib/database/users";
 import UsersPageClient from "./user-page-client";
 
 export default async function UsersPage() {

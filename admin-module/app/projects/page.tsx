@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { listProjects } from "../../lib/config";
+import { listProjects } from "../../lib/database/projects";
 import ProjectsPageClient from "./projects-page-client";
 
 export default async function ProjectsPage() {

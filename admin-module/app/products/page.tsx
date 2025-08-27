@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { listProducts } from "../../lib/config";
+import { listProducts } from "../../lib/database/products";
 import ProductsPageClient from "./products-page-client";
 
 export default async function ProductsPage() {

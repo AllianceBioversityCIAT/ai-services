@@ -19,14 +19,22 @@ export default function UsersTable({
 
   async function handleDelete(email: string) {
     setDeleteLoading(true);
-    await fetch("/api/users/delete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-    setConfirmDelete(null);
+    try {
+      // Cambiar de POST a DELETE y usar el endpoint correcto
+      const res = await fetch(`/api/users/${encodeURIComponent(email)}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setConfirmDelete(null);
+        if (onUserDeleted) onUserDeleted();
+      } else {
+        console.error("Error deleting user");
+      }
+    } catch (error) {
+      console.error("Error deleting user:", error);
+    }
     setDeleteLoading(false);
-    if (onUserDeleted) onUserDeleted();
   }
 
   return (
@@ -59,12 +67,12 @@ export default function UsersTable({
           <tbody>
             {loading ? (
               <TableSkeleton
-                columns={5}
+                columns={4}
                 rows={5}
-                widths={["w-32", "w-48", "w-16", "w-20", "w-24"]}
+                widths={["w-48", "w-20", "w-24", "w-16"]}
               />
             ) : users.length === 0 ? (
-              <tr>
+              <tr key="empty-state">
                 <td
                   colSpan={4}
                   className="text-center py-12 text-muted-foreground"
@@ -81,38 +89,37 @@ export default function UsersTable({
               users.map((user) => (
                 <tr
                   key={user.email}
-                  className="border-b border-border hover:bg-muted/50 transition-colors"
+                  className="border-b border-border hover:bg-muted/50"
                 >
-                  <td className="py-3 px-6">
-                    <div className="font-medium text-foreground">
-                      {user.email}
-                    </div>
+                  <td className="py-3 px-6 text-sm font-medium text-foreground">
+                    {user.email}
                   </td>
                   <td className="py-3 px-6">
                     <span
-                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         user.role === "admin"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-gray-100 text-gray-700"
+                          ? "bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100"
+                          : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100"
                       }`}
                     >
                       {user.role}
                     </span>
                   </td>
-                  <td className="py-3 px-6">
-                    <div className="text-sm text-muted-foreground">
-                      {new Date(user.createdAt).toLocaleDateString()}
-                    </div>
+                  <td className="py-3 px-6 text-sm text-muted-foreground">
+                    {user.createdAt
+                      ? new Date(user.createdAt).toLocaleDateString()
+                      : "Invalid Date"}
                   </td>
                   <td className="py-3 px-6">
-                    <div className="flex items-center justify-end">
+                    <div className="flex items-center justify-end space-x-2">
                       {user.email !== currentUserEmail && (
                         <button
                           onClick={() => setConfirmDelete(user.email)}
-                          disabled={loading}
-                          className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+                          disabled={deleteLoading}
+                          className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50"
+                          title="Delete user"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       )}
                     </div>

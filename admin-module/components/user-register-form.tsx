@@ -21,7 +21,7 @@ export default function UserRegisterForm({
     setLoading(true);
     setMessage("");
 
-    const res = await fetch("/api/users/register", {
+    const res = await fetch("/api/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -37,7 +37,6 @@ export default function UserRegisterForm({
       setEmail("");
       setPassword("");
       setRole("user");
-      // Refrescar la tabla
       if (onUserCreated) onUserCreated();
     } else {
       setMessage(data.error || "Error creating user");
@@ -51,7 +50,7 @@ export default function UserRegisterForm({
         Register New User
       </h3>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
         <div>
           <label className="block text-sm font-medium text-foreground mb-1.5">
             Email
@@ -61,6 +60,8 @@ export default function UserRegisterForm({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            autoComplete="new-email"
+            name="user-email"
             className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
             placeholder="Enter user email"
           />
@@ -75,6 +76,8 @@ export default function UserRegisterForm({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            autoComplete="new-password"
+            name="user-password"
             className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
             placeholder="Enter password"
           />
@@ -87,6 +90,7 @@ export default function UserRegisterForm({
           <select
             value={role}
             onChange={(e) => setRole(e.target.value)}
+            autoComplete="off"
             className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
           >
             <option value="user">User</option>

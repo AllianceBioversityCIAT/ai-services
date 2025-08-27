@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { deleteProject } from "@/lib/config";
+import { deleteProject } from "@/lib/database/projects";
 
 export async function POST(req: Request) {
   const { id } = await req.json();

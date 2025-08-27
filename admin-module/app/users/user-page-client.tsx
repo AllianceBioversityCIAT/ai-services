@@ -15,9 +15,21 @@ export default function UsersPageClient({
 
   async function fetchUsers() {
     setLoading(true);
-    const res = await fetch("/api/users/list");
-    const data = await res.json();
-    setUsers(data.users || []);
+    try {
+      const res = await fetch("/api/users");
+      console.log("🚀 ~ fetchUsers ~ res:", res)
+      if (res.ok) {
+        const data = await res.json();
+        console.log("🚀 ~ fetchUsers ~ data:", data)
+        setUsers(data.users || []);
+      } else {
+        console.error("Error fetching users");
+        setUsers([]);
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      setUsers([]);
+    }
     setLoading(false);
   }
 

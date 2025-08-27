@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createProject } from "@/lib/config";
+import { createProject } from "@/lib/database/projects";
 
 export async function POST(req: Request) {
   try {
@@ -7,6 +7,9 @@ export async function POST(req: Request) {
     const project = await createProject(body);
     return NextResponse.json({ project });
   } catch (error) {
-    return NextResponse.json({ error: "Error al crear proyecto" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error al crear proyecto" },
+      { status: 500 }
+    );
   }
 }
