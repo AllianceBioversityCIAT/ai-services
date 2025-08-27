@@ -124,8 +124,8 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR):
     print(prompt)
 
     try:
-        reference_file_regions = "clarisa_regions.xlsx"
-        reference_file_countries = "clarisa_countries.xlsx"
+        reference_file_regions = "star/text-mining/files/clarisa_regions.xlsx"
+        reference_file_countries = "star/text-mining/files/clarisa_countries.xlsx"
         initialize_reference_data(
             bucket_name, reference_file_regions, reference_file_countries)
 
@@ -172,8 +172,8 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS):
     print(f"PRMS Processing: {prompt}")
 
     try:
-        reference_file_regions = "clarisa_regions.xlsx"
-        reference_file_countries = "clarisa_countries.xlsx"
+        reference_file_regions = "prms/text-mining/files/clarisa_regions.xlsx"
+        reference_file_countries = "prms/text-mining/files/clarisa_countries.xlsx"
         initialize_reference_data(
             bucket_name, reference_file_regions, reference_file_countries)
 
