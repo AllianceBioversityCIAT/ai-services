@@ -1,23 +1,21 @@
 "use client";
 import { useState } from "react";
-import UserRegisterForm from "@/components/user-register-form";
-import UsersTable from "@/components/users-table";
+import ProductsTable from "@/components/products-table";
+import ProductForm from "@/components/product-form";
 
-export default function UsersPageClient({
-  initialUsers,
-  currentUserEmail,
+export default function ProductsPageClient({
+  initialProducts,
 }: {
-  initialUsers: any[];
-  currentUserEmail: string;
+  initialProducts: any[];
 }) {
-  const [users, setUsers] = useState(initialUsers);
+  const [products, setProducts] = useState(initialProducts); //
   const [loading, setLoading] = useState(false);
 
-  async function fetchUsers() {
+  async function fetchProducts() {
     setLoading(true);
-    const res = await fetch("/api/users/list");
+    const res = await fetch("/api/products/list");
     const data = await res.json();
-    setUsers(data.users || []);
+    setProducts(data.products || []);
     setLoading(false);
   }
 
@@ -26,11 +24,9 @@ export default function UsersPageClient({
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-foreground">
-            User Management
-          </h1>
+          <h1 className="text-2xl font-semibold text-foreground">Products</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage system users and permissions
+            Manage your product catalog
           </p>
         </div>
 
@@ -38,15 +34,14 @@ export default function UsersPageClient({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Form Sidebar */}
           <div className="lg:col-span-1">
-            <UserRegisterForm isAdmin={true} onUserCreated={fetchUsers} />
+            <ProductForm onCreated={fetchProducts} />
           </div>
 
           {/* Table Main Content */}
           <div className="lg:col-span-2">
-            <UsersTable
-              users={users}
-              currentUserEmail={currentUserEmail}
-              onUserDeleted={fetchUsers}
+            <ProductsTable
+              products={products}
+              onRefresh={fetchProducts}
               loading={loading}
             />
           </div>

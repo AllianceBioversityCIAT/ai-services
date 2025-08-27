@@ -1,13 +1,16 @@
 "use client";
 import { useState } from "react";
-import { Pencil, Trash2, MoreHorizontal } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
+import TableSkeleton from "./table-skeleton";
 
 export default function ProductsTable({
   products,
   onRefresh,
+  loading = false,
 }: {
   products: any[];
   onRefresh?: () => void;
+  loading?: boolean;
 }) {
   const [editing, setEditing] = useState<any | null>(null);
   const [editValues, setEditValues] = useState<Record<string, any>>({});
@@ -64,7 +67,13 @@ export default function ProductsTable({
       <div className="p-6 border-b border-border">
         <h3 className="text-lg font-medium text-foreground">Products</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          {products.length} product{products.length !== 1 ? "s" : ""} registered
+          {loading ? (
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32"></div>
+          ) : (
+            `${products.length} product${
+              products.length !== 1 ? "s" : ""
+            } registered`
+          )}
         </p>
       </div>
 
@@ -90,7 +99,13 @@ export default function ProductsTable({
             </tr>
           </thead>
           <tbody>
-            {products.length === 0 ? (
+            {loading ? (
+              <TableSkeleton
+                columns={5}
+                rows={5}
+                widths={["w-32", "w-48", "w-16", "w-20", "w-24"]}
+              />
+            ) : products.length === 0 ? (
               <tr>
                 <td
                   colSpan={5}
@@ -163,7 +178,6 @@ export default function ProductsTable({
         </table>
       </div>
 
-      {/* Edit Modal */}
       {editing && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-card border border-border rounded-lg shadow-lg w-full max-w-md mx-4">
@@ -263,7 +277,6 @@ export default function ProductsTable({
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-card border border-border rounded-lg shadow-lg w-full max-w-sm mx-4">

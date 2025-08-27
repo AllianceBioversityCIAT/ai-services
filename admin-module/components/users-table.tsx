@@ -1,29 +1,31 @@
 "use client";
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
+import TableSkeleton from "./table-skeleton";
 
 export default function UsersTable({
   users,
   currentUserEmail,
   onUserDeleted,
+  loading = false,
 }: {
   users: any[];
   currentUserEmail: string;
   onUserDeleted?: () => void;
+  loading?: boolean;
 }) {
-  const [loading, setLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   async function handleDelete(email: string) {
-    setLoading(true);
+    setDeleteLoading(true);
     await fetch("/api/users/delete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
     });
     setConfirmDelete(null);
-    setLoading(false);
-    // Refrescar la tabla
+    setDeleteLoading(false);
     if (onUserDeleted) onUserDeleted();
   }
 
@@ -55,7 +57,13 @@ export default function UsersTable({
             </tr>
           </thead>
           <tbody>
-            {users.length === 0 ? (
+            {loading ? (
+              <TableSkeleton
+                columns={5}
+                rows={5}
+                widths={["w-32", "w-48", "w-16", "w-20", "w-24"]}
+              />
+            ) : users.length === 0 ? (
               <tr>
                 <td
                   colSpan={4}

@@ -1,29 +1,19 @@
-import type { Metadata } from 'next';
-import { GeistSans } from 'geist/font/sans';
-import { GeistMono } from 'geist/font/mono';
-import './globals.css';
-import Navbar from '@/components/navbar';
-import { getSession } from '@/lib/auth';
+import type { Metadata } from "next";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
+import "./globals.css";
+import NavbarWrapper from "@/components/navbar-wrapper";
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
-}
+  title: "Admin Module",
+  description: "CGIAR AI Services Admin Module",
+};
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
-  // Detectar si el usuario es admin (server component)
-  // NOTA: Si el layout no puede ser async, se puede usar un Client Component wrapper para Navbar
-  let isAdmin = false;
-  try {
-    const session = await getSession();
-    isAdmin = session?.role === 'admin';
-  } catch {}
-
   return (
     <html lang="en">
       <head>
@@ -36,7 +26,7 @@ html {
         `}</style>
       </head>
       <body>
-        <Navbar isAdmin={isAdmin} />
+        <NavbarWrapper />
         {children}
       </body>
     </html>

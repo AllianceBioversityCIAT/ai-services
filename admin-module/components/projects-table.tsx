@@ -1,14 +1,17 @@
 import React, { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
+import TableSkeleton from "./table-skeleton";
 
 export default function ProjectsTable({
   projects,
   onDelete,
   onEdit,
+  loading = false,
 }: {
   projects: any[];
   onDelete?: (id: string) => void;
   onEdit?: () => void;
+  loading?: boolean;
 }) {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
@@ -83,7 +86,13 @@ export default function ProjectsTable({
             </tr>
           </thead>
           <tbody>
-            {projects.length === 0 ? (
+            {loading ? (
+              <TableSkeleton
+                columns={5}
+                rows={5}
+                widths={["w-32", "w-48", "w-16", "w-20", "w-24"]}
+              />
+            ) : projects.length === 0 ? (
               <tr>
                 <td
                   colSpan={5}
