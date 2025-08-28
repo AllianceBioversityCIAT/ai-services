@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { updateProject } from "@/lib/config";
+import { updateProject } from "@/lib/database/projects";
 
 export async function POST(req: Request) {
   const { id, updates } = await req.json();
