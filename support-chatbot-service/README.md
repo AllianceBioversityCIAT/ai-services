@@ -31,7 +31,7 @@ An intelligent service that combines conversational chat capabilities with embed
 
 ---
 
-## 🏗️ Project Structure
+## 📂 Project Structure
 
 ```
 ai-support-chatbot/
@@ -93,7 +93,7 @@ SUPABASE_COLLECTION=your_collection_name
 ### 1. Clone and Setup Environment
 
 ```bash
-git clone <repository>
+git clone git clone https://github.com/AllianceBioversityCIAT/ai-services.git
 cd ai_support_chatbot
 python -m venv .venv
 source .venv/bin/activate  # Linux/Mac
