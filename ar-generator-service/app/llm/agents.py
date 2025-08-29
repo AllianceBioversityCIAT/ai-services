@@ -41,17 +41,22 @@ def run_agent_chatbot(user_input, phase, indicator, section, session_id, memory_
 
     logger.info(f"💬 Session State: {session_state}")
 
-    input_text = f"""{user_input}
+    input_text = f"""
+User question:
+{user_input}
 
-    [User-selected filters]
-    - phase_name: {phase}
-    - indicator_acronym: {indicator}
-    - table_type: {section}
+Context:
+This question is asked in the context of:
+- Phase: {phase}
+- Indicator: {indicator}
+- Section: {section}
 
-    Instructions:
-    If these filters are not "All", you must strictly focus on them.
-    If any of these are set to "All", interpret the user's question contextually and include the most relevant records dynamically across phases, indicators, and sections."""
-    
+Instructions:
+- Use only the retrieved knowledge base content for your answer.
+- If the filters are set to "All", interpret the question broadly and include the most relevant information across phases, indicators, and sections.
+- If no relevant evidence is found, clearly state it and suggest adjusting the filters or ask the user for clarification.
+"""
+
     response = bedrock_agent_runtime.invoke_agent(
         agentId=agent_id,
         agentAliasId=agent_alias_id,
