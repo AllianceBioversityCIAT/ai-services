@@ -16,6 +16,7 @@ export interface Project {
   description: string;
   product_id: string;
   status: "active" | "inactive";
+  swaggerURL: string;
   created_at: string;
 }
 
@@ -34,6 +35,7 @@ export async function createProject(
       description: project.description,
       product_id: project.product_id,
       status: project.status || "active",
+      swaggerURL: project.swaggerURL,
       created_at: new Date().toISOString(),
     };
 

@@ -5,6 +5,7 @@ export default function ProjectForm({ onCreated }: { onCreated: () => void }) {
     name: "",
     description: "",
     product_id: "",
+    swaggerURL: "",
     status: "active",
   });
   const [products, setProducts] = useState<any[]>([]);
@@ -38,6 +39,7 @@ export default function ProjectForm({ onCreated }: { onCreated: () => void }) {
         name: "",
         description: "",
         product_id: "",
+        swaggerURL: "",
         status: "active",
       });
       onCreated();
@@ -106,6 +108,22 @@ export default function ProjectForm({ onCreated }: { onCreated: () => void }) {
               </option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">
+            Swagger URL
+          </label>
+          <input
+            type="url"
+            value={values.swaggerURL}
+            onChange={(e) =>
+              setValues((v) => ({ ...v, swaggerURL: e.target.value }))
+            }
+            required
+            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+            placeholder="https://example.com/swagger"
+          />
         </div>
 
         <div>

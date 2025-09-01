@@ -30,6 +30,7 @@ export default function ProjectsTable({
     setEditValues({
       name: project.name,
       description: project.description,
+      swaggerURL: project.swaggerURL || "",
       status: project.status,
     });
   }
@@ -78,6 +79,9 @@ export default function ProjectsTable({
                 Product
               </th>
               <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
+                Swagger
+              </th>
+              <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
                 Status
               </th>
               <th className="text-right py-3 px-6 text-sm font-medium text-muted-foreground">
@@ -88,14 +92,14 @@ export default function ProjectsTable({
           <tbody>
             {loading ? (
               <TableSkeleton
-                columns={5}
+                columns={6}
                 rows={5}
-                widths={["w-32", "w-48", "w-16", "w-20", "w-24"]}
+                widths={["w-32", "w-48", "w-24", "w-20", "w-16", "w-24"]}
               />
             ) : projects.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="text-center py-12 text-muted-foreground"
                 >
                   <div className="flex flex-col items-center space-y-2">
@@ -122,16 +126,30 @@ export default function ProjectsTable({
                       {project.description}
                     </div>
                   </td>
-                  <td className="py-3 px-6">
-                    <div className="text-sm text-muted-foreground">
-                      {project.product_name || "-"}
-                    </div>
-                  </td>
-                  <td className="py-3 px-6">
-                    <span
-                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        project.status === "active"
-                          ? "bg-emerald-100 text-emerald-700"
+                <td className="py-3 px-6">
+                  <div className="text-sm text-muted-foreground">
+                    {project.product_name || "-"}
+                  </div>
+                </td>
+                <td className="py-3 px-6">
+                  {project.swaggerURL ? (
+                    <a
+                      href={project.swaggerURL}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="text-sm font-medium text-primary hover:underline"
+                    >
+                      Open
+                    </a>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">-</span>
+                  )}
+                </td>
+                <td className="py-3 px-6">
+                  <span
+                    className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      project.status === "active"
+                        ? "bg-emerald-100 text-emerald-700"
                           : "bg-gray-100 text-gray-700"
                       }`}
                     >
@@ -236,6 +254,23 @@ export default function ProjectsTable({
                     required
                     rows={3}
                     className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Swagger URL
+                  </label>
+                  <input
+                    type="url"
+                    value={editValues.swaggerURL}
+                    onChange={(e) =>
+                      setEditValues((v) => ({
+                        ...v,
+                        swaggerURL: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
                   />
                 </div>
 
