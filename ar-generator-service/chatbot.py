@@ -18,7 +18,18 @@ logger = get_logger()
 
 st.set_page_config(page_title="AICCRA chatbot", page_icon="🤖", layout="wide")
 st.title("🤖 AICCRA Assistant")
-mode = st.radio("Choose chatbot mode:", ["Agents (with memory)", "OpenSearch (basic functionality)"], index=0)
+mode = st.radio(
+    "Choose interaction style:", 
+    [
+        "💬 Conversational (with memory & follow-ups)", 
+        "🔍 Quick Search (specific questions only)"
+    ], 
+    index=0)
+
+if mode == "💬 Conversational (with memory & follow-ups)":
+    st.caption("🧠 **Recommended**: Remembers your conversation, can answer follow-up questions, and provides contextual responses")
+elif mode == "🔍 Quick Search (specific questions only)":
+    st.caption("⚡ **Quick queries**: Best for specific, one-time questions about AICCRA data")
 
 ## --- Initial status of messages ---
 if "messages" not in st.session_state:
@@ -113,9 +124,9 @@ if user_input:
     
     with st.spinner("Thinking..."):
         try:
-            if mode == "OpenSearch (basic functionality)":
+            if mode == "🔍 Quick Search (specific questions only)":
                 response_stream = run_chatbot(user_input, phase=phase, indicator=indicator, section=section)
-            elif mode == "Agents (with memory)":
+            elif mode == "💬 Conversational (with memory & follow-ups)":
                 response_stream = run_agent_chatbot(
                     user_input,
                     phase=phase,
