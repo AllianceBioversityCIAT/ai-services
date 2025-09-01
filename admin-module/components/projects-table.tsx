@@ -158,6 +158,13 @@ export default function ProjectsTable({
                   </td>
                   <td className="py-3 px-6">
                     <div className="flex items-center justify-end space-x-2">
+                      <a
+                        href={`/projects/${project.id || project.PK.split("#")[1]}/prompts`}
+                        className="px-2 py-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 text-xs font-medium"
+                        title="Manage prompts"
+                      >
+                        Prompts
+                      </a>
                       <button
                         onClick={() => openEdit(project)}
                         className="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 transition-colors"

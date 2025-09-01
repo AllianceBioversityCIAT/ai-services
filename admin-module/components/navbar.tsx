@@ -14,6 +14,7 @@ export default function Navbar({ isAdmin }: { isAdmin: boolean }) {
       { label: "Dashboard", href: "/dashboard" },
       { label: "Products", href: "/products" },
       { label: "Projects", href: "/projects" },
+      { label: "Prompts", href: "/prompts" },
       ...(isAdmin ? [{ label: "User Management", href: "/users" }] : []),
     ],
     [isAdmin]
