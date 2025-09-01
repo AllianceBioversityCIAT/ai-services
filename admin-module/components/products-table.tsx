@@ -155,7 +155,8 @@ export default function ProductsTable({
                     <div className="flex items-center justify-end space-x-2">
                       <button
                         onClick={() => openEdit(product)}
-                        className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+                        className="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 transition-colors"
+                        title="Edit product"
                       >
                         <Pencil size={16} />
                       </button>
@@ -165,7 +166,8 @@ export default function ProductsTable({
                             product.id || product.PK.split("#")[1]
                           )
                         }
-                        className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-destructive transition-colors"
+                        className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-destructive/40 transition-colors"
+                        title="Delete product"
                       >
                         <Trash2 size={16} />
                       </button>

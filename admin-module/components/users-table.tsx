@@ -116,7 +116,7 @@ export default function UsersTable({
                         <button
                           onClick={() => setConfirmDelete(user.email)}
                           disabled={deleteLoading}
-                          className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50"
+                          className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-destructive/40 transition-colors disabled:opacity-50"
                           title="Delete user"
                         >
                           <Trash2 className="h-4 w-4" />
