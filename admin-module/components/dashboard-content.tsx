@@ -35,7 +35,7 @@ export function DashboardContent({ user }: DashboardContentProps) {
       });
 
       if (response.ok) {
-        router.push("/login");
+        router.replace("/login");
       } else {
         console.error("Logout failed");
         setIsLoggingOut(false);

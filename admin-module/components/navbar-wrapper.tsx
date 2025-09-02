@@ -9,7 +9,7 @@ export default function NavbarWrapper() {
   const pathname = usePathname();
 
   // Rutas donde NO debe aparecer el navbar
-  const publicRoutes = ["/login", "/register"];
+  const publicRoutes = ["/", "/login", "/register"];
   const shouldHideNavbar = publicRoutes.includes(pathname);
 
   useEffect(() => {

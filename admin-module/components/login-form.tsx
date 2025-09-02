@@ -74,7 +74,8 @@ export function LoginForm() {
       const data = await response.json();
 
       if (response.ok) {
-        router.push("/dashboard");
+        // Replace history to avoid going back to login, land on dashboard
+        router.replace("/dashboard");
       } else {
         setServerError(data.error || "Login failed");
       }
@@ -165,6 +166,15 @@ export function LoginForm() {
             ) : (
               "Log In"
             )}
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => router.push("/")}
+          >
+            Back to Home
           </Button>
         </form>
       </CardContent>
