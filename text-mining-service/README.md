@@ -3,7 +3,7 @@
 This project is a microservice for intelligent document processing using LLMs (Large Language Models). It extracts structured information from documents using techniques like vector search, RAG, and prompt engineering — all powered by AWS Bedrock and other AI services.
 
 The service supports multiple projects:
-- **STAR**: Uses the `/process` endpoint
+- **STAR**: Uses the `/star/text-mining` endpoint
 - **PRMS**: Uses the `/prms/text-mining` endpoint
 
 ---
@@ -90,7 +90,7 @@ This will install a cronjob that runs daily at 7:00 PM to clean up temporary dat
 You can now test the service using **multipart/form-data** requests for both projects.
 
 ### For STAR Project
-Below is an example of the expected fields when calling the `/process` endpoint:
+Below is an example of the expected fields when calling the `/star/text-mining` endpoint:
 
 | Field       | Type   | Description                     |
 |-------------|--------|---------------------------------|
@@ -159,7 +159,7 @@ First, start the text mining service locally:
 uv run python -m app.mcp.client
 ```
 
-This will launch the FastAPI server at `http://localhost:8000` with interactive documentation available at `/docs`. Then, you can test the `/process` endpoint directly uploading files or specifying S3 keys. You will find more information in the following section.
+This will launch the FastAPI server at `http://localhost:8000` with interactive documentation available at `/docs`. Then, you can test the `/star/text-mining` endpoint directly uploading files or specifying S3 keys. You will find more information in the following section.
 
 You can also add unit tests using `pytest`.
 
@@ -173,7 +173,7 @@ The service exposes two REST API endpoints:
 
 #### For STAR Project
 ```bash
-curl -X POST http://localhost:8000/process \
+curl -X POST http://localhost:8000/star/text-mining \
   -F "key=my-document.pdf" \
   -F "bucketName=my-bucket" \
   -F "token=auth-token" \
@@ -197,7 +197,7 @@ curl -X POST http://localhost:8000/prms/text-mining \
 import requests
 
 # For STAR Project
-star_url = "http://localhost:8000/process"
+star_url = "http://localhost:8000/star/text-mining"
 
 # For PRMS Project  
 prms_url = "http://localhost:8000/prms/text-mining"
@@ -352,7 +352,7 @@ MCP is a protocol that enables seamless integration between the service and LLM 
 ### MCP Architecture
 
 ```
-STAR Client Request → FastAPI /process → MCP Client → MCP Server → process_document → LLM Processing → Response
+STAR Client Request → FastAPI /star/text-mining → MCP Client → MCP Server → process_document → LLM Processing → Response
 PRMS Client Request → FastAPI /prms/text-mining → MCP Client → MCP Server → process_document_prms → LLM Processing → Response
 ```
 
