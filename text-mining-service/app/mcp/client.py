@@ -98,7 +98,7 @@ async def handle_sampling_message(message: types.CreateMessageRequestParams) -> 
     )
 
 
-@app.post("/process",
+@app.post("/star/text-mining",
           summary="Process Document for STAR Project",
           description="""
           Process a document using AI text mining techniques for the STAR project.
