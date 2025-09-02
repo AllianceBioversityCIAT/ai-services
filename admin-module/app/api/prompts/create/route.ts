@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { createPromptVersion, getLatestPrompt } from "@/lib/database/prompts";
+import {
+  createPromptVersion,
+  getLatestPrompt,
+  getPromptAccessForUser,
+} from "@/lib/database/prompts";
 import { getSession } from "@/lib/auth";
 
 export async function POST(req: Request) {
@@ -18,14 +22,15 @@ export async function POST(req: Request) {
       );
     }
 
-    // Authorization: admins can create; non-admins only if they "own" latest prompt
-    // If no prompts exist yet, allow creation by any authenticated user.
-    const latest = await getLatestPrompt(projectId);
-    if (latest && session.role !== "admin" && latest.created_by !== session.email) {
-      return NextResponse.json(
-        { error: "Forbidden: You cannot edit this prompt" },
-        { status: 403 }
-      );
+    // Authorization: admins can create; non-admins need editor access on project
+    if (session.role !== "admin") {
+      const access = await getPromptAccessForUser(projectId, session.email);
+      if (!access || access.role !== "editor") {
+        return NextResponse.json(
+          { error: "Forbidden: You need editor access for this project" },
+          { status: 403 }
+        );
+      }
     }
 
     const ver = version || new Date().toISOString();
@@ -47,4 +52,3 @@ export async function POST(req: Request) {
     );
   }
 }
-

@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { CheckCircle2, Plus, Save, Star } from "lucide-react";
 
 type VersionItem = {
@@ -19,22 +19,19 @@ type PromptsEditorProps = {
   projectId: string;
   initialVersions: VersionItem[];
   initialStats: any;
-  user: { email: string; role: string };
+  isAdmin: boolean;
+  canEdit: boolean;
 };
 
 export default function PromptsEditor(props: PromptsEditorProps) {
-  const { projectId, initialVersions, initialStats, user } = props;
+  const { projectId, initialVersions, initialStats, isAdmin, canEdit } = props;
   const [versions, setVersions] = useState<VersionItem[]>(initialVersions);
   const [stats, setStats] = useState<any>(initialStats);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const latest = versions[0];
 
-  const canEdit = useMemo(() => {
-    if (user.role === "admin") return true;
-    if (!latest) return true; // allow first creation
-    return latest?.created_by === user.email;
-  }, [latest, user]);
+  // canEdit is computed server-side based on access control
 
   const [editor, setEditor] = useState({
     prompt_text: latest?.prompt_text || "",
@@ -133,7 +130,7 @@ export default function PromptsEditor(props: PromptsEditorProps) {
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-medium text-foreground">Editor</h3>
             {!canEdit && (
-              <span className="text-xs text-muted-foreground">Read-only (not owner)</span>
+              <span className="text-xs text-muted-foreground">Read-only (no editor access)</span>
             )}
           </div>
 
@@ -262,7 +259,7 @@ export default function PromptsEditor(props: PromptsEditorProps) {
                           >
                             Load
                           </button>
-                          {user.role === "admin" && !v.is_stable && (
+                          {isAdmin && !v.is_stable && (
                             <button
                               onClick={() => handleMarkStable(v.created_at)}
                               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-amber-700 hover:bg-amber-50"

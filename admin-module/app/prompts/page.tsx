@@ -1,13 +1,22 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { listProjects } from "@/lib/database/projects";
+import { getProject, listProjects } from "@/lib/database/projects";
+import { listProjectIdsForUserAccess } from "@/lib/database/prompts";
 
 export default async function PromptsIndexPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const projects = await listProjects();
+  let projects: any[] = [];
+  if (session.role === "admin") {
+    projects = await listProjects();
+  } else {
+    const ids = await listProjectIdsForUserAccess(session.email);
+    const uniqueIds = Array.from(new Set(ids));
+    const results = await Promise.all(uniqueIds.map((id) => getProject(id)));
+    projects = results.filter(Boolean) as any[];
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -39,4 +48,3 @@ export default async function PromptsIndexPage() {
     </div>
   );
 }
-

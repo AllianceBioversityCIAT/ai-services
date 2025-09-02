@@ -21,6 +21,15 @@ export interface Prompt {
   parameters?: Record<string, any>;
 }
 
+// Access control for prompts per project
+export type PromptAccessRole = "editor" | "viewer";
+export interface PromptAccess {
+  project_id: string;
+  user_email: string;
+  role: PromptAccessRole;
+  created_at: string;
+}
+
 // Create prompt version
 export async function createPromptVersion(
   prompt: Omit<Prompt, "created_at">
@@ -197,6 +206,129 @@ export async function deletePromptVersion(
   } catch (error) {
     console.error("Error deleting prompt version:", error);
     return false;
+  }
+}
+
+// --- Prompt Access Control helpers ---
+
+// Grant access to a user for a project's prompts
+export async function grantPromptAccess(
+  projectId: string,
+  userEmail: string,
+  role: PromptAccessRole = "editor"
+): Promise<boolean> {
+  try {
+    const item = {
+      PK: `PROMPT#${projectId}`,
+      SK: `ACCESS#${userEmail}`,
+      entity_type: "PROMPT_ACCESS",
+      project_id: projectId,
+      user_email: userEmail,
+      role,
+      created_at: new Date().toISOString(),
+    };
+
+    const command = new PutCommand({
+      TableName: env.DYNAMO_DB_CONFIG_TABLE!,
+      Item: item,
+    });
+    await dynamoDb.send(command);
+    return true;
+  } catch (error) {
+    console.error("Error granting prompt access:", error);
+    return false;
+  }
+}
+
+// Revoke access for a user
+export async function revokePromptAccess(
+  projectId: string,
+  userEmail: string
+): Promise<boolean> {
+  try {
+    const command = new DeleteCommand({
+      TableName: env.DYNAMO_DB_CONFIG_TABLE!,
+      Key: { PK: `PROMPT#${projectId}`, SK: `ACCESS#${userEmail}` },
+    });
+    await dynamoDb.send(command);
+    return true;
+  } catch (error) {
+    console.error("Error revoking prompt access:", error);
+    return false;
+  }
+}
+
+// Get access entry for a user on a project (if any)
+export async function getPromptAccessForUser(
+  projectId: string,
+  userEmail: string
+): Promise<PromptAccess | null> {
+  try {
+    const command = new GetCommand({
+      TableName: env.DYNAMO_DB_CONFIG_TABLE!,
+      Key: { PK: `PROMPT#${projectId}`, SK: `ACCESS#${userEmail}` },
+    });
+    const result = await dynamoDb.send(command);
+    const item = result.Item;
+    if (!item) return null;
+    return {
+      project_id: item.project_id,
+      user_email: item.user_email,
+      role: item.role,
+      created_at: item.created_at,
+    } as PromptAccess;
+  } catch (error) {
+    console.error("Error getting prompt access for user:", error);
+    return null;
+  }
+}
+
+// List users with access to a project
+export async function listPromptAccessUsers(
+  projectId: string
+): Promise<PromptAccess[]> {
+  try {
+    const command = new QueryCommand({
+      TableName: env.DYNAMO_DB_CONFIG_TABLE!,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+      ExpressionAttributeValues: {
+        ":pk": `PROMPT#${projectId}`,
+        ":sk": "ACCESS#",
+      },
+    });
+    const result = await dynamoDb.send(command);
+    return (result.Items || []).map((item: any) => ({
+      project_id: item.project_id,
+      user_email: item.user_email,
+      role: item.role,
+      created_at: item.created_at,
+    }));
+  } catch (error) {
+    console.error("Error listing prompt access users:", error);
+    return [];
+  }
+}
+
+// List project IDs a user has any access to
+export async function listProjectIdsForUserAccess(
+  userEmail: string
+): Promise<string[]> {
+  try {
+    const command = new ScanCommand({
+      TableName: env.DYNAMO_DB_CONFIG_TABLE!,
+      FilterExpression: "entity_type = :type AND user_email = :email",
+      ExpressionAttributeValues: {
+        ":type": "PROMPT_ACCESS",
+        ":email": userEmail,
+      },
+    });
+    const result = await dynamoDb.send(command);
+    const items = result.Items || [];
+    const ids = Array.from(new Set(items.map((i: any) => i.project_id)));
+    return ids;
+  } catch (error) {
+    console.error("Error listing projects for user access:", error);
+    return [];
   }
 }
 

@@ -7,10 +7,12 @@ export default function ProductsTable({
   products,
   onRefresh,
   loading = false,
+  isAdmin = false,
 }: {
   products: any[];
   onRefresh?: () => void;
   loading?: boolean;
+  isAdmin?: boolean;
 }) {
   const [editing, setEditing] = useState<any | null>(null);
   const [editValues, setEditValues] = useState<Record<string, any>>({});
@@ -93,9 +95,11 @@ export default function ProductsTable({
               <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
                 Created
               </th>
-              <th className="text-right py-3 px-6 text-sm font-medium text-muted-foreground">
-                Actions
-              </th>
+              {isAdmin && (
+                <th className="text-right py-3 px-6 text-sm font-medium text-muted-foreground">
+                  Actions
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -108,7 +112,7 @@ export default function ProductsTable({
             ) : products.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={isAdmin ? 5 : 4}
                   className="text-center py-12 text-muted-foreground"
                 >
                   <div className="flex flex-col items-center space-y-2">
@@ -151,28 +155,30 @@ export default function ProductsTable({
                       {new Date(product.created_at).toLocaleDateString()}
                     </div>
                   </td>
-                  <td className="py-3 px-6">
-                    <div className="flex items-center justify-end space-x-2">
-                      <button
-                        onClick={() => openEdit(product)}
-                        className="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 transition-colors"
-                        title="Edit product"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        onClick={() =>
-                          setConfirmDelete(
-                            product.id || product.PK.split("#")[1]
-                          )
-                        }
-                        className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-destructive/40 transition-colors"
-                        title="Delete product"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
+                  {isAdmin && (
+                    <td className="py-3 px-6">
+                      <div className="flex items-center justify-end space-x-2">
+                        <button
+                          onClick={() => openEdit(product)}
+                          className="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 transition-colors"
+                          title="Edit product"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          onClick={() =>
+                            setConfirmDelete(
+                              product.id || product.PK.split("#")[1]
+                            )
+                          }
+                          className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-destructive/40 transition-colors"
+                          title="Delete product"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))
             )}

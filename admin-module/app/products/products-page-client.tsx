@@ -5,8 +5,10 @@ import ProductForm from "@/components/product-form";
 
 export default function ProductsPageClient({
   initialProducts,
+  isAdmin,
 }: {
   initialProducts: any[];
+  isAdmin: boolean;
 }) {
   const [products, setProducts] = useState(initialProducts); //
   const [loading, setLoading] = useState(false);
@@ -33,9 +35,11 @@ export default function ProductsPageClient({
         {/* Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Form Sidebar */}
-          <div className="lg:col-span-1">
-            <ProductForm onCreated={fetchProducts} />
-          </div>
+          {isAdmin && (
+            <div className="lg:col-span-1">
+              <ProductForm onCreated={fetchProducts} />
+            </div>
+          )}
 
           {/* Table Main Content */}
           <div className="lg:col-span-2">
@@ -43,6 +47,7 @@ export default function ProductsPageClient({
               products={products}
               onRefresh={fetchProducts}
               loading={loading}
+              isAdmin={isAdmin}
             />
           </div>
         </div>

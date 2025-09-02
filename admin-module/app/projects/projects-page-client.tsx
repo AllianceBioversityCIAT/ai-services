@@ -5,8 +5,12 @@ import ProjectForm from "@/components/project-form";
 
 export default function ProjectsPageClient({
   initialProjects,
+  isAdmin,
+  editableProjectIds,
 }: {
   initialProjects: any[];
+  isAdmin: boolean;
+  editableProjectIds: string[];
 }) {
   const [projects, setProjects] = useState(initialProjects);
   const [loading, setLoading] = useState(false);
@@ -41,10 +45,12 @@ export default function ProjectsPageClient({
 
         {/* Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Form Sidebar */}
-          <div className="lg:col-span-1">
-            <ProjectForm onCreated={fetchProjects} />
-          </div>
+          {/* Form Sidebar (admin only) */}
+          {isAdmin && (
+            <div className="lg:col-span-1">
+              <ProjectForm onCreated={fetchProjects} />
+            </div>
+          )}
 
           {/* Table Main Content */}
           <div className="lg:col-span-2">
@@ -53,6 +59,8 @@ export default function ProjectsPageClient({
               onDelete={handleDelete}
               onEdit={fetchProjects}
               loading={loading}
+              isAdmin={isAdmin}
+              editableProjectIds={editableProjectIds}
             />
           </div>
         </div>

@@ -11,6 +11,6 @@ export default async function ProductsPage() {
   }
 
   const products = await listProducts();
-
-  return <ProductsPageClient initialProducts={products} />;
+  const isAdmin = user.role === "admin";
+  return <ProductsPageClient initialProducts={products} isAdmin={isAdmin} />;
 }

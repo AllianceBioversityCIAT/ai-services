@@ -7,11 +7,15 @@ export default function ProjectsTable({
   onDelete,
   onEdit,
   loading = false,
+  isAdmin = false,
+  editableProjectIds = [],
 }: {
   projects: any[];
   onDelete?: (id: string) => void;
   onEdit?: () => void;
   loading?: boolean;
+  isAdmin?: boolean;
+  editableProjectIds?: string[];
 }) {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
@@ -165,20 +169,24 @@ export default function ProjectsTable({
                       >
                         Prompts
                       </a>
-                      <button
-                        onClick={() => openEdit(project)}
-                        className="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 transition-colors"
-                        title="Edit project"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        onClick={() => setConfirmId(project.PK.split("#")[1])}
-                        className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-destructive/40 transition-colors"
-                        title="Delete project"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {(isAdmin || editableProjectIds.includes(project.id || project.PK.split("#")[1])) && (
+                        <button
+                          onClick={() => openEdit(project)}
+                          className="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 transition-colors"
+                          title="Edit project"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button
+                          onClick={() => setConfirmId(project.PK.split("#")[1])}
+                          className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-destructive/40 transition-colors"
+                          title="Delete project"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
