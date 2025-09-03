@@ -3,16 +3,17 @@ from typing import Any
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from app.utils.logger.logger_util import get_logger
-from app.middleware.auth_middleware import AuthMiddleware
+from app.middleware.star_auth_middleware import AuthMiddleware as StarAuthMiddleware
+from app.middleware.prms_auth_middleware import AuthMiddleware as PrmsAuthMiddleware
 from app.llm.mining import process_document as process_with_llm
 from app.llm.mining import process_document_prms as process_with_llm_prms
 from app.utils.notification.notification_service import NotificationService
 
-
 load_dotenv()
 logger = get_logger()
 
-auth_middleware = AuthMiddleware()
+star_auth_middleware = StarAuthMiddleware()
+prms_auth_middleware = PrmsAuthMiddleware()
 notification_service = NotificationService()
 
 mcp = FastMCP("DocumentProcessor")
@@ -21,7 +22,7 @@ s3_client = boto3.client("s3")
 bedrock_client = boto3.client("bedrock-runtime", region_name="us-west-2")
 
 
-async def authenticate(key: str, bucket: str, token: str, environmentUrl: str):
+async def authenticate_star(key: str, bucket: str, token: str, environmentUrl: str):
     try:
         payload = {
             "token": token,
@@ -29,18 +30,32 @@ async def authenticate(key: str, bucket: str, token: str, environmentUrl: str):
             "bucket": bucket,
             "environmentUrl": environmentUrl
         }
-        return await auth_middleware.authenticate(payload)
+        return await star_auth_middleware.authenticate(payload)
     except Exception as e:
-        logger.error(f"Auth error: {str(e)}")
+        logger.error(f"Auth error (STAR): {str(e)}")
+        return None
+
+
+async def authenticate_prms(key: str, bucket: str, token: str, environmentUrl: str):
+    try:
+        payload = {
+            "token": token,
+            "key": key,
+            "bucket": bucket,
+            "environmentUrl": environmentUrl
+        }
+        return await prms_auth_middleware.authenticate(payload)
+    except Exception as e:
+        logger.error(f"Auth error (PRMS): {str(e)}")
         return None
 
 
 @mcp.tool()
 async def process_document(bucket: str, key: str, token: Any, environmentUrl: str) -> dict:
     logger.info("✅ process_document invoked via MCP")
-    
+
     try:
-        is_authenticated = await authenticate(key, bucket, token, environmentUrl)
+        is_authenticated = await authenticate_star(key, bucket, token, environmentUrl)
         print(f"Authenticated: {is_authenticated}")
         if not is_authenticated:
             raise ValueError("Authentication failed")
@@ -79,14 +94,15 @@ async def process_document(bucket: str, key: str, token: Any, environmentUrl: st
 @mcp.tool()
 async def process_document_prms(bucket: str, key: str, token: Any, environmentUrl: str) -> dict:
     logger.info("✅ process_document_prms invoked via MCP")
-    
+
     try:
-        is_authenticated = await authenticate(key, bucket, token, environmentUrl)
+        is_authenticated = await authenticate_prms(key, bucket, token, environmentUrl)
         print(f"PRMS Authenticated: {is_authenticated}")
         if not is_authenticated:
             raise ValueError("PRMS Authentication failed")
 
-        logger.info(f"Processing document for PRMS: {key} from bucket: {bucket}")
+        logger.info(
+            f"Processing document for PRMS: {key} from bucket: {bucket}")
 
         result = process_with_llm_prms(
             bucket_name=bucket, file_key=key)

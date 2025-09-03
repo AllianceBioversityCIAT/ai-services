@@ -1,7 +1,7 @@
 import os
 import json
 import uvicorn
-from typing import Optional
+from typing import Optional, Union
 from pydantic import BaseModel, Field
 from mcp.client.stdio import stdio_client
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,9 +31,6 @@ class TextMiningRequest(BaseModel):
         ..., description="Authentication token", examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."])
     environmentUrl: str = Field(
         ..., description="Environment for the service (e.g., production, test)")
-    prompt: Optional[str] = Field(
-        "Extract key points from this document", description="Specific instructions for document processing", examples=["Extract capacity development activities and their impact metrics"])
-
 
 class UploadResponse(BaseModel):
     bucket: str = Field(..., description="S3 bucket where the file was uploaded")
@@ -74,8 +71,8 @@ app = FastAPI(
         "url": "https://opensource.org/licenses/MIT"
     },
     servers=[
-        {"url": "http://localhost:8000", "description": "Development server"},
-        {"url": "https://d3djd7q7g7v7di.cloudfront.net", "description": "Production server"}
+        {"url": "https://d3djd7q7g7v7di.cloudfront.net", "description": "Production server"},
+        {"url": "http://localhost:8000", "description": "Development server"}
     ]
 )
 
@@ -98,7 +95,7 @@ async def handle_sampling_message(message: types.CreateMessageRequestParams) -> 
     )
 
 
-@app.post("/process",
+@app.post("/star/text-mining",
           summary="Process Document for STAR Project",
           description="""
           Process a document using AI text mining techniques for the STAR project.
@@ -132,11 +129,9 @@ async def process_document_endpoint(
     token: str = Form(
         ..., description="Authentication token", examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."]),
     key: Optional[str] = Form(
-        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["reports/training-report-2024.pdf"]),
-    file: Optional[UploadFile] = File(
-        None, description="Document file to upload and process. Optional if key is provided", examples=["training-report-2024.pdf"]),
-    prompt: Optional[str] = Form(
-        "Extract key points from this document", description="Custom processing instructions for the AI model", examples=["Extract all capacity development activities, participant demographics, and training outcomes"]),
+        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["star/text-mining/files/training-report-2024.pdf"]),
+    file: Optional[Union[UploadFile, str]] = File(
+        default=None, description="Document file to upload and process. Optional if key is provided"),
     environmentUrl: str = Form(
         ..., description="Target environment URL for authentication"
     )
@@ -149,34 +144,30 @@ async def process_document_endpoint(
     - token: Authentication token
     - key: Object key in the S3 bucket (required if no file is provided)
     - file: File to upload and process (required if no key is provided)
-    - prompt: Specific instructions for document processing
     - environmentUrl: Environment for the service (e.g., production, test)
 
     Returns:
         dict: Result of the document processing
     """
-    # Validate that at least one of key or file is provided
+    
+    if isinstance(file, str) and file == "":
+        file = None
+
     if key is None and file is None:
         raise HTTPException(
             status_code=400,
             detail="Either 'key' or 'file' must be provided"
         )
 
-    # If file is provided, upload it to S3 first
     if file is not None:
         try:
-            # Read file content
             file_content = await file.read()
 
-            # Use the filename as the key in S3
             filename = file.filename
-            #key = f"star/text-mining/files/{filename}"
-            key = filename
+            key = f"star/text-mining/files/{filename}"
 
-            # Determine content type from file
             content_type = file.content_type
 
-            # Upload file to S3
             upload_file_to_s3(
                 file_content=file_content,
                 bucket_name=bucketName,
@@ -191,7 +182,6 @@ async def process_document_endpoint(
             raise HTTPException(
                 status_code=500, detail=f"Error uploading file: {str(e)}")
 
-    # Process the document using the key (either provided or generated from file upload)
     logger.info(
         f"Processing document with key: {key} from bucket {bucketName}")
 
@@ -206,7 +196,6 @@ async def process_document_endpoint(
                         "bucket": bucketName,
                         "key": key,
                         "token": token,
-                        "prompt": prompt,
                         "environmentUrl": environmentUrl
                     }
                 )
@@ -249,11 +238,9 @@ async def process_document_prms_endpoint(
     token: str = Form(
         ..., description="Authentication token for PRMS access", examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."]),
     key: Optional[str] = Form(
-        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["policies/climate-policy-2024.docx"]),
-    file: Optional[UploadFile] = File(
-        None, description="File to upload and process. Optional if key is provided", examples=["climate-policy-2024.docx"]),
-    prompt: Optional[str] = Form(
-        "Extract key points from this document", description="Specific instructions for document processing", examples=["Analyze policy changes, innovation developments, and capacity building activities with stakeholder details"]),
+        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["prms/text-mining/files/climate-policy-2024.docx"]),
+    file: Optional[Union[UploadFile, str]] = File(
+        default=None, description="File to upload and process. Optional if key is provided"),
     environmentUrl: str = Form(
         ..., description="Target environment URL for PRMS authentication"
     )
@@ -266,33 +253,29 @@ async def process_document_prms_endpoint(
     - token: Authentication token
     - key: Object key in the S3 bucket (required if no file is provided)
     - file: File to upload and process (required if no key is provided)
-    - prompt: Specific instructions for document processing
     - environmentUrl: Environment for the service (e.g., production, test)
 
     Returns:
         dict: Result of the document processing for PRMS
     """
-    # Validate that at least one of key or file is provided
+    if isinstance(file, str) and file == "":
+        file = None
+    
     if key is None and file is None:
         raise HTTPException(
             status_code=400,
             detail="Either 'key' or 'file' must be provided"
         )
-
-    # If file is provided, upload it to S3 first
+    
     if file is not None:
         try:
-            # Read file content
             file_content = await file.read()
 
-            # Use the filename as the key in S3
             filename = file.filename
-            key = filename
+            key = f"prms/text-mining/files/{filename}"
 
-            # Determine content type from file
             content_type = file.content_type
 
-            # Upload file to S3
             upload_file_to_s3(
                 file_content=file_content,
                 bucket_name=bucketName,
@@ -307,7 +290,6 @@ async def process_document_prms_endpoint(
             raise HTTPException(
                 status_code=500, detail=f"Error uploading file for PRMS: {str(e)}")
 
-    # Process the document using the key (either provided or generated from file upload)
     logger.info(
         f"Processing document for PRMS with key: {key} from bucket {bucketName}")
 
@@ -322,7 +304,6 @@ async def process_document_prms_endpoint(
                         "bucket": bucketName,
                         "key": key,
                         "token": token,
-                        "prompt": prompt,
                         "environmentUrl": environmentUrl
                     }
                 )
