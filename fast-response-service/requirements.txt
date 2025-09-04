@@ -1,0 +1,10 @@
+boto3
+pandas
+pyjwt
+aiohttp
+requests
+fastapi
+uvicorn
+mangum
+python-multipart
+python-dotenv
