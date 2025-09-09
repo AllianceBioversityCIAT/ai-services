@@ -8,6 +8,7 @@ from app.middleware.prms_auth_middleware import AuthMiddleware as PrmsAuthMiddle
 from app.llm.mining import process_document as process_with_llm
 from app.llm.mining import process_document_prms as process_with_llm_prms
 from app.utils.notification.notification_service import NotificationService
+from app.llm.bulk_upload.upload_capdev import process_document_capdev as process_bulk_capdev
 
 load_dotenv()
 logger = get_logger()
@@ -131,6 +132,47 @@ async def process_document_prms(bucket: str, key: str, token: Any, environmentUr
             priority="High"
         )
         return {"status": "error", "key": key, "error": str(e), "project": "PRMS"}
+
+
+@mcp.tool()
+async def process_document_capdev(bucket: str, key: str, token: Any, environmentUrl: str) -> dict:
+    logger.info("✅ process_document_capdev invoked via MCP")
+
+    try:
+        is_authenticated = await authenticate_star(key, bucket, token, environmentUrl)
+        print(f"Authenticated: {is_authenticated}")
+        if not is_authenticated:
+            raise ValueError("Authentication failed")
+
+        logger.info(f"Processing document: {key} from bucket: {bucket}")
+
+        result = process_bulk_capdev(
+            bucket_name=bucket, file_key=key)
+
+        await notification_service.send_slack_notification(
+            emoji=":ai: :pick:",
+            app_name="Bulk upload via Mining Service (STAR)",
+            color="#36a64f",
+            title="Document Processed",
+            message=f"Successfully processed document: *{key}*\nBucket: *{bucket}*",
+            time_taken=f"Time taken: *{result['time_taken']}* seconds",
+            priority="Low"
+        )
+
+        return result["json_content"]
+
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        await notification_service.send_slack_notification(
+            emoji=":ai: :pick: :alert:",
+            app_name="Bulk upload via Mining Service (STAR)",
+            color="#FF0000",
+            title="Document Processing Failed",
+            message=f"Error processing document: *{key}*\nError: *{str(e)}*",
+            time_taken="Time taken: *N/A*",
+            priority="High"
+        )
+        return {"status": "error", "key": key, "error": str(e)}
 
 
 if __name__ == "__main__":
