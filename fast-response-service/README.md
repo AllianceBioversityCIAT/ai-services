@@ -41,11 +41,8 @@ fast-response-service/
 │   └── utils/
 │       ├── config/
 │       │   └── config_util.py  # AWS configuration
-│       ├── logger/
-│       │   └── logger_util.py  # Logging configuration
-│       └── prompt/
-│           ├── prompt_prms.py  # Predefined PRMS prompts
-│           └── prompt_star.py  # Predefined STAR prompts
+│       └── logger/
+│           └── logger_util.py  # Logging configuration
 └── data/
     └── logs/
         └── app.log        # Application logs
