@@ -1,6 +1,5 @@
 """REST API endpoints for Fast Response Service."""
 
-import traceback
 from app.llm.mining import return_response
 from app.utils.logger.logger_util import get_logger
 from fastapi import APIRouter, HTTPException, status
@@ -84,18 +83,8 @@ async def fast_response(request: FastRequest) -> FastResponse:
     - input_text: Text to apply the prompt to.
     """
     try:
-        logger.info(f"⚡ Generating fast response for prompt: {request.prompt[:50]}...")
-        logger.debug(f"Full request: prompt='{request.prompt}', input_text length={len(request.input_text)}")
-        
-        # Validation
-        if not request.prompt.strip():
-            raise ValueError("Prompt cannot be empty")
-        if not request.input_text.strip():
-            raise ValueError("Input text cannot be empty")
-        
+        logger.info(f"⚡ Generating fast response for prompt: {request.prompt}")
         output = return_response(request.prompt, request.input_text)
-        
-        logger.info("✅ Fast response generated successfully")
         return FastResponse(
             prompt=request.prompt,
             input_text=request.input_text,
@@ -104,15 +93,14 @@ async def fast_response(request: FastRequest) -> FastResponse:
         )
     
     except ValueError as e:
-        logger.error(f"❌ Validation error: {str(e)}")
+        logger.error(f"Validation error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"error": "Invalid parameters", "details": str(e), "status": "error"}
         )
     
     except Exception as e:
-        logger.error(f"❌ Unexpected error: {str(e)}")
-        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        logger.error(f"Unexpected error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": "Internal error", "details": str(e), "status": "error"}
