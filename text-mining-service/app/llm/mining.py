@@ -38,12 +38,12 @@ def split_text(text):
     return text_splitter.split_text(text)
 
 
-def invoke_model(prompt):
+def invoke_model(prompt, max_tokens=5000):
     try:
         logger.info("🚀 Invoking the model...")
         request_body = {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 4000,
+            "max_tokens": max_tokens,
             "temperature": 0.1,
             "top_k": 250,
             "top_p": 0.999,
