@@ -220,8 +220,10 @@ Geoscope (Geographical Scope)
 Evidence
     • Refers to the supporting materials or documentation that validate the training activities and outcomes.
     • Extract the evidence(s) description and link into the following field as an array of objects:
-        • evidence: [{"description": "<evidence description>", "link": "<URL>"}]
-    • If no evidence description or link is mentioned, do not return the evidence field in the output JSON.
+        • evidences: [{"evidence_description": "<evidence description>", "evidence_link": "<URL>"}]
+    • Only include the evidence field if BOTH the evidence_description AND evidence_link are present for a given evidence.
+    • If either the description or the link is missing for any evidence, do not include that evidence object in the array.
+    • If no evidence objects meet this requirement, do not return the evidence field in the output JSON.
 
 ⸻
 
@@ -316,10 +318,10 @@ Follow this exact structure:
                     "areas": ["<ISO 3166-2 subnational area code 1>", "<ISO 3166-2 subnational area code 2>"] (only if geoscope_level is Sub-national)
                 }
             ] (only if geoscope_level is National or Sub-national),
-            "evidence": [
+            "evidences": [
                 {
-                    "description": "<value>",
-                    "link": "<value>"
+                    "evidence_description": "<value>",
+                    "evidence_link": "<value>"
                 }
             ]
         }
