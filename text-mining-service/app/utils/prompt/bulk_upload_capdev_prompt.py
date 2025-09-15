@@ -40,7 +40,7 @@ Reporting Year
 
 Alliance Main Contact Person
     • Extract the contact's name into the following field as an object:
-        • main_contact_person: {"contact_name": "..."}
+        • main_contact_person: {"name": "..."}
     • Look for any mention or indication of the primary Alliance contact in the document (e.g., "Alliance focal point," "main Alliance contact," "Alliance coordinator," or a named person specifically flagged as responsible).
     • If no specific name or contact is mentioned, do not return the field in the output JSON.
 
@@ -162,8 +162,8 @@ Trainee nationality
     • Refers to the nationality of the trainee.
     • Only include the "trainee_nationality" field if the training_type is "Individual training".
     • Return this field as an object with the following structure:
-        {"country_code": "<ISO Alpha-2 country code>"}
-        e.g. {"country_code": "KE"} for Kenya, {"country_code": "IN"} for India.
+        {"code": "<ISO Alpha-2 country code>"}
+        e.g. {"code": "KE"} for Kenya, {"code": "IN"} for India.
     • If the document does not provide enough detail, do not return the trainee_nationality field in the output JSON.
 
 Trainee gender
@@ -264,7 +264,7 @@ Follow this exact structure:
             "description": "<result description>",
             "year": "<value>",
             "main_contact_person": {
-                "contact_name": "<value>"
+                "name": "<value>"
             },
             "keywords": [
                 "<keyword1>",
@@ -290,7 +290,7 @@ Follow this exact structure:
             },
             "trainee_name": "<value (only if individual training)>",
             "trainee_nationality": {
-                "country_code": "<ISO Alpha-2 value (only if individual training)>"
+                "code": "<ISO Alpha-2 value (only if individual training)>"
             },
             "trainee_gender": "<value (only if individual training)>",
             "training_supervisor": {
