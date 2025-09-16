@@ -28,6 +28,7 @@ Output Fields for Each Result
 Result Title
     • title
     • Identify the exact title of the result as stated in the document.
+    • If no title is mentioned explicitly, try to infer a concise title that accurately reflects the content of the result.
 
 Result Description
     • description
@@ -53,7 +54,7 @@ Reporting Project
     • Extract and split the project code and name into the following fields:
         • contract_code
         • contract_name
-    • If no project code or name is mentioned, do not return the field(s) in the output JSON.
+    • If no project code or name is mentioned, return an empty string in the output JSON.
 
 Contribution to SDG targets:
     • sdg_targets
@@ -175,6 +176,7 @@ Trainee gender
 Training supervisor
     • training_supervisor
     • Refers to the lead scientist overseeing the training.
+    • Do not confuse with the Alliance main contact person, unless it is explicitly stated that the primary Alliance contact is also the training supervisor.
     • Return the name of the training supervisor as an object:
         {"name": "<name of the training supervisor>"}
     • If the document does not provide enough detail, do not return the training_supervisor field in the output JSON.
@@ -240,6 +242,7 @@ Required and mandatory fields:
 • title
 • description
 • keywords
+• contract_code
 • training_type
 • training_category
 • geoscope_level
