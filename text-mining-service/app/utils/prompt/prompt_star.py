@@ -39,6 +39,7 @@ Innovation Development
 Result Title
     • title
     • Identify the exact title of the result as stated in the document.
+    • If no title is mentioned explicitly, try to infer a concise title that accurately reflects the content of the result.
 
 Result Description
     • description
