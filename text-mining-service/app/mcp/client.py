@@ -314,5 +314,102 @@ async def process_document_prms_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/star/mining-bulk-upload/capdev",
+          summary="Bulk Upload for STAR Project",
+          description="""
+          This endpoint allows for the bulk upload of documents for the STAR project, specifically for the Capacity Sharing for Development (CapDev) indicator.
+
+          Note: You must provide either `key` (for existing S3 documents) or `file` (for upload), but not both.
+          """,
+          responses={
+              200: {"description": "Document processed successfully"},
+              400: {"description": "Bad Request - Missing or invalid parameters"},
+              401: {"description": "Unauthorized - Invalid or missing authentication token"},
+              500: {"description": "Internal Server Error - Error processing document"}
+          },
+          tags=["STAR Project"])
+async def bulk_upload_capdev_endpoint(
+    bucketName: str = Form(
+        ..., description="Name of the S3 bucket where the document is/will be located", examples=["cgiar-documents"]),
+    token: str = Form(
+        ..., description="Authentication token", examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."]),
+    key: Optional[str] = Form(
+        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["star/text-mining/files/training-report-2024.pdf"]),
+    file: Optional[Union[UploadFile, str]] = File(
+        default=None, description="Document file to upload and process. Optional if key is provided"),
+    environmentUrl: str = Form(
+        ..., description="Target environment URL for authentication"
+    )
+):
+    """
+    Process a document stored in S3 using text mining techniques.
+    You can either provide a key to an existing document in S3 or upload a new file.
+
+    - bucketName: Name of the S3 bucket where the document is/will be located
+    - token: Authentication token
+    - key: Object key in the S3 bucket (required if no file is provided)
+    - file: File to upload and process (required if no key is provided)
+    - environmentUrl: Environment for the service (e.g., production, test)
+
+    Returns:
+        dict: Result of the document processing
+    """
+    
+    if isinstance(file, str) and file == "":
+        file = None
+
+    if key is None and file is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Either 'key' or 'file' must be provided"
+        )
+
+    if file is not None:
+        try:
+            file_content = await file.read()
+
+            filename = file.filename
+            key = f"star/text-mining/files/{filename}"
+
+            content_type = file.content_type
+
+            upload_file_to_s3(
+                file_content=file_content,
+                bucket_name=bucketName,
+                file_key=key,
+                content_type=content_type
+            )
+
+            logger.info(f"✅ File {filename} uploaded to {bucketName}/{key}")
+
+        except Exception as e:
+            logger.error(f"❌ Error uploading file: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Error uploading file: {str(e)}")
+
+    logger.info(
+        f"Processing document with key: {key} from bucket {bucketName}")
+
+    try:
+        async with stdio_client(server_params) as (read, write):
+            async with ClientSession(read, write, sampling_callback=handle_sampling_message) as session:
+                await session.initialize()
+
+                result = await session.call_tool(
+                    "process_document_capdev",
+                    arguments={
+                        "bucket": bucketName,
+                        "key": key,
+                        "token": token,
+                        "environmentUrl": environmentUrl
+                    }
+                )
+                return result
+
+    except Exception as e:
+        logger.error(f"Error processing document: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
