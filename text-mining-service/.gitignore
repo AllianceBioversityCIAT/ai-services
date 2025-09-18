@@ -187,3 +187,7 @@ chroma/
 .chroma/
 faiss/
 .faiss/
+
+*.json
+*.csv
+*.jsonl
