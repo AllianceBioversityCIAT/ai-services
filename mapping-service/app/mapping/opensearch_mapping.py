@@ -46,7 +46,7 @@ def map_entries_to_ids(entries: List[MappingEntry]) -> List[MappingResult]:
             url = f"{opensearch_url}/{index}/_search"
             
             query_body = {
-                "size": 3,
+                "size": 1,
                 "query": {
                     "bool": {
                         "should": [
