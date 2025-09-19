@@ -33,14 +33,10 @@ SQL_SERVER = {
 OPENSEARCH = {
     "host": os.getenv("OPENSEARCH_HOST"),
     "index": os.getenv("OPENSEARCH_INDEX_NAME"),
-    "index_chatbot": os.getenv("OPENSEARCH_INDEX_NAME_CHATBOT"),
     "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID_OS"),
     "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY_OS")
 }
 
 KNOWLEDGE_BASE = {
-    "knowledge_base_id": os.getenv("KNOWLEDGE_BASE_ID"),
-    "agent_id": os.getenv("AGENT_ID"),
-    "agent_alias_id": os.getenv("AGENT_ALIAS_ID"),
-    "memory_id": os.getenv("MEMORY_ID")
+    "knowledge_base_id": os.getenv("KNOWLEDGE_BASE_ID")
 }
