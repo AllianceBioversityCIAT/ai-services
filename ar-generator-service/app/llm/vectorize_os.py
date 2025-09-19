@@ -75,14 +75,11 @@ def create_index_if_not_exists(dimension=1024):
         return False
 
 
-def insert_into_opensearch(table_name: str, mode: str):
+def insert_into_opensearch(table_name: str):
     try:
         logger.info(f"🔍 Processing table: {table_name}")
 
-        if mode == "generator":
-            df = load_data(table_name)
-        # else:
-        #     df = load_full_data(table_name)
+        df = load_data(table_name)
         
         rows = df.to_dict(orient="records")
 
@@ -211,133 +208,6 @@ def retrieve_context(query, indicator, year, top_k=10000):
         return []
 
 
-def retrieve_context_chatbot(query, phase=None, indicator=None, section=None):
-    """
-    Retrieve context for the chatbot dynamically filtering by phase, indicator, and section (source_table).
-    - phase: e.g., "Progress 2025", "AWPB 2025", "AR 2025", or "All phases"
-    - indicator: e.g., "PDO Indicator 1", or "All indicators"
-    - section: e.g., "Deliverables", "OICRs", "Innovations", "Contributions", or "All sections"
-    """
-    try:
-        logger.info("📚 Retrieving relevant context from OpenSearch with dynamic filters...")
-
-        selected_filters_count = 0
-        if phase and phase != "All phases":
-            selected_filters_count += 1
-        if indicator and indicator != "All indicators":
-            selected_filters_count += 1
-        if section and section != "All sections":
-            selected_filters_count += 1
-
-        # Adjust top_k based on filters
-        if selected_filters_count >= 2:
-            top_k = 10000
-        else:
-            top_k = 100
-
-        embedding = get_bedrock_embeddings([query])[0]
-
-        selected_year = None
-        selected_phase_type = None
-        if phase and phase != "All phases":
-            parts = phase.split()
-            for p in parts:
-                if p.isdigit():
-                    selected_year = p
-            if "Progress" in phase:
-                selected_phase_type = "Progress"
-            elif "AWPB" in phase:
-                selected_phase_type = "AWPB"
-            elif "AR" in phase:
-                selected_phase_type = "AR"
-
-        filter_conditions = []
-
-        if selected_year:
-            filter_conditions.append({"term": {"year": selected_year}})
-
-        if indicator and indicator != "All indicators":
-            filter_conditions.append({"term": {"indicator_acronym": indicator}})
-
-        allowed_tables = []
-        if section and section != "All sections":
-            section_map = {
-                "Deliverables": ["vw_ai_deliverables"],
-                "OICRs": ["vw_ai_oicrs"],
-                "Innovations": ["vw_ai_innovations"],
-                "Contributions": ["vw_ai_project_contribution", "vw_ai_questions"],
-            }
-            if section in section_map:
-                allowed_tables.extend(section_map[section])
-        else:
-            allowed_tables = [
-                "vw_ai_deliverables",
-                "vw_ai_project_contribution",
-                "vw_ai_oicrs",
-                "vw_ai_innovations",
-                "vw_ai_questions"
-            ]
-
-        if allowed_tables:
-            filter_conditions.append({
-                "bool": {
-                    "should": [{"term": {"source_table": tbl}} for tbl in allowed_tables],
-                    "minimum_should_match": 1
-                }
-            })
-        
-        ## VECTOR SEARCH
-        knn_query = {
-            "size": top_k,
-            "query": {
-                "bool": {
-                    "filter": filter_conditions,
-                    "must": [
-                        {
-                            "knn": {
-                                "embedding": {
-                                    "vector": embedding,
-                                    "k": top_k
-                                }
-                            }
-                        }
-                    ]
-                }
-            }
-        }
-
-        knn_response = opensearch.search(index=INDEX_NAME_CHATBOT, body=knn_query)
-        knn_chunks = [hit["_source"]["chunk"] for hit in knn_response["hits"]["hits"]]
-
-        if selected_phase_type:
-            filtered_chunks = []
-            for chunk in knn_chunks:
-                table_type = chunk.get("table_type")
-                chunk_phase = chunk.get("phase_name")
-                if table_type in ["questions", "contributions"]:
-                    if chunk_phase and selected_phase_type not in chunk_phase:
-                        continue
-                filtered_chunks.append(chunk)
-        else:   
-            filtered_chunks = knn_chunks
-
-        ## FILTER KNN CHUNKS
-        filtered_knn_chunks = [
-            chunk for chunk in filtered_chunks
-            if not (
-                (chunk.get("table_type") == "deliverables" and chunk.get("cluster_role") == "Shared")
-                or
-                (chunk.get("table_type") == "innovations" and chunk.get("cluster_role") == "Shared")
-            )
-        ]
-
-        return filtered_knn_chunks
-    
-    except Exception as e:
-        logger.error(f"❌ Error retrieving context: {e}")
-        return []
-
-
 def calculate_summary(indicator, year):
     df_contributions = load_data("vw_ai_project_contribution")
     df_filtered = df_contributions[
@@ -371,11 +241,11 @@ def run_pipeline(indicator, year, insert_data=False):
                 logger.info(f"🗑️ Deleting existing index: {INDEX_NAME}")
                 opensearch.indices.delete(index=INDEX_NAME)
             create_index_if_not_exists()
-            insert_into_opensearch("vw_ai_deliverables", mode="generator")
-            insert_into_opensearch("vw_ai_project_contribution", mode="generator")
-            insert_into_opensearch("vw_ai_questions", mode="generator")
-            insert_into_opensearch("vw_ai_oicrs", mode="generator")
-            insert_into_opensearch("vw_ai_innovations", mode="generator")
+            insert_into_opensearch("vw_ai_deliverables")
+            insert_into_opensearch("vw_ai_project_contribution")
+            insert_into_opensearch("vw_ai_questions")
+            insert_into_opensearch("vw_ai_oicrs")
+            insert_into_opensearch("vw_ai_innovations")
 
         total_expected, total_achieved, progress = calculate_summary(indicator, year)
 
@@ -389,68 +259,10 @@ def run_pipeline(indicator, year, insert_data=False):
             Do the following:\n{PROMPT}
             """
 
-        final_report = invoke_model(query, mode="generator")
+        final_report = invoke_model(query)
 
         logger.info("✅ Report generation completed successfully.")
         return final_report
 
     except Exception as e:
         logger.error(f"❌ Error in pipeline execution: {e}")
-
-
-def run_chatbot(user_input, phase=None, indicator=None, section=None, insert_data=False):
-    try:
-        if insert_data:
-            if opensearch.indices.exists(index=INDEX_NAME_CHATBOT):
-                logger.info(f"🗑️ Deleting existing index: {INDEX_NAME_CHATBOT}")
-                opensearch.indices.delete(index=INDEX_NAME_CHATBOT)
-            create_index_if_not_exists()
-            insert_into_opensearch("vw_ai_deliverables", mode="chatbot")
-            insert_into_opensearch("vw_ai_project_contribution", mode="chatbot")
-            insert_into_opensearch("vw_ai_questions", mode="chatbot")
-            insert_into_opensearch("vw_ai_oicrs", mode="chatbot")
-            insert_into_opensearch("vw_ai_innovations", mode="chatbot")
-
-        input_text = f"""{user_input}
-
-        [User-selected filters]
-        - Phase: {phase}
-        - Indicator: {indicator}
-        - Section: {section}
-
-        Instructions:
-        If these filters are not "All", you must strictly focus on them.
-        If any of these are set to "All", interpret the user's question contextually and include the most relevant records dynamically across phases, indicators, and sections."""
-
-        context = retrieve_context_chatbot(input_text, phase=phase, indicator=indicator, section=section)
-        # save_context_to_file(context, "context", indicator, phase)
-
-        CHATBOT_PROMPT = generate_chatbot_prompt(phase, indicator, section)
-        
-        query = f"""
-You are an AI assistant specialized in AICCRA. Follow these instructions carefully:
-
-{CHATBOT_PROMPT}
-
----
-
-The user asked the following question:
-\"\"\"{user_input}\"\"\"
-
-Use ONLY the following retrieved context to answer the question. 
-If the context does not have enough information, clearly say so and suggest a broader search.
-
-Retrieved context:
-{context}
-
-Now, provide the best possible answer.      
-"""
-
-        final_response = invoke_model(query, mode="chatbot")
-
-        logger.info("✅ Chatbot response generated successfully.")
-        return final_response
-
-    except Exception as e:
-        logger.error(f"❌ Error in chatbot execution: {e}")
-        return f"⚠️ An error occurred: {e}"
