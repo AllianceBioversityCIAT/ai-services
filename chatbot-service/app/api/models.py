@@ -112,6 +112,32 @@ class ChatRequest(BaseModel):
         examples=["user@example.com", "researcher@cgiar.org", "john.doe@university.edu"]
     )
 
+    insert_data: Optional[bool] = Field(
+        default=False,
+        description="""
+        Force data reload into the knowledge base (optional).
+        
+        When set to True, the system will:
+        - Reload all AICCRA data from the SQL Server database
+        - Process and upload fresh data to the AWS Bedrock Knowledge Base
+        - Synchronize the knowledge base with the latest information
+        
+        ⚠️ **Warning**: This operation can take several minutes to complete as it involves:
+        - Querying multiple database views
+        - Processing thousands of records
+        - Uploading files to S3
+        - Synchronizing the knowledge base
+        
+        **When to use**:
+        - After significant database updates
+        - When troubleshooting data inconsistencies
+        - For periodic maintenance (recommended weekly)
+        
+        **Default**: False (uses existing knowledge base data)
+        """,
+        examples=[False, True]
+    )
+
 
 class ChatResponse(BaseModel):
     """
@@ -151,6 +177,22 @@ class ChatResponse(BaseModel):
             "section": "All sections"
         }]
     )
+
+    data_reloaded: Optional[bool] = Field(
+        default=None,
+        description="Indicates if fresh data was loaded into the knowledge base for this request",
+        examples=[False, True]
+    )
+
+    processing_info: Optional[dict] = Field(
+        default=None,
+        description="Additional processing information when data reload was performed",
+        examples=[{
+            "data_reload_time": "45.2s",
+            "records_processed": 15847,
+            "tables_updated": ["deliverables", "contributions", "innovations", "oicrs", "questions"]
+        }]
+    )
     
     status: str = Field(
         default="success", 
@@ -173,7 +215,8 @@ class ErrorResponse(BaseModel):
             "Invalid request parameters",
             "Chatbot service unavailable", 
             "AWS Bedrock service error",
-            "Context limit exceeded"
+            "Context limit exceeded",
+            "Data reload failed"
         ]
     )
     
@@ -189,6 +232,7 @@ class ErrorResponse(BaseModel):
         examples=[
             "Message length exceeds maximum allowed characters",
             "Invalid session ID format",
-            "AWS service temporarily unavailable"
+            "AWS service temporarily unavailable",
+            "Database connection failed during data reload"
         ]
     )

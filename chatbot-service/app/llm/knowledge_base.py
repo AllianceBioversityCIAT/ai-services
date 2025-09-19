@@ -1,7 +1,6 @@
 import boto3
 from app.utils.prompts.kb_generation_prompt import DEFAULT_PROMPT
 from app.utils.config.config_util import KNOWLEDGE_BASE_ID, OPENSEARCH, BR
-from app.utils.prompts.report_generation_prompt import generate_report_prompt
 
 
 model_id = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"

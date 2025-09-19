@@ -30,6 +30,22 @@ app = FastAPI(
     - 📊 **Data-Driven Insights**: Provides insights from real AICCRA reporting data
     - 🎯 **Contextual Responses**: Builds upon previous questions for comprehensive answers
     - 🔗 **Rich Citations**: Includes links to relevant documents and reports
+    - 🔄 **Data Refresh**: Option to reload fresh data from the database
+    
+    🔄 Data Management
+    
+    The service supports two data access modes:
+    
+    **Standard Mode (insert_data=false)**
+    - Uses existing knowledge base data for fast responses (~3-5 seconds)
+    - Recommended for most queries and regular usage
+    - Data is typically refreshed weekly
+    
+    **Fresh Data Mode (insert_data=true)**
+    - Reloads data directly from SQL Server database (~3-5 minutes)
+    - Processes all database views and uploads to knowledge base
+    - Use when you need the absolute latest information
+    - Recommended after major database updates
     
     🗣️ What You Can Ask
     
@@ -84,6 +100,17 @@ app = FastAPI(
     
     This API uses AWS IAM authentication for accessing backend services.
     No API key is required for the HTTP endpoints.
+    
+    ⚠️ **Data Reload Notice**
+    
+    When using `insert_data=true`, the following process occurs:
+    1. Connects to SQL Server and queries all AICCRA views
+    2. Processes thousands of records from multiple tables
+    3. Uploads data files to S3 bucket
+    4. Synchronizes AWS Bedrock Knowledge Base
+    5. Completes the chat request with fresh data
+    
+    This ensures you get the most up-to-date information but takes significantly longer.
     """,
     version="1.0.0",
     docs_url="/docs",
@@ -150,13 +177,26 @@ async def root():
         },
         "supported_years": "2021-2025",
         "data_sections": ["Deliverables", "Contributions", "Innovations", "OICRs"],
+        "data_modes": {
+            "standard": {
+                "insert_data": False,
+                "response_time": "3-5 seconds",
+                "description": "Uses existing knowledge base data"
+            },
+            "fresh_data": {
+                "insert_data": True,
+                "response_time": "3-5 minutes",
+                "description": "Reloads data from database before responding"
+            }
+        },
         "technology_stack": ["FastAPI", "AWS Bedrock Agents", "Amazon OpenSearch", "SQL Server"],
         "capabilities": [
             "Natural language conversation",
             "Session-based memory", 
             "Context-aware responses",
             "Smart data filtering",
-            "Citation and linking"
+            "Citation and linking",
+            "Real-time data refresh"
         ]
     }
 
@@ -179,7 +219,8 @@ async def health():
                 "chat": "available",
                 "memory": "enabled",
                 "filters": "active",
-                "vector_search": "operational"
+                "vector_search": "operational",
+                "data_reload": "available"
             }
         }
     except Exception as e:

@@ -73,7 +73,7 @@ def create_index_if_not_exists(dimension=1024):
         return False
 
 
-def insert_into_opensearch(table_name: str, mode: str):
+def insert_into_opensearch(table_name: str):
     try:
         logger.info(f"🔍 Processing table: {table_name}")
 
@@ -256,11 +256,11 @@ def run_chatbot(user_input, phase=None, indicator=None, section=None, insert_dat
                 logger.info(f"🗑️ Deleting existing index: {INDEX_NAME_CHATBOT}")
                 opensearch.indices.delete(index=INDEX_NAME_CHATBOT)
             create_index_if_not_exists()
-            insert_into_opensearch("vw_ai_deliverables", mode="chatbot")
-            insert_into_opensearch("vw_ai_project_contribution", mode="chatbot")
-            insert_into_opensearch("vw_ai_questions", mode="chatbot")
-            insert_into_opensearch("vw_ai_oicrs", mode="chatbot")
-            insert_into_opensearch("vw_ai_innovations", mode="chatbot")
+            insert_into_opensearch("vw_ai_deliverables")
+            insert_into_opensearch("vw_ai_project_contribution")
+            insert_into_opensearch("vw_ai_questions")
+            insert_into_opensearch("vw_ai_oicrs")
+            insert_into_opensearch("vw_ai_innovations")
 
         input_text = f"""{user_input}
 
@@ -297,7 +297,7 @@ Retrieved context:
 Now, provide the best possible answer.      
 """
 
-        final_response = invoke_model(query, mode="chatbot")
+        final_response = invoke_model(query)
 
         logger.info("✅ Chatbot response generated successfully.")
         return final_response
