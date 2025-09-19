@@ -10,42 +10,64 @@ from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import KNOWLEDGE_BASE
 from app.utils.s3.upload_file_to_s3 import upload_file_to_s3
 
-
 memory_id = KNOWLEDGE_BASE['memory_id']
 MEMORY_ID = hashlib.sha256(memory_id.encode()).hexdigest()
 
 logger = get_logger()
 
 st.set_page_config(page_title="AICCRA chatbot", page_icon="🤖", layout="wide")
-st.title("🤖 AICCRA Assistant")
-mode = st.radio(
-    "Choose interaction style:", 
-    [
-        "💬 Conversational (with memory & follow-ups)", 
-        "🔍 Quick Search (specific questions only)"
-    ], 
-    index=0)
+st.title("🤖 AI Assistant for AICCRA")
 
-if mode == "💬 Conversational (with memory & follow-ups)":
-    st.caption("🧠 **Recommended**: Remembers your conversation, can answer follow-up questions, and provides contextual responses")
-elif mode == "🔍 Quick Search (specific questions only)":
-    st.caption("⚡ **Quick queries**: Best for specific, one-time questions about AICCRA data")
 
-## --- Initial status of messages ---
+def start_new_session():
+    """Limpia el historial de conversación e inicia una nueva sesión"""
+    st.session_state.messages = []
+    st.session_state.session_id = str(uuid.uuid4())
+    st.session_state.show_feedback_area = False
+    if "feedback_submitted" in st.session_state:
+        del st.session_state.feedback_submitted
+    logger.info(f"🔄 New session started: {st.session_state.session_id}")
+    st.rerun()
+
+
+st.markdown("""
+Welcome to your intelligent assistant for **AICCRA** (Accelerating Impacts of CGIAR Climate Research for Africa) data exploration. 
+
+**How it works:**
+- 🧠 **Memory-enabled**: Remembers your conversation and can answer follow-up questions
+- 🎯 **Contextual responses**: Builds upon previous questions for more comprehensive answers  
+- 🔍 **Smart filtering**: Use the sidebar filters to focus on specific data subsets
+- 📊 **Data-driven**: Provides insights from AICCRA's deliverables, innovations, contributions, and impact reports
+
+**Get started** by asking questions about clusters, indicators, innovations, or any AICCRA activities!
+""")
+
+
+# mode = st.radio(
+#     "Choose interaction style:", 
+#     [
+#         "💬 Conversational (with memory & follow-ups)", 
+#         "🔍 Quick Search (specific questions only)"
+#     ], 
+#     index=0)
+
+# if mode == "💬 Conversational (with memory & follow-ups)":
+#     st.caption("🧠 **Recommended**: Remembers your conversation, can answer follow-up questions, and provides contextual responses")
+# elif mode == "🔍 Quick Search (specific questions only)":
+#     st.caption("⚡ **Quick queries**: Best for specific, one-time questions about AICCRA data")
+
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-## --- Session ID for agents ---
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
-## --- Status to show/hide filters ---
 if "show_filters" not in st.session_state:
     st.session_state.show_filters = True
 
 def toggle_filters():
     st.session_state.show_filters = not st.session_state.show_filters
-
 
 def get_year_from_phase(phase_label: str):
     """Extract year from phase label like 'AWPB 2024'. Returns int year or None for 'All phases'."""
@@ -53,7 +75,6 @@ def get_year_from_phase(phase_label: str):
         return None
     match = re.search(r"(20\d{2})$", phase_label)
     return int(match.group(1)) if match else None
-
 
 def get_indicator_options(year: int | None):
     """Return the indicator options according to the specified year.
@@ -76,7 +97,6 @@ def get_indicator_options(year: int | None):
             "IPI 3.1", "IPI 3.2", "IPI 3.3", "IPI 3.4",
         ]
     else:
-        # Union of all indicators when year is None (All phases) or unknown
         pdo = [f"PDO Indicator {i}" for i in range(1, 6)]
         ipi = [
             "IPI 1.1", "IPI 1.2", "IPI 1.3", "IPI 1.4",
@@ -86,13 +106,8 @@ def get_indicator_options(year: int | None):
 
     return base + pdo + ipi
 
-
 phase, indicator, section = "All phases", "All indicators", "All sections"
 
-## --- HISTORY ---
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
 
 with st.sidebar:
     st.subheader("Filters")
@@ -101,11 +116,29 @@ with st.sidebar:
     indicator = st.selectbox("Indicator", indicator_options, index=0)
     section = st.selectbox("Section", ["All sections", "Deliverables", "OICRs", "Innovations", "Contributions"])
     st.caption("Apply filters to focus the AI assistant on specific data subsets.")
+    
+    st.divider()
+    st.subheader("Session Controls")
+    
+    if st.session_state.messages:
+        messages_count = len([msg for msg in st.session_state.messages if msg["role"] == "user"])
+        st.caption(f"💬 Current session: {messages_count} questions asked")
+        st.caption(f"🆔 Session ID: `{st.session_state.session_id[:8]}...`")
+    
+    if st.button("🔄 Start New Session", 
+                 type="primary", 
+                 help="Clear conversation history and start fresh",
+                 use_container_width=True):
+        start_new_session()
+
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
 
 user_input = st.chat_input("Ask about your AICCRA data, request reports, or get insights…☺️")
 
 if user_input:
-    ## --- Save user message ---
     st.session_state.messages.append({"role": "user", "content": user_input})
     st.session_state.feedback_submitted = False
 
@@ -124,17 +157,17 @@ if user_input:
     
     with st.spinner("Thinking..."):
         try:
-            if mode == "🔍 Quick Search (specific questions only)":
-                response_stream = run_chatbot(user_input, phase=phase, indicator=indicator, section=section)
-            elif mode == "💬 Conversational (with memory & follow-ups)":
-                response_stream = run_agent_chatbot(
-                    user_input,
-                    phase=phase,
-                    indicator=indicator,
-                    section=section,
-                    session_id=st.session_state.session_id,
-                    memory_id=MEMORY_ID
-                )
+            # if mode == "🔍 Quick Search (specific questions only)":
+            #     response_stream = run_chatbot(user_input, phase=phase, indicator=indicator, section=section)
+            # elif mode == "💬 Conversational (with memory & follow-ups)":
+            response_stream = run_agent_chatbot(
+                user_input,
+                phase=phase,
+                indicator=indicator,
+                section=section,
+                session_id=st.session_state.session_id,
+                memory_id=MEMORY_ID
+            )
     
             full_response = ""
             first_chunk = True
@@ -167,8 +200,31 @@ if user_input:
 
             st.session_state.messages.append({"role": "assistant", "content": full_response})
 
-
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
+
+    col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
+
+    with col5:
+        if st.button("💾 Export Chat", 
+                     key="export_chat",
+                     help="Download conversation history",
+                     type="primary"):
+            chat_content = ""
+            for i, msg in enumerate(st.session_state.messages):
+                role = "User" if msg["role"] == "user" else "Assistant"
+                chat_content += f"{role}: {msg['content']}\n\n"
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            st.download_button(
+                label="📄 Download",
+                data=chat_content,
+                file_name=f"aiccra_chat_{timestamp}.txt",
+                mime="text/plain",
+                key="download_chat"
+            )
+
+    st.divider()
+    
     if "show_feedback_area" not in st.session_state:
         st.session_state.show_feedback_area = False
     

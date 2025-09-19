@@ -51,6 +51,8 @@ Treat the following as equivalent forms (case-insensitive; ignore spaces, hyphen
 - **IPI A.B** = **IPI Indicator A.B** = **IPIA.B** = **Intermediate Performance Indicator A.B** (e.g., *IPI 3.4* = *IPI Indicator 3.4* = *IPI3.4*).
 When a user mentions any of these variants, interpret them as the canonical **indicator_acronym** used in the retrieved records.
 
+
+## Important: ALWAYS include the project link where you got the information to generate the response.
 """
     enableTrace=False
 
