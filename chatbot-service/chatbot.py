@@ -4,7 +4,7 @@ import uuid
 import hashlib
 import streamlit as st
 from datetime import datetime, timezone
-from app.llm.vectorize_os import run_chatbot
+# from app.llm.vectorize_os import run_chatbot
 from app.llm.agents import run_agent_chatbot
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import KNOWLEDGE_BASE
