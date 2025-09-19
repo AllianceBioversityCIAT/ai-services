@@ -7,8 +7,6 @@ dependencies = [
     "pandas",
     "boto3",
     "python-dotenv",
-    "vecs",
-    "supabase",
     "sqlalchemy",
     "mysql-connector-python",
     "openpyxl",
