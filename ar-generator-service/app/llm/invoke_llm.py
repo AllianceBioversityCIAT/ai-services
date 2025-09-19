@@ -31,7 +31,7 @@ def get_bedrock_embeddings(texts):
     return embeddings
 
 
-def invoke_model(prompt, mode):
+def invoke_model(prompt):
     try:
         logger.info("✍️  Generating report with LLM...")
         logger.info("🚀 Invoking the model...")
