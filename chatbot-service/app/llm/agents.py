@@ -52,15 +52,6 @@ def run_agent_chatbot(user_input, phase, indicator, section, session_id, memory_
     input_text = f"""
 ## User question:
 {user_input}
-
-## Terminology & Aliases (Normalization)
-Treat the following as equivalent forms (case-insensitive; ignore spaces, hyphens, and the word "Indicator"):
-- **PDO X** = **PDO Indicator X** = **PDOX** = **Project Development Objective X** (e.g., *PDO 1* = *PDO Indicator 1* = *PDO1*).
-- **IPI A.B** = **IPI Indicator A.B** = **IPIA.B** = **Intermediate Performance Indicator A.B** (e.g., *IPI 3.4* = *IPI Indicator 3.4* = *IPI3.4*).
-When a user mentions any of these variants, interpret them as the canonical **indicator_acronym** used in the retrieved records.
-
-
-## Important: ALWAYS include the project link where you got the information to generate the response.
 """
     enableTrace=False
 

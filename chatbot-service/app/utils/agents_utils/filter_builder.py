@@ -69,6 +69,11 @@ def filter_metadata(phase, section, indicator):
     }
 
     if filter_conditions:
-        vector_search_config["filter"] = {"andAll": filter_conditions}
+        if len(filter_conditions) == 1:
+            # If only one condition, use it directly instead of wrapping in andAll
+            vector_search_config["filter"] = filter_conditions[0]
+        else:
+            # If multiple conditions, use andAll
+            vector_search_config["filter"] = {"andAll": filter_conditions}
     
     return vector_search_config
