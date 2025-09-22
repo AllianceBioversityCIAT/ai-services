@@ -64,7 +64,7 @@ def filter_metadata(phase, section, indicator):
         })
 
     vector_search_config = {
-        "numberOfResults": 50,
+        "numberOfResults": 30,
         "overrideSearchType": "HYBRID"
     }
 
