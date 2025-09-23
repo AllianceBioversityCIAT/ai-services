@@ -72,7 +72,8 @@ app = FastAPI(
         "url": "https://opensource.org/licenses/MIT"
     },
     servers=[
-        {"url": "http://localhost:8000", "description": "Development server"},
+        {"url": "https://oxnrkcntlheycdgcnilexrwp4i0tucqz.lambda-url.us-east-1.on.aws", "description": "Test server"},
+        {"url": "http://localhost:8000", "description": "Local server"},
         {"url": "https://d3djd7q7g7v7di.cloudfront.net", "description": "Production server"}
     ]
 )

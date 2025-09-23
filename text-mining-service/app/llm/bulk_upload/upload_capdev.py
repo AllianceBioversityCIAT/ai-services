@@ -3,7 +3,7 @@ import json
 from app.utils.logger.logger_util import get_logger
 from app.llm.vectorize import get_all_reference_data
 from app.utils.s3.s3_util import read_document_from_s3
-# from app.llm.map_fields import map_fields_with_opensearch
+from app.llm.map_fields import map_fields_with_opensearch
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.utils.prompt.bulk_upload_capdev_prompt import PROMPT_BULK_UPLOAD_CAPDEV
 from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME
@@ -11,8 +11,8 @@ from app.llm.vectorize import get_embedding, store_temp_embeddings, get_relevant
 from app.llm.mining import initialize_reference_data, split_text, invoke_model, is_valid_json
 
 logger = get_logger()
+mapping_service_url = "https://d8ty0ozpxa.execute-api.us-east-1.amazonaws.com"
 # mapping_service_url = "http://localhost:8001"
-
 
 def process_excel_in_batches(chunks, batch_size=5):
     """
@@ -25,8 +25,7 @@ def process_excel_in_batches(chunks, batch_size=5):
     return batches
 
 
-# def process_single_batch(batch_chunks, prompt, batch_number, all_reference_data, mapping_service_url=mapping_service_url):
-def process_single_batch(batch_chunks, prompt, batch_number, all_reference_data):
+def process_single_batch(batch_chunks, prompt, batch_number, all_reference_data, mapping_service_url=mapping_service_url):
     """
     Process a single batch of chunks (thread-safe)
     """
@@ -62,12 +61,12 @@ def process_single_batch(batch_chunks, prompt, batch_number, all_reference_data)
                     if isinstance(result, dict):
                         result["batch_number"] = batch_number
 
-                        # if mapping_service_url:
-                        #     try:
-                        #         result = map_fields_with_opensearch(result, mapping_service_url)
-                        #         logger.info(f"🔗 [Thread-{batch_number}] Fields mapped for result in batch {batch_number}")
-                        #     except Exception as map_error:
-                        #         logger.warning(f"⚠️ [Thread-{batch_number}] Field mapping failed for batch {batch_number}: {str(map_error)}")
+                        if mapping_service_url:
+                            try:
+                                result = map_fields_with_opensearch(result, mapping_service_url)
+                                logger.info(f"🔗 [Thread-{batch_number}] Fields mapped for result in batch {batch_number}")
+                            except Exception as map_error:
+                                logger.warning(f"⚠️ [Thread-{batch_number}] Field mapping failed for batch {batch_number}: {str(map_error)}")
             
             return parsed_result
         
@@ -84,15 +83,15 @@ def process_single_batch(batch_chunks, prompt, batch_number, all_reference_data)
                         if isinstance(result, dict):
                             result["batch_number"] = batch_number
 
-                            # if mapping_service_url:
-                            #     try:
-                            #         result = map_fields_with_opensearch(result, mapping_service_url)
-                            #         logger.info(f"🔗 Field mapping enabled with service: {mapping_service_url}")
-                            #         logger.info(f"🔗 [Thread-{batch_number}] Fields mapped for cleaned result in batch {batch_number}")
-                            #     except Exception as map_error:
-                            #         logger.warning(f"⚠️ [Thread-{batch_number}] Field mapping failed for cleaned batch {batch_number}: {str(map_error)}")
-                            # else:
-                            #     logger.info(f"⚠️ Field mapping disabled (no mapping_service_url provided)")
+                            if mapping_service_url:
+                                try:
+                                    result = map_fields_with_opensearch(result, mapping_service_url)
+                                    logger.info(f"🔗 Field mapping enabled with service: {mapping_service_url}")
+                                    logger.info(f"🔗 [Thread-{batch_number}] Fields mapped for cleaned result in batch {batch_number}")
+                                except Exception as map_error:
+                                    logger.warning(f"⚠️ [Thread-{batch_number}] Field mapping failed for cleaned batch {batch_number}: {str(map_error)}")
+                            else:
+                                logger.info(f"⚠️ Field mapping disabled (no mapping_service_url provided)")
 
                 return parsed_result
             
