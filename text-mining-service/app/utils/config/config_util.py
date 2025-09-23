@@ -14,13 +14,7 @@ BR = {
     "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY_BR")
 }
 
-RABBITMQ = {
-    "username": os.getenv("RABBITMQ_USERNAME"),
-    "password": os.getenv("RABBITMQ_PASSWORD"),
-    "host": os.getenv("RABBITMQ_HOST"),
-    "port": os.getenv("RABBITMQ_PORT"),
-    "protocol": os.getenv("RABBITMQ_PROTOCOL", "amqps"),
-    "queue": os.getenv("RABBITMQ_QUEUE", "cola_test_python")
-}
-
 MS_NAME = os.getenv("MS_NAME", "Mining Microservice")
+
+STAR_BUCKET_KEY_NAME = os.getenv("STAR_BUCKET_KEY_NAME")
+PRMS_BUCKET_KEY_NAME = os.getenv("PRMS_BUCKET_KEY_NAME")
