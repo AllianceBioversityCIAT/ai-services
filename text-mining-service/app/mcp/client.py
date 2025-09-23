@@ -129,7 +129,7 @@ async def process_document_endpoint(
     token: str = Form(
         ..., description="Authentication token", examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."]),
     key: Optional[str] = Form(
-        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["star/text-mining/files/training-report-2024.pdf"]),
+        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["star/text-mining/files/test/training-report-2024.pdf"]),
     file: Optional[Union[UploadFile, str]] = File(
         default=None, description="Document file to upload and process. Optional if key is provided"),
     environmentUrl: str = Form(
@@ -164,7 +164,7 @@ async def process_document_endpoint(
             file_content = await file.read()
 
             filename = file.filename
-            key = f"star/text-mining/files/{filename}"
+            key = f"star/text-mining/files/test/{filename}"
 
             content_type = file.content_type
 
@@ -334,7 +334,7 @@ async def bulk_upload_capdev_endpoint(
     token: str = Form(
         ..., description="Authentication token", examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."]),
     key: Optional[str] = Form(
-        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["star/text-mining/files/training-report-2024.pdf"]),
+        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["star/text-mining/files/test/training-report-2024.pdf"]),
     file: Optional[Union[UploadFile, str]] = File(
         default=None, description="Document file to upload and process. Optional if key is provided"),
     environmentUrl: str = Form(
@@ -369,7 +369,7 @@ async def bulk_upload_capdev_endpoint(
             file_content = await file.read()
 
             filename = file.filename
-            key = f"star/text-mining/files/{filename}"
+            key = f"star/text-mining/files/test/{filename}"
 
             content_type = file.content_type
 
