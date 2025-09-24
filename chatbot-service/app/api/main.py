@@ -1,15 +1,13 @@
 """FastAPI application for AICCRA Chatbot Service."""
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-
 from app.api.routes import router
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from app.utils.logger.logger_util import get_logger
 
 logger = get_logger()
 
-# Create FastAPI application
 app = FastAPI(
     title="AICCRA Chatbot API",
     description="""
@@ -31,6 +29,7 @@ app = FastAPI(
     - 🎯 **Contextual Responses**: Builds upon previous questions for comprehensive answers
     - 🔗 **Rich Citations**: Includes links to relevant documents and reports
     - 🔄 **Data Refresh**: Option to reload fresh data from the database
+    - 📝 **Feedback System**: Collect user feedback for continuous improvement
     
     🔄 Data Management
     
@@ -46,6 +45,25 @@ app = FastAPI(
     - Processes all database views and uploads to knowledge base
     - Use when you need the absolute latest information
     - Recommended after major database updates
+
+    📝 Feedback System
+    
+    **Continuous Improvement Through User Feedback**
+    
+    The service includes a feedback system to collect user opinions on AI responses:
+    
+    - **Positive Feedback (👍)**: When responses are helpful and accurate
+    - **Negative Feedback (👎)**: When responses need improvement, with optional detailed comments
+    - **Session Tracking**: Links feedback to specific conversations
+    - **Metadata Collection**: Captures context like filters used and response characteristics
+    - **Secure Storage**: Feedback stored in AWS S3 with unique tracking IDs
+    
+    **Feedback Features:**
+    - Unique tracking IDs for each feedback submission
+    - Session and user context preservation
+    - Optional detailed comments for negative feedback
+    - Automatic metadata capture (timestamps, response length, filters used)
+    - Secure S3 storage with organized folder structure
     
     🗣️ What You Can Ask
     
@@ -95,6 +113,7 @@ app = FastAPI(
     - **Vector Search**: Amazon OpenSearch Service for semantic search
     - **Database**: SQL Server for structured data
     - **Cloud Services**: AWS S3, AWS Bedrock Knowledge Base
+    - **Feedback Storage**: AWS S3 with organized structure
     
     🔒 Authentication
     
@@ -130,22 +149,24 @@ app = FastAPI(
             "description": "Conversational AI operations for AICCRA data exploration",
         },
         {
+            "name": "Feedback", 
+            "description": "User feedback collection and analytics for AI response quality",
+        },
+        {
             "name": "Health",
             "description": "Service health and status endpoints",
         }
     ]
 )
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include API routes
 app.include_router(router)
 
 
@@ -169,6 +190,7 @@ async def root():
         },
         "endpoints": {
             "POST /api/chat": "Send message to AICCRA chatbot",
+            "POST /api/feedback": "Submit feedback on AI responses",
             "GET /health": "Health check endpoint"
         },
         "supported_indicators": {
@@ -188,6 +210,12 @@ async def root():
                 "response_time": "3-5 minutes",
                 "description": "Reloads data from database before responding"
             }
+        },
+        "feedback_system": {
+            "feedback_types": ["positive", "negative"],
+            "features": ["Session tracking", "User identification", "Comment support", "Metadata collection"],
+            "storage": "AWS S3",
+            "tracking": "Unique feedback IDs for each submission"
         },
         "technology_stack": ["FastAPI", "AWS Bedrock Agents", "Amazon OpenSearch", "SQL Server"],
         "capabilities": [
@@ -220,7 +248,8 @@ async def health():
                 "memory": "enabled",
                 "filters": "active",
                 "vector_search": "operational",
-                "data_reload": "available"
+                "data_reload": "available",
+                "feedback_system": "operational"
             }
         }
     except Exception as e:
@@ -232,7 +261,6 @@ async def health():
         }
 
 
-# Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Global exception handler for unhandled errors."""

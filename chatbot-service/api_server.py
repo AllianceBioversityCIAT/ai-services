@@ -42,7 +42,7 @@ def main():
     
     args = parser.parse_args()
     
-    print(f"Starting AICCRA Report Generator API server...")
+    print(f"Starting Chatbot API server...")
     print(f"Server will be available at: http://{args.host}:{args.port}")
     print(f"API documentation: http://{args.host}:{args.port}/docs")
     print(f"Health check: http://{args.host}:{args.port}/health")

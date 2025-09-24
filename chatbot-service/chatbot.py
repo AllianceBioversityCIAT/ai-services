@@ -2,6 +2,7 @@ import os
 import re
 import uuid
 import hashlib
+import requests
 import streamlit as st
 from datetime import datetime, timezone
 # from app.llm.vectorize_os import run_chatbot
@@ -15,9 +16,58 @@ MEMORY_ID = hashlib.sha256(memory_id.encode()).hexdigest()
 
 logger = get_logger()
 
+API_BASE_URL = "http://localhost:8000"
+
 st.set_page_config(page_title="AICCRA chatbot", page_icon="🤖", layout="wide")
 st.title("🤖 AI Assistant for AICCRA")
 
+
+def submit_feedback_to_api(session_id: str, memory_id: str, user_message: str, 
+                          ai_response: str, feedback_type: str, 
+                          feedback_comment: str = None, filters: dict = None):
+    """Submit feedback to the API backend."""
+    try:
+        feedback_data = {
+            "session_id": session_id,
+            "memory_id": memory_id,
+            "user_message": user_message,
+            "ai_response": ai_response,
+            "feedback_type": feedback_type,
+            "service_name": "chatbot"
+        }
+        
+        if feedback_comment:
+            feedback_data["feedback_comment"] = feedback_comment
+            
+        if filters:
+            feedback_data["filters_applied"] = filters
+        
+        response = requests.post(
+            f"{API_BASE_URL}/api/feedback",
+            json=feedback_data,
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f"✅ Feedback submitted successfully: {result.get('feedback_id')}")
+            return True, result.get('message', 'Feedback submitted successfully')
+        else:
+            try:
+                error_detail = response.json()
+                error_message = error_detail.get('details', 'Unknown error')
+            except:
+                error_message = response.text
+            logger.error(f"❌ Feedback submission failed: {error_message}")
+            return False, f"Failed to submit feedback: {error_message}"
+            
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ Network error submitting feedback: {e}")
+        return False, f"Network error: {str(e)}"
+    except Exception as e:
+        logger.error(f"❌ Unexpected error submitting feedback: {e}")
+        return False, f"Unexpected error: {str(e)}"
+    
 
 def start_new_session():
     """Limpia el historial de conversación e inicia una nueva sesión"""
@@ -142,13 +192,6 @@ if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
     st.session_state.feedback_submitted = False
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    file_name = f"interaction_{timestamp}.txt"
-    local_path = os.path.join(os.getcwd(), "chat_logs", file_name)
-    s3_key = f"aiccra/chatbot/chat_logs/{file_name}"
-    st.session_state.feedback_local_path = local_path
-    st.session_state.feedback_s3_key = s3_key
-
     if phase == "All phases" or indicator == "All indicators" or section == "All sections":
         st.toast("💡 Tip: Your answers will be more precise if you apply filters from the sidebar.")
 
@@ -184,13 +227,6 @@ if user_input:
                 response_placeholder.markdown(full_response)
 
             st.session_state.messages.append({"role": "assistant", "content": full_response})
-            os.makedirs(os.path.dirname(local_path), exist_ok=True)
-
-            with open(local_path, "w", encoding="utf-8") as f:
-                f.write(f"User:\n{user_input}\n\nAssistant:\n{full_response}")
-
-            upload_file_to_s3(s3_key, local_path)
-            os.remove(local_path)
 
         except Exception as e:
             full_response = f"⚠️ An error occurred: {e}"
@@ -230,32 +266,68 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "assis
     
     st.markdown("***Give feedback on this response*** :white_check_mark:")
     feedback_ack = st.empty()
+    
+    last_user_msg = ""
+    last_ai_response = ""
+    
+    if len(st.session_state.messages) >= 2:
+        last_ai_response = st.session_state.messages[-1]["content"]
+        last_user_msg = st.session_state.messages[-2]["content"]
+    
     col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12, col13, col14 = st.columns([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
     with col1:
         if st.button("👍", key="thumbs_up"):
-            st.session_state.show_feedback_area = False
-            feedback_ack.success("Thanks for your feedback!")
+            filters_applied = {
+                "phase": phase,
+                "indicator": indicator,
+                "section": section
+            }
+
+            success, message = submit_feedback_to_api(
+                session_id=st.session_state.session_id,
+                memory_id=MEMORY_ID,
+                user_message=last_user_msg,
+                ai_response=last_ai_response,
+                feedback_type="positive",
+                filters=filters_applied
+            )
+
+            if success:
+                st.session_state.show_feedback_area = False
+                feedback_ack.success("✅ Thanks for your positive feedback!")
+            else:
+                feedback_ack.error(f"❌ Error submitting feedback: {message}")
+    
     with col2:
         if st.button("👎", key="thumbs_down"):
             st.session_state.show_feedback_area = True
 
     if st.session_state.show_feedback_area:
         with st.form("feedback_form", clear_on_submit=True):
-            feedback = st.text_area("Tell us what went wrong 👇", placeholder="Any suggestions or issues?")
+            feedback_comment = st.text_area("\* Tell us what went wrong 👇", placeholder="Any suggestions or issues?")
             submitted = st.form_submit_button("Submit feedback", type="primary")
-            if submitted and feedback:
-                try:
+            
+            if submitted and feedback_comment:
+                filters_applied = {
+                    "phase": phase,
+                    "indicator": indicator,
+                    "section": section
+                }
+                
+                success, message = submit_feedback_to_api(
+                    session_id=st.session_state.session_id,
+                    memory_id=MEMORY_ID,
+                    user_message=last_user_msg,
+                    ai_response=last_ai_response,
+                    feedback_type="negative",
+                    feedback_comment=feedback_comment if feedback_comment else None,
+                    filters=filters_applied
+                )
+                
+                if success:
                     st.session_state.feedback_submitted = True
-                    with open(st.session_state.feedback_local_path, "w", encoding="utf-8") as f:
-                        f.write(
-                            f"User:\n{st.session_state.messages[-2]['content']}\n\nAssistant:\n{st.session_state.messages[-1]['content']}\n\nFeedback:\n{feedback}"
-                        )
-                    upload_file_to_s3(st.session_state.feedback_s3_key, st.session_state.feedback_local_path)
-                    os.remove(st.session_state.feedback_local_path)
-
-                    st.success("✅ Feedback submitted and saved.")
+                    st.success("✅ Feedback submitted successfully. Thank you for helping us improve!")
                     st.session_state.show_feedback_area = False
-
-                except Exception as e:
-                    st.error("❌ Failed to save feedback.")
-                    logger.error(f"Failed to save feedback: {e}")
+                else:
+                    st.error(f"❌ Failed to submit feedback: {message}")
+                    logger.error(f"Failed to submit feedback via API: {message}")

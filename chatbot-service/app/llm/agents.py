@@ -151,7 +151,11 @@ def run_agent_chatbot(user_input, phase, indicator, section, session_id, memory_
     except Exception as e:
         if "context limit" in str(e) or "Input is too long" in str(e):
             logger.error(f"🚫 Context limit error: {str(e)}")
-            yield f"Sorry, your query is too complex. Please try a shorter, more specific question; or start a new session. Error details: Input length exceeded context limits."
+            yield f"Sorry, your query is too complex. Please try a shorter, more specific question; or start a new session ☺️"
+        elif "InvokeAgent operation" in str(e) or "internalServerException" in str(e):
+            logger.error(f"🚫 Service error: {str(e)}")
+            yield f"Sorry, there was an internal service error with the AI model. Please try your request again ☺️"
+
         else:
             logger.error(f"🚫 Agent error: {e}")
             raise e
