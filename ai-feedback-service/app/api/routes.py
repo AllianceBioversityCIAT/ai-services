@@ -1,5 +1,6 @@
 """REST API endpoints for General AI Services Feedback System."""
 
+import traceback
 from pydantic import Field
 from datetime import datetime
 from fastapi.responses import JSONResponse
@@ -396,7 +397,7 @@ async def search_feedback(search_request: GetFeedbackRequest) -> Dict[str, Any]:
 
 @router.get(
     "/api/feedback/services",
-    response_model=Dict[str, Dict[str, Any]],
+    response_model=Dict[str, Any],
     tags=["Feedback"],
     summary="Get registered AI services information",
     description="""
@@ -418,12 +419,14 @@ async def search_feedback(search_request: GetFeedbackRequest) -> Dict[str, Any]:
     - Service monitoring and management
     """
 )
-async def get_registered_services() -> Dict[str, Dict[str, Any]]:
+async def get_registered_services() -> Dict[str, Any]:
     """Get information about all registered AI services."""
     try:
         logger.info("📋 Retrieving registered AI services information")
+        logger.info(f"🔧 ai_feedback_service object: {type(ai_feedback_service)}")
         
         services = ai_feedback_service.get_registered_services()
+        logger.info(f"📋 Raw services data: {services}")
         
         logger.info(f"✅ Retrieved information for {len(services)} registered services")
         return {
@@ -433,6 +436,10 @@ async def get_registered_services() -> Dict[str, Dict[str, Any]]:
         }
         
     except Exception as e:
+        logger.error(f"❌ Detailed error in get_registered_services: {type(e).__name__}: {str(e)}")
+        logger.error(f"❌ ai_feedback_service type: {type(ai_feedback_service)}")
+        logger.error(f"❌ ai_feedback_service methods: {dir(ai_feedback_service)}")
+        logger.error(f"❌ Full traceback: {traceback.format_exc()}")
         logger.error(f"Error retrieving services: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
