@@ -49,14 +49,14 @@ class AIFeedbackService:
         self.local_feedback_dir.mkdir(exist_ok=True)
         self.s3_feedback_prefix = "ai-feedback"
         
-        self.registered_services = {}
-        
-        self.register_service(
-            service_name="chatbot",
-            display_name="AICCRA Chatbot",
-            description="Conversational AI for AICCRA data exploration",
-            expected_context=["filters_applied"]
-        )
+        # Service registry for known AI services
+        self.registered_services = {
+            "chatbot": {
+                "name": "AICCRA Chatbot",
+                "description": "Conversational AI for AICCRA data exploration",
+                "expected_context": ["filters_applied"]
+            }
+        }
         
         logger.info("🚀 AI Feedback Service initialized with multi-service support")
     
