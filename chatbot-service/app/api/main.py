@@ -63,7 +63,6 @@ app = FastAPI(
     - Session and user context preservation
     - Optional detailed comments for negative feedback
     - Automatic metadata capture (timestamps, response length, filters used)
-    - Secure S3 storage with organized folder structure
     
     🗣️ What You Can Ask
     
@@ -113,7 +112,6 @@ app = FastAPI(
     - **Vector Search**: Amazon OpenSearch Service for semantic search
     - **Database**: SQL Server for structured data
     - **Cloud Services**: AWS S3, AWS Bedrock Knowledge Base
-    - **Feedback Storage**: AWS S3 with organized structure
     
     🔒 Authentication
     
@@ -147,10 +145,6 @@ app = FastAPI(
         {
             "name": "Chat",
             "description": "Conversational AI operations for AICCRA data exploration",
-        },
-        {
-            "name": "Feedback", 
-            "description": "User feedback collection and analytics for AI response quality",
         },
         {
             "name": "Health",
@@ -190,7 +184,6 @@ async def root():
         },
         "endpoints": {
             "POST /api/chat": "Send message to AICCRA chatbot",
-            "POST /api/feedback": "Submit feedback on AI responses",
             "GET /health": "Health check endpoint"
         },
         "supported_indicators": {
@@ -248,8 +241,7 @@ async def health():
                 "memory": "enabled",
                 "filters": "active",
                 "vector_search": "operational",
-                "data_reload": "available",
-                "feedback_system": "operational"
+                "data_reload": "available"
             }
         }
     except Exception as e:

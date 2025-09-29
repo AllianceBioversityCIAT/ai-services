@@ -16,36 +16,44 @@ MEMORY_ID = hashlib.sha256(memory_id.encode()).hexdigest()
 
 logger = get_logger()
 
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = "http://localhost:8001"
 
 st.set_page_config(page_title="AICCRA chatbot", page_icon="🤖", layout="wide")
 st.title("🤖 AI Assistant for AICCRA")
 
 
-def submit_feedback_to_api(session_id: str, memory_id: str, user_message: str, 
-                          ai_response: str, feedback_type: str, 
-                          feedback_comment: str = None, filters: dict = None):
+def submit_feedback_to_api(session_id: str, user_id: str, user_input: str, 
+                          ai_output: str, feedback_type: str, feedback_comment: str = None, 
+                          context: dict = None, response_time: float = None):
     """Submit feedback to the API backend."""
     try:
         feedback_data = {
             "session_id": session_id,
-            "memory_id": memory_id,
-            "user_message": user_message,
-            "ai_response": ai_response,
+            "user_id": user_id,
+            "user_input": user_input,
+            "ai_output": ai_output,
             "feedback_type": feedback_type,
-            "service_name": "chatbot"
+            "service_name": "chatbot",
+            "platform": "AICCRA",
         }
         
         if feedback_comment:
             feedback_data["feedback_comment"] = feedback_comment
-            
-        if filters:
-            feedback_data["filters_applied"] = filters
+
+        if context:
+            enhanced_context = {
+                "filters_applied": context,
+                "session_length": len(st.session_state.messages)
+            }
+            feedback_data["context"] = enhanced_context
+        
+        if response_time:
+            feedback_data["response_time_seconds"] = response_time
         
         response = requests.post(
             f"{API_BASE_URL}/api/feedback",
             json=feedback_data,
-            timeout=10
+            timeout=60
         )
         
         if response.status_code == 200:
@@ -194,6 +202,8 @@ if user_input:
 
     if phase == "All phases" or indicator == "All indicators" or section == "All sections":
         st.toast("💡 Tip: Your answers will be more precise if you apply filters from the sidebar.")
+    
+    start_time = datetime.now()
 
     with st.chat_message("user"):
         st.markdown(user_input)
@@ -225,6 +235,11 @@ if user_input:
 
                 full_response += chunk
                 response_placeholder.markdown(full_response)
+            
+            end_time = datetime.now()
+            response_time = (end_time - start_time).total_seconds()
+
+            st.session_state.last_response_time = response_time
 
             st.session_state.messages.append({"role": "assistant", "content": full_response})
 
@@ -285,11 +300,12 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "assis
 
             success, message = submit_feedback_to_api(
                 session_id=st.session_state.session_id,
-                memory_id=MEMORY_ID,
-                user_message=last_user_msg,
-                ai_response=last_ai_response,
+                user_id=MEMORY_ID,
+                user_input=last_user_msg,
+                ai_output=last_ai_response,
                 feedback_type="positive",
-                filters=filters_applied
+                context=filters_applied,
+                response_time=getattr(st.session_state, 'last_response_time', None)
             )
 
             if success:
@@ -316,12 +332,12 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "assis
                 
                 success, message = submit_feedback_to_api(
                     session_id=st.session_state.session_id,
-                    memory_id=MEMORY_ID,
-                    user_message=last_user_msg,
-                    ai_response=last_ai_response,
+                    user_id=MEMORY_ID,
+                    user_input=last_user_msg,
+                    ai_output=last_ai_response,
                     feedback_type="negative",
                     feedback_comment=feedback_comment if feedback_comment else None,
-                    filters=filters_applied
+                    context=filters_applied
                 )
                 
                 if success:
