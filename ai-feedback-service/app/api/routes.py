@@ -24,32 +24,32 @@ router = APIRouter()
     tags=["Feedback"],
     summary="Submit feedback on AI service responses",
     description="""
-    📝 **Submit User Feedback on AI Responses**
+    📝 Submit User Feedback on AI Responses
     
     This endpoint allows users to provide feedback (positive or negative) on AI-generated responses
     to help improve the service quality and monitor performance.
 
-    🔄 **Feedback Collection Process**
+    🔄 Feedback Collection Process
     
-    1. **Capture Context**: Records the original question, AI response, and conversation metadata
-    2. **Store Feedback**: Saves feedback data to S3 with unique tracking ID
-    3. **Enable Analytics**: Provides data for service improvement and quality monitoring
-    4. **Track Performance**: Enables measurement of user satisfaction over time
+    1. Capture Context: Records the original question, AI response, and conversation metadata
+    2. Store Feedback: Saves feedback data to S3 with unique tracking ID
+    3. Enable Analytics: Provides data for service improvement and quality monitoring
+    4. Track Performance: Enables measurement of user satisfaction over time
     
-    🎯 **Use Cases**
+    🎯 Use Cases
     
-    **Positive Feedback (👍)**
+    Positive Feedback (👍)
     - Response was accurate and helpful
     - Information was relevant and well-structured
     - User found the answer satisfactory
     
-    **Negative Feedback (👎)**
+    Negative Feedback (👎)
     - Response was inaccurate or misleading
     - Information was not relevant to the question
     - Response missed important context
     - Technical errors or formatting issues
 
-    📊 **Feedback Metadata**
+    📊 Feedback Metadata
     
     The system automatically captures:
     - Unique feedback ID for tracking
@@ -58,16 +58,16 @@ router = APIRouter()
     - Response characteristics (length, filters used)
     - Service identification
     
-    ## 🎯 **Multi-Service Support**
+    🎯 Multi-Service Support
     
     This endpoint supports feedback from various AI services:
     
-    **Currently Supported Services:**
-    - **`chatbot`**: Conversational AI interactions
+    Currently Supported Services:
+    - `chatbot`: Conversational AI interactions
     
-    ## 📝 **Service-Specific Context**
+    📝 Service-Specific Context
     
-    **Chatbot Services:**
+    Chatbot Services:
     ```json
     {
         "context": {
@@ -76,20 +76,20 @@ router = APIRouter()
     }
     ```
 
-    ## 📊 **Automatic Service Registration**
+    📊 Automatic Service Registration
     
     New AI services are automatically registered when first encountered:
     - Service information is stored for analytics
     - Context fields are tracked for service-specific insights
     
-    ## 🔒 **Data Privacy & Security**
+    🔒 Data Privacy & Security
     
     - All feedback is stored securely in AWS S3
     - User identifiers can be emails, session IDs, or anonymous tokens
     - AI output content is stored for improvement but can be configured for privacy
     - Context data is flexible and can exclude sensitive information
     
-    ## 📈 **Analytics & Monitoring**
+    📈 Analytics & Monitoring
     
     Submitted feedback enables:
     - Service-specific satisfaction tracking
@@ -97,64 +97,6 @@ router = APIRouter()
     - User experience monitoring
     - AI model performance insights
     - Context-aware improvement identification
-    
-    ## 🔧 **Integration Examples**
-    
-    **React/JavaScript Frontend:**
-    ```javascript
-    // Chatbot feedback
-    const submitChatbotFeedback = async (feedbackData) => {
-        const response = await fetch('/api/feedback', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                user_id: 'user@example.com',
-                session_id: 'session-123',
-                user_input: 'What is the progress on climate indicators?',
-                ai_output: 'Progress is good.',
-                feedback_type: 'negative',
-                feedback_comment: 'Response needs more detail',
-                service_name: 'chatbot',
-                context: {
-                    filters_applied: { phase: '2025', indicator: 'IPI 1.1' }
-                },
-                response_time_seconds: 2.5,
-                platform: 'AICCRA'
-            })
-        });
-        return response.json();
-    };
-    ```
-    
-    **Python Service Integration:**
-    ```python
-    import requests
-    
-    class AIServiceFeedbackClient:
-        def __init__(self, feedback_api_url: str):
-            self.api_url = feedback_api_url
-        
-        def submit_feedback(self, service_name: str, **kwargs):
-            payload = {
-                'service_name': service_name,
-                **kwargs
-            }
-            response = requests.post(f'{self.api_url}/api/feedback', json=payload)
-            return response.json()
-    
-    # Usage in different AI services
-    feedback_client = AIServiceFeedbackClient('https://api.example.com')
-    
-    # From a chatbot service
-    feedback_client.submit_feedback(
-        service_name='chatbot',
-        feedback_type='positive',
-        user_id='user@example.com',
-        user_input='Hello, how are you?',
-        ai_output='I am doing well, thank you!',
-        context={'filters_applied': {'phase': '2025'}},
-    )
-    ```
     """,
     response_description="Feedback submitted successfully with tracking information",
     responses={
@@ -220,25 +162,25 @@ async def submit_feedback(feedback_request: FeedbackRequest) -> FeedbackResponse
     tags=["Feedback"],
     summary="Get feedback analytics summary",
     description="""
-    📊 **Multi-Service Feedback Analytics**
+    📊 Multi-Service Feedback Analytics
     
     Retrieve comprehensive analytics and summary statistics for user feedback
     across all AI services or filtered by specific services.
     
-    **Analytics Include:**
+    Analytics Include:
     - Total feedback counts by service
     - Satisfaction rates and trends
     - Service performance comparison
     - Recent feedback samples
     - Time-based analytics
     
-    **Service Breakdown:**
+    Service Breakdown:
     - Individual service satisfaction rates
     - Cross-service performance comparison
     - Service-specific feedback volume
     - Response time analytics (if available)
     
-    **Use Cases:**
+    Use Cases:
     - Monitor overall AI service quality
     - Compare performance across different services
     - Identify services needing improvement
@@ -294,24 +236,24 @@ async def get_feedback_summary(
     tags=["Feedback"],
     summary="Search and retrieve feedback entries",
     description="""
-    🔍 **Advanced Feedback Search & Analytics**
+    🔍 Advanced Feedback Search & Analytics
     
     Retrieve feedback entries with advanced filtering, sorting, and pagination
     capabilities across all AI services.
     
-    **Advanced Filtering Options:**
-    - **Service Filters**: Filter by service name
-    - **User Filters**: Filter by user ID
-    - **Feedback Filters**: Filter by type, comments
-    - **Performance Filters**: Filter by response time, model performance
-    - **Time Filters**: Date range filtering with flexible periods
+    Advanced Filtering Options:
+    - Service Filters: Filter by service name
+    - User Filters: Filter by user ID
+    - Feedback Filters: Filter by type, comments
+    - Performance Filters: Filter by response time, model performance
+    - Time Filters: Date range filtering with flexible periods
     
-    **Sorting & Pagination:**
+    Sorting & Pagination:
     - Sort by timestamp, service, feedback type, response time
     - Configurable page size (up to 1000 entries)
     - Offset-based pagination for large datasets
     
-    **Response Format:**
+    Response Format:
     ```json
     {
         "feedback_entries": [...],
@@ -330,7 +272,7 @@ async def get_feedback_summary(
     }
     ```
     
-    **Use Cases:**
+    Use Cases:
     - Investigate specific user complaints
     - Analyze feedback patterns by service
     - Export feedback data for external analysis
@@ -401,18 +343,18 @@ async def search_feedback(search_request: GetFeedbackRequest) -> Dict[str, Any]:
     tags=["Feedback"],
     summary="Get registered AI services information",
     description="""
-    🏗️ **Registered AI Services Registry**
+    🏗️ Registered AI Services Registry
     
     Get information about all registered AI services that are collecting feedback
     through this system.
     
-    **Service Information Includes:**
+    Service Information Includes:
     - Service display name and description
     - Expected context fields
     - Registration timestamp
     - Feedback collection status
     
-    **Use Cases:**
+    Use Cases:
     - Service discovery and integration
     - Understanding available feedback sources
     - API documentation generation
@@ -457,18 +399,18 @@ async def get_registered_services() -> Dict[str, Any]:
     tags=["Feedback"],
     summary="Get feedback for a specific AI service",
     description="""
-    🎯 **Service-Specific Feedback Analytics**
+    🎯 Service-Specific Feedback Analytics
     
     Retrieve all feedback entries for a specific AI service with service-optimized
     analytics and insights.
     
-    **Service-Specific Features:**
+    Service-Specific Features:
     - Context-aware filtering based on service type
     - Service-specific performance metrics
     - Tailored analytics for different AI service types
     - Recent feedback trends for the service
     
-    **Supported Services:**
+    Supported Services:
     - `chatbot`: Conversational AI feedback
     - Any registered AI service
     """

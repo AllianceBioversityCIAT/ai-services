@@ -36,94 +36,70 @@ app = FastAPI(
     lifespan=lifespan,
     title="AI Services Feedback API",
     description="""
-    🔄 **AI Feedback Collection System**
+    🔄 AI Feedback Collection System
     
     A comprehensive feedback management service for collecting, storing, and analyzing
     user feedback on AI-generated responses across multiple AI services and applications.
     
-    ## 🎯 **Multi-Service Architecture**
+    🎯 Multi-Service Architecture
     
     This service is designed to handle feedback from any AI service:
     
-    **Currently Supported AI Services:**
-    - **Chatbot Service**: Conversational AI interactions
+    Currently Supported AI Services:
+    - Chatbot Service: Conversational AI interactions
     
-    ## 🚀 **Key Features**
+    🚀 Key Features
     
-    - 📝 **Feedback Collection**: Works with any AI service
-    - 🔍 **Advanced Analytics**: Service-specific and cross-service insights
-    - 📊 **Real-time Monitoring**: Track AI service performance and user satisfaction
-    - 🔒 **Secure Storage**: AWS S3 with future database migration support
-    - 📈 **Scalable Design**: Built to handle feedback from multiple services
-    - 🎛️ **Rich Context Support**: Flexible metadata for service-specific insights
+    - 📝 Feedback Collection: Works with any AI service
+    - 🔍 Advanced Analytics: Service-specific and cross-service insights
+    - 📊 Real-time Monitoring: Track AI service performance and user satisfaction
+    - 🔒 Secure Storage: AWS S3 with future database migration support
+    - 📈 Scalable Design: Built to handle feedback from multiple services
+    - 🎛️ Rich Context Support: Flexible metadata for service-specific insights
     
-    ## 🔧 **Integration Examples**
+    📊 Analytics & Monitoring
     
-    **Chatbot Service Integration:**
-    ```python
-    import requests
-    
-    # Submit chatbot feedback
-    feedback_response = requests.post('/api/feedback', json={
-        'feedback_type': 'positive',
-        'feedback_comment': 'Great response with detailed information',
-        'service_name': 'chatbot',
-        'user_id': 'user@example.com',
-        'session_id': 'chat-session-123',
-        'user_input': 'What is the weather like today?',
-        'ai_output': 'Today is sunny with 22°C...',
-        'context': {
-            'conversation_turn': 3,
-            'filters_applied': {'location': 'London'}
-        },
-        'response_time_seconds': 2.5,
-        'confidence_score': 0.95
-    })
-    ```
-    
-    ## 📊 **Analytics & Monitoring**
-    
-    **Cross-Service Analytics:**
+    Cross-Service Analytics:
     - Compare satisfaction rates across different AI services
     - Identify which services need improvement
     - Track performance trends over time
     - Monitor user experience across the AI ecosystem
     
-    **Service-Specific Insights:**
+    Service-Specific Insights:
     - Context-aware analytics based on service type
     - Performance metrics tailored to each AI service
     - Custom reporting for different stakeholder needs
     - Improvement recommendations based on feedback patterns
     
-    ## 🏗️ **Service Registration**
+    🏗️ Service Registration
     
-    **Automatic Service Discovery:**
+    Automatic Service Discovery:
     - New AI services are automatically registered when first encountered
     - Service metadata is stored for analytics and monitoring
     - Context fields are tracked for service-specific insights
     
-    **Manual Service Registration:**
+    Manual Service Registration:
     Services can also be explicitly registered with detailed metadata for
     enhanced analytics and monitoring capabilities.
     
-    ## 📈 **Future Enhancements**
+    📈 Future Enhancements
     
-    - **Database Migration**: Moving from S3 to DynamoDB for better querying
-    - **Real-time Dashboards**: Live monitoring of AI service performance
-    - **Machine Learning Insights**: Predictive analytics on feedback patterns
-    - **API Integrations**: Webhooks and real-time notifications
-    - **Advanced Filtering**: Complex queries across multiple dimensions
+    - Database Migration: Moving from S3 to DynamoDB for better querying
+    - Real-time Dashboards: Live monitoring of AI service performance
+    - Machine Learning Insights: Predictive analytics on feedback patterns
+    - API Integrations: Webhooks and real-time notifications
+    - Advanced Filtering: Complex queries across multiple dimensions
     
-    ## 🔒 **Security & Privacy**
+    🔒 Security & Privacy
     
-    - **Secure Storage**: All feedback encrypted and stored in AWS S3
-    - **Access Control**: IAM-based access control for sensitive operations
-    - **Data Privacy**: Configurable data retention and anonymization
-    - **Audit Trails**: Complete tracking of all feedback operations
+    - Secure Storage: All feedback encrypted and stored in AWS S3
+    - Access Control: IAM-based access control for sensitive operations
+    - Data Privacy: Configurable data retention and anonymization
+    - Audit Trails: Complete tracking of all feedback operations
     
-    ## 📝 **Data Structure**
+    📝 Data Structure
     
-    **Comprehensive Feedback Records:**
+    Comprehensive Feedback Records:
     Each feedback entry captures:
     - Core feedback (type, comments, ratings)
     - Service information (name)
