@@ -17,8 +17,10 @@ and analytics capabilities.
 import os
 import json
 import uuid
+import boto3
 from pathlib import Path
 from datetime import datetime, timezone
+from app.utils.config.config_util import S3
 from typing import List, Dict, Optional, Any, Tuple
 
 from app.utils.logger.logger_util import get_logger
@@ -49,14 +51,22 @@ class AIFeedbackService:
         self.local_feedback_dir.mkdir(exist_ok=True)
         self.s3_feedback_prefix = "ai-feedback"
         
-        # Service registry for known AI services
-        self.registered_services = {
-            "chatbot": {
-                "name": "AICCRA Chatbot",
-                "description": "Conversational AI for AICCRA data exploration",
-                "expected_context": ["filters_applied"]
-            }
-        }
+        self.s3_client = boto3.client(
+            's3',
+            aws_access_key_id=S3['aws_access_key'],
+            aws_secret_access_key=S3['aws_secret_key'],
+            region_name=S3['aws_region']
+        )
+        self.bucket_name = S3['bucket_name']
+        
+        self.registered_services = {}
+        
+        self.register_service(
+            service_name="chatbot",
+            display_name="AICCRA Chatbot",
+            description="Conversational AI for AICCRA data exploration",
+            expected_context=["filters_applied"]
+        )
         
         logger.info("🚀 AI Feedback Service initialized with multi-service support")
     
@@ -128,38 +138,75 @@ class AIFeedbackService:
             logger.info(f"🔍 Service filter: {service_name or 'All services'}")
             logger.info(f"📅 Date range: {start_date} to {end_date}")
             
-            # TODO: Replace with actual S3/DynamoDB queries when implemented
-            # For now, return structured mock data based on registered services
+            all_feedback = self._read_feedback_from_s3(
+                service_name=service_name,
+                start_date=start_date,
+                end_date=end_date
+            )
+            
+            logger.info(f"📊 Found {len(all_feedback)} feedback entries for analysis")
             
             services_breakdown = {}
             total_positive = 0
             total_negative = 0
+            response_times = []
+            recent_feedback = []
             
             if service_name:
                 services_breakdown[service_name] = {"positive": 0, "negative": 0}
             else:
                 for service in self.registered_services.keys():
                     services_breakdown[service] = {"positive": 0, "negative": 0}
+
+            for feedback in all_feedback:
+                feedback_type = feedback.get('feedback_type', '').lower()
+                service = feedback.get('service_name', 'unknown')
+
+                if service not in services_breakdown:
+                    services_breakdown[service] = {"positive": 0, "negative": 0}
+
+                if feedback_type in ['positive', 'like', 'thumbs_up', 'good']:
+                    total_positive += 1
+                    services_breakdown[service]["positive"] += 1
+                elif feedback_type in ['negative', 'dislike', 'thumbs_down', 'bad']:
+                    total_negative += 1
+                    services_breakdown[service]["negative"] += 1
+
+                response_time = feedback.get('response_time_seconds')
+                if response_time is not None:
+                    response_times.append(response_time)
+
+                if len(recent_feedback) < 10:
+                    recent_feedback.append({
+                        'service_name': service,
+                        'feedback_type': feedback_type,
+                        'timestamp': feedback.get('timestamp'),
+                        'user_feedback': feedback.get('user_feedback', ''),
+                        'has_comment': bool(feedback.get('user_feedback', '').strip())
+                    })
             
             total_feedback = total_positive + total_negative
             satisfaction_rate = (total_positive / total_feedback * 100) if total_feedback > 0 else 0.0
+            average_response_time = sum(response_times) / len(response_times) if response_times else None
+            
+            recent_feedback.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
             
             summary = FeedbackSummary(
                 service_name=service_name,
                 total_feedback=total_feedback,
                 positive_feedback=total_positive,
                 negative_feedback=total_negative,
-                satisfaction_rate=satisfaction_rate,
-                average_response_time=None,
+                satisfaction_rate=round(satisfaction_rate, 2),
+                average_response_time=round(average_response_time, 2) if average_response_time else None,
                 services_breakdown=services_breakdown,
-                recent_feedback=[],
+                recent_feedback=recent_feedback[:10],
                 time_period={
-                    "start_date": start_date,
-                    "end_date": end_date
+                    "start_date": start_date.isoformat() if start_date else None,
+                    "end_date": end_date.isoformat() if end_date else None
                 }
             )
             
-            logger.info(f"✅ Feedback summary generated: {total_feedback} total entries")
+            logger.info(f"✅ Feedback summary generated: {total_feedback} total entries, {satisfaction_rate:.1f}% satisfaction")
             return summary
             
         except Exception as e:
@@ -184,10 +231,48 @@ class AIFeedbackService:
             logger.info(f"📊 Type: {request.feedback_type or 'All'}")
             logger.info(f"📄 Limit: {request.limit}, Offset: {request.offset}")
             
-            # TODO: Replace with actual S3/DynamoDB queries when implemented
-            # For now, return empty results with proper structure
-            feedback_entries = []
-            total_count = 0
+            all_feedback = self._read_feedback_from_s3(
+                service_name=request.service_name,
+                start_date=request.start_date,
+                end_date=request.end_date
+            )
+            
+            filtered_feedback = []
+            for feedback in all_feedback:
+                if request.user_id and feedback.get('user_id') != request.user_id:
+                    continue
+                    
+                if request.feedback_type and feedback.get('feedback_type') != request.feedback_type:
+                    continue
+
+                if request.has_comment is not None:
+                    has_comment = feedback.get('has_comment', False)
+                    if request.has_comment != has_comment:
+                        continue
+
+                if request.max_response_time is not None:
+                    response_time = feedback.get('response_time_seconds')
+                    if response_time is None or response_time > request.max_response_time:
+                        continue
+                
+                filtered_feedback.append(feedback)
+            
+            if request.sort_by:
+                reverse_order = request.sort_order == "desc"
+                if request.sort_by == "timestamp":
+                    filtered_feedback.sort(key=lambda x: x.get('timestamp', ''), reverse=reverse_order)
+                elif request.sort_by == "feedback_type":
+                    filtered_feedback.sort(key=lambda x: x.get('feedback_type', ''), reverse=reverse_order)
+                elif request.sort_by == "service_name":
+                    filtered_feedback.sort(key=lambda x: x.get('service_name', ''), reverse=reverse_order)
+                elif request.sort_by == "response_time":
+                    filtered_feedback.sort(key=lambda x: x.get('response_time_seconds', 0), reverse=reverse_order)
+            
+            total_count = len(filtered_feedback)
+            
+            start_index = request.offset
+            end_index = start_index + request.limit
+            feedback_entries = filtered_feedback[start_index:end_index]
             
             logger.info(f"✅ Retrieved {len(feedback_entries)} feedback entries (total: {total_count})")
             return feedback_entries, total_count
@@ -275,13 +360,17 @@ class AIFeedbackService:
             return self.registered_services[service_name]
         else:
             logger.info(f"🆕 Auto-registering unknown service: {service_name}")
-            service_info = {
-                "name": service_name.replace("-", " ").replace("_", " ").title(),
-                "description": f"AI service: {service_name}",
-                "expected_context": []
-            }
-            self.registered_services[service_name] = service_info
-            return service_info
+            display_name = service_name.replace("-", " ").replace("_", " ").title()
+            description = f"AI service: {service_name}"
+            
+            self.register_service(
+                service_name=service_name,
+                display_name=display_name,
+                description=description,
+                expected_context=[]
+            )
+            
+            return self.registered_services[service_name]
     
 
     def _create_feedback_record(
@@ -354,12 +443,88 @@ class AIFeedbackService:
         
         s3_key = f"{self.s3_feedback_prefix}/{service_name}/{timestamp.strftime('%Y%m%d')}/{filename}"
         upload_file_to_s3(s3_key, str(local_path))
-        
+
         try:
             os.remove(local_path)
             logger.info(f"📤 Feedback saved to S3: {s3_key}")
         except Exception as e:
-            logger.warning(f"⚠️ Could not remove local file {local_path}: {e}")
+            logger.warning(f"⚠️ Could not remove local file {filename}: {e}")
+    
+
+    def _read_feedback_from_s3(
+        self, 
+        service_name: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Read feedback data from S3.
+        
+        Args:
+            service_name: Optional filter by service name
+            start_date: Optional start date filter
+            end_date: Optional end date filter
+            
+        Returns:
+            List of feedback records
+        """
+        try:
+            all_feedback = []
+            
+            logger.info(f"🔍 Reading from S3 bucket: {self.bucket_name}")
+            
+            services_to_query = [service_name] if service_name else list(self.registered_services.keys())
+            logger.info(f"📋 Services to query: {services_to_query}")
+            
+            for service in services_to_query:
+                try:
+                    prefix = f"{self.s3_feedback_prefix}/{service}/"
+                    logger.info(f"🔍 Querying S3 with prefix: {prefix}")
+                    
+                    response = self.s3_client.list_objects_v2(
+                        Bucket=self.bucket_name,
+                        Prefix=prefix
+                    )
+                    
+                    if 'Contents' not in response:
+                        logger.info(f"� No feedback files found for service: {service}")
+                        continue
+                    
+                    logger.info(f"📁 Found {len(response['Contents'])} files for service: {service}")
+                    
+                    for obj in response['Contents']:
+                        try:
+                            file_response = self.s3_client.get_object(
+                                Bucket=self.bucket_name,
+                                Key=obj['Key']
+                            )
+                            
+                            feedback_data = json.loads(file_response['Body'].read().decode('utf-8'))
+                            
+                            if start_date or end_date:
+                                feedback_timestamp = datetime.fromisoformat(feedback_data.get('timestamp', '').replace('Z', '+00:00'))
+                                
+                                if start_date and feedback_timestamp < start_date:
+                                    continue
+                                if end_date and feedback_timestamp > end_date:
+                                    continue
+                            
+                            all_feedback.append(feedback_data)
+                            
+                        except Exception as file_error:
+                            logger.warning(f"⚠️ Error reading feedback file {obj['Key']}: {file_error}")
+                            continue
+                    
+                except Exception as service_error:
+                    logger.warning(f"⚠️ Error querying S3 for service {service}: {service_error}")
+                    continue
+            
+            logger.info(f"📊 Retrieved {len(all_feedback)} feedback entries from S3")
+            return all_feedback
+            
+        except Exception as e:
+            logger.error(f"❌ Error reading feedback from S3: {e}")
+            return []
 
 
 # Global feedback service instance
