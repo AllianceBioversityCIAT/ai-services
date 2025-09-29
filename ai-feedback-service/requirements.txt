@@ -1,0 +1,8 @@
+pandas,
+boto3,
+python-dotenv,
+requests,
+fastapi,
+uvicorn,
+mangum,
+pydantic
