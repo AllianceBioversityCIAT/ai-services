@@ -1,0 +1,15 @@
+[project]
+name = "ai-feedback-service"
+version = "1.0.0"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pandas",
+    "boto3",
+    "python-dotenv",
+    "requests",
+    "fastapi",
+    "uvicorn",
+    "mangum",
+    "pydantic"
+]
