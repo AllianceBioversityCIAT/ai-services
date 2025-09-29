@@ -1,12 +1,14 @@
 import time
 import json
 import boto3
-from app.utils.config.config_util import BR
+from typing import Dict, Any
 from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
 from app.utils.prompt.prompt_star import DEFAULT_PROMPT_STAR
 from app.utils.prompt.prompt_prms import DEFAULT_PROMPT_PRMS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from app.utils.config.config_util import BR, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME
+from app.schemas.mining_schemas import MiningResponse, ErrorResponse, InnovationDevelopmentResult, PolicyChangeResult, CapacityDevelopmentResult
 from app.llm.vectorize import (get_embedding,
                                check_reference_exists,
                                store_reference_embeddings,
@@ -119,13 +121,72 @@ def initialize_reference_data(bucket_name, file_key_regions, file_key_countries)
         raise
 
 
+def format_mining_response(raw_response: str) -> Dict[str, Any]:
+    """
+    Format the mining response to ensure consistent structure with indicator-specific fields
+    """
+    try:
+        if is_valid_json(raw_response):
+            parsed_response = json.loads(raw_response)
+        else:
+            logger.warning(f"Invalid JSON received from LLM: {raw_response[:200]}...")
+            return {
+                "content": raw_response,
+                "status": "partial_success", 
+                "error": "LLM returned invalid JSON"
+            }
+
+        results = parsed_response.get("results", [])
+        if not isinstance(results, list):
+            results = []
+        
+        typed_results = []
+        for result in results:
+            indicator = result.get("indicator", "")
+            
+            try:
+                if indicator == "Capacity Sharing for Development":
+                    capacity_result = CapacityDevelopmentResult(**result)
+                    typed_results.append(capacity_result)
+                    
+                elif indicator == "Policy Change":
+                    policy_result = PolicyChangeResult(**result)
+                    typed_results.append(policy_result)
+                    
+                elif indicator == "Innovation Development":
+                    innovation_result = InnovationDevelopmentResult(**result)
+                    typed_results.append(innovation_result)
+                    
+                else:
+                    logger.warning(f"Unknown indicator type: {indicator}")
+                    continue
+                    
+            except Exception as e:
+                logger.error(f"Error processing result with indicator '{indicator}': {str(e)}")
+                continue
+        
+        mining_response = MiningResponse(
+            results=typed_results
+        )
+        
+        return mining_response.model_dump(exclude_none=True)
+        
+    except Exception as e:
+        logger.error(f"Error formatting mining response: {str(e)}")
+        
+        error_response = ErrorResponse(
+            error=f"Error formatting response: {str(e)}"
+        )
+        return error_response.model_dump(exclude_none=True)
+
+
 def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR):
     start_time = time.time()
     print(prompt)
 
     try:
-        reference_file_regions = "star/text-mining/files/clarisa_regions.xlsx"
-        reference_file_countries = "star/text-mining/files/clarisa_countries.xlsx"
+        reference_file_regions = f"{STAR_BUCKET_KEY_NAME}/clarisa_regions.xlsx"
+        reference_file_countries = f"{STAR_BUCKET_KEY_NAME}/clarisa_countries.xlsx"
         initialize_reference_data(
             bucket_name, reference_file_regions, reference_file_countries)
 
@@ -152,6 +213,12 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR):
 
         end_time = time.time()
         elapsed_time = end_time - start_time
+
+        # formatted_response = format_mining_response(
+        #     raw_response=response_text
+        # )
+
+        # logger.info(f"✅ Successfully generated response:\n{json.dumps(formatted_response, indent=2)}")
         logger.info(f"✅ Successfully generated response:\n{response_text}")
         logger.info(f"⏱️ Response time: {elapsed_time:.2f} seconds")
 
@@ -159,6 +226,7 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR):
             "content": response_text,
             "time_taken": f"{elapsed_time:.2f}",
             "json_content": json.loads(response_text) if is_valid_json(response_text) else {"text": response_text}
+            # "json_content": formatted_response
         }
 
     except Exception as e:
@@ -172,8 +240,8 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS):
     print(f"PRMS Processing: {prompt}")
 
     try:
-        reference_file_regions = "prms/text-mining/files/clarisa_regions.xlsx"
-        reference_file_countries = "prms/text-mining/files/clarisa_countries.xlsx"
+        reference_file_regions = f"{PRMS_BUCKET_KEY_NAME}/clarisa_regions.xlsx"
+        reference_file_countries = f"{PRMS_BUCKET_KEY_NAME}/clarisa_countries.xlsx"
         initialize_reference_data(
             bucket_name, reference_file_regions, reference_file_countries)
 

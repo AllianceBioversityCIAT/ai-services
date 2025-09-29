@@ -39,39 +39,39 @@ Innovation Development
 Result Title
     • title
     • Identify the exact title of the result as stated in the document.
+    • If no title is mentioned explicitly, try to infer a concise title that accurately reflects the content of the result.
 
 Result Description
     • description
     • Provide a brief description of the result.
+
+Alliance Main Contact Person
+    • Extract the contact's name into the following field as an object:
+        • main_contact_person: {"name": "..."}
+    • Look for any mention or indication of the primary Alliance contact in the document (e.g., "Alliance focal point," "main Alliance contact," "Alliance coordinator," or a named person specifically flagged as responsible).
+    • If no specific name or contact is mentioned, do not return the field in the output JSON.
 
 Keywords
     • keywords
     • List relevant keywords in lowercase, as an array of strings.
 
 Geoscope (Geographical Scope)
-    • geoscope
-For each result, specify:
-    • level:
-        • "Global"
-        • "Regional"
-        • "National"
-        • "Sub-national"
-        • "This is yet to be determined"
-    • sub_list:
-        • If level = "Regional", return an array with the appropriate UN49 code(s).
-        • If level = "National", return an array with the ISO Alpha-2 country code(s) (e.g., ["KE"]).
-        • If level = "Sub-national", return an array of objects, each containing the country code and an array of subnational areas
-            (e.g., [{"country_code": "KE", "areas": ["Western Kenya", "Eastern Kenya"]}]).
-        • If not applicable, set "sub_list": null.
-
-Alliance Main Contact Person
-    • Extract and split the contact's name into the following fields:
-        • alliance_main_contact_person_first_name
-        • alliance_main_contact_person_last_name
-    • Look for any mention or indication of the primary Alliance contact in the document (e.g., "Alliance focal point," "main Alliance contact," "Alliance coordinator," or a named person specifically flagged as responsible).
-    • If no specific name or contact is mentioned, return:
-        • alliance_main_contact_person_first_name: "Not collected"
-        • alliance_main_contact_person_last_name: "Not collected"
+    • For each result, specify:
+        • geoscope_level:
+            • "Global": if the document does not specify a region or country.
+            • "Regional": if the document mentions ONLY the region, but does not specify countries. If the document specifies countries within the region, it should be classified as "National".
+            • "National": if the document mentions one or more countries, but does not specify sub-national areas.
+            • "Sub-national": if the document mentions specific locations within a country.
+            • "This is yet to be determined"
+        • regions and countries:
+            • If level = "Regional", return an array with the appropriate UN49 region code(s) as numbers:
+                (e.g., regions: [150, 2] (150 for Europe region and 2 for Africa region)).
+            • If level = "National", return an array with objects containing the ISO Alpha-2 country code(s):
+                (e.g., countries: [{"code": "KE"}, {"code": "UG"}]).
+            • If level = "Sub-national", return an array of objects, each containing the country code and an array with the appropriate ISO 3166-2 code(s) for the subnational areas. 
+              Use your knowledge of ISO 3166-2 subnational codes to provide the appropriate codes based on the location names mentioned in the document:
+                (e.g., countries: [{"code": "CO", "areas": ["CO-CUN", "CO-CAS"]}]).
+            • If not applicable, do not return the regions or countries field in the output JSON.
 
 ⸻
 
@@ -90,7 +90,7 @@ For "Group training," validate and reinforce participant counting by ensuring:
     3. Partial gender counts
         • If only some gender counts are specified (e.g., male participants but not female or non_binary):
             • Fill in the known count for each gender.
-            • For any missing genders, use "Not collected".
+            • For any missing genders, do not return the field in the output JSON.
             • If total_participants is provided:
         • Ensure the sum of known gender counts matches total_participants. Use the following formula:
             total_participants = 
@@ -99,18 +99,18 @@ For "Group training," validate and reinforce participant counting by ensuring:
                 (non_binary_participants if explicitly stated in the document, else 0)
         • If there is a discrepancy (e.g., total_participants is 15 but you can only account for 10 across known genders):
             • Keep the known gender counts.
-            • Set any missing gender counts to "Not collected".
+            • Set any missing gender counts to null (do not return the field in the output JSON).
             • Adjust total_participants to reflect the sum of the known counts (in this example, 10). Do not invent additional participants.
         • If total_participants is not provided:
             • Record the known gender counts.
-            • Set total_participants to "Not collected".
+            • Set total_participants to null (do not return the field in the output JSON).
     4. Completely missing gender counts
         If total_participants is present but no gender-specific counts are given, assume:
 
         {
-            "male_participants": "Not collected",
-            "female_participants": "Not collected",
-            "non_binary_participants": "Not collected"
+            "male_participants": null (do not return the field in the output JSON),
+            "female_participants": null (do not return the field in the output JSON),
+            "non_binary_participants": null (do not return the field in the output JSON)
         }
 
     5. Names with gender annotations
@@ -119,18 +119,10 @@ For "Group training," validate and reinforce participant counting by ensuring:
         • Increase female_participants for females,
         • Increase non_binary_participants if someone does not identify as male or female.
     6. Non-negative integer rule
-        All participant counts must be non-negative integers (≥ 0). Use "Not collected" only when the document does not provide the necessary information.
+        All participant counts must be non-negative integers (≥ 0). Use null only when the document does not provide the necessary information.
 
-Training Duration Validation
-    • start_date and end_date should capture the training period as stated in the document (in YYYY-MM-DD format).
-    • length_of_training should be calculated as the time elapsed between the start_date and the end_date.
-    • If either date is missing, return "Not collected" for the start_date, end_date, and length_of_training.
-    • Long-term training refers to training that goes for 3 or more months.
-    • Short-term training refers to training that goes for less than 3 months.
-    • If the document does not provide enough detail, use "Not collected".
-
-Degree Validation (only if length_of_training is Long-term):
-    • Only include the "degree" field **if and only if** length_of_training is "Long-term".
+Degree Validation:
+    • Only include the "degree" field **if and only if** length_of_training is "Long-term" or training_type is "Individual training".
     • If length_of_training is not "Long-term", **do not include the "degree" field at all** in the output JSON.
     • When included, check if the document explicitly mentions that the training led to a degree such as:
         • "PhD"
@@ -138,12 +130,19 @@ Degree Validation (only if length_of_training is Long-term):
         • "BSc"
         • "Other" (for any degree not classified under the above)
     • If a degree is mentioned, return its value.
-    • If not specified, return "Not collected".
+    • If not specified, do not return the degree field in the output JSON.
+        
+Training Duration Validation
+    • start_date and end_date should capture the training period as stated in the document (in YYYY-MM-DD format).
+    • length_of_training should be calculated as the time elapsed between the start_date and the end_date.
+    • Long-term training refers to training that goes for 3 or more months.
+    • Short-term training refers to training that goes for less than 3 months.
+    • If the document does not provide enough detail about the training duration or dates, do not return the missing field(s) in the output JSON.
 
 Delivery Modality
     • delivery_modality
     • If the document explicitly states how the training was delivered (e.g., "virtual," "in-person," "hybrid"), use that exact term.
-    • If not stated, use "Not collected".
+    • If not stated, do not return the delivery_modality field in the output JSON.
 
 ⸻
 
@@ -194,7 +193,7 @@ Innovation Type:
     • Must be one of the following predefined values:
         • "Technological innovation": Innovations of technical/ material nature, including varieties/ breeds; crop and livestock management practices; machines; processing technologies; big data and information systems.
         • "Capacity development innovation": Innovations that strengthen capacity, including farmer, extension or investor decision-support services; accelerator/ incubator programs; manuals, training programs and curricula; online courses.
-        • "Policy/organizational/institutional innovation": Innovations that create enabling conditions, including policy, legal and regulatory frameworks; business models; finance mechanisms; partnership models; public/ private delivery strategies.
+        • "Policy, organizational or institutional innovation": Innovations that create enabling conditions, including policy, legal and regulatory frameworks; business models; finance mechanisms; partnership models; public/ private delivery strategies.
         • "Other": Unknown or the type does not work for the innovation.
     • If the document does not specify the type of innovation, or it cannot be deduced, return "Other".
     • If the document provides a specific type, use that value.
@@ -242,7 +241,7 @@ Actors involved in the innovation:
             • "Policy actors (public or private)"
             • "Other"
         • other_actor_type: If the type is "Other", this field must contain information about the type of actor involved in the innovation that does not fit into the predefined values. If the type is not "Other", this field should not be included in the output JSON.
-        • gender_age: Must be a single value or an array with one or more of the following predefined values, which defines the gender and age of the actor:
+        • gender_age: Must be an array with one or more of the following predefined values, which defines the gender and age of the actor:
             • "Women: Youth"
             • "Women: Non-youth"
             • "Men: Youth"
@@ -269,7 +268,7 @@ Organization(s) involved in the innovation:
 Organization types:
     • organization_type
     • This field is used ONLY if the anticipated_users is "Users have been determined".
-    • This field is used to classify the type of organization(s) identified in the organizations field.
+    • This field is used to classify the type(s) of organization(s) identified in the organizations field.
     • Must be one or more of the following predefined values:
         • "NGO"
         • "Research organizations and universities"
@@ -338,14 +337,24 @@ Other organization types:
 
 6. Output Format
 
-Your output must be valid JSON and must not include any additional text or explanations.
-Return dates in YYYY-MM-DD format or "Not collected".
+Return dates in YYYY-MM-DD format when available.
 For partial or missing participant data, follow the partial participant rule above.
 Your output must be a single valid JSON object, and must not include any additional text, comments, footnotes, citations, or explanations.
+
+Required and mandatory fields:
+• indicator
+• title
+• description
+• keywords
+• geoscope_level
+
 Do not:
 • Add text before or after the JSON.
 • Add any explanatory sentences, notes, or references (e.g., "This result is extracted from…").
 • Include markdown code blocks like ```json or ```.
+• Escape quotes unless necessary.
+• Wrap the JSON in additional quotes or strings.
+• Include fields with null values - omit them completely.
 The response must be raw JSON only — nothing else.
 
 ⸻
@@ -357,27 +366,32 @@ Follow this exact structure:
             "indicator": "<'Capacity Sharing for Development' or 'Policy Change' or 'Innovation Development'>",
             "title": "<result title>",
             "description": "<result description>",
+            "main_contact_person": {
+                "name": "<value>"
+            },
             "keywords": [
                 "<keyword1>",
                 "<keyword2>",
                 "..."
             ],
-            "geoscope": {
-                "level": "<Global | Regional | National | Sub-national | This is yet to be determined>",
-                "sub_list": <[array of codes or region names] or null>
-            },
+            "geoscope_level": "<Global | Regional | National | Sub-national | This is yet to be determined>",
+            "regions": [<UN49 region code 1>, <UN49 region code 2>, ...] (only if geoscope_level is Regional),
+            "countries": [
+                {
+                    "code": "<ISO Alpha-2 country code (if geoscope_level is National or Sub-national)>",
+                    "areas": ["<ISO 3166-2 subnational area code 1>", "<ISO 3166-2 subnational area code 2>"] (only if geoscope_level is Sub-national)
+                }
+            ] (only if geoscope_level is National or Sub-national),
             "training_type": "<Individual training or Group training (only if applicable and indicator is 'Capacity Sharing for Development')>",
-            "total_participants": <number or 'Not collected' (only if group training and indicator is 'Capacity Sharing for Development')>,
-            "male_participants": <number or 'Not collected' (only if group training and indicator is 'Capacity Sharing for Development')>,
-            "female_participants": <number or 'Not collected' (only if group training and indicator is 'Capacity Sharing for Development')>,
-            "non_binary_participants": <number or 'Not collected' (only if group training and indicator is 'Capacity Sharing for Development')>,
-            "delivery_modality": "<value or 'Not collected' (only if indicator is 'Capacity Sharing for Development')>",
-            "start_date": "<value or 'Not collected' (only if indicator is 'Capacity Sharing for Development')>",
-            "end_date": "<value or 'Not collected' (only if indicator is 'Capacity Sharing for Development')>",
-            "length_of_training": "<Short-term or Long-term or 'Not collected' (only if indicator is 'Capacity Sharing for Development')>",
-            "degree": "<value or 'Not collected' (only if length_of_training is Long-term and indicator is 'Capacity Sharing for Development')>",
-            "alliance_main_contact_person_first_name": "<value or 'Not collected'>",
-            "alliance_main_contact_person_last_name": "<value or 'Not collected'>",
+            "total_participants": <number (only if group training and indicator is 'Capacity Sharing for Development')>,
+            "male_participants": <number (only if group training and indicator is 'Capacity Sharing for Development')>,
+            "female_participants": <number (only if group training and indicator is 'Capacity Sharing for Development')>,
+            "non_binary_participants": <number (only if group training and indicator is 'Capacity Sharing for Development')>,
+            "delivery_modality": "<value (only if indicator is 'Capacity Sharing for Development')>",
+            "start_date": "<value (only if indicator is 'Capacity Sharing for Development')>",
+            "end_date": "<value (only if indicator is 'Capacity Sharing for Development')>",
+            "length_of_training": "<Short-term or Long-term (only if indicator is 'Capacity Sharing for Development')>",
+            "degree": "<value (only if length_of_training is Long-term or training_type is Individual training and indicator is 'Capacity Sharing for Development')>",
             "evidence_for_stage": "<value or 'Not collected' (only if indicator is 'Policy Change')>",
             "policy_type": "<'Policy or Strategy' | 'Legal instrument' | 'Program, Budget, or Investment' | 'Not collected' (only if indicator is 'Policy Change')>",
             "stage_in_policy_process": "<Stage 1: ... | Stage 2: ... | Stage 3: ... | Not collected (only if indicator is 'Policy Change')>"
@@ -391,11 +405,11 @@ Follow this exact structure:
                     "name": "<actor name or 'Not collected' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
                     "type": "<value or 'Other' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
                     "other_actor_type": "<value or 'Not collected' (only if type is 'Other' and indicator is 'Innovation Development')>",
-                    "gender_age:": "<value(s) or 'Not collected' (only if indicator is 'Innovation Development')>"
+                    "gender_age": "<[array of values] or null (only if indicator is 'Innovation Development')>"
                 }
             ],
-            "organizations": "<array of organization names or 'Not collected' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
-            "organization_type": "<value(s) or 'Other' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
+            "organizations": "<[array of organization names] or null (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
+            "organization_type": "<[array of organization types] or null (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
             "organization_sub_type": "<value or 'Not collected' (only if indicator is 'Innovation Development')>",
             "other_organization_type": "<value or 'Not collected' (only if organization_type is 'Other' and indicator is 'Innovation Development')>"
         }

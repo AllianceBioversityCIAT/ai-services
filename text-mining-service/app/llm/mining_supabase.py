@@ -7,6 +7,7 @@ from app.utils.s3.s3_util import read_document_from_s3
 from app.utils.prompt.prompt_star import DEFAULT_PROMPT_STAR
 from app.utils.prompt.prompt_prms import DEFAULT_PROMPT_PRMS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from app.utils.config.config_util import BR, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME
 from app.llm.vectorize_supabase import (get_embedding,
                                store_reference_embeddings,
                                store_temp_embeddings,
@@ -115,8 +116,8 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR):
     print(prompt)
 
     try:
-        reference_file_regions = "star/text-mining/files/clarisa_regions.xlsx"
-        reference_file_countries = "star/text-mining/files/clarisa_countries.xlsx"
+        reference_file_regions = f"{STAR_BUCKET_KEY_NAME}/clarisa_regions.xlsx"
+        reference_file_countries = f"{STAR_BUCKET_KEY_NAME}/clarisa_countries.xlsx"
         initialize_supabase_tables()
         initialize_reference_data(
             bucket_name, reference_file_regions, reference_file_countries)
@@ -164,8 +165,8 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS):
     print(f"PRMS Supabase Processing: {prompt}")
 
     try:
-        reference_file_regions = "prms/text-mining/files/clarisa_regions.xlsx"
-        reference_file_countries = "prms/text-mining/files/clarisa_countries.xlsx"
+        reference_file_regions = f"{PRMS_BUCKET_KEY_NAME}/clarisa_regions.xlsx"
+        reference_file_countries = f"{PRMS_BUCKET_KEY_NAME}/clarisa_countries.xlsx"
         initialize_supabase_tables()
         initialize_reference_data(
             bucket_name, reference_file_regions, reference_file_countries)

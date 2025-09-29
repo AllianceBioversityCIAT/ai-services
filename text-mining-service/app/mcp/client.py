@@ -9,6 +9,7 @@ from app.utils.s3.s3_util import upload_file_to_s3
 from app.utils.logger.logger_util import get_logger
 from mcp import ClientSession, StdioServerParameters, types
 from fastapi import FastAPI, HTTPException, Body, UploadFile, File, Form
+from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME
 
 
 logger = get_logger()
@@ -129,7 +130,7 @@ async def process_document_endpoint(
     token: str = Form(
         ..., description="Authentication token", examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."]),
     key: Optional[str] = Form(
-        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["star/text-mining/files/training-report-2024.pdf"]),
+        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["star/text-mining/files/test/training-report-2024.pdf"]),
     file: Optional[Union[UploadFile, str]] = File(
         default=None, description="Document file to upload and process. Optional if key is provided"),
     environmentUrl: str = Form(
@@ -164,7 +165,7 @@ async def process_document_endpoint(
             file_content = await file.read()
 
             filename = file.filename
-            key = f"star/text-mining/files/{filename}"
+            key = f"{STAR_BUCKET_KEY_NAME}/{filename}"
 
             content_type = file.content_type
 
@@ -238,7 +239,7 @@ async def process_document_prms_endpoint(
     token: str = Form(
         ..., description="Authentication token for PRMS access", examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."]),
     key: Optional[str] = Form(
-        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["prms/text-mining/files/climate-policy-2024.docx"]),
+        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["prms/text-mining/files/test/climate-policy-2024.docx"]),
     file: Optional[Union[UploadFile, str]] = File(
         default=None, description="File to upload and process. Optional if key is provided"),
     environmentUrl: str = Form(
@@ -272,7 +273,7 @@ async def process_document_prms_endpoint(
             file_content = await file.read()
 
             filename = file.filename
-            key = f"prms/text-mining/files/{filename}"
+            key = f"{PRMS_BUCKET_KEY_NAME}/{filename}"
 
             content_type = file.content_type
 
@@ -334,7 +335,7 @@ async def bulk_upload_capdev_endpoint(
     token: str = Form(
         ..., description="Authentication token", examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."]),
     key: Optional[str] = Form(
-        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["star/text-mining/files/training-report-2024.pdf"]),
+        None, description="Object key in the S3 bucket. Optional if file is provided", examples=["star/text-mining/files/test/training-report-2024.pdf"]),
     file: Optional[Union[UploadFile, str]] = File(
         default=None, description="Document file to upload and process. Optional if key is provided"),
     environmentUrl: str = Form(
@@ -369,7 +370,7 @@ async def bulk_upload_capdev_endpoint(
             file_content = await file.read()
 
             filename = file.filename
-            key = f"star/text-mining/files/{filename}"
+            key = f"{STAR_BUCKET_KEY_NAME}/{filename}"
 
             content_type = file.content_type
 
