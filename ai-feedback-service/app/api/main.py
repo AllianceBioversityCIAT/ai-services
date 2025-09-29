@@ -120,14 +120,6 @@ app = FastAPI(
             "description": "Universal feedback collection and management for AI services",
         },
         {
-            "name": "Analytics",
-            "description": "Cross-service analytics and performance monitoring",
-        },
-        {
-            "name": "Services",
-            "description": "AI service registration and discovery",
-        },
-        {
             "name": "Health",
             "description": "Service health and status monitoring",
         }
