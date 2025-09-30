@@ -17,3 +17,5 @@ CLARISA = {
     "opensearch_username": os.getenv("CLARISA_OPENSEARCH_USERNAME"),
     "opensearch_password": os.getenv("CLARISA_OPENSEARCH_PASSWORD"),
 }
+
+LLM_API_URL = os.getenv("LLM_API_URL")
