@@ -2,10 +2,19 @@ import os
 import sys
 import logging
 from pathlib import Path
+from dotenv import load_dotenv
 from logging.handlers import RotatingFileHandler
 
-logs_dir = Path(__file__).parent.parent.parent.parent / "data" / "logs"
-logs_dir.mkdir(parents=True, exist_ok=True)
+load_dotenv()
+
+ENV = os.getenv("ENV")
+
+if ENV == "testing":
+    logs_dir = Path(__file__).parent.parent.parent.parent / "data" / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+else:
+    logs_dir = Path("/tmp/logs")
+    logs_dir.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger("ai-feedback-service")
 logger.setLevel(logging.DEBUG)
