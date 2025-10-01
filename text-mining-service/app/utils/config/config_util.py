@@ -18,3 +18,5 @@ MS_NAME = os.getenv("MS_NAME", "Mining Microservice")
 
 STAR_BUCKET_KEY_NAME = os.getenv("STAR_BUCKET_KEY_NAME")
 PRMS_BUCKET_KEY_NAME = os.getenv("PRMS_BUCKET_KEY_NAME")
+
+MAPPING_URL = os.getenv("MAPPING_URL")

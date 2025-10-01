@@ -5,14 +5,14 @@ from app.llm.vectorize import get_all_reference_data
 from app.utils.s3.s3_util import read_document_from_s3
 from app.llm.map_fields import map_fields_with_opensearch
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, MAPPING_URL
 from app.utils.prompt.bulk_upload_capdev_prompt import PROMPT_BULK_UPLOAD_CAPDEV
-from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME
 from app.llm.vectorize import get_embedding, store_temp_embeddings, get_relevant_chunk
 from app.llm.mining import initialize_reference_data, split_text, invoke_model, is_valid_json
 
 logger = get_logger()
-mapping_service_url = "https://d8ty0ozpxa.execute-api.us-east-1.amazonaws.com"
-# mapping_service_url = "http://localhost:8001"
+mapping_service_url = MAPPING_URL
+
 
 def process_excel_in_batches(chunks, batch_size=5):
     """
