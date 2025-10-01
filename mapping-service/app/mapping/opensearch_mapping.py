@@ -225,12 +225,20 @@ def map_entries_to_ids(entries: List[MappingEntry]) -> List[MappingResult]:
 
                 llm_result = call_llm_validation(entry.value, candidates, entry.type)
                 
+                logger.info(f"📊 OpenSearch returned {len(candidates)} candidates for '{entry.value}':")
+                for i, candidate in enumerate(candidates, 1):
+                    if entry.type == "staff":
+                        logger.info(f"   {i}. ID: {candidate['id']} | Name: {candidate['name']} | Score: {candidate['score']}")
+                    else:
+                        logger.info(f"   {i}. ID: {candidate['id']} | Name: {candidate['name']} | Acronym: {candidate.get('acronym')} | Score: {candidate['score']}")
+
                 if llm_result and llm_result.get("selected_candidate") is not None:
                     selected_index = llm_result["selected_candidate"] - 1
                     if 0 <= selected_index < len(candidates):
                         selected_candidate = candidates[selected_index]
                         
                         logger.info(f"🤖 LLM selected candidate {llm_result['selected_candidate']}: {selected_candidate['name']}")
+                        logger.info(f"🤖 Confidence score: {llm_result.get('confidence_score', 'N/A')}/100")
                         logger.info(f"🤖 Reasoning: {llm_result.get('reasoning', 'No reasoning provided')}")
                         
                         results.append(MappingResult(
@@ -239,7 +247,7 @@ def map_entries_to_ids(entries: List[MappingEntry]) -> List[MappingResult]:
                             mapped_id=selected_candidate["id"],
                             mapped_name=selected_candidate["name"],
                             mapped_acronym=selected_candidate.get("acronym"),
-                            score=selected_candidate["score"]
+                            score=llm_result.get("confidence_score")
                         ))
                     else:
                         logger.error(f"❌ LLM selected invalid candidate index: {selected_index}")
@@ -251,7 +259,7 @@ def map_entries_to_ids(entries: List[MappingEntry]) -> List[MappingResult]:
                             mapped_id=first_candidate["id"],
                             mapped_name=first_candidate["name"],
                             mapped_acronym=first_candidate.get("acronym"),
-                            score=first_candidate["score"]
+                            score=90
                         ))
                 elif llm_result and llm_result.get("selected_candidate") is None:
                     # LLM explicitly said no reliable match
@@ -278,7 +286,7 @@ def map_entries_to_ids(entries: List[MappingEntry]) -> List[MappingResult]:
                         mapped_id=first_candidate["id"],
                         mapped_name=first_candidate["name"],
                         mapped_acronym=first_candidate.get("acronym"),
-                        score=first_candidate["score"]
+                        score=90
                     ))
             else:
                 # No OpenSearch results found

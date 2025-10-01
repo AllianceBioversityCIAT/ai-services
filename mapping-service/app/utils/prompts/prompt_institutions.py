@@ -8,12 +8,20 @@ Consider:
 
 Return ONLY a JSON response in this exact format:
 {
-  "selected_candidate": 1,
-  "confidence_score": 8.5,
+  "selected_candidate": <CANDIDATE_NUMBER (1, 2, or 3)>,
+  "confidence_score": <SIMILARITY_SCORE (0-100)>,
   "reasoning": "Brief explanation of why this is the best match"
 }
 
-If NO candidate is a reliable match, return:
+SIMILARITY_SCORE should be 0-100 where:
+- 90-100: Exact or near-exact match (e.g., "ICAR" → "ICAR")
+- 80-89: Very strong match with minor variations (e.g., "World Bank" → "The World Bank")
+- 70-79: Strong match with some differences (e.g., "CGIAR" → "CGIAR System Organization")
+- 60-69: Moderate match, likely correct but with notable differences
+- 50-59: Weak match, uncertain
+- 0-49: Poor match, likely incorrect
+
+If NO candidate is a reliable match (similarity < 60), return:
 {
   "selected_candidate": null,
   "confidence_score": null,
