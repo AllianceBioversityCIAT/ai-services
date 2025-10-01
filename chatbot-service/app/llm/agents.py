@@ -149,7 +149,10 @@ def run_agent_chatbot(user_input, phase, indicator, section, session_id, memory_
         print(f"\n\nSession ID: {response.get('sessionId')}")
     
     except Exception as e:
-        if "context limit" in str(e) or "Input is too long" in str(e):
+        if "Read timed out" in str(e):
+            logger.error(f"🕐 Connection timeout: {str(e)}")
+            yield f"The request is taking longer than expected. Please try a simpler query or try again later ☺️"
+        elif "context limit" in str(e) or "Input is too long" in str(e):
             logger.error(f"🚫 Context limit error: {str(e)}")
             yield f"Sorry, your query is too complex. Please try a shorter, more specific question; or start a new session ☺️"
         elif "InvokeAgent operation" in str(e) or "internalServerException" in str(e):

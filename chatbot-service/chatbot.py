@@ -18,8 +18,8 @@ logger = get_logger()
 
 API_BASE_URL = "http://localhost:8001"
 
-st.set_page_config(page_title="AICCRA chatbot", page_icon="🤖", layout="wide")
-st.title("🤖 AI Assistant for AICCRA")
+st.set_page_config(page_title="MARLO-AICCRA chatbot", page_icon="🤖", layout="wide")
+st.title("🤖 AI Assistant for MARLO-AICCRA")
 
 
 def submit_feedback_to_api(session_id: str, user_id: str, user_input: str, 
@@ -89,13 +89,13 @@ def start_new_session():
 
 
 st.markdown("""
-Welcome to your intelligent assistant for **AICCRA** (Accelerating Impacts of CGIAR Climate Research for Africa) data exploration. 
+Welcome to your intelligent assistant for **MARLO-AICCRA** (Accelerating Impacts of CGIAR Climate Research for Africa) data exploration. 
 
 **How it works:**
 - 🧠 **Memory-enabled**: Remembers your conversation and can answer follow-up questions
 - 🎯 **Contextual responses**: Builds upon previous questions for more comprehensive answers  
 - 🔍 **Smart filtering**: Use the sidebar filters to focus on specific data subsets
-- 📊 **Data-driven**: Provides insights from AICCRA's deliverables, innovations, contributions, and impact reports
+- 📊 **Data-driven**: Provides insights from AICCRA's deliverables, innovations, contributions, and outcome impact case reports.
 
 **Get started** by asking questions about clusters, indicators, innovations, or any AICCRA activities!
 """)
