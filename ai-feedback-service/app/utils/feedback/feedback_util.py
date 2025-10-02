@@ -20,7 +20,7 @@ import uuid
 import boto3
 from pathlib import Path
 from datetime import datetime, timezone
-from app.utils.config.config_util import S3
+from app.utils.config.config_util import BR
 from typing import List, Dict, Optional, Any, Tuple
 
 from app.utils.logger.logger_util import get_logger
@@ -53,11 +53,11 @@ class AIFeedbackService:
         
         self.s3_client = boto3.client(
             's3',
-            aws_access_key_id=S3['aws_access_key'],
-            aws_secret_access_key=S3['aws_secret_key'],
-            region_name=S3['aws_region']
+            aws_access_key_id=BR['aws_access_key'],
+            aws_secret_access_key=BR['aws_secret_key'],
+            region_name=BR['region']
         )
-        self.bucket_name = S3['bucket_name']
+        self.bucket_name = BR['bucket_name']
         
         self.registered_services = {}
         
