@@ -14,16 +14,17 @@ types of AI interactions while maintaining consistent feedback collection
 and analytics capabilities.
 """
 
+import os
 import json
 import uuid
 import boto3
-from decimal import Decimal
+from pathlib import Path
 from datetime import datetime, timezone
-from botocore.exceptions import ClientError
 from app.utils.config.config_util import BR
-from boto3.dynamodb.conditions import Key, Attr
 from typing import List, Dict, Optional, Any, Tuple
+
 from app.utils.logger.logger_util import get_logger
+from app.utils.s3.upload_file_to_s3 import upload_file_to_s3
 from app.api.models import (FeedbackRequest, FeedbackResponse, FeedbackSummary, GetFeedbackRequest)
 
 logger = get_logger()
@@ -31,39 +32,34 @@ logger = get_logger()
 
 class AIFeedbackService:
     """
-    General feedback service for AI services using DynamoDB.
+    General feedback service for AI services.
     
     This service provides comprehensive feedback management capabilities
     for any AI service that generates user-facing content. It supports:
     
-    - Multi-service feedback collection with dedicated tables
+    - Multi-service feedback collection
     - Flexible metadata storage
     - Service-specific analytics
-    - Scalable DynamoDB storage architecture
-    - Auto table creation per service
+    - Scalable storage architecture
+    - Future database migration support
     """
     
 
     def __init__(self):
-        """Initialize the AI feedback service with DynamoDB."""
-        self.table_prefix = "ai-feedback"
+        """Initialize the AI feedback service."""
+        self.local_feedback_dir = Path("feedback_logs")
+        self.local_feedback_dir.mkdir(exist_ok=True)
+        self.s3_feedback_prefix = "ai-feedback"
         
-        self.dynamodb = boto3.resource(
-            'dynamodb',
+        self.s3_client = boto3.client(
+            's3',
             aws_access_key_id=BR['aws_access_key'],
             aws_secret_access_key=BR['aws_secret_key'],
             region_name=BR['region']
         )
-        
-        self.dynamodb_client = boto3.client(
-            'dynamodb',
-            aws_access_key_id=BR['aws_access_key'],
-            aws_secret_access_key=BR['aws_secret_key'],
-            region_name=BR['region']
-        )
+        self.bucket_name = BR['bucket_name']
         
         self.registered_services = {}
-        self.service_tables = {}
         
         self.register_service(
             service_name="chatbot",
@@ -72,7 +68,7 @@ class AIFeedbackService:
             expected_context=["filters_applied"]
         )
         
-        logger.info("🚀 AI Feedback Service initialized with DynamoDB multi-table support")
+        logger.info("🚀 AI Feedback Service initialized with multi-service support")
     
 
     def submit_feedback(self, feedback_request: FeedbackRequest) -> FeedbackResponse:
@@ -98,13 +94,12 @@ class AIFeedbackService:
             logger.info(f"📊 Type: {feedback_request.feedback_type}")
             
             service_info = self._get_service_info(feedback_request.service_name)
-            table = self._get_service_table(feedback_request.service_name)
             
             feedback_record = self._create_feedback_record(
                 feedback_id, timestamp, feedback_request, service_info
             )
             
-            self._save_feedback_to_dynamodb(table, feedback_record)
+            self._save_feedback_record(feedback_record, timestamp, feedback_request.service_name)
             
             logger.info(f"✅ Feedback submitted successfully: {feedback_id}")
             
@@ -143,7 +138,7 @@ class AIFeedbackService:
             logger.info(f"🔍 Service filter: {service_name or 'All services'}")
             logger.info(f"📅 Date range: {start_date} to {end_date}")
             
-            all_feedback = self._read_feedback_from_dynamodb(
+            all_feedback = self._read_feedback_from_s3(
                 service_name=service_name,
                 start_date=start_date,
                 end_date=end_date
@@ -179,19 +174,15 @@ class AIFeedbackService:
 
                 response_time = feedback.get('response_time_seconds')
                 if response_time is not None:
-                    if isinstance(response_time, Decimal):
-                        response_time = float(response_time)
                     response_times.append(response_time)
 
                 if len(recent_feedback) < 10:
-                    feedback_comment = feedback.get('feedback_comment', '')
-
                     recent_feedback.append({
                         'service_name': service,
                         'feedback_type': feedback_type,
                         'timestamp': feedback.get('timestamp'),
-                        'user_feedback': feedback_comment,
-                        'has_comment': bool(feedback_comment and str(feedback_comment).strip())
+                        'user_feedback': feedback.get('user_feedback', ''),
+                        'has_comment': bool(feedback.get('user_feedback', '').strip())
                     })
             
             total_feedback = total_positive + total_negative
@@ -240,7 +231,7 @@ class AIFeedbackService:
             logger.info(f"📊 Type: {request.feedback_type or 'All'}")
             logger.info(f"📄 Limit: {request.limit}, Offset: {request.offset}")
             
-            all_feedback = self._read_feedback_from_dynamodb(
+            all_feedback = self._read_feedback_from_s3(
                 service_name=request.service_name,
                 start_date=request.start_date,
                 end_date=request.end_date
@@ -355,8 +346,6 @@ class AIFeedbackService:
                 "expected_context": expected_context or []
             }
             
-            self._create_service_table(service_name)
-            
             logger.info(f"✅ Registered new AI service: {service_name} ({display_name})")
             return True
             
@@ -382,108 +371,6 @@ class AIFeedbackService:
             )
             
             return self.registered_services[service_name]
-    
-
-    def _get_service_table(self, service_name: str):
-        """Get DynamoDB table for a service, create if not exists."""
-        table_name = f"{self.table_prefix}-{service_name}"
-        
-        if service_name not in self.service_tables:
-            self.service_tables[service_name] = self.dynamodb.Table(table_name)
-        
-        return self.service_tables[service_name]
-    
-
-    def _create_service_table(self, service_name: str) -> None:
-        """Create DynamoDB table for a service if it doesn't exist."""
-        table_name = f"{self.table_prefix}-{service_name}"
-        
-        try:
-            self.dynamodb_client.describe_table(TableName=table_name)
-            logger.info(f"🏷️ Table {table_name} already exists")
-            return
-            
-        except ClientError as e:
-            if e.response['Error']['Code'] != 'ResourceNotFoundException':
-                raise e
-        
-        try:
-            logger.info(f"🏗️ Creating DynamoDB table: {table_name}")
-            
-            table = self.dynamodb.create_table(
-                TableName=table_name,
-                KeySchema=[
-                    {
-                        'AttributeName': 'feedback_id',
-                        'KeyType': 'HASH'  # Partition key
-                    },
-                    {
-                        'AttributeName': 'timestamp',
-                        'KeyType': 'RANGE'  # Sort key
-                    }
-                ],
-                AttributeDefinitions=[
-                    {
-                        'AttributeName': 'feedback_id',
-                        'AttributeType': 'S'
-                    },
-                    {
-                        'AttributeName': 'timestamp',
-                        'AttributeType': 'S'
-                    },
-                    {
-                        'AttributeName': 'user_id',
-                        'AttributeType': 'S'
-                    },
-                    {
-                        'AttributeName': 'feedback_type',
-                        'AttributeType': 'S'
-                    }
-                ],
-                GlobalSecondaryIndexes=[
-                    {
-                        'IndexName': 'user-timestamp-index',
-                        'KeySchema': [
-                            {
-                                'AttributeName': 'user_id',
-                                'KeyType': 'HASH'
-                            },
-                            {
-                                'AttributeName': 'timestamp',
-                                'KeyType': 'RANGE'
-                            }
-                        ],
-                        'Projection': {
-                            'ProjectionType': 'ALL'
-                        }
-                    },
-                    {
-                        'IndexName': 'feedback-type-timestamp-index',
-                        'KeySchema': [
-                            {
-                                'AttributeName': 'feedback_type',
-                                'KeyType': 'HASH'
-                            },
-                            {
-                                'AttributeName': 'timestamp',
-                                'KeyType': 'RANGE'
-                            }
-                        ],
-                        'Projection': {
-                            'ProjectionType': 'ALL'
-                        }
-                    }
-                ],
-                BillingMode='PAY_PER_REQUEST'
-            )
-            
-            table.wait_until_exists()
-            
-            logger.info(f"✅ Table {table_name} created successfully")
-            
-        except Exception as e:
-            logger.error(f"❌ Error creating table {table_name}: {e}")
-            raise
     
 
     def _create_feedback_record(
@@ -539,76 +426,44 @@ class AIFeedbackService:
         }
     
 
-    def _clean_record_for_dynamodb(self, record: Dict[str, Any]) -> Dict[str, Any]:
-        """Clean record for DynamoDB by removing None values, empty strings, and converting floats to Decimal."""
-        cleaned = {}
+    def _save_feedback_record(
+        self, 
+        feedback_record: Dict[str, Any], 
+        timestamp: datetime, 
+        service_name: str
+    ) -> None:
+        """Save feedback record to local file and S3."""
         
-        for key, value in record.items():
-            if value is None:
-                continue
-            elif isinstance(value, str) and value == "":
-                continue
-            elif isinstance(value, float):
-                cleaned[key] = Decimal(str(value))
-            elif isinstance(value, int):
-                cleaned[key] = value
-            elif isinstance(value, dict):
-                cleaned_dict = self._clean_record_for_dynamodb(value)
-                if cleaned_dict:
-                    cleaned[key] = cleaned_dict
-            elif isinstance(value, list):
-                if len(value) == 0:
-                    continue
-                cleaned_list = []
-                for item in value:
-                    if isinstance(item, dict):
-                        cleaned_item = self._clean_record_for_dynamodb(item)
-                        if cleaned_item:
-                            cleaned_list.append(cleaned_item)
-                    elif isinstance(item, float):
-                        cleaned_list.append(Decimal(str(item)))
-                    elif item is not None and item != "":
-                        cleaned_list.append(item)
-                
-                if cleaned_list:
-                    cleaned[key] = cleaned_list
-            else:
-                cleaned[key] = value
+        feedback_uuid = feedback_record['feedback_id'][:11]
+        filename = f"feedback_{service_name}_{timestamp.strftime('%Y%m%d_%H%M%S')}_{feedback_uuid}.json"
+        local_path = self.local_feedback_dir / filename
         
-        return cleaned
-    
+        with open(local_path, 'w', encoding='utf-8') as f:
+            json.dump(feedback_record, f, indent=2, ensure_ascii=False)
+        
+        s3_key = f"{self.s3_feedback_prefix}/{service_name}/{timestamp.strftime('%Y%m%d')}/{filename}"
+        upload_file_to_s3(s3_key, str(local_path))
 
-    def _save_feedback_to_dynamodb(self, table, feedback_record: Dict[str, Any]) -> None:
-        """Save feedback record to DynamoDB."""
         try:
-            cleaned_record = self._clean_record_for_dynamodb(feedback_record)
-            
-            logger.info(f"💾 Saving feedback to DynamoDB table: {table.name}")
-            logger.debug(f"🔍 Cleaned record keys: {list(cleaned_record.keys())}")
-
-            table.put_item(Item=cleaned_record)
-            
-            logger.info(f"💾 Feedback saved to DynamoDB table: {table.name}")
-            
+            os.remove(local_path)
+            logger.info(f"📤 Feedback saved to S3: {s3_key}")
         except Exception as e:
-            logger.error(f"❌ Error saving to DynamoDB: {e}")
-            logger.error(f"🔍 Record that failed: {json.dumps(feedback_record, default=str, indent=2)}")
-            raise
+            logger.warning(f"⚠️ Could not remove local file {filename}: {e}")
     
 
-    def _read_feedback_from_dynamodb(
+    def _read_feedback_from_s3(
         self, 
         service_name: Optional[str] = None,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None
     ) -> List[Dict[str, Any]]:
         """
-        Read feedback data from DynamoDB.
+        Read feedback data from S3.
         
         Args:
             service_name: Optional filter by service name
             start_date: Optional start date filter
-            end_date: Optional end_date filter
+            end_date: Optional end date filter
             
         Returns:
             List of feedback records
@@ -616,100 +471,60 @@ class AIFeedbackService:
         try:
             all_feedback = []
             
-            if service_name:
-                services_to_query = [service_name]
-            else:
-                services_to_query = self._discover_feedback_services()
+            logger.info(f"🔍 Reading from S3 bucket: {self.bucket_name}")
             
+            services_to_query = [service_name] if service_name else list(self.registered_services.keys())
             logger.info(f"📋 Services to query: {services_to_query}")
             
             for service in services_to_query:
                 try:
-                    table = self._get_service_table(service)
+                    prefix = f"{self.s3_feedback_prefix}/{service}/"
+                    logger.info(f"🔍 Querying S3 with prefix: {prefix}")
                     
-                    filter_expression = None
+                    response = self.s3_client.list_objects_v2(
+                        Bucket=self.bucket_name,
+                        Prefix=prefix
+                    )
                     
-                    if start_date:
-                        start_str = start_date.isoformat()
-                        filter_expression = Attr('timestamp').gte(start_str)
+                    if 'Contents' not in response:
+                        logger.info(f"� No feedback files found for service: {service}")
+                        continue
                     
-                    if end_date:
-                        end_str = end_date.isoformat()
-                        if filter_expression:
-                            filter_expression = filter_expression & Attr('timestamp').lte(end_str)
-                        else:
-                            filter_expression = Attr('timestamp').lte(end_str)
+                    logger.info(f"📁 Found {len(response['Contents'])} files for service: {service}")
                     
-                    scan_kwargs = {}
-                    if filter_expression:
-                        scan_kwargs['FilterExpression'] = filter_expression
-                    
-                    response = table.scan(**scan_kwargs)
-                    
-                    service_feedback = response.get('Items', [])
-                    logger.info(f"📊 Found {len(service_feedback)} items for service: {service}")
-                    
-                    while 'LastEvaluatedKey' in response:
-                        scan_kwargs['ExclusiveStartKey'] = response['LastEvaluatedKey']
-                        response = table.scan(**scan_kwargs)
-                        service_feedback.extend(response.get('Items', []))
-                    
-                    all_feedback.extend(service_feedback)
+                    for obj in response['Contents']:
+                        try:
+                            file_response = self.s3_client.get_object(
+                                Bucket=self.bucket_name,
+                                Key=obj['Key']
+                            )
+                            
+                            feedback_data = json.loads(file_response['Body'].read().decode('utf-8'))
+                            
+                            if start_date or end_date:
+                                feedback_timestamp = datetime.fromisoformat(feedback_data.get('timestamp', '').replace('Z', '+00:00'))
+                                
+                                if start_date and feedback_timestamp < start_date:
+                                    continue
+                                if end_date and feedback_timestamp > end_date:
+                                    continue
+                            
+                            all_feedback.append(feedback_data)
+                            
+                        except Exception as file_error:
+                            logger.warning(f"⚠️ Error reading feedback file {obj['Key']}: {file_error}")
+                            continue
                     
                 except Exception as service_error:
-                    logger.warning(f"⚠️ Error querying DynamoDB for service {service}: {service_error}")
+                    logger.warning(f"⚠️ Error querying S3 for service {service}: {service_error}")
                     continue
             
-            logger.info(f"📊 Retrieved {len(all_feedback)} feedback entries from DynamoDB")
+            logger.info(f"📊 Retrieved {len(all_feedback)} feedback entries from S3")
             return all_feedback
             
         except Exception as e:
-            logger.error(f"❌ Error reading feedback from DynamoDB: {e}")
+            logger.error(f"❌ Error reading feedback from S3: {e}")
             return []
-
-
-    def _discover_feedback_services(self) -> List[str]:
-        """
-        Discover all existing feedback tables in DynamoDB.
-        
-        Returns:
-            List of service names that have feedback tables
-        """
-        try:
-            response = self.dynamodb_client.list_tables()
-            all_tables = response.get('TableNames', [])
-            
-            while 'LastEvaluatedTableName' in response:
-                response = self.dynamodb_client.list_tables(
-                    ExclusiveStartTableName=response['LastEvaluatedTableName']
-                )
-                all_tables.extend(response.get('TableNames', []))
-            
-            feedback_tables = [
-                table for table in all_tables 
-                if table.startswith(f"{self.table_prefix}-")
-            ]
-            
-            services = []
-            for table in feedback_tables:
-                service_name = table.replace(f"{self.table_prefix}-", "")
-                services.append(service_name)
-                
-                if service_name not in self.registered_services:
-                    logger.info(f"🔄 Auto-registering discovered service: {service_name}")
-                    display_name = service_name.replace("-", " ").replace("_", " ").title()
-                    self.registered_services[service_name] = {
-                        "name": display_name,
-                        "description": f"Auto-discovered AI service: {service_name}",
-                        "expected_context": []
-                    }
-            
-            logger.info(f"🔍 Discovered {len(services)} feedback services: {services}")
-            return services
-            
-        except Exception as e:
-            logger.error(f"❌ Error discovering feedback services: {e}")
-            return list(self.registered_services.keys())
 
 
 # Global feedback service instance
