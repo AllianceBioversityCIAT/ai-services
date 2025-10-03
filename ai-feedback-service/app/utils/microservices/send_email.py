@@ -45,7 +45,6 @@ class EmailServiceRabbitMQ:
         logger.info("🐰 Initializing RabbitMQ Email Service")
         logger.info(f"🔗 Queue: {self.queue_name}")
         logger.info(f"🎯 Pattern: send")
-        logger.info(f"👤 Auth User: {self.auth_header_ms1.get('username', 'Not configured')}")
         logger.info(f"📧 Recipients: {len(self.negative_feedback_recipients or [])} configured")
 
 
@@ -84,7 +83,7 @@ class EmailServiceRabbitMQ:
     def _setup_queue(self) -> None:
         """Setup queue for email notifications."""
         try:
-            logger.info("⚙️ Setting up RabbitMQ queue...")
+            logger.info("⚙️  Setting up RabbitMQ queue...")
             
             self.channel.queue_declare(
                 queue=self.queue_name,
@@ -161,8 +160,6 @@ class EmailServiceRabbitMQ:
 
             message_body = json.dumps(payload, default=str)
             
-            logger.info(f"📦 Payload structure: pattern='send' + auth + data")
-            logger.info(f"🔐 Auth user: {self.auth_header_ms1.get('username')}")
             logger.info(f"📧 Recipients: {config_message_dto.get('emailBody', {}).get('to', [])}")
             
             self.channel.basic_publish(
@@ -178,8 +175,7 @@ class EmailServiceRabbitMQ:
             )
             
             logger.info("✅ Email message emitted successfully to RabbitMQ")
-            logger.info(f"📬 Queue: {self.queue_name}")
-            logger.info(f"🎯 Pattern: send")
+
             return True
             
         except Exception as e:
@@ -201,7 +197,7 @@ def send_negative_feedback_email(feedback_data: Dict[str, Any]) -> bool:
         True if email queued successfully
     """
     try:
-        logger.info(f"📧 Preparing negative feedback email for: {feedback_data.get('feedback_id')}")
+        logger.info(f"📧 Preparing negative feedback email")
         
         if not email_service.is_connected():
             logger.info("🔄 Email service not connected, connecting...")
@@ -230,11 +226,6 @@ def send_negative_feedback_email(feedback_data: Dict[str, Any]) -> bool:
                 }
             }
         }
-        
-        logger.info(f"📋 Email structure:")
-        logger.info(f"   Subject: {subject}")
-        logger.info(f"   Recipients: {email_service.negative_feedback_recipients}")
-        logger.info(f"   From: {email_service.from_email}")
         
         success = email_service.send_email(config_message_dto)
         
@@ -268,17 +259,20 @@ A user has submitted negative feedback for one of our AI services. Please review
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📋 FEEDBACK DETAILS:
+
 • Feedback ID: {feedback_data.get('feedback_id', 'N/A')}
 • Feedback Type: {feedback_data.get('feedback_type', 'N/A').upper()}
 • Timestamp: {timestamp}
 • Service: {feedback_data.get('service_display_name', 'N/A')} ({feedback_data.get('service_name', 'N/A')})
 
 👤 USER INFORMATION:
+
 • User ID: {feedback_data.get('user_id', 'N/A')}
 • Platform: {feedback_data.get('platform', 'N/A')}
 • Session ID: {feedback_data.get('session_id', 'N/A')}
 
 💬 USER COMMENT:
+
 "{feedback_data.get('feedback_comment', 'No comment provided')}"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -286,19 +280,23 @@ A user has submitted negative feedback for one of our AI services. Please review
 🤖 AI INTERACTION DETAILS:
 
 📝 User Input:
+
 {feedback_data.get('user_input', 'No input recorded')[:500]}{'...' if len(str(feedback_data.get('user_input', ''))) > 500 else ''}
 
 🤖 AI Output:
+
 {feedback_data.get('ai_output', 'No output recorded')[:500]}{'...' if len(str(feedback_data.get('ai_output', ''))) > 500 else ''}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🔍 ADDITIONAL CONTEXT:
+
 {_format_context_data(feedback_data.get('context', {}))}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🎯 RECOMMENDED ACTIONS:
+
 1. Review the AI output quality for this specific interaction
 2. Analyze if this is a recurring issue with similar user inputs
 3. Consider updating the AI model or prompts if needed
@@ -308,6 +306,7 @@ This is an automated notification from the IBD AI Services Feedback System.
 Please review and take appropriate action as needed.
 
 Best regards,
+
 IBD AI Services Team
     """.strip()
     

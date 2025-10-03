@@ -408,7 +408,7 @@ class AIFeedbackService:
         
         try:
             self.dynamodb_client.describe_table(TableName=table_name)
-            logger.info(f"🏷️ Table {table_name} already exists")
+            logger.info(f"🏷️  Table {table_name} already exists")
             return
             
         except ClientError as e:
@@ -592,7 +592,6 @@ class AIFeedbackService:
             cleaned_record = self._clean_record_for_dynamodb(feedback_record)
             
             logger.info(f"💾 Saving feedback to DynamoDB table: {table.name}")
-            logger.debug(f"🔍 Cleaned record keys: {list(cleaned_record.keys())}")
 
             table.put_item(Item=cleaned_record)
             
