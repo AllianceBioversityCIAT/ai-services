@@ -24,6 +24,7 @@ from app.utils.config.config_util import BR
 from boto3.dynamodb.conditions import Key, Attr
 from typing import List, Dict, Optional, Any, Tuple
 from app.utils.logger.logger_util import get_logger
+from app.utils.microservices.send_email import send_negative_feedback_email
 from app.api.models import (FeedbackRequest, FeedbackResponse, FeedbackSummary, GetFeedbackRequest)
 
 logger = get_logger()
@@ -106,6 +107,13 @@ class AIFeedbackService:
             
             self._save_feedback_to_dynamodb(table, feedback_record)
             
+            if self._is_negative_feedback(feedback_request.feedback_type):
+                try:
+                    logger.info(f"📧 Detected negative feedback, sending notification email...")
+                    self._send_negative_feedback_notification(feedback_record, feedback_request)
+                except Exception as email_error:
+                    logger.error(f"❌ Failed to send negative feedback notification: {email_error}")
+
             logger.info(f"✅ Feedback submitted successfully: {feedback_id}")
             
             return FeedbackResponse(
@@ -710,6 +718,58 @@ class AIFeedbackService:
         except Exception as e:
             logger.error(f"❌ Error discovering feedback services: {e}")
             return list(self.registered_services.keys())
+    
+
+    def _is_negative_feedback(self, feedback_type: str) -> bool:
+        """
+        Determine if feedback is negative based on feedback type.
+        
+        Args:
+            feedback_type: The type of feedback
+            
+        Returns:
+            True if feedback is considered negative
+        """
+        negative_types = ['negative', 'dislike', 'thumbs_down', 'bad', 'poor', 'unsatisfied']
+        return feedback_type.lower() in negative_types
+
+
+    def _send_negative_feedback_notification(self, feedback_record: Dict[str, Any], feedback_request: FeedbackRequest) -> None:
+        """
+        Send email notification for negative feedback using the email microservice.
+        
+        Args:
+            feedback_record: The complete feedback record
+            feedback_request: The original feedback request
+        """
+        try:            
+            logger.info(f"📧 Sending negative feedback notification for: {feedback_record['feedback_id']}")
+            
+            # Preparar los datos más importantes para el email
+            email_data = {
+                'feedback_id': feedback_record['feedback_id'],
+                'feedback_type': feedback_record['feedback_type'],
+                'feedback_comment': feedback_record.get('feedback_comment', 'No comment provided'),
+                'user_id': feedback_record['user_id'],
+                'service_name': feedback_record['service_name'],
+                'service_display_name': feedback_record['service_display_name'],
+                'timestamp': feedback_record['timestamp'],
+                'user_input': feedback_record.get('user_input', ''),
+                'ai_output': feedback_record.get('ai_output', ''),
+                'session_id': feedback_record.get('session_id', ''),
+                'platform': feedback_record.get('platform', ''),
+                'response_time_seconds': feedback_record.get('response_time_seconds', 0),
+                'context': feedback_record.get('context', {})
+            }
+            
+            # Llamar al microservicio de email
+            send_negative_feedback_email(email_data)
+            
+            logger.info(f"✅ Negative feedback notification sent successfully")
+            
+        except Exception as e:
+            logger.error(f"❌ Error sending negative feedback notification: {e}")
+            raise
 
 
 # Global feedback service instance
