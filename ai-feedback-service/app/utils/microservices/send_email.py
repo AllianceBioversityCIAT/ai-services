@@ -265,7 +265,7 @@ def _create_negative_feedback_email_text(feedback_data: Dict[str, Any]) -> str:
 
 A user has submitted negative feedback for one of our AI services. Please review the details below:
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📋 FEEDBACK DETAILS:
 • Feedback ID: {feedback_data.get('feedback_id', 'N/A')}
@@ -281,7 +281,7 @@ A user has submitted negative feedback for one of our AI services. Please review
 💬 USER COMMENT:
 "{feedback_data.get('feedback_comment', 'No comment provided')}"
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🤖 AI INTERACTION DETAILS:
 
@@ -291,26 +291,24 @@ A user has submitted negative feedback for one of our AI services. Please review
 🤖 AI Output:
 {feedback_data.get('ai_output', 'No output recorded')[:500]}{'...' if len(str(feedback_data.get('ai_output', ''))) > 500 else ''}
 
-⏱️ Response Time: {feedback_data.get('response_time_seconds', 'N/A')} seconds
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🔍 ADDITIONAL CONTEXT:
 {_format_context_data(feedback_data.get('context', {}))}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🎯 RECOMMENDED ACTIONS:
 1. Review the AI output quality for this specific interaction
 2. Analyze if this is a recurring issue with similar user inputs
-3. Consider updating the AI model or training data if needed
+3. Consider updating the AI model or prompts if needed
 4. Follow up with the user if appropriate
 
-This is an automated notification from the CGIAR AI Services Feedback System.
+This is an automated notification from the IBD AI Services Feedback System.
 Please review and take appropriate action as needed.
 
 Best regards,
-CGIAR AI Services Team
+IBD AI Services Team
     """.strip()
     
     return email_text
