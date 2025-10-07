@@ -22,58 +22,74 @@ st.set_page_config(page_title="MARLO-AICCRA chatbot", page_icon="🤖", layout="
 st.title("🤖 AI Assistant for MARLO-AICCRA")
 
 
-def submit_feedback_to_api(session_id: str, user_id: str, user_input: str, 
-                          ai_output: str, feedback_type: str, feedback_comment: str = None, 
-                          context: dict = None, response_time: float = None):
-    """Submit feedback to the API backend."""
+def track_ai_interaction(user_input: str, ai_output: str, context: dict = None, 
+                        response_time: float = None, feedback_type: str = None, 
+                        feedback_comment: str = None, update_mode: bool = False, 
+                        interaction_id: str = None):
+    """Track AI interaction or update with feedback."""
     try:
-        feedback_data = {
-            "session_id": session_id,
-            "user_id": user_id,
-            "user_input": user_input,
+        interaction_data = {
+            "user_id": MEMORY_ID,
+            "session_id": st.session_state.session_id,
             "ai_output": ai_output,
-            "feedback_type": feedback_type,
             "service_name": "chatbot",
             "platform": "AICCRA",
+            "update_mode": update_mode
         }
         
+        # Add user_input only for new interactions (not updates)
+        if not update_mode:
+            interaction_data["user_input"] = user_input
+        
+        # Add interaction_id for updates
+        if update_mode and interaction_id:
+            interaction_data["interaction_id"] = interaction_id
+        
+        # Add feedback data if provided
+        if feedback_type:
+            interaction_data["feedback_type"] = feedback_type
         if feedback_comment:
-            feedback_data["feedback_comment"] = feedback_comment
-
+            interaction_data["feedback_comment"] = feedback_comment
+        
+        # Add context and performance data
         if context:
             enhanced_context = {
                 "filters_applied": context,
                 "session_length": len(st.session_state.messages)
             }
-            feedback_data["context"] = enhanced_context
+            interaction_data["context"] = enhanced_context
         
         if response_time:
-            feedback_data["response_time_seconds"] = response_time
+            interaction_data["response_time_seconds"] = response_time
         
         response = requests.post(
-            f"{API_BASE_URL}/api/feedback",
-            json=feedback_data,
+            f"{API_BASE_URL}/api/interactions",
+            json=interaction_data,
             timeout=60
         )
         
         if response.status_code == 200:
             result = response.json()
-            logger.info(f"✅ Feedback submitted successfully: {result.get('feedback_id')}")
-            return True, result.get('message', 'Feedback submitted successfully')
+            interaction_id = result.get('interaction_id')
+            if update_mode:
+                logger.info(f"✅ Feedback submitted successfully for interaction: {interaction_id}")
+            else:
+                logger.info(f"✅ Interaction tracked successfully: {interaction_id}")
+            return True, interaction_id
         else:
             try:
                 error_detail = response.json()
                 error_message = error_detail.get('details', 'Unknown error')
             except:
                 error_message = response.text
-            logger.error(f"❌ Feedback submission failed: {error_message}")
-            return False, f"Failed to submit feedback: {error_message}"
+            logger.error(f"❌ Interaction tracking failed: {error_message}")
+            return False, error_message
             
     except requests.exceptions.RequestException as e:
-        logger.error(f"❌ Network error submitting feedback: {e}")
+        logger.error(f"❌ Network error tracking interaction: {e}")
         return False, f"Network error: {str(e)}"
     except Exception as e:
-        logger.error(f"❌ Unexpected error submitting feedback: {e}")
+        logger.error(f"❌ Unexpected error tracking interaction: {e}")
         return False, f"Unexpected error: {str(e)}"
     
 
@@ -84,6 +100,8 @@ def start_new_session():
     st.session_state.show_feedback_area = False
     if "feedback_submitted" in st.session_state:
         del st.session_state.feedback_submitted
+    if "last_interaction_id" in st.session_state:
+        del st.session_state.last_interaction_id
     logger.info(f"🔄 New session started: {st.session_state.session_id}")
     st.rerun()
 
@@ -241,6 +259,26 @@ if user_input:
 
             st.session_state.last_response_time = response_time
 
+            # Track the AI interaction in the database
+            filters_applied = {
+                "phase": phase,
+                "indicator": indicator,
+                "section": section
+            }
+            
+            success, interaction_id = track_ai_interaction(
+                user_input=user_input,
+                ai_output=full_response,
+                context=filters_applied,
+                response_time=response_time
+            )
+            
+            if success:
+                st.session_state.last_interaction_id = interaction_id
+                logger.info(f"✅ Interaction tracked with ID: {interaction_id}")
+            else:
+                logger.error(f"❌ Failed to track interaction: {interaction_id}")
+
             st.session_state.messages.append({"role": "assistant", "content": full_response})
 
         except Exception as e:
@@ -248,6 +286,16 @@ if user_input:
             
             with st.chat_message("assistant"):
                 st.markdown(full_response)
+
+            # Track error interaction
+            try:
+                track_ai_interaction(
+                    user_input=user_input,
+                    ai_output=full_response,
+                    context={"error": True, "error_message": str(e)}
+                )
+            except:
+                logger.error("Failed to track error interaction")
 
             st.session_state.messages.append({"role": "assistant", "content": full_response})
 
@@ -292,27 +340,22 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "assis
     col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12, col13, col14 = st.columns([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
     with col1:
         if st.button("👍", key="thumbs_up"):
-            filters_applied = {
-                "phase": phase,
-                "indicator": indicator,
-                "section": section
-            }
+            if hasattr(st.session_state, 'last_interaction_id'):
+                success, message = track_ai_interaction(
+                    user_input="",  # Not needed for updates
+                    ai_output="",   # Not needed for updates
+                    feedback_type="positive",
+                    update_mode=True,
+                    interaction_id=st.session_state.last_interaction_id
+                )
 
-            success, message = submit_feedback_to_api(
-                session_id=st.session_state.session_id,
-                user_id=MEMORY_ID,
-                user_input=last_user_msg,
-                ai_output=last_ai_response,
-                feedback_type="positive",
-                context=filters_applied,
-                response_time=getattr(st.session_state, 'last_response_time', None)
-            )
-
-            if success:
-                st.session_state.show_feedback_area = False
-                feedback_ack.success("✅ Thanks for your positive feedback!")
+                if success:
+                    st.session_state.show_feedback_area = False
+                    feedback_ack.success("✅ Thanks for your positive feedback!")
+                else:
+                    feedback_ack.error(f"❌ Error submitting feedback: {message}")
             else:
-                feedback_ack.error(f"❌ Error submitting feedback: {message}")
+                feedback_ack.error("❌ No interaction ID found. Please try again.")
     
     with col2:
         if st.button("👎", key="thumbs_down"):
@@ -324,26 +367,22 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "assis
             submitted = st.form_submit_button("Submit feedback", type="primary")
             
             if submitted and feedback_comment:
-                filters_applied = {
-                    "phase": phase,
-                    "indicator": indicator,
-                    "section": section
-                }
-                
-                success, message = submit_feedback_to_api(
-                    session_id=st.session_state.session_id,
-                    user_id=MEMORY_ID,
-                    user_input=last_user_msg,
-                    ai_output=last_ai_response,
-                    feedback_type="negative",
-                    feedback_comment=feedback_comment if feedback_comment else None,
-                    context=filters_applied
-                )
-                
-                if success:
-                    st.session_state.feedback_submitted = True
-                    st.success("✅ Feedback submitted successfully. Thank you for helping us improve!")
-                    st.session_state.show_feedback_area = False
+                if hasattr(st.session_state, 'last_interaction_id'):
+                    success, message = track_ai_interaction(
+                        user_input="",  # Not needed for updates
+                        ai_output="",   # Not needed for updates
+                        feedback_type="negative",
+                        feedback_comment=feedback_comment,
+                        update_mode=True,
+                        interaction_id=st.session_state.last_interaction_id
+                    )
+                    
+                    if success:
+                        st.session_state.feedback_submitted = True
+                        st.success("✅ Feedback submitted successfully. Thank you for helping us improve!")
+                        st.session_state.show_feedback_area = False
+                    else:
+                        st.error(f"❌ Failed to submit feedback: {message}")
+                        logger.error(f"Failed to submit feedback via API: {message}")
                 else:
-                    st.error(f"❌ Failed to submit feedback: {message}")
-                    logger.error(f"Failed to submit feedback via API: {message}")
+                    st.error("❌ No interaction ID found. Please try again.")

@@ -5,11 +5,11 @@ from typing import Optional, Literal, Dict, Any, List
 from datetime import datetime, timezone
 import uuid
 
-class FeedbackRequest(BaseModel):
+class AIInteractionRequest(BaseModel):
     """
-    General request model for submitting feedback on AI service responses.
+    Request model for tracking AI interactions and optionally submitting feedback.
     
-    This model captures user feedback on AI-generated content for quality improvement
+    This model captures all AI interactions with optional feedback data for quality improvement
     and service monitoring purposes across different AI services.
     """
     
@@ -38,17 +38,17 @@ class FeedbackRequest(BaseModel):
     
     ai_output: str = Field(
         ...,
-        description="AI-generated output that the user is providing feedback on",
+        description="AI-generated output from the interaction",
         examples=[
             "Based on the latest data, AICCRA has achieved significant progress...",
             "The climate data shows trends of..."
         ]
     )
     
-    # Core feedback data
-    feedback_type: Literal["positive", "negative"] = Field(
-        ...,
-        description="Type of feedback - positive (thumbs up) or negative (thumbs down)",
+    # Optional feedback data (only provided when user gives feedback)
+    feedback_type: Optional[Literal["positive", "negative"]] = Field(
+        default=None,
+        description="Type of feedback - positive (thumbs up) or negative (thumbs down). Only provided when user gives feedback.",
         examples=["positive", "negative"]
     )
     
@@ -61,6 +61,19 @@ class FeedbackRequest(BaseModel):
             "The response was not relevant to my question",
             "Missing important context about climate data"
         ]
+    )
+    
+    # Update mode for feedback
+    update_mode: Optional[bool] = Field(
+        default=False,
+        description="Set to true when updating existing interaction with feedback",
+        examples=[False, True]
+    )
+    
+    interaction_id: Optional[str] = Field(
+        default=None,
+        description="Existing interaction ID when updating with feedback",
+        examples=["req_550e8400-e29b-41d4-a716-446655440000"]
     )
     
     # AI Service Information
@@ -99,53 +112,64 @@ class FeedbackRequest(BaseModel):
     )
 
 
-class FeedbackResponse(BaseModel):
-    """Response model for successful feedback submission."""
+class AIInteractionResponse(BaseModel):
+    """Response model for successful AI interaction tracking."""
     
-    feedback_id: str = Field(
+    interaction_id: str = Field(
         ...,
-        description="Unique identifier for the submitted feedback",
-        examples=["fb_550e8400-e29b-41d4-a716-446655440000"]
+        description="Unique identifier for the tracked interaction",
+        examples=["req_550e8400-e29b-41d4-a716-446655440000"]
     )
     
     status: str = Field(
         default="success",
-        description="Status of the feedback submission",
-        examples=["success"]
+        description="Status of the interaction tracking",
+        examples=["success", "updated"]
     )
     
     message: str = Field(
-        default="Feedback submitted successfully",
+        default="Interaction tracked successfully",
         description="Confirmation message",
         examples=[
-            "Feedback submitted successfully. Thank you for helping us improve!",
-            "Your feedback has been recorded and will help improve our AI services."
+            "AI interaction tracked successfully",
+            "Interaction updated with feedback successfully"
         ]
     )
     
     timestamp: datetime = Field(
         ...,
-        description="Timestamp when the feedback was processed",
+        description="Timestamp when the interaction was processed",
         examples=["2025-01-27T10:30:00Z"]
     )
     
     service_name: str = Field(
         ...,
-        description="Name of the service that received the feedback"
+        description="Name of the service that generated the interaction"
+    )
+    
+    has_feedback: bool = Field(
+        default=False,
+        description="Whether this interaction includes feedback",
+        examples=[True, False]
     )
 
 
-class FeedbackSummary(BaseModel):
-    """Model for feedback analytics and summary data."""
+class InteractionSummary(BaseModel):
+    """Model for AI interaction analytics and summary data."""
     
     service_name: Optional[str] = Field(
         default=None,
         description="Service name filter applied (null for all services)"
     )
     
-    total_feedback: int = Field(
+    total_interactions: int = Field(
         ...,
-        description="Total number of feedback entries"
+        description="Total number of AI interactions"
+    )
+    
+    interactions_with_feedback: int = Field(
+        ...,
+        description="Number of interactions that have feedback"
     )
     
     positive_feedback: int = Field(
@@ -158,9 +182,16 @@ class FeedbackSummary(BaseModel):
         description="Number of negative feedback entries"
     )
     
+    feedback_rate: float = Field(
+        ...,
+        description="Percentage of interactions that received feedback (0.0 to 100.0)",
+        ge=0.0,
+        le=100.0
+    )
+    
     satisfaction_rate: float = Field(
         ...,
-        description="Percentage of positive feedback (0.0 to 100.0)",
+        description="Percentage of positive feedback among feedback entries (0.0 to 100.0)",
         ge=0.0,
         le=100.0
     )
@@ -172,17 +203,16 @@ class FeedbackSummary(BaseModel):
     
     services_breakdown: Dict[str, Dict[str, int]] = Field(
         ...,
-        description="Breakdown of feedback by service",
+        description="Breakdown of interactions and feedback by service",
         examples=[{
-            "chatbot": {"positive": 150, "negative": 25},
-            "reports-generator": {"positive": 89, "negative": 12},
-            "text-mining": {"positive": 45, "negative": 8}
+            "chatbot": {"total_interactions": 1000, "positive": 150, "negative": 25, "no_feedback": 825},
+            "reports-generator": {"total_interactions": 500, "positive": 89, "negative": 12, "no_feedback": 399}
         }]
     )
     
-    recent_feedback: List[Dict[str, Any]] = Field(
+    recent_interactions: List[Dict[str, Any]] = Field(
         ...,
-        description="Recent feedback entries (last 10)"
+        description="Recent interaction entries (last 10)"
     )
     
     time_period: Dict[str, Optional[datetime]] = Field(
@@ -191,8 +221,8 @@ class FeedbackSummary(BaseModel):
     )
 
 
-class GetFeedbackRequest(BaseModel):
-    """Request model for retrieving feedback data."""
+class GetInteractionRequest(BaseModel):
+    """Request model for retrieving AI interaction data."""
     
     # Service filters
     service_name: Optional[str] = Field(
@@ -214,6 +244,11 @@ class GetFeedbackRequest(BaseModel):
         description="Filter by feedback type"
     )
     
+    has_feedback: Optional[bool] = Field(
+        default=None,
+        description="Filter by whether interaction includes feedback"
+    )
+    
     has_comment: Optional[bool] = Field(
         default=None,
         description="Filter by whether feedback includes comments"
@@ -222,12 +257,12 @@ class GetFeedbackRequest(BaseModel):
     # Time filters
     start_date: Optional[datetime] = Field(
         default=None,
-        description="Filter feedback from this date onwards"
+        description="Filter interactions from this date onwards"
     )
     
     end_date: Optional[datetime] = Field(
         default=None,
-        description="Filter feedback up to this date"
+        description="Filter interactions up to this date"
     )
     
     max_response_time: Optional[float] = Field(
@@ -238,7 +273,7 @@ class GetFeedbackRequest(BaseModel):
     # Result controls
     limit: Optional[int] = Field(
         default=50,
-        description="Maximum number of feedback entries to return",
+        description="Maximum number of interaction entries to return",
         le=1000,
         ge=1
     )
@@ -267,4 +302,4 @@ class ErrorResponse(BaseModel):
     status: str = Field(default="error", description="Status indicator")
     details: Optional[str] = Field(default=None, description="Additional error details")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    service: str = Field(default="ai-feedback-service", description="Service name")
+    service: str = Field(default="ai-interaction-service", description="Service name")

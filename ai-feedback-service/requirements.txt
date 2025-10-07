@@ -5,4 +5,5 @@ requests,
 fastapi,
 uvicorn,
 mangum,
-pydantic
+pydantic,
+pika

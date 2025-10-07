@@ -11,5 +11,6 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "mangum",
-    "pydantic"
+    "pydantic",
+    "pika"
 ]
