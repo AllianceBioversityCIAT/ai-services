@@ -1,9 +1,9 @@
-pandas,
-boto3,
-python-dotenv,
-requests,
-fastapi,
-uvicorn,
-mangum,
-pydantic,
+pandas
+boto3
+python-dotenv
+requests
+fastapi
+uvicorn
+mangum
+pydantic
 pika
