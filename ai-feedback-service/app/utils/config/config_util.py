@@ -19,3 +19,5 @@ RABBITMQ = {
     "from_name": os.getenv("EMAIL_SENDER_NAME"),
     "feedback_recipients": [email.strip() for email in os.getenv("EMAIL_RECIPIENT", "").split(",") if email.strip()]
 }
+
+ENV = os.getenv("ENV")
