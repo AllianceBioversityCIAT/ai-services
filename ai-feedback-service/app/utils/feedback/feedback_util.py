@@ -52,15 +52,11 @@ class AIInteractionService:
         
         self.dynamodb = boto3.resource(
             'dynamodb',
-            aws_access_key_id=BR['aws_access_key'],
-            aws_secret_access_key=BR['aws_secret_key'],
             region_name=BR['region']
         )
         
         self.dynamodb_client = boto3.client(
             'dynamodb',
-            aws_access_key_id=BR['aws_access_key'],
-            aws_secret_access_key=BR['aws_secret_key'],
             region_name=BR['region']
         )
         
