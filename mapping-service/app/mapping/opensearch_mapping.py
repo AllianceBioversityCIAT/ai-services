@@ -272,7 +272,7 @@ def map_entries_to_ids(entries: List[MappingEntry]) -> List[MappingResult]:
                         mapped_id=None,
                         mapped_name=None,
                         mapped_acronym=None,
-                        score=None
+                        score=0
                     ))
                 else:
                     # LLM call failed completely (parsing errors, network issues, etc.)
@@ -297,7 +297,7 @@ def map_entries_to_ids(entries: List[MappingEntry]) -> List[MappingResult]:
                     mapped_id=None,
                     mapped_name=None,
                     mapped_acronym=None,
-                    score=None
+                    score=0
                 ))
             
             logger.info(f"✅ Response generated successfully")
@@ -310,7 +310,7 @@ def map_entries_to_ids(entries: List[MappingEntry]) -> List[MappingResult]:
                 mapped_id=None,
                 mapped_name=None,
                 mapped_acronym=None,
-                score=None
+                score=0
             ))
 
     return results
