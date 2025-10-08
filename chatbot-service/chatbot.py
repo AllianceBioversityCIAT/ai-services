@@ -16,7 +16,7 @@ MEMORY_ID = hashlib.sha256(memory_id.encode()).hexdigest()
 
 logger = get_logger()
 
-API_BASE_URL = "http://localhost:8001"
+API_BASE_URL = "https://i8s5i8c21i.execute-api.us-east-1.amazonaws.com"
 
 st.set_page_config(page_title="MARLO-AICCRA chatbot", page_icon="🤖", layout="wide")
 st.title("🤖 AI Assistant for MARLO-AICCRA")

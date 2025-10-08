@@ -1,17 +1,18 @@
 import boto3
 from app.utils.prompts.kb_generation_prompt import DEFAULT_PROMPT
-from app.utils.config.config_util import KNOWLEDGE_BASE_ID, OPENSEARCH, BR
+from app.utils.config.config_util import KNOWLEDGE_BASE, AWS
 
 
 model_id = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 model_arn = f'arn:aws:bedrock:us-east-1:569113802249:inference-profile/{model_id}'
+KNOWLEDGE_BASE_ID = KNOWLEDGE_BASE['knowledge_base_id']
 
 
 bedrock_agent_runtime = boto3.client(
     service_name='bedrock-agent-runtime',
-    aws_access_key_id=OPENSEARCH['aws_access_key'],
-    aws_secret_access_key=OPENSEARCH['aws_secret_key'],
-    region_name=BR['region']
+    aws_access_key_id=AWS['aws_access_key'],
+    aws_secret_access_key=AWS['aws_secret_key'],
+    region_name=AWS['region']
 )
 
 

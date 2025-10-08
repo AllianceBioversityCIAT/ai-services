@@ -3,7 +3,7 @@ import textwrap
 # from db_conn.sql_connection import load_full_data
 from app.utils.logger.logger_util import get_logger
 from app.utils.agents_utils.filter_builder import filter_metadata
-from app.utils.config.config_util import BR, OPENSEARCH, KNOWLEDGE_BASE
+from app.utils.config.config_util import AWS, KNOWLEDGE_BASE
 
 logger = get_logger()
 
@@ -13,16 +13,16 @@ KNOWLEDGE_BASE_ID = KNOWLEDGE_BASE['knowledge_base_id']
 
 bedrock_agent = boto3.client(
     service_name='bedrock-agent', 
-    aws_access_key_id=OPENSEARCH['aws_access_key'],
-    aws_secret_access_key=OPENSEARCH['aws_secret_key'],
-    region_name=BR['region']
+    aws_access_key_id=AWS['aws_access_key'],
+    aws_secret_access_key=AWS['aws_secret_key'],
+    region_name=AWS['region']
 )
 
 bedrock_agent_runtime = boto3.client(
     service_name='bedrock-agent-runtime',
-    aws_access_key_id=OPENSEARCH['aws_access_key'],
-    aws_secret_access_key=OPENSEARCH['aws_secret_key'],
-    region_name=BR['region']
+    aws_access_key_id=AWS['aws_access_key'],
+    aws_secret_access_key=AWS['aws_secret_key'],
+    region_name=AWS['region']
 )
 
 

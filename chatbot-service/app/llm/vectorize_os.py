@@ -6,7 +6,7 @@ import pandas as pd
 from requests_aws4auth import AWS4Auth
 from db_conn.sql_connection import load_full_data
 from app.utils.logger.logger_util import get_logger
-from app.utils.config.config_util import BR, OPENSEARCH
+from app.utils.config.config_util import AWS, OPENSEARCH
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from app.llm.invoke_llm import invoke_model, get_bedrock_embeddings
 from app.utils.prompts.chatbot_prompt import generate_chatbot_prompt
@@ -14,12 +14,12 @@ from app.utils.prompts.chatbot_prompt import generate_chatbot_prompt
 logger = get_logger()
 
 credentials = boto3.Session(
-    aws_access_key_id=OPENSEARCH['aws_access_key'],
-    aws_secret_access_key=OPENSEARCH['aws_secret_key'],
-    region_name=BR['region']
+    aws_access_key_id=AWS['aws_access_key'],
+    aws_secret_access_key=AWS['aws_secret_key'],
+    region_name=AWS['region']
 ).get_credentials()
 
-region = BR['region']
+region = AWS['region']
 awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, 'es', session_token=credentials.token)
 
 opensearch = OpenSearch(
@@ -30,14 +30,13 @@ opensearch = OpenSearch(
     connection_class=RequestsHttpConnection
 )
 
-INDEX_NAME = OPENSEARCH['index']
 INDEX_NAME_CHATBOT = OPENSEARCH['index_chatbot']
 
 
 def create_index_if_not_exists(dimension=1024):
     try:
-        if not opensearch.indices.exists(index=INDEX_NAME):
-            logger.info(f"📦 Creating OpenSearch index: {INDEX_NAME}")
+        if not opensearch.indices.exists(index=INDEX_NAME_CHATBOT):
+            logger.info(f"📦 Creating OpenSearch index: {INDEX_NAME_CHATBOT}")
             index_body = {
                 "settings": {
                     "index": {
@@ -62,10 +61,10 @@ def create_index_if_not_exists(dimension=1024):
                     }
                 }
             }
-            opensearch.indices.create(index=INDEX_NAME, body=index_body)
+            opensearch.indices.create(index=INDEX_NAME_CHATBOT, body=index_body)
             return True
         
-        logger.info(f"📦 Index {INDEX_NAME} already exists. Skipping creation.")
+        logger.info(f"📦 Index {INDEX_NAME_CHATBOT} already exists. Skipping creation.")
         return False
 
     except Exception as e:
@@ -104,7 +103,7 @@ def insert_into_opensearch(table_name: str):
                 "indicator_acronym": row.get("indicator_acronym"),
                 "year": row.get("year")
             }
-            opensearch.index(index=INDEX_NAME, id=f"{table_name}-{i}", body=doc)
+            opensearch.index(index=INDEX_NAME_CHATBOT, id=f"{table_name}-{i}", body=doc)
 
         logger.info(f"✅ Vectorization completed for {len(chunks)} rows of {table_name}")
     
