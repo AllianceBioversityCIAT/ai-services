@@ -2,7 +2,7 @@ import pyodbc
 import pandas as pd
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import SQL_SERVER
-from app.utils.s3.divide_jsonl_files import split_jsonl_to_individual_files
+from app.utils.s3.divide_jsonl_files import split_jsonl_to_individual_csv_files
 
 logger = get_logger()
 
@@ -92,14 +92,17 @@ def load_full_data(table_name):
 
         if table_name == "vw_ai_project_contribution":
             df.rename(columns={'Phase name': 'phase_name', 'Phase year': 'year'}, inplace=True)
+            df.drop(['ID Phase', 'cluster_id', 'indicator_pk', 'pk', 'contribution_pk', 'default_phase_name', 'default_phase_year'], axis=1, inplace=True)
             df = df.dropna(axis=1, how='all')
             df["table_type"] = "contributions"
         
         elif table_name == "vw_ai_questions":
+            df.drop(['contribution_pk', 'indicator_pk', 'project_id', 'phase'], axis=1, inplace=True)
             df = df.dropna(axis=1, how='all')
             df["table_type"] = "questions"
 
         elif table_name == "vw_ai_deliverables":
+            df.drop(['compose_id', 'indicator_pk', 'contribution_pk', 'indicator_id', 'Indicator', 'indicator_code', 'DLV_planned', 'activity_id', 'image_small', 'last_updated_altmetric', 'last_sync_almetric', 'id_phase_dlv', 'cluster_owner_id', 'institution_id', 'location_id', 'cluster_id'], axis=1, inplace=True)
             df = df.dropna(axis=1, how='all')
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
@@ -112,6 +115,7 @@ def load_full_data(table_name):
         
         elif table_name == "vw_ai_oicrs":
             df.rename(columns={'link_pdf_file': 'link_pdf_oicr', 'oicr_year': 'year'}, inplace=True)
+            df.drop(['cluster_id', 'parameter_value', 'link_cluster_id', 'outcome_communication', 'country_id', 'country_iso_alpha3', 'contributing_crp', 'indicator_pk', 'contribution_pk', 'institution_id', 'cluster_id_year'], axis=1, inplace=True)
             df = df.dropna(axis=1, how='all')
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
@@ -124,6 +128,7 @@ def load_full_data(table_name):
         
         else:
             df.rename(columns={'link_pdf_file': 'link_pdf_innovation'}, inplace=True)
+            df.drop(['stage', 'stage_definition', 'country_id', 'gender_relevance', 'gender_explanation_evidence', 'youth_relevance', 'youth_explanation_evidence', 'indicator_pk', 'contribution_pk', 'cluster_id', 'cluster_owner_id', 'status', 'institution_id', 'are_users_determined', 'is_scaling_partner', 'cluster_id_year'], axis=1, inplace=True)
             df = df.dropna(axis=1, how='all')
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
@@ -137,7 +142,7 @@ def load_full_data(table_name):
         df.to_json(f'{table_name}.jsonl', orient='records', lines=True, force_ascii=False)
         df.to_csv(f'{table_name}.csv', index=False)
 
-        split_jsonl_to_individual_files(f'{table_name}.jsonl')
+        split_jsonl_to_individual_csv_files(f'{table_name}.jsonl')
         
         return df
 

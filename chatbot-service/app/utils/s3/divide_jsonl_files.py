@@ -24,7 +24,7 @@ def split_jsonl_to_individual_csv_files(jsonl_file_path):
                 table_type = data.get("table_type", "")
                 phase_name = data.get("phase_name", "")
 
-                content_str = ",".join([f'"{k}":"{v}"' for k, v in data.items() if v not in ("", None, [], {})])
+                content_str = ",".join([f'"{k}":"{v}"' for k, v in data.items() if v not in ("", None, [], {}, "Not Provided", "Not provided", "Not linked", "Not defined", "NA", "Not Applicable", "N/A")])
 
                 file_name = f"{table_type}_record_{line_number}.csv"
                 local_path = os.path.join(os.getcwd(), "csv_files", file_name)
@@ -90,7 +90,7 @@ def split_jsonl_to_individual_csv_files(jsonl_file_path):
                 with open(metadata_local_path, 'w', encoding='utf-8') as metafile:
                     json.dump(metadata, metafile, indent=2)
 
-                file_key = f"aiccra/generator/knowledge_base/{table_type}/{file_name}"
+                file_key = f"aiccra/chatbot/knowledge_base/{table_type}/{file_name}"
                 upload_file_to_s3(file_key, local_path)
                 upload_file_to_s3(file_key + ".metadata.json", metadata_local_path)
                 os.remove(local_path)
