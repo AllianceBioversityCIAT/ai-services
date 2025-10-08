@@ -4,19 +4,16 @@ import uuid
 import hashlib
 import requests
 import streamlit as st
-from datetime import datetime, timezone
+from datetime import datetime
 # from app.llm.vectorize_os import run_chatbot
 from app.llm.agents import run_agent_chatbot
 from app.utils.logger.logger_util import get_logger
-from app.utils.config.config_util import KNOWLEDGE_BASE
-from app.utils.s3.upload_file_to_s3 import upload_file_to_s3
+from app.utils.config.config_util import KNOWLEDGE_BASE, AI_FEEDBACK_URL
 
 memory_id = KNOWLEDGE_BASE['memory_id']
 MEMORY_ID = hashlib.sha256(memory_id.encode()).hexdigest()
 
 logger = get_logger()
-
-API_BASE_URL = "https://i8s5i8c21i.execute-api.us-east-1.amazonaws.com"
 
 st.set_page_config(page_title="MARLO-AICCRA chatbot", page_icon="🤖", layout="wide")
 st.title("🤖 AI Assistant for MARLO-AICCRA")
@@ -63,7 +60,7 @@ def track_ai_interaction(user_input: str, ai_output: str, context: dict = None,
             interaction_data["response_time_seconds"] = response_time
         
         response = requests.post(
-            f"{API_BASE_URL}/api/interactions",
+            f"{AI_FEEDBACK_URL}/api/interactions",
             json=interaction_data,
             timeout=60
         )

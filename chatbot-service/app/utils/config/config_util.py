@@ -28,3 +28,5 @@ KNOWLEDGE_BASE = {
     "agent_alias_id": os.getenv("AGENT_ALIAS_ID"),
     "memory_id": os.getenv("MEMORY_ID")
 }
+
+AI_FEEDBACK_URL = os.getenv("AI_FEEDBACK_URL")
