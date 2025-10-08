@@ -3,10 +3,10 @@ name: Trigger Jenkins Job AI Feedback service
 on:
   push:
     branches:
-      - "main-feedback-setup"
+      - "main-feedback"
   pull_request:
     branches:
-      - "main-feedback-setup"
+      - "main-feedback"
   workflow_dispatch:
 
 jobs:
