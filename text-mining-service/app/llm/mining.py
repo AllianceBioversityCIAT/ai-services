@@ -4,10 +4,11 @@ import boto3
 from typing import Dict, Any
 from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
+from app.llm.map_fields import map_fields_with_opensearch
 from app.utils.prompt.prompt_star import DEFAULT_PROMPT_STAR
 from app.utils.prompt.prompt_prms import DEFAULT_PROMPT_PRMS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from app.utils.config.config_util import BR, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME
+from app.utils.config.config_util import BR, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, MAPPING_URL
 from app.schemas.mining_schemas import MiningResponse, ErrorResponse, InnovationDevelopmentResult, PolicyChangeResult, CapacityDevelopmentResult
 from app.llm.vectorize import (get_embedding,
                                check_reference_exists,
@@ -211,6 +212,22 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR):
 
         response_text = invoke_model(query)
 
+        json_content = json.loads(response_text) if is_valid_json(response_text) else {"text": response_text}
+        
+        if isinstance(json_content, dict) and "results" in json_content:
+            mapped_results = []
+            for result in json_content["results"]:
+                try:
+                    mapped_result = map_fields_with_opensearch(result, MAPPING_URL)
+                    mapped_results.append(mapped_result)
+                    logger.info(f"🔗 Fields mapped for result with indicator: {result.get('indicator', 'Unknown')}")
+                except Exception as map_error:
+                    logger.warning(f"⚠️ Field mapping failed for result: {str(map_error)}")
+                    mapped_results.append(result)
+            
+            json_content["results"] = mapped_results
+            logger.info(f"🔗 Field mapping completed for {len(mapped_results)} results")
+
         end_time = time.time()
         elapsed_time = end_time - start_time
 
@@ -219,13 +236,13 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR):
         # )
 
         # logger.info(f"✅ Successfully generated response:\n{json.dumps(formatted_response, indent=2)}")
-        logger.info(f"✅ Successfully generated response:\n{response_text}")
+        logger.info(f"✅ Successfully generated response:\n{json.dumps(json_content, indent=2, ensure_ascii=False)}")
         logger.info(f"⏱️ Response time: {elapsed_time:.2f} seconds")
 
         return {
             "content": response_text,
             "time_taken": f"{elapsed_time:.2f}",
-            "json_content": json.loads(response_text) if is_valid_json(response_text) else {"text": response_text}
+            "json_content": json_content
             # "json_content": formatted_response
         }
 
@@ -278,15 +295,32 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS):
 
         response_text = invoke_model(query)
 
+        json_content = json.loads(response_text) if is_valid_json(response_text) else {"text": response_text}
+        
+        if isinstance(json_content, dict) and "results" in json_content:
+            mapped_results = []
+            for result in json_content["results"]:
+                try:
+                    mapped_result = map_fields_with_opensearch(result, MAPPING_URL)
+                    mapped_results.append(mapped_result)
+                    logger.info(f"🔗 Fields mapped for result with indicator: {result.get('indicator', 'Unknown')}")
+                except Exception as map_error:
+                    logger.warning(f"⚠️ Field mapping failed for result: {str(map_error)}")
+                    mapped_results.append(result)
+            
+            json_content["results"] = mapped_results
+            logger.info(f"🔗 Field mapping completed for {len(mapped_results)} results")
+
         end_time = time.time()
         elapsed_time = end_time - start_time
-        logger.info(f"✅ Successfully generated PRMS response:\n{response_text}")
+        
+        logger.info(f"✅ Successfully generated PRMS response:\n{json.dumps(json_content, indent=2, ensure_ascii=False)}")
         logger.info(f"⏱️ PRMS Response time: {elapsed_time:.2f} seconds")
 
         return {
             "content": response_text,
             "time_taken": f"{elapsed_time:.2f}",
-            "json_content": json.loads(response_text) if is_valid_json(response_text) else {"text": response_text},
+            "json_content": json_content,
             "project": "PRMS"
         }
 
