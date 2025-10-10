@@ -4,16 +4,16 @@ import pandas as pd
 from io import BytesIO
 from PyPDF2 import PdfReader
 from pptx import Presentation
-from app.utils.config.config_util import S3
+from app.utils.config.config_util import AWS
 from app.utils.logger.logger_util import get_logger
 
 logger = get_logger()
 
 s3_client = boto3.client(
     's3',
-    aws_access_key_id=S3['aws_access_key'],
-    aws_secret_access_key=S3['aws_secret_key'],
-    region_name=S3['aws_region']
+    aws_access_key_id=AWS['aws_access_key'],
+    aws_secret_access_key=AWS['aws_secret_key'],
+    region_name=AWS['aws_region']
 )
 
 
