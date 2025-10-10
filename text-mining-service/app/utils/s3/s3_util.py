@@ -9,10 +9,7 @@ from app.utils.logger.logger_util import get_logger
 
 logger = get_logger()
 
-s3_client = boto3.client(
-    's3',
-    region_name=AWS['aws_region']
-)
+s3_client = boto3.client('s3')
 
 
 def _process_file_content(file_extension, file_content):
