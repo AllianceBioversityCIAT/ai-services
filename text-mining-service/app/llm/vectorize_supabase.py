@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 from psycopg2.extras import execute_values
-from app.utils.config.config_util import BR
+from app.utils.config.config_util import AWS
 from app.utils.logger.logger_util import get_logger
 
 load_dotenv()
@@ -23,8 +23,8 @@ DBNAME = os.getenv("SUPABASE_DB")
 
 bedrock_runtime = boto3.client(
     service_name='bedrock-runtime',
-    aws_access_key_id=BR['aws_access_key'],
-    aws_secret_access_key=BR['aws_secret_key'],
+    aws_access_key_id=AWS['aws_access_key'],
+    aws_secret_access_key=AWS['aws_secret_key'],
     region_name='us-east-1' 
 )
 

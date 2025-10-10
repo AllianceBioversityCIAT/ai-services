@@ -8,7 +8,7 @@ from app.llm.map_fields import map_fields_with_opensearch
 from app.utils.prompt.prompt_star import DEFAULT_PROMPT_STAR
 from app.utils.prompt.prompt_prms import DEFAULT_PROMPT_PRMS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from app.utils.config.config_util import BR, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, MAPPING_URL
+from app.utils.config.config_util import AWS, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, MAPPING_URL
 from app.schemas.mining_schemas import MiningResponse, ErrorResponse, InnovationDevelopmentResult, PolicyChangeResult, CapacityDevelopmentResult
 from app.llm.vectorize import (get_embedding,
                                check_reference_exists,
@@ -23,8 +23,8 @@ logger = get_logger()
 
 bedrock_runtime = boto3.client(
     service_name='bedrock-runtime',
-    aws_access_key_id=BR['aws_access_key'],
-    aws_secret_access_key=BR['aws_secret_key'],
+    aws_access_key_id=AWS['aws_access_key'],
+    aws_secret_access_key=AWS['aws_secret_key'],
     region_name='us-east-1'
 )
 

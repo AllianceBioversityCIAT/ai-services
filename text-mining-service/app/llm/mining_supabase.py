@@ -1,13 +1,12 @@
 import time
 import json
 import boto3
-from app.utils.config.config_util import BR
 from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
 from app.utils.prompt.prompt_star import DEFAULT_PROMPT_STAR
 from app.utils.prompt.prompt_prms import DEFAULT_PROMPT_PRMS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from app.utils.config.config_util import BR, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME
+from app.utils.config.config_util import AWS, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME
 from app.llm.vectorize_supabase import (get_embedding,
                                store_reference_embeddings,
                                store_temp_embeddings,
@@ -22,8 +21,8 @@ logger = get_logger()
 
 bedrock_runtime = boto3.client(
     service_name='bedrock-runtime',
-    aws_access_key_id=BR['aws_access_key'],
-    aws_secret_access_key=BR['aws_secret_key'],
+    aws_access_key_id=AWS['aws_access_key'],
+    aws_secret_access_key=AWS['aws_secret_key'],
     region_name='us-east-1'
 )
 
