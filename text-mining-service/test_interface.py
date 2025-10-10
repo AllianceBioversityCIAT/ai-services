@@ -14,20 +14,10 @@ from botocore.exceptions import BotoCoreError, ClientError
 # Page config & styles
 # =========================
 st.set_page_config(
-    page_title="Text Mining - Reporting Tool",
+    page_title="Bulk Upload",
     page_icon="🧠",
     layout="wide",
 )
-
-st.markdown("""
-<style>
-.small { font-size: 0.85rem; opacity: 0.9; }
-.muted { color: #6b7280; }
-.stAlert { border-radius: 10px; }
-.block-container { padding-top: 1.2rem; }
-</style>
-""", unsafe_allow_html=True)
-
 
 # -------------------------
 # Session state (persist results across reruns)
@@ -101,34 +91,42 @@ def normalize_results_to_df(result_json: Dict) -> pd.DataFrame:
 
     first_cols = [
         "indicator",
-        "title",
+        "title", 
         "description",
+        "year",
+        "main_contact_person.name",
+        "main_contact_person.code",
+        "main_contact_person.similarity_score",
         "keywords",
-        "geoscope.level",
-        "geoscope.sub_list",
+        "contract_code",
+        "contract_name",
+        "sdg_targets",
+        "training_category",
         "training_type",
+        "training_purpose",
+        "start_date",
+        "end_date", 
+        "delivery_modality",
+        "length_of_training",
         "total_participants",
         "male_participants",
-        "female_participants",
+        "female_participants", 
         "non_binary_participants",
-        "delivery_modality",
-        "start_date",
-        "end_date",
-        "length_of_training",
         "degree",
-        "policy_type",
-        "stage_in_policy_process",
-        "evidence_for_stage",
-        "short_title",
-        "innovation_nature",
-        "innovation_type",
-        "assess_readiness",
-        "anticipated_users",
-        "organizations",
-        "organization_type",
-        "organization_sub_type",
-        "alliance_main_contact_person_first_name",
-        "alliance_main_contact_person_last_name",
+        "trainee_name",
+        "trainee_gender",
+        "trainee_affiliation.affiliation_name",
+        "trainee_affiliation.institution_id",
+        "trainee_affiliation.similarity_score",
+        "trainee_nationality.code",
+        "training_supervisor.name",
+        "language.name",
+        "language.code",
+        "partners",
+        "geoscope_level",
+        "regions",
+        "countries",
+        "evidences"
     ]
     ordered = [c for c in first_cols if c in df.columns] + [c for c in df.columns if c not in first_cols]
     return df[ordered] if not df.empty else df
@@ -187,6 +185,45 @@ def _clear_results() -> None:
     st.session_state["last_source_id"] = None
 
 
+def post_to_star_formalize(
+    token: str,
+    selected_results: List[Dict]
+) -> Dict:
+    """
+    Send selected results to STAR formalize bulk endpoint.
+    """
+    url =  "https://main-allianceindicatorstest.ciat.cgiar.org/api/results/ai/formalize/bulk"
+    
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = selected_results
+    
+    st.write(f"🔍 **Debug Info:**")
+    st.write(f"- Number of selected results: {len(selected_results)}")
+    
+    if payload:
+        st.write(f"- Sample of first result:")
+        with st.expander("First result preview", expanded=False):
+            st.json(payload[0])
+    
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=300)
+        st.write(f"- Response status: {resp.status_code}")
+        
+        if resp.status_code not in [200, 201]:
+            st.write(f"- Response text: {resp.text}")
+            raise RuntimeError(f"STAR API error {resp.status_code}: {resp.text}")
+        
+        return resp.json()
+        
+    except requests.exceptions.RequestException as e:
+        st.write(f"- Request exception: {str(e)}")
+        raise RuntimeError(f"Network error: {str(e)}")
+
+
 def _render_results(result: Dict, df: pd.DataFrame, elapsed: float) -> None:
     st.success(f"Processed successfully! ⏱️ {elapsed:.2f}s")
 
@@ -194,15 +231,123 @@ def _render_results(result: Dict, df: pd.DataFrame, elapsed: float) -> None:
         st.json(result)
 
     st.subheader("📊 Results")
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    # Agregar funcionalidad de selección si hay resultados
+    if not df.empty:
+        # Obtener los resultados originales del JSON
+        payload = extract_inner_results_json(result)
+        original_results = payload.get("results", [])
+        
+        if original_results:
+            st.markdown("**Select records to submit to STAR platform:**")
+            
+            # Crear controles en la parte superior
+            col1, col2, col3 = st.columns([1, 2, 2])
+            
+            with col1:
+                # Checkbox para seleccionar todos
+                select_all = st.checkbox("Select All", key="select_all_records")
+            
+            with col2:
+                st.info(f"📊 Found {len(original_results)} records")
+            
+            with col3:
+                # Botón para enviar a STAR
+                submit_to_star = st.button(
+                    "🚀 Submit to STAR", 
+                    type="primary",
+                    disabled=len(original_results) == 0,
+                    help="Submit selected records to STAR platform",
+                    use_container_width=True
+                )
+            
+            # Crear una lista para almacenar las selecciones
+            selection_data = []
+            
+            # Crear checkboxes y almacenar selecciones
+            with st.container():
+                for idx, row in df.iterrows():
+                    checkbox_key = f"record_select_{idx}"
+                    # Si select_all cambió, actualizar todos los checkboxes
+                    if f"prev_select_all" not in st.session_state:
+                        st.session_state[f"prev_select_all"] = False
+                    
+                    if st.session_state.get("select_all_records", False) != st.session_state[f"prev_select_all"]:
+                        st.session_state[checkbox_key] = st.session_state.get("select_all_records", False)
+                    
+                    selected = st.checkbox(
+                        f"Row {idx + 1}",
+                        value=st.session_state.get(checkbox_key, False),
+                        key=checkbox_key,
+                        label_visibility="collapsed"
+                    )
+                    selection_data.append(selected)
+                
+                # Actualizar el estado previo de select_all
+                st.session_state[f"prev_select_all"] = st.session_state.get("select_all_records", False)
+            
+            # Mostrar DataFrame con checkboxes como primera columna
+            df_display = df.copy()
+            df_display.insert(0, "✓", ["☑️" if sel else "☐" for sel in selection_data])
+            
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            
+            # Mostrar contador de seleccionados
+            selected_count = sum(selection_data)
+            if selected_count > 0:
+                st.info(f"📋 Selected: {selected_count} of {len(original_results)} records")
+            
+            # Procesar envío a STAR
+            if submit_to_star:
+                selected_indices = [idx for idx, selected in enumerate(selection_data) if selected]
+                
+                if not selected_indices:
+                    st.warning("⚠️ Please select at least one record to submit to STAR.")
+                else:
+                    selected_results = [original_results[idx] for idx in selected_indices]
+                    
+                    try:
+                        with st.spinner(f"Submitting {len(selected_results)} records to STAR platform..."):
+                            star_response = post_to_star_formalize(
+                                token=st.session_state.get("token", ""),
+                                selected_results=selected_results
+                            )
+                        
+                        st.success(f"✅ Successfully submitted {len(selected_results)} records to STAR!")
+                        
+                        # Mostrar información detallada de la respuesta
+                        with st.expander("📋 STAR Submission Details", expanded=True):
+                            st.json(star_response)
+                            
+                        # Opcional: limpiar selecciones después del envío exitoso
+                        if st.button("🔄 Clear Selections", key="clear_selections"):
+                            for idx in range(len(original_results)):
+                                if f"record_select_{idx}" in st.session_state:
+                                    del st.session_state[f"record_select_{idx}"]
+                            if "select_all_records" in st.session_state:
+                                del st.session_state["select_all_records"]
+                            st.rerun()
+                            
+                    except Exception as e:
+                        st.error(f"❌ Error submitting to STAR: {str(e)}")
+                        # Mostrar más detalles del error si está disponible
+                        with st.expander("🔍 Error Details", expanded=False):
+                            st.code(str(e))
+        else:
+            st.dataframe(df, use_container_width=True, hide_index=True)
+    else:
+        st.dataframe(df, use_container_width=True, hide_index=True)
 
+    # Botones de descarga
+    st.markdown("---")
+    st.subheader("📥 Download Results")
     c1, c2 = st.columns(2)
     with c1:
         json_bytes = json.dumps(result, ensure_ascii=False, indent=2).encode("utf-8")
         st.download_button(
             "⬇️ **Download JSON**",
             data=json_bytes,
-            file_name="text_mining_result.json",
+            file_name="bulk_upload_result.json",
             mime="application/json",
             use_container_width=True
         )
@@ -212,7 +357,7 @@ def _render_results(result: Dict, df: pd.DataFrame, elapsed: float) -> None:
         st.download_button(
             "⬇️ **Download CSV**",
             data=csv_buf.getvalue(),
-            file_name="text_mining_result.csv",
+            file_name="bulk_upload_result.csv",
             mime="text/csv",
             use_container_width=True
         )
@@ -225,6 +370,8 @@ def post_to_api(
     bucket: str,
     token: str,
     environment_url: str,
+    project_type: str,
+    folder_path: str,
     prompt: Optional[str] = None,
     key: Optional[str] = None,
     file_bytes: Optional[bytes] = None,
@@ -232,11 +379,13 @@ def post_to_api(
     file_type: Optional[str] = None,
 ) -> Dict:
     """
-    Call the FastAPI /process endpoint.
+    Call the FastAPI /star/mining-bulk-upload/capdev endpoint.
     - If file_bytes is present, send multipart with 'file'
     - Otherwise, send 'key'
     """
-    url = base_url.rstrip("/") + "/prms/text_mining"
+    if project_type == "STAR":
+        url = base_url.rstrip("/") + "/star/mining-bulk-upload/capdev"
+    
     data = {
         "bucketName": bucket,
         "token": token,
@@ -248,7 +397,9 @@ def post_to_api(
 
     files = None
     if file_bytes is not None and file_name:
+        full_key = folder_path + file_name
         files = {"file": (file_name, file_bytes, file_type or "application/octet-stream")}
+        data["key"] = full_key
     else:
         data["key"] = key or ""
 
@@ -263,10 +414,31 @@ def post_to_api(
 st.sidebar.title("⚙️ Settings")
 api_base_url = st.sidebar.text_input(
     "FastAPI Base URL",
-    value="https://d3djd7q7g7v7di.cloudfront.net",
-    help="Your FastAPI service URL (defaults to https://d3djd7q7g7v7di.cloudfront.net)."
+    value="https://oxnrkcntlheycdgcnilexrwp4i0tucqz.lambda-url.us-east-1.on.aws",
+    help="Your FastAPI service URL (defaults to https://oxnrkcntlheycdgcnilexrwp4i0tucqz.lambda-url.us-east-1.on.aws)."
 )
-bucket = st.sidebar.text_input("S3 Bucket", value="microservice-mining")
+bucket = st.sidebar.text_input("S3 Bucket", value="ai-services-ibd")
+
+project_type = st.sidebar.selectbox(
+    "Project Type",
+    options=["STAR"],
+    help="Select the project type to determine the correct folder structure"
+)
+
+# Definir las carpetas base según el proyecto
+if project_type == "STAR":
+    base_folders = [
+        "star/text-mining/files/test/",
+        "star/text-mining/files/prod/"
+    ]
+    api_endpoint = "/star/text-mining"
+
+folder_path = st.sidebar.selectbox(
+    "Base Folder",
+    options=base_folders,
+    help="Select the base folder for document operations"
+)
+
 token = st.sidebar.text_input("Auth Token", value="", type="password")
 environment_url = st.sidebar.text_input("Environment URL", value="https://management-allianceindicatorstest.ciat.cgiar.org/api/")
 
@@ -276,7 +448,7 @@ st.sidebar.caption("*AWS credentials are taken from your environment. Ensure `bo
 # =========================
 # Main
 # =========================
-st.title("🧠 Text Mining - Interactive Test UI")
+st.title("🧠 Bulk Upload - Text Mining Service")
 st.markdown(
     "<div class='muted'>Upload a document or select one from S3, send it to the text-mining service, and visualize results.</div>",
     unsafe_allow_html=True
@@ -298,27 +470,38 @@ uploaded_file = None
 with col_left:
     if mode == "Upload file":
         uploaded_file = st.file_uploader(
-            "File type (_pdf, docx, txt, xlsx, xls, pptx_)",
-            type=None,
+            "File type (pdf, docx, txt, xlsx, xls, pptx)",
+            type=["pdf", "docx", "txt", "xlsx", "xls", "pptx"],
             accept_multiple_files=False
         )
+        if uploaded_file:
+            st.info(f"📁 File will be uploaded to: `{bucket}/{folder_path}{uploaded_file.name}`")
+    
     else:
         with st.expander("S3 search options", expanded=True):
-            prefix = st.text_input("Prefix (optional)", value="")
+            additional_prefix = st.text_input(
+                "Additional prefix (optional)", 
+                value="",
+                help=f"Will be appended to base folder: {folder_path}"
+            )
+            full_prefix = folder_path + additional_prefix
+            st.caption(f"Searching in: `{bucket}/{full_prefix}`")
             refresh = st.button("🔄 Refresh list")
 
         if bucket:
-            if "s3_keys_cache" not in st.session_state or refresh or st.session_state.get("last_prefix") != prefix:
+            cache_key = f"s3_keys_{bucket}_{full_prefix}"
+            if cache_key not in st.session_state or refresh:
                 with st.spinner("Listing S3 objects..."):
-                    st.session_state["s3_keys_cache"] = list_s3_objects(bucket, prefix)
-                    st.session_state["last_prefix"] = prefix
-            keys = st.session_state.get("s3_keys_cache", [])
+                    st.session_state[cache_key] = list_s3_objects(bucket, full_prefix)
+            
+            keys = st.session_state.get(cache_key, [])
             if keys:
                 selected_key = st.selectbox(
                     "Select an object from S3",
                     options=keys,
                     index=0
                 )
+                st.caption(f"Selected: `{selected_key}`")
             else:
                 st.info("_No objects found for this bucket/prefix._")
 
@@ -334,6 +517,9 @@ if run_btn:
     if not bucket or not token or not environment_url:
         st.error("❌ _Please complete **S3 Bucket**, **Auth Token**, and **Environment URL** in the sidebar._")
     else:
+        st.session_state["token"] = token
+        st.session_state["environment_url"] = environment_url
+
         try:
             with st.spinner("Sending document to the service…"):
                 t0 = time.time()
@@ -348,6 +534,8 @@ if run_btn:
                         bucket=bucket,
                         token=token,
                         environment_url=environment_url,
+                        project_type=project_type,
+                        folder_path=folder_path,
                         file_bytes=file_bytes,
                         file_name=uploaded_file.name,
                         file_type=uploaded_file.type
@@ -361,6 +549,8 @@ if run_btn:
                         bucket=bucket,
                         token=token,
                         environment_url=environment_url,
+                        project_type=project_type,
+                        folder_path=folder_path,
                         key=selected_key
                     )
 
@@ -414,4 +604,4 @@ if not st.session_state.get("has_rendered_this_run") and st.session_state.get("l
 # =========================
 st.markdown("#")
 st.markdown("---")
-st.caption("© Text Mining Service - Demo UI. Built with ❤️ in Streamlit.")
+st.caption("© Bulk Upload Service - Demo UI. Built with ❤️ in Streamlit.")
