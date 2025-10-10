@@ -1,4 +1,3 @@
-# streamlit_app.py
 import io
 import json
 import time
@@ -7,7 +6,7 @@ import requests
 import pandas as pd
 import streamlit as st
 from typing import Optional, List, Dict
-from app.utils.config.config_util import S3
+from app.utils.config.config_util import AWS
 from botocore.exceptions import BotoCoreError, ClientError
 
 # =========================
@@ -32,8 +31,9 @@ if "last_elapsed" not in st.session_state:
     st.session_state["last_elapsed"] = None
 if "last_source_id" not in st.session_state:
     st.session_state["last_source_id"] = None
-# IMPORTANT: reset this to False on every run so downloads don't hide results
+
 st.session_state["has_rendered_this_run"] = False
+
 
 # =========================
 # Helpers
@@ -43,9 +43,9 @@ def list_s3_objects(bucket: str, prefix: str = "", max_items: int = 1000) -> Lis
     try:
         s3 = boto3.client(
             "s3", 
-            aws_access_key_id=S3['aws_access_key'],
-            aws_secret_access_key=S3['aws_secret_key'],
-            region_name=S3['aws_region']
+            aws_access_key_id=AWS['aws_access_key'],
+            aws_secret_access_key=AWS['aws_secret_key'],
+            region_name=AWS['aws_region']
         )
         paginator = s3.get_paginator("list_objects_v2")
         pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
@@ -173,10 +173,9 @@ def _set_results(result: Dict, payload: Dict, df: pd.DataFrame, elapsed: float, 
     st.session_state["last_df"] = df
     st.session_state["last_elapsed"] = elapsed
     st.session_state["last_source_id"] = source_id
-    st.session_state["has_rendered_this_run"] = False  # ensure we can render after rerun
+    st.session_state["has_rendered_this_run"] = False
 
 
-# Helper to clear persisted results
 def _clear_results() -> None:
     st.session_state["last_result"] = None
     st.session_state["last_payload"] = None
@@ -232,27 +231,22 @@ def _render_results(result: Dict, df: pd.DataFrame, elapsed: float) -> None:
 
     st.subheader("📊 Results")
     
-    # Agregar funcionalidad de selección si hay resultados
     if not df.empty:
-        # Obtener los resultados originales del JSON
         payload = extract_inner_results_json(result)
         original_results = payload.get("results", [])
         
         if original_results:
             st.markdown("**Select records to submit to STAR platform:**")
             
-            # Crear controles en la parte superior
             col1, col2, col3 = st.columns([1, 2, 2])
             
             with col1:
-                # Checkbox para seleccionar todos
                 select_all = st.checkbox("Select All", key="select_all_records")
             
             with col2:
                 st.info(f"📊 Found {len(original_results)} records")
             
             with col3:
-                # Botón para enviar a STAR
                 submit_to_star = st.button(
                     "🚀 Submit to STAR", 
                     type="primary",
@@ -261,50 +255,57 @@ def _render_results(result: Dict, df: pd.DataFrame, elapsed: float) -> None:
                     use_container_width=True
                 )
             
-            # Crear una lista para almacenar las selecciones
-            selection_data = []
-            
-            # Crear checkboxes y almacenar selecciones
-            with st.container():
-                for idx, row in df.iterrows():
-                    checkbox_key = f"record_select_{idx}"
-                    # Si select_all cambió, actualizar todos los checkboxes
-                    if f"prev_select_all" not in st.session_state:
-                        st.session_state[f"prev_select_all"] = False
-                    
-                    if st.session_state.get("select_all_records", False) != st.session_state[f"prev_select_all"]:
-                        st.session_state[checkbox_key] = st.session_state.get("select_all_records", False)
-                    
-                    selected = st.checkbox(
-                        f"Row {idx + 1}",
-                        value=st.session_state.get(checkbox_key, False),
-                        key=checkbox_key,
-                        label_visibility="collapsed"
-                    )
-                    selection_data.append(selected)
-                
-                # Actualizar el estado previo de select_all
-                st.session_state[f"prev_select_all"] = st.session_state.get("select_all_records", False)
-            
-            # Mostrar DataFrame con checkboxes como primera columna
             df_display = df.copy()
-            df_display.insert(0, "✓", ["☑️" if sel else "☐" for sel in selection_data])
             
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            selection_column = []
+            for idx in range(len(df_display)):
+                checkbox_key = f"record_select_{idx}"
+                
+                if select_all:
+                    st.session_state[checkbox_key] = True
+                
+                current_value = st.session_state.get(checkbox_key, False)
+                selection_column.append(current_value)
             
-            # Mostrar contador de seleccionados
+            df_display.insert(0, "Select", selection_column)
+            
+            edited_df = st.data_editor(
+                df_display,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Select": st.column_config.CheckboxColumn(
+                        "Select",
+                        help="Select records to submit to STAR",
+                        default=False,
+                    ),
+                    "title": st.column_config.TextColumn(
+                        "title",
+                        help="Edit the title of the record",
+                        max_chars=500,
+                    )
+                },
+                disabled=[col for col in df_display.columns if col not in ["Select", "title"]],
+                key="data_editor"
+            )
+            
+            selection_data = edited_df["Select"].tolist()
             selected_count = sum(selection_data)
+            
             if selected_count > 0:
                 st.info(f"📋 Selected: {selected_count} of {len(original_results)} records")
             
-            # Procesar envío a STAR
             if submit_to_star:
                 selected_indices = [idx for idx, selected in enumerate(selection_data) if selected]
                 
                 if not selected_indices:
                     st.warning("⚠️ Please select at least one record to submit to STAR.")
                 else:
-                    selected_results = [original_results[idx] for idx in selected_indices]
+                    selected_results = []
+                    for idx in selected_indices:
+                        result = original_results[idx].copy()
+                        result["title"] = edited_df.iloc[idx]["title"]
+                        selected_results.append(result)
                     
                     try:
                         with st.spinner(f"Submitting {len(selected_results)} records to STAR platform..."):
@@ -315,22 +316,18 @@ def _render_results(result: Dict, df: pd.DataFrame, elapsed: float) -> None:
                         
                         st.success(f"✅ Successfully submitted {len(selected_results)} records to STAR!")
                         
-                        # Mostrar información detallada de la respuesta
                         with st.expander("📋 STAR Submission Details", expanded=True):
                             st.json(star_response)
                             
-                        # Opcional: limpiar selecciones después del envío exitoso
                         if st.button("🔄 Clear Selections", key="clear_selections"):
-                            for idx in range(len(original_results)):
-                                if f"record_select_{idx}" in st.session_state:
-                                    del st.session_state[f"record_select_{idx}"]
+                            if "data_editor" in st.session_state:
+                                del st.session_state["data_editor"]
                             if "select_all_records" in st.session_state:
                                 del st.session_state["select_all_records"]
                             st.rerun()
                             
                     except Exception as e:
                         st.error(f"❌ Error submitting to STAR: {str(e)}")
-                        # Mostrar más detalles del error si está disponible
                         with st.expander("🔍 Error Details", expanded=False):
                             st.code(str(e))
         else:
@@ -338,29 +335,28 @@ def _render_results(result: Dict, df: pd.DataFrame, elapsed: float) -> None:
     else:
         st.dataframe(df, use_container_width=True, hide_index=True)
 
-    # Botones de descarga
-    st.markdown("---")
-    st.subheader("📥 Download Results")
-    c1, c2 = st.columns(2)
-    with c1:
-        json_bytes = json.dumps(result, ensure_ascii=False, indent=2).encode("utf-8")
-        st.download_button(
-            "⬇️ **Download JSON**",
-            data=json_bytes,
-            file_name="bulk_upload_result.json",
-            mime="application/json",
-            use_container_width=True
-        )
-    with c2:
-        csv_buf = io.StringIO()
-        df.to_csv(csv_buf, index=False)
-        st.download_button(
-            "⬇️ **Download CSV**",
-            data=csv_buf.getvalue(),
-            file_name="bulk_upload_result.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
+    # st.markdown("---")
+    # st.subheader("📥 Download Results")
+    # c1, c2 = st.columns(2)
+    # with c1:
+    #     json_bytes = json.dumps(result, ensure_ascii=False, indent=2).encode("utf-8")
+    #     st.download_button(
+    #         "⬇️ **Download JSON**",
+    #         data=json_bytes,
+    #         file_name="bulk_upload_result.json",
+    #         mime="application/json",
+    #         use_container_width=True
+    #     )
+    # with c2:
+    #     csv_buf = io.StringIO()
+    #     df.to_csv(csv_buf, index=False)
+    #     st.download_button(
+    #         "⬇️ **Download CSV**",
+    #         data=csv_buf.getvalue(),
+    #         file_name="bulk_upload_result.csv",
+    #         mime="text/csv",
+    #         use_container_width=True
+    #     )
 
     st.session_state["has_rendered_this_run"] = True
 
@@ -408,6 +404,7 @@ def post_to_api(
         raise RuntimeError(f"API error {resp.status_code}: {resp.text}")
     return resp.json()
 
+
 # =========================
 # Sidebar
 # =========================
@@ -425,7 +422,6 @@ project_type = st.sidebar.selectbox(
     help="Select the project type to determine the correct folder structure"
 )
 
-# Definir las carpetas base según el proyecto
 if project_type == "STAR":
     base_folders = [
         "star/text-mining/files/test/",
@@ -444,6 +440,7 @@ environment_url = st.sidebar.text_input("Environment URL", value="https://manage
 
 st.sidebar.markdown("---")
 st.sidebar.caption("*AWS credentials are taken from your environment. Ensure `boto3` is authorized.*")
+
 
 # =========================
 # Main
@@ -510,6 +507,7 @@ with col_right:
     run_btn = st.button("🚀 Process document", type="primary", use_container_width=True)
     st.caption("_Tip: Filter by prefix to quickly find your files._")
 
+
 # =========================
 # Main action
 # =========================
@@ -561,7 +559,6 @@ if run_btn:
                 st.error(f"❌ _Service returned an error: {result.get('error') or result.get('message') or 'Unknown error'}_")
                 st.stop()
 
-            # Build a stable source identifier (only updates when user clicks Process)
             if mode == "Upload file" and uploaded_file is not None:
                 source_id = f"upload::{uploaded_file.name}"
             elif mode == "Select from S3" and selected_key:
@@ -569,7 +566,6 @@ if run_btn:
             else:
                 source_id = "unknown"
 
-            # Normalize and persist results in session_state
             try:
                 payload = extract_inner_results_json(result)
                 df = normalize_results_to_df(payload)
@@ -591,11 +587,11 @@ if run_btn:
             _clear_results()
             st.exception(e)
 
+
 # -------------------------
 # Persist results across reruns (e.g., after clicking download buttons)
 # -------------------------
 if not st.session_state.get("has_rendered_this_run") and st.session_state.get("last_df") is not None:
-    # Only render if we have previous results and haven't rendered them yet in this run
     _render_results(st.session_state["last_result"], st.session_state["last_df"], st.session_state["last_elapsed"])
 
 
