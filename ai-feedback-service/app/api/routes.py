@@ -29,17 +29,32 @@ router = APIRouter()
     This endpoint tracks all AI interactions and optionally handles feedback submission
     when users provide feedback on AI-generated responses. It serves dual purposes:
     
-    1. **Interaction Tracking**: Records every AI interaction for analytics and monitoring
-    2. **Feedback Collection**: Captures user feedback when provided
+    1. Interaction Tracking: Records every AI interaction for analytics and monitoring
+    2. Feedback Collection: Captures user feedback when provided
+
+    🏷️ Service Registration & Metadata
+    
+    Automatic Service Registration: When a new service sends its first interaction,
+    it's automatically registered with either:
+    - Custom metadata (if `display_name` and/or `service_description` provided)
+    - Auto-generated metadata (if no custom metadata provided)
+    
+    Custom Service Metadata (Optional):
+    - `display_name`: Human-readable service name (e.g., "AICCRA Advanced Chatbot")
+    - `service_description`: Detailed service description (e.g., "Conversational AI for climate data exploration")
+    
+    If no custom metadata is provided, the service will be auto-registered as:
+    - Display Name: "Climate Chatbot" (auto-formatted from service_name)
+    - Description: "AI service: climate-chatbot" (auto-generated)
 
     🔄 Two Usage Modes
     
-    **Mode 1: Initial Interaction Tracking**
+    Mode 1: Initial Interaction Tracking
     - Called by AI services after generating responses
     - Records the interaction with optional immediate feedback
     - Creates new interaction record in database
     
-    **Mode 2: Feedback Update**
+    Mode 2: Feedback Update
     - Called by applications when users provide feedback
     - Updates existing interaction with feedback data
     - Requires interaction_id and update_mode=true
@@ -48,6 +63,7 @@ router = APIRouter()
     
     This unified approach enables:
     - Complete interaction tracking across all AI services
+    - Custom service naming and descriptions for better analytics
     - Feedback rate analysis (what percentage of interactions get feedback)
     - Service performance monitoring
     - User engagement metrics
@@ -87,6 +103,11 @@ async def track_interaction(interaction_request: AIInteractionRequest) -> AIInte
         else:
             logger.info(f"📝 Processing new AI interaction for service: {interaction_request.service_name}")
             
+            if interaction_request.display_name:
+                logger.info(f"🏷️ Custom display name provided: {interaction_request.display_name}")
+            if interaction_request.service_description:
+                logger.info(f"📄 Custom service description provided")
+        
         logger.info(f"🔧 Service: {interaction_request.service_name}")
         logger.info(f"👤 User: {interaction_request.user_id}")
         logger.info(f"📊 Has Feedback: {interaction_request.feedback_type is not None}")
@@ -151,10 +172,10 @@ async def track_interaction(interaction_request: AIInteractionRequest) -> AIInte
     - Time-based analytics
     
     Key Metrics:
-    - **Total Interactions**: All AI interactions tracked
-    - **Feedback Rate**: Percentage of interactions that received feedback
-    - **Satisfaction Rate**: Percentage of positive feedback among feedback entries
-    - **Service Breakdown**: Performance comparison across services
+    - Total Interactions: All AI interactions tracked
+    - Feedback Rate: Percentage of interactions that received feedback
+    - Satisfaction Rate: Percentage of positive feedback among feedback entries
+    - Service Breakdown: Performance comparison across services
     
     Use Cases:
     - Monitor overall AI service usage and quality
