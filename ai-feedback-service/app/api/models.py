@@ -82,6 +82,22 @@ class AIInteractionRequest(BaseModel):
         description="Name of the AI service being evaluated",
         examples=["chatbot", "reports-generator", "text-mining"]
     )
+
+    display_name: Optional[str] = Field(
+        default=None,
+        description="Optional human-readable display name for the service. If provided, will be used for service registration instead of auto-generated name.",
+        examples=["AICCRA Chatbot", "Reports Generator AI", "Advanced Text Mining Service"]
+    )
+    
+    service_description: Optional[str] = Field(
+        default=None,
+        description="Optional description of the AI service. If provided, will be used for service registration instead of auto-generated description.",
+        examples=[
+            "Conversational AI for AICCRA data exploration",
+            "AI-powered reports generation service",
+            "Advanced text analysis and mining capabilities"
+        ]
+    )
     
     # Flexible context and metadata
     context: Optional[Dict[str, Any]] = Field(
