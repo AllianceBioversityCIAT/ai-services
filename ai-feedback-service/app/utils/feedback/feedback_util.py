@@ -199,7 +199,11 @@ class AIInteractionService:
             logger.info(f"👤 User: {interaction_request.user_id}")
             logger.info(f"📊 Has Feedback: {interaction_request.feedback_type is not None}")
             
-            service_info = self._get_service_info(interaction_request.service_name)
+            service_info = self._get_service_info(
+                interaction_request.service_name,
+                interaction_request.display_name,
+                interaction_request.service_description
+            )
             
             interaction_record = self._create_interaction_record(
                 interaction_id, timestamp, interaction_request, service_info
@@ -586,19 +590,32 @@ class AIInteractionService:
             return False
     
 
-    def _get_service_info(self, service_name: str) -> Dict[str, Any]:
+    def _get_service_info(self, service_name: str, display_name: Optional[str] = None, service_description: Optional[str] = None) -> Dict[str, Any]:
         """Get service information, register if unknown."""
         if service_name in self.registered_services:
             return self.registered_services[service_name]
         else:
-            logger.info(f"🆕 Auto-registering unknown service: {service_name}")
-            display_name = service_name.replace("-", " ").replace("_", " ").title()
-            description = f"AI service: {service_name}"
+            if display_name and service_description:
+                logger.info(f"🎯 Auto-registering service with provided metadata: {service_name}")
+                final_display_name = display_name
+                final_description = service_description
+            elif display_name:
+                logger.info(f"🎯 Auto-registering service with provided display name: {service_name}")
+                final_display_name = display_name
+                final_description = f"AI service: {service_name}"
+            elif service_description:
+                logger.info(f"🎯 Auto-registering service with provided description: {service_name}")
+                final_display_name = service_name.replace("-", " ").replace("_", " ").title()
+                final_description = service_description
+            else:
+                logger.info(f"🆕 Auto-registering unknown service with generated names: {service_name}")
+                final_display_name = service_name.replace("-", " ").replace("_", " ").title()
+                final_description = f"AI service: {service_name}"
             
             self.register_service(
                 service_name=service_name,
-                display_name=display_name,
-                description=description,
+                display_name=final_display_name,
+                description=final_description,
                 expected_context=[]
             )
             
