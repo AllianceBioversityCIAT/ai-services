@@ -36,8 +36,8 @@ class AIInteractionRequest(BaseModel):
         ]
     )
     
-    ai_output: str = Field(
-        ...,
+    ai_output: Optional[str] = Field(
+        default=None,
         description="AI-generated output from the interaction",
         examples=[
             "Based on the latest data, AICCRA has achieved significant progress...",
