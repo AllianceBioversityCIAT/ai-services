@@ -277,7 +277,6 @@ Follow this exact structure:
                 "..."
             ],
             "contract_code": "<value>",
-            "contract_name": "<value>",
             "sdg_targets": <[array of sdg targets]>,
             "training_category": "<Training or Engagement>",
             "start_date": "<value>",
