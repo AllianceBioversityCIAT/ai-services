@@ -260,10 +260,10 @@ A user has submitted negative feedback for one of our AI services. Please review
 
 📋 FEEDBACK DETAILS:
 
-• Feedback ID: {feedback_data.get('feedback_id', 'N/A')}
+• Interaction ID: {feedback_data.get('interaction_id', 'N/A')}
 • Feedback Type: {feedback_data.get('feedback_type', 'N/A').upper()}
 • Timestamp: {timestamp}
-• Service: {feedback_data.get('service_display_name', 'N/A')} ({feedback_data.get('service_name', 'N/A')})
+• Service: {feedback_data.get('service_display_name', 'N/A')}
 
 👤 USER INFORMATION:
 
@@ -285,7 +285,7 @@ A user has submitted negative feedback for one of our AI services. Please review
 
 🤖 AI Output:
 
-{feedback_data.get('ai_output', 'No output recorded')[:500]}{'...' if len(str(feedback_data.get('ai_output', ''))) > 500 else ''}
+{feedback_data.get('ai_output', 'No output recorded')}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
