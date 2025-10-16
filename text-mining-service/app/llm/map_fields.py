@@ -16,7 +16,7 @@ def map_fields_with_opensearch(mining_result, mapping_service_url):
         entries.append({"value": affiliation, "type": "institution"})
 
     for partner in mining_result.get("partners", []):
-        if partner_name := partner.get("name"):
+        if partner_name := partner.get("institution_name"):
             entries.append({"value": partner_name, "type": "institution"})
 
     if not entries:
@@ -58,7 +58,7 @@ def map_fields_with_opensearch(mining_result, mapping_service_url):
                 mining_result["trainee_affiliation"]["similarity_score"] = m.get("score", 0)
 
         for partner in mining_result.get("partners", []):
-            if partner_name := partner.get("name"):
+            if partner_name := partner.get("institution_name"):
                 key = (partner_name, "institution")
                 if key in mapped_dict:
                     m = mapped_dict[key]
@@ -87,7 +87,7 @@ def map_fields_with_opensearch(mining_result, mapping_service_url):
                 mining_result["trainee_affiliation"]["similarity_score"] = 0
 
         for partner in mining_result.get("partners", []):
-            if partner.get("name"):
+            if partner.get("institution_name"):
                 if "institution_id" not in partner:
                     partner["institution_id"] = None
                 if "similarity_score" not in partner:
