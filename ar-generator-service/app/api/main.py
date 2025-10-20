@@ -23,13 +23,13 @@ app = FastAPI(
     
     🎯 Report Types Available
     
-    **Mid-Year Progress Reports** (`/api/generate`)
+    Mid-Year Progress Reports (`/api/generate`)
     - Focus on interim progress assessment and milestone tracking
     - Covers January-June achievements and progress towards annual targets
     - Includes risk assessment and course correction recommendations
     - Ideal for progress monitoring and mid-year strategic reviews
     
-    **Annual Reports** (`/api/generate-annual`)  
+    Annual Reports (`/api/generate-annual`)  
     - Comprehensive year-end performance and impact assessment
     - Covers complete January-December achievements and outcomes
     - Includes detailed impact analysis, disaggregated targets, and lessons learned
