@@ -1,4 +1,4 @@
-"""Main pipeline for generating Mid-Year Progress Reports using OpenSearch and LLMs."""
+"""Main pipeline for generating Annual Reports using OpenSearch and LLMs."""
 
 import re
 import json
@@ -6,12 +6,13 @@ import boto3
 import numpy as np
 import pandas as pd
 from requests_aws4auth import AWS4Auth
+from db_conn.mysql_connection import load_data
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import BR, OPENSEARCH
 from opensearchpy import OpenSearch, RequestsHttpConnection
-from db_conn.sql_connection import load_data, load_full_data
-from app.utils.prompts.report_prompt import generate_report_prompt
 from app.llm.invoke_llm import invoke_model, get_bedrock_embeddings
+from app.utils.prompts.diss_targets_prompt import generate_target_prompt
+from app.utils.prompts.annual_report_prompt import generate_report_prompt
 
 logger = get_logger()
 
@@ -74,15 +75,11 @@ def create_index_if_not_exists(dimension=1024):
         return False
 
 
-def insert_into_opensearch(table_name: str, mode: str):
+def insert_into_opensearch(table_name: str):
     try:
         logger.info(f"🔍 Processing table: {table_name}")
 
-        if mode == "generator":
-            df = load_data(table_name)
-        else:
-            df = load_full_data(table_name)
-        
+        df = load_data(table_name)
         rows = df.to_dict(orient="records")
 
         date_fields = ["last_updated_altmetric", "last_sync_almetric"]
@@ -176,6 +173,31 @@ def retrieve_context(query, indicator, year, top_k=10000):
         doi_response = opensearch.search(index=INDEX_NAME, body=doi_query)
         doi_chunks = [hit["_source"]["chunk"] for hit in doi_response["hits"]["hits"]]
 
+        ## QUESTIONS SEARCH
+        questions_query = {
+            "size": 10000,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"term": {"indicator_acronym": indicator}},
+                        {"term": {"year": year}},
+                        {
+                            "bool": {
+                                "should": [
+                                    {"term": {"source_table": "vw_ai_questions"}},
+                                    {"term": {"source_table": "vw_ai_project_contribution"}}
+                                ],
+                                "minimum_should_match": 1
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+
+        questions_response = opensearch.search(index=INDEX_NAME, body=questions_query)
+        questions_chunks = [hit["_source"]["chunk"] for hit in questions_response["hits"]["hits"]]
+
         ## COMBINE KNN AND DOI CHUNKS
         seen_keys = set()
         combined_chunks = []
@@ -203,7 +225,16 @@ def retrieve_context(query, indicator, year, top_k=10000):
             )
         ]
 
-        return filtered_knn_chunks
+        ## FILTER QUESTIONS CHUNKS
+        filtered_questions_chunks = [
+            chunk for chunk in questions_chunks
+            if not (
+                chunk.get("table_type") == "questions" and
+                chunk.get("phase_name") == "AWPB"
+            )
+        ]
+
+        return filtered_knn_chunks, filtered_questions_chunks
     
     except Exception as e:
         logger.error(f"❌ Error retrieving context: {e}")
@@ -236,6 +267,32 @@ def save_context_to_file(context, filename, indicator, year):
         logger.error(f"❌ Error saving context to file: {e}")
 
 
+def extract_dois_from_text(text):
+    markdown_links = re.findall(r"\[.*?\]\((https?://[^\s)]+)\)", text)
+    plain_links = re.findall(r"(?<!\()https?://[^\s\]\)]+", text)
+
+    return set(markdown_links + plain_links)
+
+
+def add_missed_links(report, context):
+    logger.info("📍 Adding missed links to the report...")
+    context_dois = {chunk.get("doi") for chunk in context if "doi" in chunk and chunk["doi"]}
+    used_dois = extract_dois_from_text(report)
+    missed_dois = context_dois - used_dois
+    missed_dois = {doi for doi in missed_dois if doi and doi.strip().lower() != "confidential"}
+
+    if missed_dois:
+        missed_section = "\n\n## Missed links\nThe following references were part of the context but not explicitly included:\n"
+        doi_to_cluster = {chunk["doi"]: chunk.get("cluster_acronym", "N/A") for chunk in context if "doi" in chunk and chunk["doi"]}
+        missed_section += "\n".join(
+            f"- [{doi}]({doi}) (Cluster: {doi_to_cluster.get(doi, 'N/A')})"
+            for doi in sorted(missed_dois)
+        )
+        report += missed_section
+    
+    return report
+
+
 def run_pipeline(indicator, year, insert_data=False):
     try:
         if insert_data:
@@ -243,24 +300,47 @@ def run_pipeline(indicator, year, insert_data=False):
                 logger.info(f"🗑️ Deleting existing index: {INDEX_NAME}")
                 opensearch.indices.delete(index=INDEX_NAME)
             create_index_if_not_exists()
-            insert_into_opensearch("vw_ai_deliverables", mode="generator")
-            insert_into_opensearch("vw_ai_project_contribution", mode="generator")
-            insert_into_opensearch("vw_ai_questions", mode="generator")
-            insert_into_opensearch("vw_ai_oicrs", mode="generator")
-            insert_into_opensearch("vw_ai_innovations", mode="generator")
-
+            insert_into_opensearch("vw_ai_deliverables")
+            insert_into_opensearch("vw_ai_project_contribution")
+            insert_into_opensearch("vw_ai_questions")
+            insert_into_opensearch("vw_ai_oicrs")
+            insert_into_opensearch("vw_ai_innovations")
+        
+        ## Part 1: Generate the report with deliverables, contributions, oicrs, and innovations
         total_expected, total_achieved, progress = calculate_summary(indicator, year)
 
         PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
         
-        context = retrieve_context(PROMPT, indicator, year)
+        context, questions = retrieve_context(PROMPT, indicator, year)
+        save_context_to_file(context, "context", indicator, year)
 
         query = f"""
             Using this information:\n{context}\n\n
             Do the following:\n{PROMPT}
             """
 
-        final_report = invoke_model(query)
+        generated_report = invoke_model(query)
+
+        ## Part 2: Generate the report with dissagregated targets
+        accepted_indicators = ["PDO Indicator 1", "PDO Indicator 2", "PDO Indicator 3", "IPI 2.3"]
+
+        if indicator in accepted_indicators:
+            TARGET_PROMPT = generate_target_prompt(indicator)
+            
+            query_questions = f"""
+                Using this information:\n{questions}\n\n
+                Do the following:\n{TARGET_PROMPT}
+                """
+            
+            logger.info("☑️  Starting disaggregated targets report generation...")
+            targets_report = invoke_model(query_questions)
+            
+            ## Combine both reports
+            targets_section = "\n\n## Disaggregated targets\n" + targets_report
+            generated_report += targets_section
+        
+        ## Part 3: Add missed links section
+        final_report = add_missed_links(generated_report, context)
 
         logger.info("✅ Report generation completed successfully.")
         return final_report
