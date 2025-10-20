@@ -21,13 +21,28 @@ app = FastAPI(
     This service combines automated report generation capabilities with vector databases 
     and Large Language Models to produce high-quality, data-driven narratives.
     
+    🎯 Report Types Available
+    
+    **Mid-Year Progress Reports** (`/api/generate`)
+    - Focus on interim progress assessment and milestone tracking
+    - Covers January-June achievements and progress towards annual targets
+    - Includes risk assessment and course correction recommendations
+    - Ideal for progress monitoring and mid-year strategic reviews
+    
+    **Annual Reports** (`/api/generate-annual`)  
+    - Comprehensive year-end performance and impact assessment
+    - Covers complete January-December achievements and outcomes
+    - Includes detailed impact analysis, disaggregated targets, and lessons learned
+    - Perfect for donor reporting, annual reviews, and strategic planning
+    
     🚀 Key Features
     
-    - 📊 Automated Report Generation: AI-generated reports for various performance indicators
+    - 📊 Automated Report Generation: AI-generated Mid-Year Progress and comprehensive Annual Reports
     - 🔍 Vector Search: Integration with Amazon OpenSearch Service for context retrieval
     - 📈 Multi-Indicator Support: Handles both IPI and PDO indicators
     - 💾 Database Integration: SQL Server connectivity for retrieving structured data
     - 🤖 AWS Bedrock Integration: Uses Claude 3.7 Sonnet for report generation
+    - 📋 Dual Report Types: Mid-year progress tracking and comprehensive annual assessments
     
     📋 Supported Indicators
     
@@ -107,7 +122,8 @@ async def root():
             "openapi_json": "/openapi.json"
         },
         "endpoints": {
-            "POST /api/generate": "Generate AICCRA report for specific indicator and year",
+            "POST /api/generate": "Generate AICCRA Mid-Year Progress Report for specific indicator and year",
+            "POST /api/generate-annual": "Generate comprehensive AICCRA Annual Report for specific indicator and year",
             "GET /health": "Health check endpoint"
         },
         "supported_indicators": {

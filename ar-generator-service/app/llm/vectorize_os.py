@@ -1,3 +1,5 @@
+"""Main pipeline for generating Mid-Year Progress Reports using OpenSearch and LLMs."""
+
 import re
 import json
 import boto3
@@ -10,7 +12,6 @@ from app.utils.config.config_util import BR, OPENSEARCH
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from app.utils.prompts.report_prompt import generate_report_prompt
 from app.llm.invoke_llm import invoke_model, get_bedrock_embeddings
-from app.utils.prompts.diss_targets_prompt import generate_target_prompt
 
 logger = get_logger()
 

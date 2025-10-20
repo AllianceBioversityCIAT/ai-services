@@ -1,3 +1,5 @@
+"""Main pipeline for generating Annual Reports using OpenSearch and LLMs."""
+
 import re
 import json
 import boto3
@@ -10,7 +12,7 @@ from app.utils.config.config_util import BR, OPENSEARCH
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from app.llm.invoke_llm import invoke_model, get_bedrock_embeddings
 from app.utils.prompts.diss_targets_prompt import generate_target_prompt
-from app.utils.prompts.report_generation_prompt import generate_report_prompt
+from app.utils.prompts.annual_report_prompt import generate_report_prompt
 
 logger = get_logger()
 
