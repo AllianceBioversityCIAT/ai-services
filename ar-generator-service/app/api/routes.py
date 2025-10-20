@@ -55,15 +55,15 @@ def _run_pipeline_opensearch_annual():
     description="""
     📊 Generate AI-Powered AICCRA Mid-Year Progress Report
     
-    This endpoint generates a **mid-year progress report** for a specific AICCRA indicator and year.
+    This endpoint generates a mid-year progress report for a specific AICCRA indicator and year.
     The report focuses on progress achieved up to mid-year and is designed for interim reporting cycles.
     
-    🎯 Report Type: **Mid-Year Progress Report**
+    🎯 Report Type: Mid-Year Progress Report
     
-    - **Purpose**: Track progress achievements up to mid-year
-    - **Scope**: Interim progress assessment and milestone tracking
-    - **Timeline**: Typically covers January-June achievements
-    - **Use Case**: Progress monitoring, mid-year reviews, course correction
+    - Purpose: Track progress achievements up to mid-year
+    - Scope: Interim progress assessment and milestone tracking
+    - Timeline: Typically covers January-June achievements
+    - Use Case: Progress monitoring, mid-year reviews, course correction
     
     🔍 How It Works
     
@@ -75,11 +75,11 @@ def _run_pipeline_opensearch_annual():
     📈 Mid-Year Report Content
     
     Generated reports include:
-    - **Progress Summary**: Mid-year quantitative achievements vs annual targets  
-    - **Key Deliverables**: Research outputs completed by mid-year with DOI links
-    - **Cluster Contributions**: Mid-year activities by regional/thematic clusters
-    - **Milestone Tracking**: Progress indicators and completion percentages
-    - **Risk Assessment**: Challenges and mitigation strategies for remaining year
+    - Progress Summary: Mid-year quantitative achievements vs annual targets  
+    - Key Deliverables: Research outputs completed by mid-year with DOI links
+    - Cluster Contributions: Mid-year activities by regional/thematic clusters
+    - Milestone Tracking: Progress indicators and completion percentages
+    - Risk Assessment: Challenges and mitigation strategies for remaining year
     
     ⚡ Performance Notes
     
@@ -231,15 +231,15 @@ async def generate_report(request: ChatRequest) -> ChatResponse:
     description="""
     📊 Generate AI-Powered AICCRA Annual Report
     
-    This endpoint generates a **comprehensive annual report** for a specific AICCRA indicator and year.
+    This endpoint generates a comprehensive annual report for a specific AICCRA indicator and year.
     The report covers the complete annual achievements and is designed for year-end reporting cycles.
     
-    🎯 Report Type: **Annual Report**
+    🎯 Report Type: Annual Report
     
-    - **Purpose**: Comprehensive review of full-year achievements
-    - **Scope**: Complete annual performance assessment and impact evaluation
-    - **Timeline**: Covers full January-December achievements
-    - **Use Case**: Annual reviews, donor reporting, impact assessment, strategic planning
+    - Purpose: Comprehensive review of full-year achievements
+    - Scope: Complete annual performance assessment and impact evaluation
+    - Timeline: Covers full January-December achievements
+    - Use Case: Annual reviews, donor reporting, impact assessment, strategic planning
     
     🔍 How It Works
     
@@ -252,16 +252,16 @@ async def generate_report(request: ChatRequest) -> ChatResponse:
     📈 Annual Report Content (More Comprehensive)
     
     Generated reports include:
-    - **Executive Summary**: Complete annual achievements overview
-    - **Quantitative Analysis**: Full-year progress vs targets with trend analysis
-    - **Key Deliverables**: All research outputs completed during the year with DOI links
-    - **Cluster Contributions**: Comprehensive activities by all regional/thematic clusters
-    - **Innovations & Technologies**: Complete innovation pipeline and readiness assessments (for IPI indicators)
-    - **Outcome Impact Reports**: Detailed impact case studies and beneficiary stories (for PDO indicators)
-    - **Disaggregated Targets**: Detailed breakdown by demographics and geography (for select indicators)
-    - **Gender & Social Inclusion**: Comprehensive social impact and equity analysis
-    - **Lessons Learned**: Challenges, successes, and strategic recommendations
-    - **Reference Links**: Complete bibliography of missed or additional references
+    - Executive Summary: Complete annual achievements overview
+    - Quantitative Analysis: Full-year progress vs targets with trend analysis
+    - Key Deliverables: All research outputs completed during the year with DOI links
+    - Cluster Contributions: Comprehensive activities by all regional/thematic clusters
+    - Innovations & Technologies: Complete innovation pipeline and readiness assessments (for IPI indicators)
+    - Outcome Impact Reports: Detailed impact case studies and beneficiary stories (for PDO indicators)
+    - Disaggregated Targets: Detailed breakdown by demographics and geography (for select indicators)
+    - Gender & Social Inclusion: Comprehensive social impact and equity analysis
+    - Lessons Learned: Challenges, successes, and strategic recommendations
+    - Reference Links: Complete bibliography of missed or additional references
     
     ⚡ Performance Notes
     
