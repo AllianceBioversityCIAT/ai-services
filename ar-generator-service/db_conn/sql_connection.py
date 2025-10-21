@@ -50,6 +50,11 @@ CREATE_VIEW_QUERIES = {
         FROM AICCRA_aiccrabi_aiccra_innovations inno
         LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = inno.indicator_pk
         LEFT JOIN AICCRA_dim_locations loc ON loc.id = inno.country_id;
+    """,
+    "vw_ai_challenges": """
+        CREATE OR ALTER VIEW vw_ai_challenges AS
+        SELECT acronym AS cluster_acronym, type, challenges_solutions, lessons_learned 
+        FROM AICCRA_dim_clusters
     """
 }
 
@@ -126,7 +131,7 @@ def load_data(table_name):
             df = df_grouped.reset_index()
             df["table_type"] = "oicrs"
         
-        else:
+        elif table_name == "vw_ai_innovations":
             df.rename(columns={'link_pdf_file': 'link_pdf_innovation'}, inplace=True)
             df.drop(['link_innovation', 'indicator_pk', 'contribution_pk', 'cluster_id', 'cluster_owner_id', 'status', 'updated_date', 'institution_id', 'is_scaling_partner', 'stage', 'stage_definition', 'country_id', 'gender_relevance', 'gender_explanation_evidence', 'youth_relevance', 'youth_explanation_evidence', 'are_users_determined', 'cluster_id_year'], axis=1, inplace=True)
             df = df[df['year'] == 2025]
@@ -138,6 +143,9 @@ def load_data(table_name):
             )
             df = df_grouped.reset_index()
             df["table_type"] = "innovations"
+        
+        else:
+            df["table_type"] = "challenges"
                         
         return df
 
