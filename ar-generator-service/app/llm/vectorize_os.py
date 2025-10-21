@@ -85,13 +85,11 @@ def insert_into_opensearch(table_name: str, mode: str):
         
         rows = df.to_dict(orient="records")
 
-        date_fields = ["last_updated_altmetric", "last_sync_almetric"]
-
         chunks = []
         for row in rows:
             chunk = {
                 k: v for k, v in row.items()
-                if (k not in date_fields or v != "") and pd.notnull(v) and v != ""
+                if pd.notnull(v) and v != ""
             }
             chunks.append(chunk)
 
