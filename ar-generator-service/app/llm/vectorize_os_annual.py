@@ -6,7 +6,7 @@ import boto3
 import numpy as np
 import pandas as pd
 from requests_aws4auth import AWS4Auth
-from db_conn.mysql_connection import load_data
+from db_conn.sql_connection import load_data
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import BR, OPENSEARCH
 from opensearchpy import OpenSearch, RequestsHttpConnection

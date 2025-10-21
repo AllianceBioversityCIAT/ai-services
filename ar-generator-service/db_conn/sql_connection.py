@@ -92,17 +92,17 @@ def load_data(table_name):
 
         if table_name == "vw_ai_project_contribution":
             df.rename(columns={'Phase name': 'phase_name', 'Phase year': 'year'}, inplace=True)
-            df.drop(['Milestone expected unit', 'Outcome Comunication', 'pk', 'contribution_pk', 'Project Link'], axis=1, inplace=True)
+            df.drop(['ID Phase', 'cluster_id', 'indicator_pk', 'Milestone expected unit', 'Outcome Comunication', 'pk', 'contribution_pk', 'Project Link', 'default_phase_name', 'default_phase_year'], axis=1, inplace=True)
             df = df[df['year'] == 2025]
             df["table_type"] = "contributions"
         
         elif table_name == "vw_ai_questions":
-            df.drop(['contribution_pk', 'indicator_pk', 'project_id', 'Project Link'], axis=1, inplace=True)
+            df.drop(['contribution_pk', 'indicator_pk', 'project_id', 'Project Link', 'phase'], axis=1, inplace=True)
             df = df[df['year'] == 2025]
             df["table_type"] = "questions"
 
         elif table_name == "vw_ai_deliverables":
-            df.drop(['contribution_pk', 'Indicator', 'indicator_code', 'DLV_planned', 'image_small', 'updated_date', 'indicator_pk', 'indicator_id', 'activity_id', 'Link', 'cluster_owner_id', 'institution_id', 'location_id', 'cluster_id'], axis=1, inplace=True)
+            df.drop(['contribution_pk', 'Indicator', 'indicator_code', 'DLV_planned', 'image_small', 'updated_date', 'indicator_pk', 'indicator_id', 'activity_id', 'Link', 'cluster_owner_id', 'institution_id', 'location_id', 'cluster_id', 'last_updated_altmetric', 'last_sync_almetric', 'id_phase_dlv'], axis=1, inplace=True)
             df = df[df['year'] == 2025]
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
@@ -115,7 +115,7 @@ def load_data(table_name):
         
         elif table_name == "vw_ai_oicrs":
             df.rename(columns={'link_pdf_file': 'link_pdf_oicr', 'oicr_year': 'year'}, inplace=True)
-            df.drop(['parameter_value', 'link_cluster_id', 'link_oicr_id', 'outcome_communication', 'srf_target', 'top_level_comment', 'country_iso_alpha3', 'contributing_crp', 'updated_date', 'indicator_pk', 'contribution_pk'], axis=1, inplace=True)
+            df.drop(['cluster_id', 'parameter_value', 'link_cluster_id', 'link_oicr_id', 'outcome_communication', 'srf_target', 'top_level_comment', 'country_iso_alpha3', 'contributing_crp', 'updated_date', 'indicator_pk', 'contribution_pk', 'country_id', 'institution_id', 'cluster_id_year'], axis=1, inplace=True)
             df = df[df['year'] == 2025]
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
@@ -128,7 +128,7 @@ def load_data(table_name):
         
         else:
             df.rename(columns={'link_pdf_file': 'link_pdf_innovation'}, inplace=True)
-            df.drop(['link_innovation', 'indicator_pk', 'contribution_pk', 'cluster_id', 'cluster_owner_id', 'updated_date', 'institution_id', 'is_scaling_partner'], axis=1, inplace=True)
+            df.drop(['link_innovation', 'indicator_pk', 'contribution_pk', 'cluster_id', 'cluster_owner_id', 'status', 'updated_date', 'institution_id', 'is_scaling_partner', 'stage', 'stage_definition', 'country_id', 'gender_relevance', 'gender_explanation_evidence', 'youth_relevance', 'youth_explanation_evidence', 'are_users_determined', 'cluster_id_year'], axis=1, inplace=True)
             df = df[df['year'] == 2025]
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
