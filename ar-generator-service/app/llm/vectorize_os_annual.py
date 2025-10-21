@@ -13,6 +13,7 @@ from opensearchpy import OpenSearch, RequestsHttpConnection
 from app.llm.invoke_llm import invoke_model, get_bedrock_embeddings
 from app.utils.prompts.diss_targets_prompt import generate_target_prompt
 from app.utils.prompts.annual_report_prompt import generate_report_prompt
+from app.utils.prompts.challenges_prompt import generate_challenges_prompt
 
 logger = get_logger()
 
@@ -82,13 +83,11 @@ def insert_into_opensearch(table_name: str):
         df = load_data(table_name)
         rows = df.to_dict(orient="records")
 
-        date_fields = ["last_updated_altmetric", "last_sync_almetric"]
-
         chunks = []
         for row in rows:
             chunk = {
                 k: v for k, v in row.items()
-                if (k not in date_fields or v != "") and pd.notnull(v) and v != ""
+                if pd.notnull(v) and v != ""
             }
             chunks.append(chunk)
 
@@ -222,6 +221,12 @@ def retrieve_context(query, indicator, year, top_k=10000):
                 (chunk.get("table_type") == "deliverables" and chunk.get("cluster_role") == "Shared")
                 or
                 (chunk.get("table_type") == "innovations" and chunk.get("cluster_role") == "Shared")
+                or
+                (chunk.get("table_type") == "oicrs" and chunk.get("cluster_role") == "Shared")
+                or
+                (chunk.get("table_type") == "contributions" and chunk.get("phase_name") == "AWPB")
+                or
+                (chunk.get("table_type") == "contributions" and chunk.get("phase_name") == "Progress")
             )
         ]
 
@@ -229,8 +234,13 @@ def retrieve_context(query, indicator, year, top_k=10000):
         filtered_questions_chunks = [
             chunk for chunk in questions_chunks
             if not (
-                chunk.get("table_type") == "questions" and
-                chunk.get("phase_name") == "AWPB"
+                (chunk.get("table_type") == "questions" and chunk.get("phase_name") == "AWPB")
+                or
+                (chunk.get("table_type") == "questions" and chunk.get("phase_name") == "Progress")
+                or
+                (chunk.get("table_type") == "contributions" and chunk.get("phase_name") == "AWPB")
+                or
+                (chunk.get("table_type") == "contributions" and chunk.get("phase_name") == "Progress")
             )
         ]
 
@@ -293,6 +303,52 @@ def add_missed_links(report, context):
     return report
 
 
+def generate_challenges_report(year):
+    """
+    Generate a Challenges and Lessons Learned report.
+    """
+    try:
+        logger.info(f"🎯 Starting Challenges and Lessons Learned report generation for {year}...")
+        
+        challenges_query = {
+            "size": 10000,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"term": {"year": year}},
+                        {"term": {"source_table": "vw_ai_challenges"}}
+                    ]
+                }
+            }
+        }
+
+        challenges_response = opensearch.search(index=INDEX_NAME, body=challenges_query)
+        challenges_chunks = [hit["_source"]["chunk"] for hit in challenges_response["hits"]["hits"]]
+        
+        if not challenges_chunks:
+            logger.warning(f"⚠️ No challenges data found for year {year}")
+            return f"# Challenges and Lessons Learned - {year}\n\nNo challenges and lessons learned data available for {year}."
+        
+        challenges_prompt = generate_challenges_prompt(year)
+        
+        save_context_to_file(challenges_chunks, "challenges_context", "all_clusters", year)
+        
+        query = f"""
+            Using this information:\n{challenges_chunks}\n\n
+            Do the following:\n{challenges_prompt}
+        """
+        
+        logger.info("🔄 Generating Challenges and Lessons Learned report...")
+        challenges_report = invoke_model(query)
+        
+        logger.info("✅ Challenges and Lessons Learned report generation completed successfully.")
+        return challenges_report
+        
+    except Exception as e:
+        logger.error(f"❌ Error generating Challenges and Lessons Learned report: {e}")
+        return f"# Challenges and Lessons Learned - {year}\n\nError generating report: {str(e)}"
+
+
 def run_pipeline(indicator, year, insert_data=False):
     try:
         if insert_data:
@@ -305,6 +361,7 @@ def run_pipeline(indicator, year, insert_data=False):
             insert_into_opensearch("vw_ai_questions")
             insert_into_opensearch("vw_ai_oicrs")
             insert_into_opensearch("vw_ai_innovations")
+            insert_into_opensearch("vw_ai_challenges")
         
         ## Part 1: Generate the report with deliverables, contributions, oicrs, and innovations
         total_expected, total_achieved, progress = calculate_summary(indicator, year)
