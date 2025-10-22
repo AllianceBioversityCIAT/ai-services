@@ -87,13 +87,20 @@ with tab2:
             try:                
                 response = generate_challenges_report(selected_year_challenges)
                 st.markdown(response)
-                
+
+                doc_challenges = docx.Document()
+                for line in response.split('\n'):
+                    doc_challenges.add_paragraph(line)
+                docx_buffer_challenges = io.BytesIO()
+                doc_challenges.save(docx_buffer_challenges)
+                docx_buffer_challenges.seek(0)
+
                 st.download_button(
                     label="📄 Download Challenges Report",
-                    data=response,
-                    file_name=f"challenges_lessons_learned_{selected_year_challenges}.md",
-                    mime="text/markdown",
-                    key="download_tab2"
+                    data=docx_buffer_challenges,
+                    file_name=f"challenges_lessons_learned_{selected_year_challenges}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key="download_tab2_docx"
                 )
 
             except Exception as e:
