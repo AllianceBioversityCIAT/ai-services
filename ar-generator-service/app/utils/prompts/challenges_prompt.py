@@ -8,47 +8,35 @@ Generate a comprehensive report about the challenges faced and lessons learned b
 
 ## Report Structure:
 
-### 1. Executive Summary
-- Brief overview of major challenges and key lessons learned across all clusters
-- Highlight 3-5 most significant insights that emerged during {year}
+### Executive Summary
+- Brief overview of major challenges and key lessons learned across all clusters during {year}
 
-### 2. Challenges by Cluster
+### 1. Challenges, Causes, and Proposed Solutions
 For each cluster that provided data, create a dedicated section with:
 - **Cluster Name** (bold formatting)
-- **Main Challenges**: List and describe the primary obstacles faced
-- **Impact Assessment**: How these challenges affected project implementation
-- **Mitigation Strategies**: Actions taken to address the challenges
+- **Main Challenges**: List and describe all the obstacles faced
+- **Impact Assessment**: How these challenges affected project implementation (if provided)
+- **Mitigation Strategies**: Actions taken to address the challenges (if provided)
 
-### 3. Lessons Learned by Cluster  
+### 2. Lessons Learned
 For each cluster:
 - **Cluster Name** (bold formatting)
-- **Key Learnings**: Most important insights gained
-- **Best Practices**: Successful strategies and approaches
-- **Adaptive Measures**: How the cluster adapted to overcome difficulties
-
-### 4. Cross-Cutting Themes
-Identify common patterns across clusters:
-- **Recurring Challenges**: Issues faced by multiple clusters
-- **Shared Solutions**: Strategies that worked across different contexts
-- **Systemic Insights**: Learnings about the broader AICCRA approach
-
-### 5. Strategic Recommendations
-Based on the challenges and lessons learned:
-- **Short-term Actions**: Immediate steps to address current challenges
-- **Medium-term Strategies**: Approaches for improving future implementation
-- **Knowledge Sharing**: Recommendations for spreading successful practices
+- **Key Learnings**: All insights gained
+- **Best Practices**: Successful strategies and approaches (if provided)
+- **Adaptive Measures**: How the cluster adapted to overcome difficulties (if provided)
 
 ## Formatting Guidelines:
 - Use clear headings and subheadings
 - Bold cluster names for easy identification
-- Use bullet points for listing challenges and lessons
+- Use one or two paragraphs per cluster to mention challenges and lessons, depending on the amount of content available (challenges and lessons have to be in separate paragraphs)
 - Include specific examples and details from the context
 - Maintain a constructive tone focused on learning and improvement
 - Ensure each cluster's unique context and contributions are reflected
+- Do not include any information outside of the provided context
 
 ## Content Requirements:
 - Draw exclusively from the provided context data
-- Ensure all clusters mentioned in the data are covered
+- Ensure all clusters that provided data about challenges and lessons learned are covered
 - Maintain factual accuracy and avoid speculation
 - Highlight both challenges and positive learnings
 - Focus on actionable insights and practical recommendations
