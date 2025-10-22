@@ -17,5 +17,6 @@ dependencies = [
     "streamlit",
     "fastapi",
     "uvicorn",
-    "mangum"
+    "mangum",
+    "python-docx"
 ]

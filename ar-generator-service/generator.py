@@ -1,37 +1,129 @@
+import io
+import docx
+import requests
 import streamlit as st
-from app.llm.vectorize_os import run_pipeline as run_pipeline_os
+from app.llm.vectorize_os_annual import run_pipeline
+from app.llm.vectorize_os_annual import generate_challenges_report
 
 st.set_page_config(page_title="AICCRA generator", page_icon="📄")
 
 st.title("📄 AICCRA Report Generator")
 
-indicators = [
-    "IPI 1.1",
-    "IPI 1.2",
-    "IPI 1.3",
-    "IPI 1.4",
-    "IPI 2.1",
-    "IPI 2.2",
-    "IPI 2.3",
-    "IPI 3.1",
-    "IPI 3.2",
-    "IPI 3.3",
-    "IPI 3.4",
-    "PDO Indicator 1",
-    "PDO Indicator 2",
-    "PDO Indicator 3",
-    "PDO Indicator 4",
-    "PDO Indicator 5"
-]
+tab1, tab2 = st.tabs(["📊 Annual Report by Indicator", "🎯 Challenges & Lessons Learned"])
 
-selected_indicator = st.selectbox("Select an indicator:", indicators)
-selected_year = st.selectbox("Select a year:", [2024, 2025])
 
-if st.button("Generate report"):
-    with st.spinner("Generating report..."):
-        try:
-            response = run_pipeline_os(selected_indicator, selected_year)
-            st.markdown(response)
+with tab1:
+    st.header("📊 Annual Report by Indicator")
+    st.caption("Generate comprehensive annual reports for specific AICCRA indicators")
+    
+    indicators = [
+        "IPI 1.1",
+        "IPI 1.2", 
+        "IPI 1.3",
+        "IPI 1.4",
+        "IPI 2.1",
+        "IPI 2.2",
+        "IPI 2.3",
+        "IPI 3.1",
+        "IPI 3.2",
+        "IPI 3.3",
+        "IPI 3.4",
+        "PDO Indicator 1",
+        "PDO Indicator 2",
+        "PDO Indicator 3",
+        "PDO Indicator 4",
+        "PDO Indicator 5"
+    ]
 
-        except Exception as e:
-            response = f"⚠️ An error occurred: {e}"
+    selected_indicator = st.selectbox("Select an indicator:", indicators, key="indicator_tab1")
+    selected_year = st.selectbox("Select a year:", [2025], key="year_tab1")
+
+    if st.button("Generate Annual Report", type="primary", key="generate_tab1"):
+        with st.spinner("Generating annual report..."):
+            try:
+                url = "https://ia.prms.cgiar.org/api/generate-annual"
+                payload = {
+                    "indicator": selected_indicator,
+                    "year": selected_year,
+                    "insert_data": "False"
+                }
+                response = requests.post(url, json=payload, timeout=600)
+                response.raise_for_status()
+                report_text = response.json().get("content", "No report found in response.")
+                
+                # response = run_pipeline(selected_indicator, selected_year)
+                
+                st.markdown(report_text)
+
+                doc = docx.Document()
+                for line in report_text.split('\n'):
+                    doc.add_paragraph(line)
+                docx_buffer = io.BytesIO()
+                doc.save(docx_buffer)
+                docx_buffer.seek(0)
+
+                st.download_button(
+                    label="📄 Download Report (DOCX)",
+                    data=docx_buffer,
+                    file_name=f"annual_report_{selected_indicator}_{selected_year}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key="download_tab1_docx"
+                )
+
+            except Exception as e:
+                st.error(f"⚠️ An error occurred: {e}")
+
+
+with tab2:
+    st.header("🎯 Challenges & Lessons Learned")
+    st.caption("Generate cross-cluster reports on challenges faced and lessons learned")
+    
+    st.info("💡 This report covers all clusters and is not divided by indicators")
+    
+    selected_year_challenges = st.selectbox("Select a year:", [2025], key="year_tab2")
+
+    if st.button("Generate Challenges Report", type="primary", key="generate_tab2"):
+        with st.spinner("Generating challenges and lessons learned report..."):
+            try:                
+                response = generate_challenges_report(selected_year_challenges)
+                st.markdown(response)
+                
+                st.download_button(
+                    label="📄 Download Challenges Report",
+                    data=response,
+                    file_name=f"challenges_lessons_learned_{selected_year_challenges}.md",
+                    mime="text/markdown",
+                    key="download_tab2"
+                )
+
+            except Exception as e:
+                st.error(f"⚠️ An error occurred: {e}")
+
+
+with st.sidebar:
+    st.subheader("📋 Report Types")
+    
+    st.markdown("""
+    **Annual Report by Indicator:**
+    - Detailed performance analysis
+    - Deliverables and contributions
+    - OICRs and innovations
+    - Disaggregated targets (selected indicators)
+    - Progress tracking and achievements
+    
+    **Challenges & Lessons Learned:**
+    - Cross-cluster analysis
+    - Implementation challenges
+    - Adaptive strategies
+    - Best practices identification
+    - Strategic recommendations
+    """)
+    
+    st.divider()
+    
+    st.subheader("ℹ️ Tips")
+    st.markdown("""
+    - Annual reports take 2-3 minutes to generate
+    - Challenges reports are typically shorter
+    - Download buttons appear after generation
+    """)
