@@ -257,8 +257,16 @@ def calculate_summary(indicator, year):
         (df_contributions["indicator_acronym"] == indicator) &
         (df_contributions["year"] == year)
     ]
-    total_expected = df_filtered["Milestone expected value"].sum()
-    total_achieved = df_filtered["Milestone reported value"].sum()
+
+    percent_indicators = ["IPI 2.2", "IPI 3.3"]
+
+    if indicator in percent_indicators:
+        total_expected = df_filtered["Milestone expected value"].mean()
+        total_achieved = df_filtered["Milestone reported value"].mean()
+    else:
+        total_expected = df_filtered["Milestone expected value"].sum()
+        total_achieved = df_filtered["Milestone reported value"].sum()
+        
     progress = round((total_achieved / total_expected) * 100, 2) if total_expected > 0 else 0
 
     def clean_number(n):
@@ -315,7 +323,6 @@ def generate_challenges_report(year):
             "query": {
                 "bool": {
                     "filter": [
-                        {"term": {"year": year}},
                         {"term": {"source_table": "vw_ai_challenges"}}
                     ]
                 }
