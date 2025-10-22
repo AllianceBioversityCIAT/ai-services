@@ -103,6 +103,11 @@ This ensures that all evidence and content corresponds to end-year achievements 
 - Begin with some context about the indicator and its contributions by end-year.
 - Then, summarize overall end-year achievements across all clusters for the {selected_indicator}. Use the following structure:
   “By end-year {selected_year}, AICCRA had achieved {total_achieved} out of {total_expected}, representing {progress}% progress for indicator {selected_indicator}.”
+- You must use the following summary values for this section:
+   Total expected: {total_expected}
+   Total achieved: {total_achieved}
+   Progress: {progress}%
+Do not use other values from the context for these totals.
 
 ------
 
