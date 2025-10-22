@@ -50,10 +50,11 @@ with tab1:
                 response = requests.post(url, json=payload, timeout=600)
                 response.raise_for_status()
                 report_text = response.json().get("content", "No report found in response.")
+
+                st.markdown(report_text)
                 
                 # response = run_pipeline(selected_indicator, selected_year)
-                
-                st.markdown(report_text)
+                # st.markdown(response)
 
                 doc = docx.Document()
                 for line in report_text.split('\n'):
