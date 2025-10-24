@@ -8,6 +8,12 @@ from app.llm.vectorize_os_annual import generate_challenges_report, generate_ind
 
 st.set_page_config(page_title="AICCRA generator", page_icon="📄")
 
+
+st.warning("""
+⚠️ *This service uses artificial intelligence (AI) to generate responses based on structured data and program documentation. While the system is designed to ensure accuracy and relevance, the content produced may contain errors or omissions and should not be considered a substitute for official reports or expert review. Users are advised to validate key information before using it for decision-making or external communication.*
+""")
+st.divider()
+
 st.title("📄 AICCRA Report Generator")
 
 tab1, tab2, tab3 = st.tabs(["📊 Annual Report by Indicator", "📋 Indicator Summary Tables", "🎯 Challenges & Lessons Learned"])
@@ -184,3 +190,5 @@ with st.sidebar:
     - Challenges reports are typically shorter
     - Download buttons appear after generation
     """)
+
+
