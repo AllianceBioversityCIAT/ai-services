@@ -76,10 +76,6 @@ with tab1:
             key="download_tab1_docx"
         )
 
-def df_to_markdown_table(df):
-    """Convierte un DataFrame a una tabla Markdown."""
-    return df.to_markdown(index=False)
-
 with tab2:
     st.header("📋 Indicator Summary Tables")
     st.caption("Generate summary tables for all PDO, IPI 1.x, IPI 2.x, and IPI 3.x indicators for 2025.")
@@ -89,7 +85,16 @@ with tab2:
     if st.button("Generate Tables", type="primary", key="generate_tab4"):
         with st.spinner("Generating summary tables..."):
             try:
-                tables = generate_indicator_tables(selected_year_tables)
+                url = "https://ia.prms.cgiar.org/api/generate-annual-tables"
+                payload = {"year": selected_year_tables}
+                response = requests.post(url, json=payload, timeout=600)
+                response.raise_for_status()
+                response_data = response.json()
+                
+                tables = {}
+                for group_name, table_list in response_data["tables"].items():
+                    tables[group_name] = pd.DataFrame(table_list)
+                
                 st.session_state.tables = tables
                 st.session_state.selected_year_tables = selected_year_tables
             except Exception as e:
