@@ -383,8 +383,16 @@ def generate_indicator_tables(year):
         for indicator in indicators:
             ind_df = group_df[group_df["indicator_acronym"] == indicator]
             indicator_title = ind_df["indicator_title"].iloc[0] if not ind_df["indicator_title"].isnull().all() else indicator
-            end_year_target = ind_df["Milestone expected value"].sum()
-            achieved = ind_df["Milestone reported value"].sum()
+            
+            percent_indicators = ["IPI 2.2", "IPI 3.3"]
+
+            if indicator in percent_indicators:
+                end_year_target = ind_df["Milestone expected value"].mean()
+                achieved = ind_df["Milestone reported value"].mean()
+            else:
+                end_year_target = ind_df["Milestone expected value"].sum()
+                achieved = ind_df["Milestone reported value"].sum()
+            
             projected = ""
             
             cluster_narratives = ind_df.groupby("cluster_acronym")["Contribution Narrative"].apply(lambda x: " ".join(x.dropna()))
@@ -403,7 +411,7 @@ def generate_indicator_tables(year):
             table_rows.append({
                 "Indicator statement": indicator_title,
                 "End-year target 2025": end_year_target,
-                "Projected targets for 2025 (Mid-year report 2025)": projected,
+                #"Projected targets for 2025 (Mid-year report 2025)": projected,
                 "Achieved in 2025": achieved,
                 "Brief overviews": brief_overview
             })
