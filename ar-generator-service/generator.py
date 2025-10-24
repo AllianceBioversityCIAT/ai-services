@@ -86,7 +86,11 @@ with tab2:
         with st.spinner("Generating summary tables..."):
             try:
                 url = "https://ia.prms.cgiar.org/api/generate-annual-tables"
-                payload = {"year": selected_year_tables}
+                payload = {
+                    "indicator": selected_indicator,
+                    "year": selected_year_tables,
+                    "insert_data": "False"
+                }
                 response = requests.post(url, json=payload, timeout=600)
                 response.raise_for_status()
                 response_data = response.json()
