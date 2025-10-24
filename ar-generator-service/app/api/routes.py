@@ -47,6 +47,23 @@ def _run_pipeline_opensearch_annual():
         )
 
 
+def _generate_indicator_tables():
+    """Lazy import of indicator tables function to avoid initialization issues."""
+    try:
+        from app.llm.vectorize_os_annual import generate_indicator_tables
+        return generate_indicator_tables
+    except Exception as e:
+        logger.error(f"Failed to import generate_indicator_tables: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Service configuration error",
+                "details": "Indicator tables generation service is not properly configured. Please check AWS credentials and configuration.",
+                "status": "error"
+            }
+        )
+
+
 @router.post(
     "/api/generate",
     response_model=ChatResponse,
@@ -386,6 +403,194 @@ async def generate_annual_report(request: ChatRequest) -> ChatResponse:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"error": "Access denied", "details": str(e), "status": "error"}
+        )
+    except RuntimeError as e:
+        logger.error(f"Runtime error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "Service error", "details": str(e), "status": "error"}
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "Internal server error", "details": str(e), "status": "error"}
+        )
+    
+
+@router.post(
+    "/api/generate-annual-tables",
+    tags=["Reports"],
+    summary="Generate AICCRA Annual Indicator Summary Tables",
+    description="""
+    📊 Generate AI-Powered AICCRA Annual Indicator Summary Tables
+    
+    This endpoint generates comprehensive summary tables for all AICCRA indicators grouped by type (PDO, IPI 1.x, IPI 2.x, IPI 3.x).
+    Each table provides key metrics and AI-generated brief overviews for the specified year.
+    
+    🎯 Report Type: Annual Indicator Summary Tables
+    
+    - Purpose: Provide consolidated overview of all indicators performance
+    - Scope: Summary tables with quantitative targets, achievements, and qualitative overviews
+    - Timeline: Annual performance snapshot for all indicators
+    - Use Case: Executive dashboards, annual reporting, performance monitoring
+    
+    🔍 How It Works
+    
+    1. Data Retrieval: Fetches contribution data from SQL Server database for all indicators
+    2. Aggregation: Groups indicators by type and calculates summary statistics
+    3. AI Summarization: Uses AWS Bedrock Claude 3.7 Sonnet to generate brief overviews from cluster narratives
+    4. Table Generation: Creates structured tables with quantitative and qualitative data
+    
+    📈 Table Content
+    
+    Each table includes:
+    - Indicator Statement: Full indicator title/description
+    - End-year Target: Sum of expected milestone values for the year
+    - Projected Targets: Reserved for mid-year projections (currently empty)
+    - Achieved: Sum of reported milestone values for the year
+    - Brief Overviews: AI-generated summaries of cluster contributions and achievements
+    
+    Generated tables:
+    - PDO Indicators: All PDO indicators (1-5)
+    - IPI 1.x Indicators: All IPI 1.1 through 1.4 indicators
+    - IPI 2.x Indicators: All IPI 2.1 through 2.3 indicators
+    - IPI 3.x Indicators: All IPI 3.1 through 3.4 indicators
+    
+    ⚡ Performance Notes
+    
+    - Processing time: ~2-5 minutes (depends on number of indicators and narratives)
+    - AI calls: One per indicator for brief overview generation
+    
+    📋 Example Usage
+    
+    ```bash
+    curl -X POST "http://localhost:8000/api/generate-annual-tables" \\
+         -H "Content-Type: application/json" \\
+         -d '{
+           "year": 2025
+         }'
+    ```
+    
+    Response format:
+    ```json
+    {
+      "year": 2025,
+      "tables": {
+        "PDO": [
+          {
+            "Indicator statement": "PDO Indicator 1: Number of farmers trained in climate-smart agriculture",
+            "End-year target 2025": 1200,
+            "Projected targets for 2025 (Mid-year report 2025)": "",
+            "Achieved in 2025": 1350,
+            "Brief overviews": "Kenya: Successfully trained 450 farmers in drought-resistant crop varieties. Zambia: Reached 300 farmers with improved irrigation techniques..."
+          }
+        ],
+        "IPI 1.x": [...],
+        "IPI 2.x": [...],
+        "IPI 3.x": [...]
+      },
+      "status": "success"
+    }
+    ```
+    """,
+    response_description="Successfully generated annual indicator summary tables with AI-generated overviews",
+    responses={
+        200: {
+            "description": "Tables generated successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "year": 2025,
+                        "tables": {
+                            "PDO": [
+                                {
+                                    "Indicator statement": "PDO Indicator 1: Number of farmers trained in climate-smart agriculture",
+                                    "End-year target 2025": 1200,
+                                    "Projected targets for 2025 (Mid-year report 2025)": "",
+                                    "Achieved in 2025": 1350,
+                                    "Brief overviews": "Kenya: Successfully trained 450 farmers in drought-resistant crop varieties. Zambia: Reached 300 farmers with improved irrigation techniques. Ethiopia: Achieved 600 farmer trainings focusing on sustainable land management practices."
+                                }
+                            ],
+                            "IPI 1.x": [],
+                            "IPI 2.x": [],
+                            "IPI 3.x": []
+                        },
+                        "status": "success"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Invalid request parameters (validation error)",
+            "model": ErrorResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "Invalid request parameters",
+                        "status": "error"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "model": ErrorResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "Internal server error",
+                        "status": "error"
+                    }
+                }
+            }
+        }
+    }
+)
+async def generate_annual_tables(request: ChatRequest):
+    """
+    Generate annual indicator summary tables for the specified year.
+    
+    This endpoint generates summary tables for all AICCRA indicators,
+    including quantitative targets/achievements and AI-generated brief overviews.
+    
+    - year: The year for the tables (must be between 2021 and 2025)
+    
+    Returns the generated tables organized by indicator type.
+    """
+    start_time = time.time()
+    
+    try:
+        logger.info(f"🚀 Starting annual tables generation for year: {request.year}")
+        
+        # Lazy import the tables generation function
+        generate_tables_func = _generate_indicator_tables()
+        
+        # Call the tables generation function
+        logger.info("🔍 Executing annual tables generation...")
+        tables = generate_tables_func(request.year)
+        
+        # Convert DataFrames to dictionaries for JSON response
+        tables_dict = {}
+        for group_name, df_table in tables.items():
+            tables_dict[group_name] = df_table.to_dict(orient="records")
+        
+        # Calculate processing time
+        processing_time = round(time.time() - start_time, 2)
+        
+        logger.info(f"✅ Successfully generated annual tables for {request.year} in {processing_time}s")
+        
+        return {
+            "year": request.year,
+            "tables": tables_dict,
+            "status": "success"
+        }
+        
+    except ValueError as e:
+        logger.error(f"Validation error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "Invalid request parameters", "details": str(e), "status": "error"}
         )
     except RuntimeError as e:
         logger.error(f"Runtime error: {str(e)}")

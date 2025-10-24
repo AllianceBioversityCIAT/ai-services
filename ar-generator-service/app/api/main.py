@@ -124,6 +124,7 @@ async def root():
         "endpoints": {
             "POST /api/generate": "Generate AICCRA Mid-Year Progress Report for specific indicator and year",
             "POST /api/generate-annual": "Generate comprehensive AICCRA Annual Report for specific indicator and year",
+            "POST /api/generate-annual-tables": "Generate comprehensive AICCRA Annual Report tables for specific year",
             "GET /health": "Health check endpoint"
         },
         "supported_indicators": {
