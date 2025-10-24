@@ -9,3 +9,5 @@ uvicorn
 pyodbc
 requests
 mangum
+python-docx
+streamlit
