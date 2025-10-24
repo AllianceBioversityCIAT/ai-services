@@ -50,7 +50,20 @@ This ensures that all evidence and content corresponds to end-year achievements 
 
 # OUTPUT STRUCTURE
 
-## 1. Indicator Narrative
+## 1. Summary Paragraph
+- Begin with some context about the indicator and its contributions by end-year.
+- Then, summarize overall end-year achievements across all clusters for the {selected_indicator}. Use the following structure:
+  “By end-year {selected_year}, AICCRA had achieved {total_achieved} out of {total_expected}, representing {progress}% progress for indicator {selected_indicator}.”
+  Or similar:
+  "By the end of {selected_year}, AICCRA aimed to reach {total_expected} (expected units) across all clusters but substantially exceeded this goal, reaching {total_achieved} beneficiaries."
+- You must use the following summary values for this section:
+   Total expected: {total_expected}
+   Total achieved: {total_achieved}
+   Progress: {progress}%
+Do not use other values from the context for these totals.
+
+
+## 2. Indicator Narrative
 - Per cluster_acronym:
    - Include achieved values, doi links, brief summaries of innovations or OICRs, and mention of progress with supporting data as described below.
    - Describe activities planned under the indicator and their current status.
@@ -99,16 +112,6 @@ This ensures that all evidence and content corresponds to end-year achievements 
 
 - Do not group clusters. Each must be clearly and separately described.
    
-## 2. End-of-Narrative Data Paragraph for Table Reference
-- Begin with some context about the indicator and its contributions by end-year.
-- Then, summarize overall end-year achievements across all clusters for the {selected_indicator}. Use the following structure:
-  “By end-year {selected_year}, AICCRA had achieved {total_achieved} out of {total_expected}, representing {progress}% progress for indicator {selected_indicator}.”
-- You must use the following summary values for this section:
-   Total expected: {total_expected}
-   Total achieved: {total_achieved}
-   Progress: {progress}%
-Do not use other values from the context for these totals.
-
 ------
 
 # STYLE GUIDE
@@ -129,14 +132,14 @@ Do not use other values from the context for these totals.
 1. **Title** 
    - indicator_title for "indicator_acronym" = {selected_indicator}.
 
-2. **Indicator Narrative**  
+2. **Summary data**  
+   - No subtitle for this section
+   - This section (paragraph) includes a concise summary of the indicator's progress, across all clusters, following the instructions detailed above.
+
+3. **Indicator Narrative**  
    [Detailed narrative following structure above.]
    - Cluster names must be **bolded** in the output.
    - All links to deliverables ("doi"), oicrs ("link_pdf_oicr") and innovations ("link_pdf_innovation") must be active and accessible; format them as markdown-style hyperlinks.
    - Keep the narrative concise and focused. Avoid overly long paragraphs. Prioritize clarity and brevity.
-
-3. **Summary data**  
-   - Subtitle for this section: "Summary"
-   - This section (paragraph) includes a concise summary of the indicator's progress, across all clusters, following the instructions detailed above. 
 
 """

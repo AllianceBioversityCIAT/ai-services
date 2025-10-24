@@ -6,6 +6,7 @@ import boto3
 import numpy as np
 import pandas as pd
 from requests_aws4auth import AWS4Auth
+from app.llm.invoke_llm import invoke_model
 from db_conn.mysql_connection import load_data
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import BR, OPENSEARCH
@@ -354,6 +355,61 @@ def generate_challenges_report(year):
     except Exception as e:
         logger.error(f"❌ Error generating Challenges and Lessons Learned report: {e}")
         return f"# Challenges and Lessons Learned - {year}\n\nError generating report: {str(e)}"
+
+
+def generate_indicator_tables(year):
+    """
+    Generate tables for all PDO, IPI 1.x, IPI 2.x, IPI 3.x.
+    Each table contains: Indicator statement, End-year target, Projected targets, Achieved, Brief overview.
+    The 'Brief overview' field is summarized by cluster using LLM.
+    """
+    logger.info(f"🎯 Starting indicator tables generation for {year}...")
+
+    df = load_data("vw_ai_project_contribution")
+    df = df[df["year"] == year]
+
+    groups = {
+        "PDO": df[df["indicator_acronym"].str.startswith("PDO")],
+        "IPI 1.x": df[df["indicator_acronym"].str.startswith("IPI 1.")],
+        "IPI 2.x": df[df["indicator_acronym"].str.startswith("IPI 2.")],
+        "IPI 3.x": df[df["indicator_acronym"].str.startswith("IPI 3.")]
+    }
+
+    tables = {}
+
+    for group_name, group_df in groups.items():
+        indicators = group_df["indicator_acronym"].unique()
+        table_rows = []
+        for indicator in indicators:
+            ind_df = group_df[group_df["indicator_acronym"] == indicator]
+            indicator_title = ind_df["indicator_title"].iloc[0] if not ind_df["indicator_title"].isnull().all() else indicator
+            end_year_target = ind_df["Milestone expected value"].sum()
+            achieved = ind_df["Milestone reported value"].sum()
+            projected = ""
+            
+            cluster_narratives = ind_df.groupby("cluster_acronym")["Contribution Narrative"].apply(lambda x: " ".join(x.dropna()))
+            formatted_narratives = "\n".join([f"{cluster}: {narrative}" for cluster, narrative in cluster_narratives.items() if narrative.strip()])
+            
+            if formatted_narratives.strip():
+                prompt = f"""
+                Summarize these contribution narratives by cluster in 2-3 sentences, highlighting key achievements and 
+                contributions:\n{formatted_narratives}. If a cluster has no contributions, omit it from the summary. Do
+                not return a title, only the summary per cluster. And do not return the answer in markdown format.
+                """
+                brief_overview = invoke_model(prompt)
+            else:
+                brief_overview = "No narratives available."
+            
+            table_rows.append({
+                "Indicator statement": indicator_title,
+                "End-year target 2025": end_year_target,
+                "Projected targets for 2025 (Mid-year report 2025)": projected,
+                "Achieved in 2025": achieved,
+                "Brief overviews": brief_overview
+            })
+        tables[group_name] = pd.DataFrame(table_rows)
+    
+    return tables
 
 
 def run_pipeline(indicator, year, insert_data=False):
