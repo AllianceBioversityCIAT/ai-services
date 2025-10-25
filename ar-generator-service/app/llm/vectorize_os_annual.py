@@ -275,16 +275,6 @@ def calculate_summary(indicator, year):
     return clean_number(total_expected), clean_number(total_achieved), clean_number(progress)
 
 
-def save_context_to_file(context, filename, indicator, year):
-    try:
-        output_path = f"{filename}_{indicator}_{year}.json"
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(context, f, indent=2, ensure_ascii=False)
-        logger.info(f"📝 Context saved to {output_path}")
-    except Exception as e:
-        logger.error(f"❌ Error saving context to file: {e}")
-
-
 def extract_dois_from_text(text):
     markdown_links = re.findall(r"\[.*?\]\((https?://[^\s)]+)\)", text)
     plain_links = re.findall(r"(?<!\()https?://[^\s\]\)]+", text)
@@ -337,8 +327,6 @@ def generate_challenges_report(year):
             return f"# Challenges and Lessons Learned - {year}\n\nNo challenges and lessons learned data available for {year}."
         
         challenges_prompt = generate_challenges_prompt(year)
-        
-        save_context_to_file(challenges_chunks, "challenges_context", "all_clusters", year)
         
         query = f"""
             Using this information:\n{challenges_chunks}\n\n
@@ -439,7 +427,6 @@ def run_pipeline(indicator, year, insert_data=False):
         PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
         
         context, questions = retrieve_context(PROMPT, indicator, year)
-        save_context_to_file(context, "context", indicator, year)
 
         query = f"""
             Using this information:\n{context}\n\n
