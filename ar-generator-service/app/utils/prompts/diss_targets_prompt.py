@@ -117,4 +117,5 @@ Example:
     - If it refers to present actions, report in present tense.
     - If it refers to expected future actions, report in future tense.
 - If you cannot determine a number, do NOT make assumptions, just state that the expected number could not be determined.
+- If a cluster has no disaggregated targets to report, do NOT generate any output for that cluster.
 """
