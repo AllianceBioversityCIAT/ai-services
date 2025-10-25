@@ -365,7 +365,7 @@ def generate_indicator_tables(year):
     tables = {}
 
     for group_name, group_df in groups.items():
-        indicators = group_df["indicator_acronym"].unique()
+        indicators = sorted(group_df["indicator_acronym"].unique())
         table_rows = []
         for indicator in indicators:
             ind_df = group_df[group_df["indicator_acronym"] == indicator]
