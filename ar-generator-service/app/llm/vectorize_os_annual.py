@@ -6,7 +6,7 @@ import boto3
 import numpy as np
 import pandas as pd
 from requests_aws4auth import AWS4Auth
-from db_conn.sql_connection import load_data
+from db_conn.sql_connection import load_data, load_full_data
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import BR, OPENSEARCH
 from opensearchpy import OpenSearch, RequestsHttpConnection
@@ -408,6 +408,18 @@ def generate_indicator_tables(year):
 
 
 def run_pipeline(indicator, year, insert_data=False):
+    try:
+        if insert_data:
+            load_full_data("vw_ai_deliverables")
+            load_full_data("vw_ai_project_contribution")
+            load_full_data("vw_ai_questions")
+            load_full_data("vw_ai_oicrs")
+            load_full_data("vw_ai_innovations")
+    except Exception as e:
+        logger.error(f"❌ Error in pipeline execution: {e}")
+
+
+def run_pipeline_2(indicator, year, insert_data=False):
     try:
         if insert_data:
             if opensearch.indices.exists(index=INDEX_NAME):
