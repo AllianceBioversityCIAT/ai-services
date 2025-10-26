@@ -8,14 +8,32 @@ from datetime import datetime
 # from app.llm.vectorize_os import run_chatbot
 from app.llm.agents import run_agent_chatbot
 from app.utils.logger.logger_util import get_logger
-from app.utils.config.config_util import KNOWLEDGE_BASE, AI_FEEDBACK_URL
+from app.utils.config.config_util import AI_FEEDBACK_URL
 
-memory_id = KNOWLEDGE_BASE['memory_id']
-MEMORY_ID = hashlib.sha256(memory_id.encode()).hexdigest()
+# memory_id = KNOWLEDGE_BASE['memory_id']
+# MEMORY_ID = hashlib.sha256(memory_id.encode()).hexdigest()
 
 logger = get_logger()
 
 st.set_page_config(page_title="MARLO-AICCRA chatbot", page_icon="🤖", layout="wide")
+
+if 'user_email' not in st.session_state:
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("### 🤖 Welcome to MARLO-AICCRA Chatbot")
+        st.markdown("Please enter your email to personalize your experience and enable memory features:")
+        email = st.text_input("Email:", key="email_input", placeholder="your.email@example.com")
+        if st.button("Start Chat", type="primary"):
+            if email and '@' in email:
+                st.session_state.user_email = email
+                st.session_state.memory_id = email.split('@')[0]
+                st.rerun()
+            else:
+                st.error("Please enter a valid email address.")
+
+    st.stop()
+
+MEMORY_ID = st.session_state.memory_id
 
 st.warning("""
 ⚠️ *This service uses artificial intelligence (AI) to generate responses based on structured data and program documentation. While the system is designed to ensure accuracy and relevance, the content produced may contain errors or omissions and should not be considered a substitute for official reports or expert review. Users are advised to validate key information before using it for decision-making or external communication.*
@@ -366,7 +384,7 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "assis
 
     if st.session_state.show_feedback_area:
         with st.form("feedback_form", clear_on_submit=True):
-            feedback_comment = st.text_area("\* Tell us what went wrong 👇", placeholder="Any suggestions or issues?")
+            feedback_comment = st.text_area("Tell us what went wrong 👇", placeholder="Any suggestions or issues?")
             submitted = st.form_submit_button("Submit feedback", type="primary")
             
             if submitted and feedback_comment:
