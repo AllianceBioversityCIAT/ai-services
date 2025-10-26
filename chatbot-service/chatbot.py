@@ -16,6 +16,12 @@ MEMORY_ID = hashlib.sha256(memory_id.encode()).hexdigest()
 logger = get_logger()
 
 st.set_page_config(page_title="MARLO-AICCRA chatbot", page_icon="🤖", layout="wide")
+
+st.warning("""
+⚠️ *This service uses artificial intelligence (AI) to generate responses based on structured data and program documentation. While the system is designed to ensure accuracy and relevance, the content produced may contain errors or omissions and should not be considered a substitute for official reports or expert review. Users are advised to validate key information before using it for decision-making or external communication.*
+""")
+st.divider()
+
 st.title("🤖 AI Assistant for MARLO-AICCRA")
 
 
