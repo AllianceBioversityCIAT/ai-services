@@ -1,4 +1,6 @@
+import sys
 import boto3
+import logging
 from typing import Any
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
@@ -12,6 +14,10 @@ from app.llm.bulk_upload.upload_capdev import process_document_capdev as process
 
 load_dotenv()
 logger = get_logger()
+
+for handler in logger.handlers[:]:
+    if isinstance(handler, logging.StreamHandler) and hasattr(handler, 'stream') and handler.stream == sys.stdout:
+        logger.removeHandler(handler)
 
 star_auth_middleware = StarAuthMiddleware()
 prms_auth_middleware = PrmsAuthMiddleware()
@@ -57,7 +63,7 @@ async def process_document(bucket: str, key: str, token: Any, environmentUrl: st
 
     try:
         is_authenticated = await authenticate_star(key, bucket, token, environmentUrl)
-        print(f"Authenticated: {is_authenticated}")
+        logger.info(f"Authenticated: {is_authenticated}")
         if not is_authenticated:
             raise ValueError("Authentication failed")
 
@@ -107,7 +113,7 @@ async def process_document_prms(bucket: str, key: str, token: Any, environmentUr
 
     try:
         is_authenticated = await authenticate_prms(key, bucket, token, environmentUrl)
-        print(f"PRMS Authenticated: {is_authenticated}")
+        logger.info(f"PRMS Authenticated: {is_authenticated}")
         if not is_authenticated:
             raise ValueError("PRMS Authentication failed")
 
@@ -157,7 +163,7 @@ async def process_document_capdev(bucket: str, key: str, token: Any, environment
 
     try:
         is_authenticated = await authenticate_star(key, bucket, token, environmentUrl)
-        print(f"Authenticated: {is_authenticated}")
+        logger.info(f"Authenticated: {is_authenticated}")
         if not is_authenticated:
             raise ValueError("Authentication failed")
 
