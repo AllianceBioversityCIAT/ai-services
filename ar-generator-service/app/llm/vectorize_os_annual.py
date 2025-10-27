@@ -394,7 +394,7 @@ def generate_indicator_tables(year):
             
             projected = ""
             
-            cluster_narratives = ind_df.groupby("cluster_acronym")["Contribution Narrative"].apply(lambda x: " ".join(x.dropna()))
+            cluster_narratives = ind_df.groupby("cluster_acronym")["Milestone achieved narrative"].apply(lambda x: " ".join(x.dropna()))
             formatted_narratives = "\n".join([f"{cluster}: {narrative}" for cluster, narrative in cluster_narratives.items() if narrative.strip()])
             
             if formatted_narratives.strip():
