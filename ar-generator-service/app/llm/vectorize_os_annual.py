@@ -242,6 +242,18 @@ def retrieve_context(query, indicator, year, top_k=10000):
                 (chunk.get("table_type") == "contributions" and chunk.get("phase_name") == "AWPB")
                 or
                 (chunk.get("table_type") == "contributions" and chunk.get("phase_name") == "Progress")
+                or
+                (chunk.get("indicator_acronym") == "PDO Indicator 1" and chunk.get("question").startswith("2.0"))
+                or
+                (chunk.get("indicator_acronym") == "PDO Indicator 2" and chunk.get("question").startswith("3.0"))
+                or
+                (chunk.get("indicator_acronym") == "PDO Indicator 3" and chunk.get("question").startswith("3.0"))
+                or
+                (chunk.get("indicator_acronym") == "IPI 2.3" and chunk.get("question").startswith("0"))
+                or
+                (chunk.get("indicator_acronym") == "IPI 2.3" and chunk.get("question").startswith("1"))
+                or
+                (chunk.get("indicator_acronym") == "IPI 2.3" and chunk.get("question").startswith("2"))
             )
         ]
 
