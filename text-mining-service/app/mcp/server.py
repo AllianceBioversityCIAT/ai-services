@@ -1,4 +1,6 @@
+import sys
 import boto3
+import logging
 from typing import Any
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
@@ -9,9 +11,14 @@ from app.llm.mining import process_document as process_with_llm
 from app.llm.mining import process_document_prms as process_with_llm_prms
 from app.utils.notification.notification_service import NotificationService
 from app.llm.bulk_upload.upload_capdev import process_document_capdev as process_bulk_capdev
+from app.llm.aiccra_mining.aiccra_mining import process_document_aiccra as process_with_llm_aiccra
 
 load_dotenv()
 logger = get_logger()
+
+for handler in logger.handlers[:]:
+    if isinstance(handler, logging.StreamHandler) and hasattr(handler, 'stream') and handler.stream == sys.stdout:
+        logger.removeHandler(handler)
 
 star_auth_middleware = StarAuthMiddleware()
 prms_auth_middleware = PrmsAuthMiddleware()
@@ -52,19 +59,20 @@ async def authenticate_prms(key: str, bucket: str, token: str, environmentUrl: s
 
 
 @mcp.tool()
-async def process_document(bucket: str, key: str, token: Any, environmentUrl: str) -> dict:
+async def process_document(bucket: str, key: str, token: Any, environmentUrl: str, user_id: str = None) -> dict:
     logger.info("✅ process_document invoked via MCP")
 
     try:
         is_authenticated = await authenticate_star(key, bucket, token, environmentUrl)
-        print(f"Authenticated: {is_authenticated}")
+        logger.info(f"Authenticated: {is_authenticated}")
         if not is_authenticated:
             raise ValueError("Authentication failed")
 
         logger.info(f"Processing document: {key} from bucket: {bucket}")
+        logger.info(f"👤 User ID for tracking: {user_id}")
 
         result = process_with_llm(
-            bucket_name=bucket, file_key=key)
+            bucket_name=bucket, file_key=key, user_id=user_id)
 
         await notification_service.send_slack_notification(
             emoji=":ai: :pick:",
@@ -76,7 +84,15 @@ async def process_document(bucket: str, key: str, token: Any, environmentUrl: st
             priority="Low"
         )
 
-        return result["json_content"]
+        if "interaction_id" in result:
+            response = {
+                "json_content": result["json_content"],
+                "interaction_id": result["interaction_id"]
+            }
+
+            return response
+        else:
+            return result["json_content"]
 
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
@@ -93,20 +109,20 @@ async def process_document(bucket: str, key: str, token: Any, environmentUrl: st
 
 
 @mcp.tool()
-async def process_document_prms(bucket: str, key: str, token: Any, environmentUrl: str) -> dict:
+async def process_document_prms(bucket: str, key: str, token: Any, environmentUrl: str, user_id: str = None) -> dict:
     logger.info("✅ process_document_prms invoked via MCP")
 
     try:
         is_authenticated = await authenticate_prms(key, bucket, token, environmentUrl)
-        print(f"PRMS Authenticated: {is_authenticated}")
+        logger.info(f"PRMS Authenticated: {is_authenticated}")
         if not is_authenticated:
             raise ValueError("PRMS Authentication failed")
 
-        logger.info(
-            f"Processing document for PRMS: {key} from bucket: {bucket}")
+        logger.info(f"Processing document for PRMS: {key} from bucket: {bucket}")
+        logger.info(f"👤 User ID for tracking: {user_id}")
 
         result = process_with_llm_prms(
-            bucket_name=bucket, file_key=key)
+            bucket_name=bucket, file_key=key, user_id=user_id)
 
         await notification_service.send_slack_notification(
             emoji=":ai: :pick:",
@@ -118,7 +134,15 @@ async def process_document_prms(bucket: str, key: str, token: Any, environmentUr
             priority="Low"
         )
 
-        return result["json_content"]
+        if "interaction_id" in result:
+            response = {
+                "json_content": result["json_content"],
+                "interaction_id": result["interaction_id"]
+            }
+
+            return response
+        else:
+            return result["json_content"]
 
     except Exception as e:
         logger.error(f"Unexpected error in PRMS processing: {str(e)}")
@@ -140,7 +164,7 @@ async def process_document_capdev(bucket: str, key: str, token: Any, environment
 
     try:
         is_authenticated = await authenticate_star(key, bucket, token, environmentUrl)
-        print(f"Authenticated: {is_authenticated}")
+        logger.info(f"Authenticated: {is_authenticated}")
         if not is_authenticated:
             raise ValueError("Authentication failed")
 
@@ -166,6 +190,51 @@ async def process_document_capdev(bucket: str, key: str, token: Any, environment
         await notification_service.send_slack_notification(
             emoji=":ai: :pick: :alert:",
             app_name="Bulk upload via Mining Service (STAR)",
+            color="#FF0000",
+            title="Document Processing Failed",
+            message=f"Error processing document: *{key}*\nError: *{str(e)}*",
+            time_taken="Time taken: *N/A*",
+            priority="High"
+        )
+        return {"status": "error", "key": key, "error": str(e)}
+
+
+@mcp.tool()
+async def process_document_aiccra(bucket: str, key: str, token: Any, environmentUrl: Any, user_id: str = None) -> dict:
+    logger.info("✅ process_document_aiccra invoked via MCP")
+
+    try:
+        logger.info(f"Processing document: {key} from bucket: {bucket}")
+        logger.info(f"👤 User ID for tracking: {user_id}")
+
+        result = process_with_llm_aiccra(
+            bucket_name=bucket, file_key=key, user_id=user_id)
+
+        await notification_service.send_slack_notification(
+            emoji=":ai: :pick:",
+            app_name="AI-MCP Mining Service (AICCRA)",
+            color="#36a64f",
+            title="Document Processed",
+            message=f"Successfully processed document: *{key}*\nBucket: *{bucket}*",
+            time_taken=f"Time taken: *{result['time_taken']}* seconds",
+            priority="Low"
+        )
+
+        if "interaction_id" in result:
+            response = {
+                "json_content": result["json_content"],
+                "interaction_id": result["interaction_id"]
+            }
+
+            return response
+        else:
+            return result["json_content"]
+
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        await notification_service.send_slack_notification(
+            emoji=":ai: :pick: :alert:",
+            app_name="AI-MCP Mining Service (AICCRA)",
             color="#FF0000",
             title="Document Processing Failed",
             message=f"Error processing document: *{key}*\nError: *{str(e)}*",

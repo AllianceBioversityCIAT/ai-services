@@ -5,7 +5,7 @@ import lancedb
 import unicodedata
 from pathlib import Path
 from datetime import datetime
-from app.utils.config.config_util import BR
+from app.utils.config.config_util import AWS
 from app.utils.logger.logger_util import get_logger
 import os
 
@@ -14,15 +14,13 @@ logger = get_logger()
 
 is_prod = os.getenv('IS_PROD', 'false').lower() == 'true'
 
-#if is_prod:
 DB_PATH = "/tmp/miningdb"
 Path(DB_PATH).mkdir(parents=True, exist_ok=True)
 logger.info(f"Production mode: DB path set to {DB_PATH}")
 
-#else:
-#    BASE_DIR = Path(__file__).resolve().parent.parent.parent
-#    DB_PATH = str(BASE_DIR / "app" / "db" / "miningdb")
-#    logger.info(f"Development mode: DB path set to {DB_PATH}")
+# BASE_DIR = Path(__file__).resolve().parent.parent.parent
+# DB_PATH = str(BASE_DIR / "app" / "db" / "miningdb")
+# logger.info(f"Development mode: DB path set to {DB_PATH}")
 
 REFERENCE_TABLE_NAME = "clarisa_reference"
 TEMP_TABLE_NAME = "temp_documents"
@@ -30,8 +28,8 @@ TEMP_TABLE_NAME = "temp_documents"
 
 bedrock_runtime = boto3.client(
     service_name='bedrock-runtime',
-    aws_access_key_id=BR['aws_access_key'],
-    aws_secret_access_key=BR['aws_secret_key'],
+    aws_access_key_id=AWS['aws_access_key'],
+    aws_secret_access_key=AWS['aws_secret_key'],
     region_name='us-east-1'
 )
 

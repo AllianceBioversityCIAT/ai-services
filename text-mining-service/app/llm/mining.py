@@ -4,10 +4,12 @@ import boto3
 from typing import Dict, Any
 from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
+from app.llm.map_fields import map_fields_with_opensearch
 from app.utils.prompt.prompt_star import DEFAULT_PROMPT_STAR
 from app.utils.prompt.prompt_prms import DEFAULT_PROMPT_PRMS
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from app.utils.config.config_util import BR, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from app.utils.interactions.interaction_client import interaction_client
+from app.utils.config.config_util import AWS, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, MAPPING_URL
 from app.schemas.mining_schemas import MiningResponse, ErrorResponse, InnovationDevelopmentResult, PolicyChangeResult, CapacityDevelopmentResult
 from app.llm.vectorize import (get_embedding,
                                check_reference_exists,
@@ -22,8 +24,8 @@ logger = get_logger()
 
 bedrock_runtime = boto3.client(
     service_name='bedrock-runtime',
-    aws_access_key_id=BR['aws_access_key'],
-    aws_secret_access_key=BR['aws_secret_key'],
+    aws_access_key_id=AWS['aws_access_key'],
+    aws_secret_access_key=AWS['aws_secret_key'],
     region_name='us-east-1'
 )
 
@@ -60,7 +62,7 @@ def invoke_model(prompt, max_tokens=5000):
             ]
         }
         response = bedrock_runtime.invoke_model(
-            modelId="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+            modelId="us.anthropic.claude-sonnet-4-20250514-v1:0",
             body=json.dumps(request_body),
             contentType="application/json",
             accept="application/json"
@@ -180,9 +182,8 @@ def format_mining_response(raw_response: str) -> Dict[str, Any]:
         return error_response.model_dump(exclude_none=True)
 
 
-def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR):
+def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR, user_id: str = None):
     start_time = time.time()
-    print(prompt)
 
     try:
         reference_file_regions = f"{STAR_BUCKET_KEY_NAME}/clarisa_regions.xlsx"
@@ -211,6 +212,22 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR):
 
         response_text = invoke_model(query)
 
+        json_content = json.loads(response_text) if is_valid_json(response_text) else {"text": response_text}
+        
+        if isinstance(json_content, dict) and "results" in json_content:
+            mapped_results = []
+            for result in json_content["results"]:
+                try:
+                    mapped_result = map_fields_with_opensearch(result, MAPPING_URL)
+                    mapped_results.append(mapped_result)
+                    logger.info(f"🔗 Fields mapped for result with indicator: {result.get('indicator', 'Unknown')}")
+                except Exception as map_error:
+                    logger.warning(f"⚠️ Field mapping failed for result: {str(map_error)}")
+                    mapped_results.append(result)
+            
+            json_content["results"] = mapped_results
+            logger.info(f"🔗 Field mapping completed for {len(mapped_results)} results")
+
         end_time = time.time()
         elapsed_time = end_time - start_time
 
@@ -218,26 +235,72 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR):
         #     raw_response=response_text
         # )
 
+        interaction_id = None
+        if user_id:
+            try:
+                user_input = f"Document analysis request for: {file_key}"
+                if isinstance(document_content, dict) and document_content.get("type") == "excel":
+                    user_input += f" (Excel file with {len(document_content.get('chunks', []))} rows)"
+                
+                ai_output = json.dumps(json_content, indent=2, ensure_ascii=False)
+                
+                tracking_context = {
+                    "bucket_name": bucket_name,
+                    "file_key": file_key,
+                    "prompt_used": prompt[:500] + "..." if len(prompt) > 500 else prompt,
+                    "prompt_full_length": len(prompt),
+                    "chunks_processed": len(chunks),
+                    "results_count": len(json_content.get("results", [])),
+                    "model_used": "claude-4-sonnet",
+                    "processing_steps": ["document_read", "text_splitting", "embedding_generation", "vector_search", "llm_processing", "field_mapping"]
+                }
+                
+                interaction_response = interaction_client.track_interaction(
+                    user_id=user_id,
+                    user_input=user_input,
+                    ai_output=ai_output,
+                    service_name="text-mining",
+                    display_name="STAR Text Mining Service",
+                    service_description="A service that analyzes documents and extracts insights based on user prompts.",
+                    context=tracking_context,
+                    response_time_seconds=elapsed_time,
+                    platform="STAR"
+                )
+
+                if interaction_response:
+                    interaction_id = interaction_response.get('interaction_id')
+                    logger.info(f"📊 Interaction tracked with ID: {interaction_id}")
+                else:
+                    logger.warning("⚠️ Failed to track interaction with interaction service")
+
+            except Exception as tracking_error:
+                logger.error(f"❌ Error tracking interaction: {str(tracking_error)}")
+
         # logger.info(f"✅ Successfully generated response:\n{json.dumps(formatted_response, indent=2)}")
-        logger.info(f"✅ Successfully generated response:\n{response_text}")
+        logger.info(f"✅ Successfully generated response:\n{json.dumps(json_content, indent=2, ensure_ascii=False)}")
         logger.info(f"⏱️ Response time: {elapsed_time:.2f} seconds")
 
-        return {
+        result = {
             "content": response_text,
             "time_taken": f"{elapsed_time:.2f}",
-            "json_content": json.loads(response_text) if is_valid_json(response_text) else {"text": response_text}
+            "json_content": json_content
             # "json_content": formatted_response
         }
+        
+        if interaction_id:
+            result["interaction_id"] = interaction_id
+        
+        return result
 
     except Exception as e:
         logger.error(f"❌ Error: {str(e)}")
         raise
 
 
-def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS):
+def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS, user_id: str = None):
     """Process document for PRMS project - identical functionality to process_document"""
     start_time = time.time()
-    print(f"PRMS Processing: {prompt}")
+    logger.info(f"PRMS Processing: {prompt}")
 
     try:
         reference_file_regions = f"{PRMS_BUCKET_KEY_NAME}/clarisa_regions.xlsx"
@@ -246,19 +309,7 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS):
             bucket_name, reference_file_regions, reference_file_countries)
 
         document_content = read_document_from_s3(bucket_name, file_key)
-
-        if isinstance(document_content, dict) and document_content.get("type") == "excel":
-            logger.info(f"📊 Excel content detected with {len(document_content['chunks'])} chunks")
-            logger.info(f"📝 First 3 chunks: {document_content['chunks'][:3]}")
-        else:
-            logger.info(f"📄 Text content length: {len(str(document_content))}")
-
         chunks = split_text(document_content)
-
-        if isinstance(document_content, dict) and document_content.get("type") == "excel":
-            logger.info(f"📊 Excel document processed into {len(chunks)} row chunks")
-        else:
-            logger.info(f"📄 Document split into {len(chunks)} chunks")
 
         logger.info("#️⃣ Generating embeddings for PRMS...")
         embeddings = [get_embedding(chunk) for chunk in chunks]
@@ -278,17 +329,80 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS):
 
         response_text = invoke_model(query)
 
+        json_content = json.loads(response_text) if is_valid_json(response_text) else {"text": response_text}
+        
+        if isinstance(json_content, dict) and "results" in json_content:
+            mapped_results = []
+            for result in json_content["results"]:
+                try:
+                    mapped_result = map_fields_with_opensearch(result, MAPPING_URL)
+                    mapped_results.append(mapped_result)
+                    logger.info(f"🔗 Fields mapped for result with indicator: {result.get('indicator', 'Unknown')}")
+                except Exception as map_error:
+                    logger.warning(f"⚠️ Field mapping failed for result: {str(map_error)}")
+                    mapped_results.append(result)
+            
+            json_content["results"] = mapped_results
+            logger.info(f"🔗 Field mapping completed for {len(mapped_results)} results")
+
         end_time = time.time()
         elapsed_time = end_time - start_time
-        logger.info(f"✅ Successfully generated PRMS response:\n{response_text}")
+
+        interaction_id = None
+        if user_id:
+            try:
+                user_input = f"Document analysis request for: {file_key}"
+                if isinstance(document_content, dict) and document_content.get("type") == "excel":
+                    user_input += f" (Excel file with {len(document_content.get('chunks', []))} rows)"
+                
+                ai_output = json.dumps(json_content, indent=2, ensure_ascii=False)
+                
+                tracking_context = {
+                    "bucket_name": bucket_name,
+                    "file_key": file_key,
+                    "prompt_used": prompt[:500] + "..." if len(prompt) > 500 else prompt,
+                    "prompt_full_length": len(prompt),
+                    "chunks_processed": len(chunks),
+                    "results_count": len(json_content.get("results", [])),
+                    "model_used": "claude-4-sonnet",
+                    "processing_steps": ["document_read", "text_splitting", "embedding_generation", "vector_search", "llm_processing", "field_mapping"]
+                }
+                
+                interaction_response = interaction_client.track_interaction(
+                    user_id=user_id,
+                    user_input=user_input,
+                    ai_output=ai_output,
+                    service_name="text-mining",
+                    display_name="PRMS Text Mining Service",
+                    service_description="A service that analyzes documents and extracts insights based on user prompts.",
+                    context=tracking_context,
+                    response_time_seconds=elapsed_time,
+                    platform="PRMS"
+                )
+
+                if interaction_response:
+                    interaction_id = interaction_response.get('interaction_id')
+                    logger.info(f"📊 Interaction tracked with ID: {interaction_id}")
+                else:
+                    logger.warning("⚠️ Failed to track interaction with interaction service")
+
+            except Exception as tracking_error:
+                logger.error(f"❌ Error tracking interaction: {str(tracking_error)}")
+        
+        logger.info(f"✅ Successfully generated PRMS response:\n{json.dumps(json_content, indent=2, ensure_ascii=False)}")
         logger.info(f"⏱️ PRMS Response time: {elapsed_time:.2f} seconds")
 
-        return {
+        result = {
             "content": response_text,
             "time_taken": f"{elapsed_time:.2f}",
-            "json_content": json.loads(response_text) if is_valid_json(response_text) else {"text": response_text},
+            "json_content": json_content,
             "project": "PRMS"
         }
+
+        if interaction_id:
+            result["interaction_id"] = interaction_id
+        
+        return result
 
     except Exception as e:
         logger.error(f"❌ PRMS Error: {str(e)}")

@@ -43,6 +43,7 @@ Alliance Main Contact Person
     • Extract the contact's name into the following field as an object:
         • main_contact_person: {"name": "..."}
     • Look for any mention or indication of the primary Alliance contact in the document (e.g., "Alliance focal point," "main Alliance contact," "Alliance coordinator," or a named person specifically flagged as responsible).
+    • It could be also the person who reported the result.
     • If no specific name or contact is mentioned, do not return the field in the output JSON.
 
 Keywords
@@ -149,7 +150,7 @@ Trainee affiliation
     • Refers to the organization or group that the trainee belongs to.
     • Only include the "trainee_affiliation" field if the training_type is "Individual training".
     • Return this field as an object with the following structure:
-        {"affiliation_name": "<name of the affiliation>"}
+        {"institution_name": "<name of the affiliation>"}
     • If the document does not provide enough detail, do not return the trainee_affiliation field in the output JSON.
 
 Trainee name
@@ -198,7 +199,8 @@ Partners
     • partners
     • Refers to the partner(s) that made a significant contribution to the achievement of the result that is being submitted.
     • List all relevant partner names mentioned in the document as an array of objects with the following structure:
-        [{"name": "<institution name 1>"}, {"name": "<institution name 2>"}]
+        [{"institution_name": "<institution name 1>"}, {"institution_name": "<institution name 2>"}]
+    • If there are multiple partners, they will be separated by commas, and you should list each one as a separate object in the array.
     • If the document does not provide enough detail, do not return the partners field in the output JSON.
 
 Geoscope (Geographical Scope)
@@ -253,6 +255,7 @@ Do not:
 • Include markdown code blocks like ```json or ```.
 • Escape quotes unless necessary.
 • Wrap the JSON in additional quotes or strings.
+• Return values like "null", "N/A", "unknown", "not specified" or something similar for missing fields.
 • Include fields with null values - omit them completely.
 The response must be raw JSON only — nothing else.
 
@@ -275,7 +278,6 @@ Follow this exact structure:
                 "..."
             ],
             "contract_code": "<value>",
-            "contract_name": "<value>",
             "sdg_targets": <[array of sdg targets]>,
             "training_category": "<Training or Engagement>",
             "start_date": "<value>",
@@ -289,7 +291,7 @@ Follow this exact structure:
             "training_purpose": "<value (only if group training)>",
             "degree": "<value (only if length_of_training is Long-term or training_type is Individual training)>",
             "trainee_affiliation": {
-                "affiliation_name": "<value (only if individual training)>"
+                "institution_name": "<value (only if individual training)>"
             },
             "trainee_name": "<value (only if individual training)>",
             "trainee_nationality": {
@@ -306,10 +308,10 @@ Follow this exact structure:
             "delivery_modality": "<value>",
             "partners": [
                 {
-                    "name": "<partner name 1>"
+                    "institution_name": "<partner name 1>"
                 },
                 {
-                    "name": "<partner name 2>"
+                    "institution_name": "<partner name 2>"
                 },
                 ...
             ],
