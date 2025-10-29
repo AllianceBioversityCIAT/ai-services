@@ -2,8 +2,7 @@ import pyodbc
 import pandas as pd
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import SQL_SERVER
-from app.utils.s3.divide_jsonl_files import split_jsonl_to_individual_files
-from app.utils.s3.upload_file_to_s3 import upload_file_to_s3, s3_file_exists
+from app.utils.s3.divide_jsonl_files import split_jsonl_to_individual_csv_files
 
 logger = get_logger()
 
@@ -51,6 +50,11 @@ CREATE_VIEW_QUERIES = {
         FROM AICCRA_aiccrabi_aiccra_innovations inno
         LEFT JOIN AICCRA_dim_indicators ind ON ind.indicator_pk = inno.indicator_pk
         LEFT JOIN AICCRA_dim_locations loc ON loc.id = inno.country_id;
+    """,
+    "vw_ai_challenges": """
+        CREATE OR ALTER VIEW vw_ai_challenges AS
+        SELECT acronym AS cluster_acronym, type, challenges_solutions, lessons_learned 
+        FROM AICCRA_dim_clusters
     """
 }
 
@@ -93,17 +97,17 @@ def load_data(table_name):
 
         if table_name == "vw_ai_project_contribution":
             df.rename(columns={'Phase name': 'phase_name', 'Phase year': 'year'}, inplace=True)
-            df.drop(['Milestone expected unit', 'Outcome Comunication', 'pk', 'contribution_pk', 'Project Link'], axis=1, inplace=True)
+            df.drop(['ID Phase', 'cluster_id', 'indicator_pk', 'Milestone expected unit', 'Outcome Comunication', 'pk', 'contribution_pk', 'Project Link', 'default_phase_name', 'default_phase_year'], axis=1, inplace=True)
             df = df[df['year'] == 2025]
             df["table_type"] = "contributions"
         
         elif table_name == "vw_ai_questions":
-            df.drop(['contribution_pk', 'indicator_pk', 'project_id', 'Project Link'], axis=1, inplace=True)
+            df.drop(['contribution_pk', 'indicator_pk', 'project_id', 'Project Link', 'phase'], axis=1, inplace=True)
             df = df[df['year'] == 2025]
             df["table_type"] = "questions"
 
         elif table_name == "vw_ai_deliverables":
-            df.drop(['contribution_pk', 'Indicator', 'indicator_code', 'DLV_planned', 'image_small', 'updated_date', 'indicator_pk', 'indicator_id', 'activity_id', 'Link', 'cluster_owner_id', 'institution_id', 'location_id', 'cluster_id'], axis=1, inplace=True)
+            df.drop(['contribution_pk', 'Indicator', 'indicator_code', 'DLV_planned', 'image_small', 'updated_date', 'indicator_pk', 'indicator_id', 'activity_id', 'Link', 'cluster_owner_id', 'institution_id', 'location_id', 'cluster_id', 'last_updated_altmetric', 'last_sync_almetric', 'id_phase_dlv'], axis=1, inplace=True)
             df = df[df['year'] == 2025]
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
@@ -116,7 +120,7 @@ def load_data(table_name):
         
         elif table_name == "vw_ai_oicrs":
             df.rename(columns={'link_pdf_file': 'link_pdf_oicr', 'oicr_year': 'year'}, inplace=True)
-            df.drop(['parameter_value', 'link_cluster_id', 'link_oicr_id', 'outcome_communication', 'srf_target', 'top_level_comment', 'country_iso_alpha3', 'contributing_crp', 'updated_date', 'indicator_pk', 'contribution_pk'], axis=1, inplace=True)
+            df.drop(['cluster_id', 'parameter_value', 'link_cluster_id', 'link_oicr_id', 'outcome_communication', 'srf_target', 'top_level_comment', 'country_iso_alpha3', 'contributing_crp', 'updated_date', 'indicator_pk', 'contribution_pk', 'country_id', 'institution_id', 'cluster_id_year'], axis=1, inplace=True)
             df = df[df['year'] == 2025]
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
@@ -127,9 +131,9 @@ def load_data(table_name):
             df = df_grouped.reset_index()
             df["table_type"] = "oicrs"
         
-        else:
+        elif table_name == "vw_ai_innovations":
             df.rename(columns={'link_pdf_file': 'link_pdf_innovation'}, inplace=True)
-            df.drop(['link_innovation', 'indicator_pk', 'contribution_pk', 'cluster_id', 'cluster_owner_id', 'updated_date', 'institution_id', 'is_scaling_partner'], axis=1, inplace=True)
+            df.drop(['link_innovation', 'indicator_pk', 'contribution_pk', 'cluster_id', 'cluster_owner_id', 'status', 'updated_date', 'institution_id', 'is_scaling_partner', 'stage', 'stage_definition', 'country_id', 'gender_relevance', 'gender_explanation_evidence', 'youth_relevance', 'youth_explanation_evidence', 'are_users_determined', 'cluster_id_year'], axis=1, inplace=True)
             df = df[df['year'] == 2025]
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
@@ -139,6 +143,9 @@ def load_data(table_name):
             )
             df = df_grouped.reset_index()
             df["table_type"] = "innovations"
+        
+        else:
+            df["table_type"] = "challenges"
                         
         return df
 
@@ -185,16 +192,17 @@ def load_full_data(table_name):
 
         if table_name == "vw_ai_project_contribution":
             df.rename(columns={'Phase name': 'phase_name', 'Phase year': 'year'}, inplace=True)
+            df.drop(['ID Phase', 'cluster_id', 'indicator_pk', 'pk', 'contribution_pk', 'default_phase_name', 'default_phase_year'], axis=1, inplace=True)
             df = df.dropna(axis=1, how='all')
             df["table_type"] = "contributions"
-            s3_folder = "contributions"
         
         elif table_name == "vw_ai_questions":
+            df.drop(['contribution_pk', 'indicator_pk', 'project_id', 'phase'], axis=1, inplace=True)
             df = df.dropna(axis=1, how='all')
             df["table_type"] = "questions"
-            s3_folder = "questions"
 
         elif table_name == "vw_ai_deliverables":
+            df.drop(['compose_id', 'indicator_pk', 'contribution_pk', 'indicator_id', 'Indicator', 'indicator_code', 'DLV_planned', 'activity_id', 'image_small', 'last_updated_altmetric', 'last_sync_almetric', 'id_phase_dlv', 'cluster_owner_id', 'institution_id', 'location_id', 'cluster_id'], axis=1, inplace=True)
             df = df.dropna(axis=1, how='all')
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
@@ -204,10 +212,10 @@ def load_full_data(table_name):
             )
             df = df_grouped.reset_index()
             df["table_type"] = "deliverables"
-            s3_folder = "deliverables"
         
         elif table_name == "vw_ai_oicrs":
             df.rename(columns={'link_pdf_file': 'link_pdf_oicr', 'oicr_year': 'year'}, inplace=True)
+            df.drop(['cluster_id', 'parameter_value', 'link_cluster_id', 'outcome_communication', 'country_id', 'country_iso_alpha3', 'contributing_crp', 'indicator_pk', 'contribution_pk', 'institution_id', 'cluster_id_year'], axis=1, inplace=True)
             df = df.dropna(axis=1, how='all')
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
@@ -217,10 +225,10 @@ def load_full_data(table_name):
             )
             df = df_grouped.reset_index()
             df["table_type"] = "oicrs"
-            s3_folder = "oicrs"
         
         else:
             df.rename(columns={'link_pdf_file': 'link_pdf_innovation'}, inplace=True)
+            df.drop(['stage', 'stage_definition', 'country_id', 'gender_relevance', 'gender_explanation_evidence', 'youth_relevance', 'youth_explanation_evidence', 'indicator_pk', 'contribution_pk', 'cluster_id', 'cluster_owner_id', 'status', 'institution_id', 'are_users_determined', 'is_scaling_partner', 'cluster_id_year'], axis=1, inplace=True)
             df = df.dropna(axis=1, how='all')
             id_column = df.columns[0]
             indicator_column = 'indicator_acronym'
@@ -230,12 +238,11 @@ def load_full_data(table_name):
             )
             df = df_grouped.reset_index()
             df["table_type"] = "innovations"
-            s3_folder = "innovations"
 
         df.to_json(f'{table_name}.jsonl', orient='records', lines=True, force_ascii=False)
         df.to_csv(f'{table_name}.csv', index=False)
 
-        split_jsonl_to_individual_files(f'{table_name}.jsonl', s3_folder)
+        split_jsonl_to_individual_csv_files(f'{table_name}.jsonl')
         
         return df
 

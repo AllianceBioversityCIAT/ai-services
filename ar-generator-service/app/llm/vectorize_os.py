@@ -1,3 +1,5 @@
+"""Main pipeline for generating Mid-Year Progress Reports using OpenSearch and LLMs."""
+
 import re
 import json
 import boto3
@@ -72,24 +74,18 @@ def create_index_if_not_exists(dimension=1024):
         return False
 
 
-def insert_into_opensearch(table_name: str, mode: str):
+def insert_into_opensearch(table_name: str):
     try:
         logger.info(f"🔍 Processing table: {table_name}")
 
-        if mode == "generator":
-            df = load_data(table_name)
-        else:
-            df = load_full_data(table_name)
-        
+        df = load_data(table_name)
         rows = df.to_dict(orient="records")
-
-        date_fields = ["last_updated_altmetric", "last_sync_almetric"]
 
         chunks = []
         for row in rows:
             chunk = {
                 k: v for k, v in row.items()
-                if (k not in date_fields or v != "") and pd.notnull(v) and v != ""
+                if pd.notnull(v) and v != ""
             }
             chunks.append(chunk)
 
@@ -241,11 +237,11 @@ def run_pipeline(indicator, year, insert_data=False):
                 logger.info(f"🗑️ Deleting existing index: {INDEX_NAME}")
                 opensearch.indices.delete(index=INDEX_NAME)
             create_index_if_not_exists()
-            insert_into_opensearch("vw_ai_deliverables", mode="generator")
-            insert_into_opensearch("vw_ai_project_contribution", mode="generator")
-            insert_into_opensearch("vw_ai_questions", mode="generator")
-            insert_into_opensearch("vw_ai_oicrs", mode="generator")
-            insert_into_opensearch("vw_ai_innovations", mode="generator")
+            insert_into_opensearch("vw_ai_deliverables")
+            insert_into_opensearch("vw_ai_project_contribution")
+            insert_into_opensearch("vw_ai_questions")
+            insert_into_opensearch("vw_ai_oicrs")
+            insert_into_opensearch("vw_ai_innovations")
 
         total_expected, total_achieved, progress = calculate_summary(indicator, year)
 
