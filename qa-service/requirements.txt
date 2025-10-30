@@ -1,0 +1,15 @@
+boto3
+PyPDF2
+python-docx
+numpy
+pandas
+openpyxl
+python-dotenv
+pyjwt
+aiohttp
+requests
+fastapi
+uvicorn
+mangum
+python-pptx
+python-multipart
