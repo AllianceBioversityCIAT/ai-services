@@ -69,6 +69,7 @@ def improve_prms_result_metadata(result_metadata: dict, user_id: str = None):
         logger.info(f"🔍 Processing PRMS document with result type: {result_type}, result level: {result_level}")
         
         prompt = build_prompt(result_type, result_level, result_metadata)
+        logger.info(f"📝 Generated prompt for LLM:\n{prompt}")
 
         response_text = invoke_model(prompt)
 
