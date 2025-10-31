@@ -2,7 +2,7 @@ import time
 import json
 import boto3
 from app.utils.config.config_util import AWS
-from app.utils.prompt.prompt import DEFAULT_PROMPT
+from app.utils.prompt.prompt import build_prompt
 from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
 from app.utils.interactions.interaction_client import interaction_client
@@ -18,7 +18,7 @@ bedrock_runtime = boto3.client(
 )
 
 
-def invoke_model(prompt, max_tokens=5000):
+def invoke_model(prompt, max_tokens=2000):
     try:
         logger.info("🚀 Invoking the model...")
         request_body = {
@@ -59,20 +59,18 @@ def is_valid_json(text):
         return False
 
 
-def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT, user_id: str = None):
+def improve_prms_result_metadata(result_metadata: dict, user_id: str = None):
     start_time = time.time()
 
     try:
-        document_content = read_document_from_s3(bucket_name, file_key)
+        result_type = result_metadata["response"].get("result_type_name", "").lower()
+        result_level = result_metadata["response"].get("result_level_name", "").lower()
 
-        context = ""
+        logger.info(f"🔍 Processing PRMS document with result type: {result_type}, result level: {result_level}")
+        
+        prompt = build_prompt(result_type, result_level, result_metadata)
 
-        query = f"""
-        Based on this context:\n{context}\n\n
-        Do the following:\n{prompt}
-        """
-
-        response_text = invoke_model(query)
+        response_text = invoke_model(prompt)
 
         json_content = json.loads(response_text) if is_valid_json(response_text) else {"text": response_text}
 
@@ -81,30 +79,23 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT, user_id:
 
         interaction_id = None
         if user_id:
-            try:
-                user_input = f"Document analysis request for: {file_key}"
-                if isinstance(document_content, dict) and document_content.get("type") == "excel":
-                    user_input += f" (Excel file with {len(document_content.get('chunks', []))} rows)"
-                
+            try:           
                 ai_output = json.dumps(json_content, indent=2, ensure_ascii=False)
+                user_input = f"PRMS Result Metadata Improvement Request:\nResult Type: {result_type}\nResult Level: {result_level}"
                 
                 tracking_context = {
-                    "bucket_name": bucket_name,
-                    "file_key": file_key,
                     "prompt_used": prompt[:500] + "..." if len(prompt) > 500 else prompt,
                     "prompt_full_length": len(prompt),
-                    "results_count": len(json_content.get("results", [])),
-                    "model_used": "claude-4-sonnet",
-                    "processing_steps": ["document_read", "text_splitting", "embedding_generation", "vector_search", "llm_processing", "field_mapping"]
+                    "model_used": "claude-4-sonnet"
                 }
                 
                 interaction_response = interaction_client.track_interaction(
                     user_id=user_id,
                     user_input=user_input,
                     ai_output=ai_output,
-                    service_name="text-mining",
-                    display_name="PRMS Text Mining Service",
-                    service_description="A service that analyzes documents and extracts insights based on user prompts.",
+                    service_name="qa-ai",
+                    display_name="PRMS QA Service",
+                    service_description="A service that provides QA capabilities for documents.",
                     context=tracking_context,
                     response_time_seconds=elapsed_time,
                     platform="PRMS"
