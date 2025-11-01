@@ -29,12 +29,9 @@ class PrmsResponse(BaseModel):
     """
     Successful response model for PRMS QA API.
     """
-    content: str = Field(..., description="Raw LLM response content", examples=["{\"new_title\": \"Improved Title\", \"new_description\": \"Improved Description\"}"])
     time_taken: str = Field(..., description="Time taken to process in seconds", examples=["1.23"])
     json_content: Dict[str, Any] = Field(..., description="Parsed JSON content from the LLM response", examples=[{"new_title": "Improved Title", "new_description": "Improved Description"}])
-    project: str = Field(..., description="Project identifier", examples=["PRMS"])
     interaction_id: Optional[str] = Field(None, description="Optional interaction tracking ID", examples=["abc123"])
-    status: str = Field(default="success", description="Response status indicator", examples=["success"])
 
 class ErrorResponse(BaseModel):
     """

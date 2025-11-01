@@ -115,10 +115,8 @@ def improve_prms_result_metadata(result_metadata: dict, user_id: str = None):
         logger.info(f"⏱️ PRMS Response time: {elapsed_time:.2f} seconds")
 
         result = {
-            "content": response_text,
             "time_taken": f"{elapsed_time:.2f}",
             "json_content": json_content,
-            "project": "PRMS"
         }
 
         if interaction_id:
