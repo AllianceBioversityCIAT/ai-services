@@ -133,12 +133,7 @@ async def get_aiccra_prompt():
 async def list_s3_objects(request: S3ListRequest):
     """List objects in S3 bucket with given prefix, ordered by LastModified (desc)."""
     try:
-        s3 = boto3.client(
-            "s3", 
-            aws_access_key_id=AWS['aws_access_key'],
-            aws_secret_access_key=AWS['aws_secret_key'],
-            region_name=AWS['aws_region']
-        )
+        s3 = boto3.client("s3")
         
         paginator = s3.get_paginator("list_objects_v2")
         pages = paginator.paginate(Bucket=request.bucket, Prefix=request.prefix)
