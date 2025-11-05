@@ -11,10 +11,7 @@ from app.utils.interactions.interaction_client import interaction_client
 logger = get_logger()
 
 bedrock_runtime = boto3.client(
-    service_name='bedrock-runtime',
-    aws_access_key_id=AWS['aws_access_key'],
-    aws_secret_access_key=AWS['aws_secret_key'],
-    region_name='us-east-1'
+    service_name='bedrock-runtime'
 )
 
 
