@@ -11,7 +11,8 @@ from app.utils.interactions.interaction_client import interaction_client
 logger = get_logger()
 
 bedrock_runtime = boto3.client(
-    service_name='bedrock-runtime'
+    service_name='bedrock-runtime',
+    region_name='us-east-1'
 )
 
 
