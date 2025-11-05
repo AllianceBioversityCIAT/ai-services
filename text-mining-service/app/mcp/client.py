@@ -113,13 +113,13 @@ async def handle_sampling_message(message: types.CreateMessageRequestParams) -> 
 app.mount("/static", StaticFiles(directory="interface"), name="static")
 
 
-@app.get("/ui")
+@app.get("/ui", tags=["AICCRA Project"])
 async def serve_ui_alt():
     """Alternative endpoint for the UI"""
     return FileResponse('interface/index.html')
 
 
-@app.get("/aiccra/prompt")
+@app.get("/aiccra/prompt", tags=["AICCRA Project"])
 async def get_aiccra_prompt():
     """Get the default AICCRA prompt template"""
     return {
@@ -129,7 +129,7 @@ async def get_aiccra_prompt():
     }
 
 
-@app.post("/list-s3-objects")
+@app.post("/list-s3-objects", tags=["AICCRA Project"])
 async def list_s3_objects(request: S3ListRequest):
     """List objects in S3 bucket with given prefix, ordered by LastModified (desc)."""
     try:
