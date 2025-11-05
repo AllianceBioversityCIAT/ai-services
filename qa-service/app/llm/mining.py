@@ -12,8 +12,6 @@ logger = get_logger()
 
 bedrock_runtime = boto3.client(
     service_name='bedrock-runtime',
-    aws_access_key_id=AWS['aws_access_key'],
-    aws_secret_access_key=AWS['aws_secret_key'],
     region_name='us-east-1'
 )
 
@@ -65,8 +63,8 @@ def improve_prms_result_metadata(result_metadata: dict, user_id: str = None):
     try:
         result_type = result_metadata["response"].get("result_type_name", "").lower()
         result_level = result_metadata["response"].get("result_level_name", "").lower()
-        result_title = result_metadata["response"].get("result_name", "").lower()
-        result_description = result_metadata["response"].get("result_description", "").lower()
+        result_title = result_metadata["response"].get("result_name", "")
+        result_description = result_metadata["response"].get("result_description", "")
 
         logger.info(f"🔍 Processing PRMS document with result type: {result_type}, result level: {result_level}")
         
@@ -84,7 +82,7 @@ def improve_prms_result_metadata(result_metadata: dict, user_id: str = None):
         if user_id:
             try:           
                 ai_output = json.dumps(json_content, indent=2, ensure_ascii=False)
-                user_input = f"PRMS Result Metadata: Result type: {result_type}, Original result title: {result_title}, Original result description: {result_description}"
+                user_input = f"PRMS Result Metadata - Result type: {result_type}, Original result title: {result_title}, Original result description: {result_description}"
 
                 tracking_context = {
                     "prompt_used": prompt[:500] + "..." if len(prompt) > 500 else prompt,
