@@ -30,7 +30,7 @@ def _get_chatbot_agent():
 @router.post(
     "/api/chat",
     response_model=ChatResponse,
-    tags=["Chat"],
+    tags=["Chatbot"],
     summary="Chat with AICCRA AI Assistant",
     description="""
     🤖 Interactive Chat with AICCRA AI Assistant
@@ -40,30 +40,30 @@ def _get_chatbot_agent():
     
     🧠 How It Works
     
-    1. **Message Processing**: Your question is analyzed for intent and context
-    2. **Data Management**: Optionally reload fresh data from the database (if insert_data=true)
-    3. **Smart Filtering**: Optional filters are applied to focus on specific data subsets
-    4. **Vector Search**: Relevant information is retrieved from the knowledge base
-    5. **AI Generation**: AWS Bedrock Claude 3.7 Sonnet generates a contextual response
-    6. **Memory Integration**: Session memory enables follow-up questions and context retention
+    1. Message Processing: Your question is analyzed for intent and context
+    2. Data Management: Optionally reload fresh data from the database (if insert_data=true)
+    3. Smart Filtering: Optional filters are applied to focus on specific data subsets
+    4. Vector Search: Relevant information is retrieved from the knowledge base
+    5. AI Generation: AWS Bedrock Claude 3.7 Sonnet generates a contextual response
+    6. Memory Integration: Session memory enables follow-up questions and context retention
     
     💬 Conversation Features
     
-    - **Session Management**: Requires a unique session_id for each conversation to maintain context
-    - **User Identification**: Requires the user's email address (memory_id) for personalized access
-    - **Context-Aware**: Builds upon previous questions for comprehensive answers
-    - **Smart Filtering**: Use filters to focus on specific phases, indicators, or sections
-    - **Rich Citations**: Responses include links to relevant documents and reports
-    - **Data Refresh**: Option to reload fresh data from the database
+    - Session Management: Requires a unique session_id for each conversation to maintain context
+    - User Identification: Requires the user's email address (memory_id) for personalized access
+    - Context-Aware: Builds upon previous questions for comprehensive answers
+    - Smart Filtering: Use filters to focus on specific phases, indicators, or sections
+    - Rich Citations: Responses include links to relevant documents and reports
+    - Data Refresh: Option to reload fresh data from the database
     
     🔄 Data Management
     
     The `insert_data` parameter allows you to control data freshness:
     
-    - **False (default)**: Uses existing knowledge base data for fast responses
-    - **True**: Reloads fresh data from SQL Server before responding
+    - False (default): Uses existing knowledge base data for fast responses
+    - True: Reloads fresh data from SQL Server before responding
     
-    ⚠️ **Data Reload Warning**: Setting `insert_data=true` will:
+    ⚠️ Data Reload Warning: Setting `insert_data=true` will:
     - Take 3-5 additional minutes to complete
     - Query all database views and process thousands of records
     - Upload fresh data to S3 and synchronize the knowledge base
@@ -71,22 +71,22 @@ def _get_chatbot_agent():
     
     🎯 What You Can Ask
     
-    **Progress Tracking**
+    Progress Tracking
     - "What progress has been made on IPI 1.1 in 2025?"
     - "How are the clusters performing against their targets?"
     - "Show me achievements for PDO Indicator 3"
     
-    **Research & Deliverables**
+    Research & Deliverables
     - "What publications were released by the Kenya cluster?"
     - "Show me deliverables related to climate information services"
     - "What research outputs are available for Theme 2?"
     
-    **Innovations & Technology**
+    Innovations & Technology
     - "What innovations were developed for climate-smart agriculture?"
     - "Show me tools created for early warning systems"
     - "What is the readiness level of AICCRA innovations?"
     
-    **Impact & Outcomes**
+    Impact & Outcomes
     - "What real-world impacts has AICCRA achieved?"
     - "Show me outcome case reports from Western Africa"
     - "How has AICCRA contributed to farmer livelihoods?"
@@ -95,20 +95,20 @@ def _get_chatbot_agent():
     
     Use optional filters to focus your queries:
     
-    - **Phase**: Target specific reporting periods (AWPB, Progress, AR)
-    - **Indicator**: Focus on specific performance indicators (IPI, PDO)
-    - **Section**: Limit to specific data types (Deliverables, Innovations, etc.)
+    - Phase: Target specific reporting periods (AWPB, Progress, AR)
+    - Indicator: Focus on specific performance indicators (IPI, PDO)
+    - Section: Limit to specific data types (Deliverables, Innovations, etc.)
     
     ⚡ Performance Notes
     
-    - **Regular Response**: ~3-5 seconds for new sessions
-    - **With Data Reload**: ~3-5 minutes (includes database refresh)
-    - **Follow-up Questions**: ~2-3 seconds with conversation memory
-    - **Complex Queries**: May take longer for comprehensive analysis
+    - Regular Response: ~3-5 seconds for new sessions
+    - With Data Reload: ~3-5 minutes (includes database refresh)
+    - Follow-up Questions: ~2-3 seconds with conversation memory
+    - Complex Queries: May take longer for comprehensive analysis
     
     📋 Example Usage
     
-    **Regular Chat:**
+    Regular Chat:
     ```bash
     curl -X POST "http://localhost:8000/api/chat" \\
          -H "Content-Type: application/json" \\
@@ -123,7 +123,7 @@ def _get_chatbot_agent():
          }'
     ```
     
-    **With Fresh Data Reload:**
+    With Fresh Data Reload:
     ```bash
     curl -X POST "http://localhost:8000/api/chat" \\
          -H "Content-Type: application/json" \\
@@ -135,7 +135,7 @@ def _get_chatbot_agent():
          }'
     ```
     
-    ⚠️ **Important**: 
+    ⚠️ Important: 
     - `session_id`: Unique identifier for each conversation session (e.g., UUID)
     - `memory_id`: User's email address for personalized knowledge base access
     - `insert_data`: Only set to true when you need the absolute latest data
@@ -151,7 +151,7 @@ def _get_chatbot_agent():
                         "regular_response": {
                             "summary": "Regular chat response",
                             "value": {
-                                "message": "Based on the latest data, AICCRA has achieved significant progress on IPI 1.1 in 2025. The **Western Africa** cluster has contributed 45% of the total achievements...",
+                                "message": "Based on the latest data, AICCRA has achieved significant progress on IPI 1.1 in 2025. The Western Africa cluster has contributed 45% of the total achievements...",
                                 "session_id": "550e8400-e29b-41d4-a716-446655440000",
                                 "filters_applied": {
                                     "phase": "Progress 2025",
@@ -320,7 +320,7 @@ async def chat_with_assistant(request: ChatRequest) -> ChatResponse:
         else:
             response_data["data_reloaded"] = False
         
-        return ChatResponse(**response_data)
+        return ChatResponse(response_data)
         
     except ValueError as e:
         logger.error(f"Validation error: {str(e)}")

@@ -123,18 +123,18 @@ class ChatRequest(BaseModel):
         - Process and upload fresh data to the AWS Bedrock Knowledge Base
         - Synchronize the knowledge base with the latest information
         
-        ⚠️ **Warning**: This operation can take several minutes to complete as it involves:
+        ⚠️ Warning: This operation can take several minutes to complete as it involves:
         - Querying multiple database views
         - Processing thousands of records
         - Uploading files to S3
         - Synchronizing the knowledge base
         
-        **When to use**:
+        When to use:
         - After significant database updates
         - When troubleshooting data inconsistencies
         - For periodic maintenance (recommended weekly)
         
-        **Default**: False (uses existing knowledge base data)
+        Default: False (uses existing knowledge base data)
         """,
         examples=[False, True]
     )
@@ -159,7 +159,7 @@ class ChatResponse(BaseModel):
         - Contextual explanations of AICCRA activities
         """,
         examples=[
-            "Based on the latest data, AICCRA has achieved significant progress on IPI 1.1 in 2025. The **Western Africa** cluster has contributed 45% of the total achievements..."
+            "Based on the latest data, AICCRA has achieved significant progress on IPI 1.1 in 2025. The Western Africa cluster has contributed 45% of the total achievements..."
         ]
     )
     

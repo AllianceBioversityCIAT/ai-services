@@ -2,7 +2,9 @@
 
 from fastapi import FastAPI
 from app.api.routes import router
+from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.utils.logger.logger_util import get_logger
 
@@ -22,25 +24,25 @@ app = FastAPI(
     
     🚀 Key Features
     
-    - 💬 **Conversational Interface**: Natural language interaction with AICCRA data
-    - 🧠 **Memory-Enabled**: Remembers conversation context across sessions
-    - 🔍 **Smart Filtering**: Apply filters by phase, indicator, and section
-    - 📊 **Data-Driven Insights**: Provides insights from real AICCRA reporting data
-    - 🎯 **Contextual Responses**: Builds upon previous questions for comprehensive answers
-    - 🔗 **Rich Citations**: Includes links to relevant documents and reports
-    - 🔄 **Data Refresh**: Option to reload fresh data from the database
-    - 📝 **Feedback System**: Collect user feedback for continuous improvement
+    - 💬 Conversational Interface: Natural language interaction with AICCRA data
+    - 🧠 Memory-Enabled: Remembers conversation context across sessions
+    - 🔍 Smart Filtering: Apply filters by phase, indicator, and section
+    - 📊 Data-Driven Insights: Provides insights from real AICCRA reporting data
+    - 🎯 Contextual Responses: Builds upon previous questions for comprehensive answers
+    - 🔗 Rich Citations: Includes links to relevant documents and reports
+    - 🔄 Data Refresh: Option to reload fresh data from the database
+    - 📝 Feedback System: Collect user feedback for continuous improvement
     
     🔄 Data Management
     
     The service supports two data access modes:
     
-    **Standard Mode (insert_data=false)**
+    Standard Mode (insert_data=false)
     - Uses existing knowledge base data for fast responses (~3-5 seconds)
     - Recommended for most queries and regular usage
     - Data is typically refreshed weekly
     
-    **Fresh Data Mode (insert_data=true)**
+    Fresh Data Mode (insert_data=true)
     - Reloads data directly from SQL Server database (~3-5 minutes)
     - Processes all database views and uploads to knowledge base
     - Use when you need the absolute latest information
@@ -48,17 +50,17 @@ app = FastAPI(
 
     📝 Feedback System
     
-    **Continuous Improvement Through User Feedback**
+    Continuous Improvement Through User Feedback
     
     The service includes a feedback system to collect user opinions on AI responses:
     
-    - **Positive Feedback (👍)**: When responses are helpful and accurate
-    - **Negative Feedback (👎)**: When responses need improvement, with optional detailed comments
-    - **Session Tracking**: Links feedback to specific conversations
-    - **Metadata Collection**: Captures context like filters used and response characteristics
-    - **Secure Storage**: Feedback stored in AWS S3 with unique tracking IDs
+    - Positive Feedback (👍): When responses are helpful and accurate
+    - Negative Feedback (👎): When responses need improvement, with optional detailed comments
+    - Session Tracking: Links feedback to specific conversations
+    - Metadata Collection: Captures context like filters used and response characteristics
+    - Secure Storage: Feedback stored in AWS S3 with unique tracking IDs
     
-    **Feedback Features:**
+    Feedback Features:
     - Unique tracking IDs for each feedback submission
     - Session and user context preservation
     - Optional detailed comments for negative feedback
@@ -66,59 +68,59 @@ app = FastAPI(
     
     🗣️ What You Can Ask
     
-    **Progress & Achievements**
+    Progress & Achievements
     - "What progress has been made on IPI 1.1 in 2025?"
     - "Show me achievements for PDO Indicator 3"
     - "How are clusters performing this year?"
     
-    **Deliverables & Research**
+    Deliverables & Research
     - "What deliverables were published by the Kenya cluster?"
     - "Show me recent publications on climate information services"
     - "What research outputs are available for Theme 2?"
     
-    **Innovations & Technologies**
+    Innovations & Technologies
     - "What innovations were developed for climate-smart agriculture?"
     - "Show me tools created for early warning systems"
     - "What technology readiness levels have been achieved?"
     
-    **Outcomes & Impact**
+    Outcomes & Impact
     - "What outcomes have been documented in OICRs?"
     - "Show me impact case reports from Eastern Africa"
     - "What real-world impacts has AICCRA achieved?"
     
     📋 Supported Data Types
     
-    **Performance Indicators**
-    - **IPI 1.1-1.4**: Climate information and early warning systems
-    - **IPI 2.1-2.3**: Agricultural technologies and practices
-    - **IPI 3.1-3.4**: Institutional capacity and partnerships
-    - **PDO Indicator 1-5**: Project outcome and impact metrics
+    Performance Indicators
+    - IPI 1.1-1.4: Climate information and early warning systems
+    - IPI 2.1-2.3: Agricultural technologies and practices
+    - IPI 3.1-3.4: Institutional capacity and partnerships
+    - PDO Indicator 1-5: Project outcome and impact metrics
     
-    **Data Sections**
-    - **Deliverables**: Research outputs, publications, tools, and datasets
-    - **Contributions**: Cluster activities, milestone progress, and narratives
-    - **Innovations**: Technology developments, platforms, and practices
-    - **OICRs**: Outcome Impact Case Reports documenting real-world impacts
+    Data Sections
+    - Deliverables: Research outputs, publications, tools, and datasets
+    - Contributions: Cluster activities, milestone progress, and narratives
+    - Innovations: Technology developments, platforms, and practices
+    - OICRs: Outcome Impact Case Reports documenting real-world impacts
     
-    **Reporting Phases**
-    - **AWPB**: Annual Work Plan and Budget (planning phase)
-    - **Progress**: Mid-year progress reports
-    - **AR**: Annual Reports (achievements and outcomes)
+    Reporting Phases
+    - AWPB: Annual Work Plan and Budget (planning phase)
+    - Progress: Mid-year progress reports
+    - AR: Annual Reports (achievements and outcomes)
     
     🏗️ Technology Stack
     
-    - **AI/ML**: AWS Bedrock (Claude 3.7 Sonnet) with Amazon Bedrock Agents
-    - **Memory**: Amazon Bedrock Knowledge Base with session management
-    - **Vector Search**: Amazon OpenSearch Service for semantic search
-    - **Database**: SQL Server for structured data
-    - **Cloud Services**: AWS S3, AWS Bedrock Knowledge Base
+    - AI/ML: AWS Bedrock (Claude 3.7 Sonnet) with Amazon Bedrock Agents
+    - Memory: Amazon Bedrock Knowledge Base with session management
+    - Vector Search: Amazon OpenSearch Service for semantic search
+    - Database: SQL Server for structured data
+    - Cloud Services: AWS S3, AWS Bedrock Knowledge Base
     
     🔒 Authentication
     
     This API uses AWS IAM authentication for accessing backend services.
     No API key is required for the HTTP endpoints.
     
-    ⚠️ **Data Reload Notice**
+    ⚠️ Data Reload Notice
     
     When using `insert_data=true`, the following process occurs:
     1. Connects to SQL Server and queries all AICCRA views
@@ -143,7 +145,7 @@ app = FastAPI(
     },
     openapi_tags=[
         {
-            "name": "Chat",
+            "name": "Chatbot",
             "description": "Conversational AI operations for AICCRA data exploration",
         },
         {
@@ -162,6 +164,12 @@ app.add_middleware(
 )
 
 app.include_router(router)
+
+app.mount("/static", StaticFiles(directory="interface"), name="static")
+
+@app.get("/chatbot-ui", tags=["Chatbot"])
+async def serve_ui_alt():
+    return FileResponse('interface/chatbot_interface.html')
 
 
 @app.get(
