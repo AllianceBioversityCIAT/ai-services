@@ -320,7 +320,7 @@ async def chat_with_assistant(request: ChatRequest) -> ChatResponse:
         else:
             response_data["data_reloaded"] = False
         
-        return ChatResponse(response_data)
+        return ChatResponse(**response_data)
         
     except ValueError as e:
         logger.error(f"Validation error: {str(e)}")
