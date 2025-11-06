@@ -18,20 +18,26 @@ logger = get_logger()
 st.set_page_config(page_title="MARLO-AICCRA chatbot", page_icon="🤖", layout="wide")
 
 if 'user_email' not in st.session_state:
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("### 🤖 Welcome to MARLO-AICCRA Chatbot")
-        st.markdown("Please enter your email to personalize your experience and enable memory features:")
-        email = st.text_input("Email:", key="email_input", placeholder="your.email@example.com")
-        if st.button("Start Chat", type="primary"):
-            if email and '@' in email:
-                st.session_state.user_email = email
-                st.session_state.memory_id = email.split('@')[0]
-                st.rerun()
-            else:
-                st.error("Please enter a valid email address.")
-
-    st.stop()
+    query_params = st.query_params
+    email_from_url = query_params.get("user_email", None)
+    
+    if email_from_url and '@' in email_from_url:
+        st.session_state.user_email = email_from_url
+        st.session_state.memory_id = email_from_url.split('@')[0]
+    else:
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown("### 🤖 Welcome to MARLO-AICCRA Chatbot")
+            st.markdown("Please enter your email to personalize your experience and enable memory features:")
+            email = st.text_input("Email:", key="email_input", placeholder="your.email@example.com")
+            if st.button("Start Chat", type="primary"):
+                if email and '@' in email:
+                    st.session_state.user_email = email
+                    st.session_state.memory_id = email.split('@')[0]
+                    st.rerun()
+                else:
+                    st.error("Please enter a valid email address.")
+        st.stop()
 
 MEMORY_ID = st.session_state.memory_id
 
