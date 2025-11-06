@@ -647,14 +647,29 @@
             const messageContent = document.createElement('div');
             messageContent.className = 'message-content';
             
-            // Basic markdown rendering for AI responses
             if (role === 'assistant') {
-                // Convert basic markdown to HTML
                 let formattedContent = content
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')  // Bold
-                    .replace(/\*(.*?)\*/g, '<em>$1</em>')              // Italic
-                    .replace(/`(.*?)`/g, '<code style="background: #f0f0f0; padding: 2px 4px; border-radius: 3px;">$1</code>')  // Code
-                    .replace(/\n/g, '<br>');                           // Line breaks
+
+                    .replace(/^### (.*$)/gm, '<h3 style="margin: 1rem 0 0.5rem 0; font-size: 1.1rem;">$1</h3>')
+                    .replace(/^## (.*$)/gm, '<h2 style="margin: 1rem 0 0.5rem 0; font-size: 1.2rem;">$1</h2>')
+                    .replace(/^# (.*$)/gm, '<h1 style="margin: 1rem 0 0.5rem 0; font-size: 1.3rem;">$1</h1>')
+
+                    .replace(/^\* (.*$)/gm, '<li style="margin-left: 1rem;">$1</li>')
+                    .replace(/^- (.*$)/gm, '<li style="margin-left: 1rem;">$1</li>')
+                    .replace(/^\d+\. (.*$)/gm, '<li style="margin-left: 1rem; list-style-type: decimal;">$1</li>')
+
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+
+                    .replace(/```([\s\S]*?)```/g, '<pre style="background: #f5f5f5; padding: 1rem; border-radius: 6px; margin: 0.5rem 0; overflow-x: auto;"><code>$1</code></pre>')
+                    .replace(/`(.*?)`/g, '<code style="background: #f0f0f0; padding: 2px 4px; border-radius: 3px;">$1</code>')
+
+                    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color: #1e88e5; text-decoration: none;">$1</a>')
+
+                    .replace(/\n/g, '<br>');
+                
+                formattedContent = formattedContent.replace(/(<li[^>]*>.*?<\/li>(\s*<br>\s*<li[^>]*>.*?<\/li>)*)/g, '<ul style="margin: 0.5rem 0; padding-left: 1rem;">$1</ul>');
+                formattedContent = formattedContent.replace(/<br>\s*<ul/g, '<ul').replace(/<\/ul>\s*<br>/g, '</ul>');
                     
                 messageContent.innerHTML = formattedContent;
             } else {
