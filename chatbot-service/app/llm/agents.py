@@ -52,6 +52,11 @@ def run_agent_chatbot(user_input, phase, indicator, section, session_id, memory_
     input_text = f"""
 ## User question:
 {user_input}
+
+## Filters applied by user:
+- Phase: {phase}
+- Indicator: {indicator}
+- Section: {section}
 """
     enableTrace=False
 
