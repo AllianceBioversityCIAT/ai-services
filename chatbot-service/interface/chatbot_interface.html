@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MARLO-AICCRA Chatbot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1079A4 0%, #5ca3bf 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(20, 129, 179, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .new-chat-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .new-chat-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Main Chat Container */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            margin: 80px 20px 20px 20px;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        /* Filters Section */
+        .filters {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-bottom: 1px solid #e9ecef;
+            transition: max-height 0.3s ease;
+            overflow: hidden;
+        }
+
+        .filters.hidden {
+            max-height: 60px;
+        }
+
+        .filters-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .filters-toggle {
+            background: none;
+            border: none;
+            color: #6c757d;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .filter-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .filter-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            background: white;
+            font-size: 0.9rem;
+        }
+
+        .filter-help {
+            font-size: 0.8rem;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        /* Chat Messages */
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+            background: white;
+        }
+
+        .message {
+            margin-bottom: 1.5rem;
+            max-width: 80%;
+        }
+
+        .message.user {
+            margin-left: auto;
+        }
+
+        .message.assistant {
+            margin-right: auto;
+        }
+
+        .message-content {
+            padding: 1rem 1.5rem;
+            border-radius: 16px;
+            line-height: 1.5;
+        }
+
+        .message.user .message-content {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .message.assistant .message-content {
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #e0e0e0;
+        }
+
+        .message-time {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 1.5rem;
+            border-top: 1px solid #e9ecef;
+            background: white;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-end;
+        }
+
+        .input-field {
+            flex: 1;
+            min-height: 50px;
+            max-height: 120px;
+            padding: 0.75rem 1rem;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            resize: none;
+            font-family: inherit;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-field:focus {
+            border-color: #1e88e5;
+        }
+
+        .send-btn {
+            background: #1e88e5;
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            background: #1565c0;
+        }
+
+        .send-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Loading indicator */
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #666;
+            font-style: italic;
+        }
+
+        .loading-dots {
+            display: inline-flex;
+            gap: 2px;
+        }
+
+        .loading-dot {
+            width: 4px;
+            height: 4px;
+            background: #666;
+            border-radius: 50%;
+            animation: loading 1.4s infinite ease-in-out;
+        }
+
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes loading {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Email Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .modal h2 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .modal p {
+            margin-bottom: 1.5rem;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .modal input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+
+        .modal button {
+            background: #1e88e5;
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        .modal button:hover {
+            background: #1565c0;
+        }
+
+        .error {
+            color: #d32f2f;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Feedback */
+        .feedback {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .feedback-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .feedback-btn {
+            background: none;
+            border: 1px solid #e0e0e0;
+            padding: 0.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        .feedback-btn:hover {
+            background: #f5f5f5;
+        }
+
+        .export-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-left: auto;
+        }
+
+        .export-btn:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <!-- Email Modal -->
+    <div id="emailModal" class="modal">
+        <div class="modal-content">
+            <h2>🤖 Welcome to MARLO-AICCRA Chatbot</h2>
+            <p>Please enter your email to personalize your experience and enable memory features:</p>
+            <input type="email" id="emailInput" placeholder="your.email@example.com">
+            <div id="emailError" class="error"></div>
+            <button onclick="startChat()">Start Chat</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🤖 AI Assistant</h1>
+            <button class="new-chat-btn" onclick="startNewSession()"><strong>🔄 New Chat</strong></button>
+        </div>
+
+        <!-- Main Chat Container -->
+        <div class="chat-container">
+            <!-- Filters -->
+            <div class="filters" id="filtersSection">
+                <div class="filters-header">
+                    <h3>Filters</h3>
+                    <button class="filters-toggle" onclick="toggleFilters()">
+                        <span id="filterToggleText">🔼 Hide Filters</span>
+                    </button>
+                </div>
+                <div class="filters-grid" id="filtersGrid">
+                    <div class="filter-group">
+                        <label>✅ Cycle</label>
+                        <select id="phaseSelect" onchange="updateIndicatorOptions()">
+                            <option value="All phases">All Cycles</option>
+                            <option value="AWPB 2021">AWPB 2021</option>
+                            <option value="Progress 2021">Progress 2021</option>
+                            <option value="AR 2021">AR 2021</option>
+                            <option value="AWPB 2022">AWPB 2022</option>
+                            <option value="Progress 2022">Progress 2022</option>
+                            <option value="AR 2022">AR 2022</option>
+                            <option value="AWPB 2023">AWPB 2023</option>
+                            <option value="Progress 2023">Progress 2023</option>
+                            <option value="AR 2023">AR 2023</option>
+                            <option value="AWPB 2024">AWPB 2024</option>
+                            <option value="Progress 2024">Progress 2024</option>
+                            <option value="AR 2024">AR 2024</option>
+                            <option value="AWPB 2025">AWPB 2025</option>
+                            <option value="Progress 2025">Progress 2025</option>
+                            <option value="AR 2025">AR 2025</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>📊 Indicator</label>
+                        <select id="indicatorSelect">
+                            <option value="All indicators">All Indicators</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>📋 Section</label>
+                        <select id="sectionSelect">
+                            <option value="All sections">All Sections</option>
+                            <option value="Deliverables">Deliverables</option>
+                            <option value="OICRs">OICRs</option>
+                            <option value="Innovations">Innovations</option>
+                            <option value="Contributions">Contributions</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="filter-help">
+                    Apply filters to focus the AI assistant on specific data subsets. The AI will use these filters to provide more targeted insights and responses.
+                </div>
+            </div>
+
+            <!-- AI Warning -->
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 0.75rem; margin: 1rem; color: #856404; font-size: 0.9rem;">
+                <strong>⚠️</strong> <em>AI-generated responses may contain errors. Validate key information before using for decision-making or external communication.</em>
+            </div>
+
+            <!-- Messages -->
+            <div class="messages" id="messagesContainer">
+                <!-- Welcome Message -->
+                <div class="message assistant">
+                    <div class="message-content">
+                        <strong>Welcome to your intelligent assistant for MARLO-AICCRA</strong> (Accelerating Impacts of CGIAR Climate Research for Africa) data exploration.
+                        <br><br>
+                        <strong>How it works:</strong><br>
+                        🧠 <strong>Memory-enabled</strong>: Remembers your conversation and can answer follow-up questions<br>
+                        🎯 <strong>Contextual responses</strong>: Builds upon previous questions for more comprehensive answers<br>
+                        🔍 <strong>Smart filtering</strong>: Use the sidebar filters to focus on specific data subsets<br>
+                        📊 <strong>Data-driven</strong>: Provides insights from AICCRA's deliverables, innovations, contributions, and outcome impact case reports.
+                        <br><br>
+                        <strong>Get started</strong> by asking questions about clusters, indicators, innovations, or any AICCRA activities!
+                    </div>
+                    <div class="message-time" id="initialTime"></div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-area">
+                <div class="input-container">
+                    <textarea 
+                        id="messageInput" 
+                        class="input-field" 
+                        placeholder="Ask about your AICCRA data, request reports, or get insights...☺️"
+                        rows="1"
+                        onkeydown="handleKeyDown(event)"
+                        oninput="autoResize(this)"></textarea>
+                    <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                        <span id="sendIcon">✈️</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let userEmail = '';
+        let memoryId = '';
+        let sessionId = generateUUID();
+        let messages = [];
+        let isLoading = false;
+        let lastInteractionId = '';
+
+        // Configuration - Replace with your actual endpoints
+        const AI_FEEDBACK_URL = 'https://clv3b6bv9d.execute-api.us-east-1.amazonaws.com';
+        const CHATBOT_API_URL = 'http://localhost:8000/api/chat';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            checkForEmailInURL();
+            updateIndicatorOptions();
+            document.getElementById('initialTime').textContent = getCurrentTime();
+        });
+
+        function checkForEmailInURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const emailFromURL = urlParams.get('user_email');
+            
+            if (emailFromURL && emailFromURL.includes('@')) {
+                userEmail = emailFromURL;
+                memoryId = emailFromURL.split('@')[0];
+                document.getElementById('emailModal').style.display = 'none';
+            } else {
+                document.getElementById('emailModal').style.display = 'flex';
+            }
+        }
+
+        function startChat() {
+            const email = document.getElementById('emailInput').value.trim();
+            const errorDiv = document.getElementById('emailError');
+            
+            if (!email || !email.includes('@')) {
+                errorDiv.textContent = 'Please enter a valid email address.';
+                return;
+            }
+            
+            userEmail = email;
+            memoryId = email.split('@')[0];
+            errorDiv.textContent = '';
+            document.getElementById('emailModal').style.display = 'none';
+        }
+
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function getCurrentTime() {
+            return new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+
+        function getYearFromPhase(phaseLabel) {
+            if (phaseLabel === "All phases") return null;
+            const match = phaseLabel.match(/(20\d{2})$/);
+            return match ? parseInt(match[1]) : null;
+        }
+
+        function updateIndicatorOptions() {
+            const phaseSelect = document.getElementById('phaseSelect');
+            const indicatorSelect = document.getElementById('indicatorSelect');
+            const year = getYearFromPhase(phaseSelect.value);
+            
+            let options = ['<option value="All indicators">All Indicators</option>'];
+            
+            if ([2021, 2022, 2023].includes(year)) {
+                for (let i = 1; i <= 3; i++) {
+                    options.push(`<option value="PDO Indicator ${i}">PDO Indicator ${i}</option>`);
+                }
+                const ipiOptions = ["IPI 1.1", "IPI 1.2", "IPI 1.3", "IPI 2.1", "IPI 2.2", "IPI 2.3", "IPI 2.4", "IPI 3.1", "IPI 3.2", "IPI 3.3", "IPI 3.4", "IPI 3.5"];
+                ipiOptions.forEach(ipi => options.push(`<option value="${ipi}">${ipi}</option>`));
+            } else if ([2024, 2025].includes(year)) {
+                for (let i = 1; i <= 5; i++) {
+                    options.push(`<option value="PDO Indicator ${i}">PDO Indicator ${i}</option>`);
+                }
+                const ipiOptions = ["IPI 1.1", "IPI 1.2", "IPI 1.3", "IPI 1.4", "IPI 2.1", "IPI 2.2", "IPI 2.3", "IPI 3.1", "IPI 3.2", "IPI 3.3", "IPI 3.4"];
+                ipiOptions.forEach(ipi => options.push(`<option value="${ipi}">${ipi}</option>`));
+            } else {
+                for (let i = 1; i <= 5; i++) {
+                    options.push(`<option value="PDO Indicator ${i}">PDO Indicator ${i}</option>`);
+                }
+                const ipiOptions = ["IPI 1.1", "IPI 1.2", "IPI 1.3", "IPI 1.4", "IPI 2.1", "IPI 2.2", "IPI 2.3", "IPI 2.4", "IPI 3.1", "IPI 3.2", "IPI 3.3", "IPI 3.4", "IPI 3.5"];
+                ipiOptions.forEach(ipi => options.push(`<option value="${ipi}">${ipi}</option>`));
+            }
+            
+            indicatorSelect.innerHTML = options.join('');
+        }
+
+        function toggleFilters() {
+            const filtersSection = document.getElementById('filtersSection');
+            const filtersGrid = document.getElementById('filtersGrid');
+            const toggleText = document.getElementById('filterToggleText');
+            
+            if (filtersGrid.style.display === 'none') {
+                filtersGrid.style.display = 'grid';
+                toggleText.textContent = '🔼 Hide Filters';
+            } else {
+                filtersGrid.style.display = 'none';
+                toggleText.textContent = '🔽 Show Filters';
+            }
+        }
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+        }
+
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message || isLoading) return;
+            
+            addMessage('user', message);
+            input.value = '';
+            input.style.height = 'auto';
+            
+            setLoading(true);
+            
+            const startTime = Date.now();
+    
+            try {
+                const response = await callChatbotAPI(message);
+                const responseTime = (Date.now() - startTime) / 1000;
+                
+                addMessage('assistant', response);
+                
+                await trackInteractionWithTiming(message, response, responseTime);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                const errorMessage = error.message.includes('fetch') 
+                    ? '🌐 Connection error. Please check your internet connection and try again.'
+                    : '⚠️ An error occurred while processing your request. Please try again.';
+                addMessage('assistant', errorMessage);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function addMessage(role, content) {
+            const messagesContainer = document.getElementById('messagesContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            
+            // Basic markdown rendering for AI responses
+            if (role === 'assistant') {
+                // Convert basic markdown to HTML
+                let formattedContent = content
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')  // Bold
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')              // Italic
+                    .replace(/`(.*?)`/g, '<code style="background: #f0f0f0; padding: 2px 4px; border-radius: 3px;">$1</code>')  // Code
+                    .replace(/\n/g, '<br>');                           // Line breaks
+                    
+                messageContent.innerHTML = formattedContent;
+            } else {
+                messageContent.textContent = content;
+            }
+            
+            const messageTime = document.createElement('div');
+            messageTime.className = 'message-time';
+            messageTime.textContent = getCurrentTime();
+            
+            messageDiv.appendChild(messageContent);
+            messageDiv.appendChild(messageTime);
+            
+            // Add feedback for assistant messages
+            if (role === 'assistant') {
+                const feedback = createFeedbackSection();
+                messageDiv.appendChild(feedback);
+            }
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // Store message
+            messages.push({ role, content, timestamp: new Date() });
+        }
+
+        function createFeedbackSection() {
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <small style="color: #666;">Give feedback on this response</small>
+                        <div class="feedback-buttons">
+                            <button class="feedback-btn" onclick="submitFeedback('positive', this)">👍</button>
+                            <button class="feedback-btn" onclick="submitFeedback('negative', this)">👎</button>
+                        </div>
+                    </div>
+                    <button class="export-btn" onclick="exportChat()">💾 Export Chat</button>
+                </div>
+            `;
+            return feedback;
+        }
+
+        function setLoading(loading) {
+            isLoading = loading;
+            const sendBtn = document.getElementById('sendBtn');
+            const sendIcon = document.getElementById('sendIcon');
+            
+            if (loading) {
+                sendBtn.disabled = true;
+                sendIcon.innerHTML = '<div class="loading-dots"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div>';
+                
+                const messagesContainer = document.getElementById('messagesContainer');
+                const loadingDiv = document.createElement('div');
+                loadingDiv.className = 'message assistant';
+                loadingDiv.id = 'loadingMessage';
+                loadingDiv.innerHTML = `
+                    <div class="message-content loading">
+                        <span>Thinking</span>
+                        <div class="loading-dots">
+                            <div class="loading-dot"></div>
+                            <div class="loading-dot"></div>
+                            <div class="loading-dot"></div>
+                        </div>
+                    </div>
+                `;
+                messagesContainer.appendChild(loadingDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            } else {
+                sendBtn.disabled = false;
+                sendIcon.textContent = '✈️';
+                
+                const loadingMessage = document.getElementById('loadingMessage');
+                if (loadingMessage) {
+                    loadingMessage.remove();
+                }
+            }
+        }
+
+       async function callChatbotAPI(message) {
+            const phase = document.getElementById('phaseSelect').value;
+            const indicator = document.getElementById('indicatorSelect').value;
+            const section = document.getElementById('sectionSelect').value;
+            
+            const requestData = {
+                message: message,
+                phase: phase,
+                indicator: indicator, 
+                section: section,
+                session_id: sessionId,
+                memory_id: memoryId,
+                insert_data: false
+            };
+            
+            try {
+                const response = await fetch(CHATBOT_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.details || `API request failed: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                return data.message;
+                
+            } catch (error) {
+                console.error('Error calling chatbot API:', error);
+                throw error;
+            }
+        }
+
+        async function trackInteractionWithTiming(userInput, aiOutput, responseTime) {
+            try {
+                const phase = document.getElementById('phaseSelect').value;
+                const indicator = document.getElementById('indicatorSelect').value;
+                const section = document.getElementById('sectionSelect').value;
+                
+                const interactionData = {
+                    user_id: userEmail,
+                    session_id: sessionId,
+                    user_input: userInput,
+                    ai_output: aiOutput,
+                    service_name: "chatbot",
+                    display_name: "AICCRA Chatbot",
+                    service_description: "Conversational AI for AICCRA data exploration",
+                    platform: "AICCRA",
+                    context: {
+                        filters_applied: { 
+                            phase: phase, 
+                            indicator: indicator, 
+                            section: section 
+                        },
+                        session_length: messages.length,
+                        memory_id: memoryId
+                    },
+                    response_time_seconds: responseTime
+                };
+                
+                const response = await fetch(`${AI_FEEDBACK_URL}/api/interactions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(interactionData)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    lastInteractionId = result.interaction_id;
+                    console.log('Interaction tracked successfully:', result);
+                } else {
+                    console.warn('Failed to track interaction:', response.status, response.statusText);
+                }
+                
+            } catch (error) {
+                console.error('Error tracking interaction:', error);
+            }
+        }
+
+        async function trackInteraction(userInput, aiOutput) {
+            try {
+                const phase = document.getElementById('phaseSelect').value;
+                const indicator = document.getElementById('indicatorSelect').value;
+                const section = document.getElementById('sectionSelect').value;
+                
+                const interactionData = {
+                    user_id: memoryId,
+                    session_id: sessionId,
+                    user_input: userInput,
+                    ai_output: aiOutput,
+                    service_name: "chatbot",
+                    platform: "AICCRA",
+                    context: {
+                        filters_applied: { phase, indicator, section },
+                        session_length: messages.length
+                    },
+                    response_time_seconds: null
+                };
+                
+                console.log('Tracking interaction:', interactionData);
+        
+                const response = await fetch(`${AI_FEEDBACK_URL}/api/interactions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(interactionData)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    lastInteractionId = result.interaction_id;
+                    console.log('Interaction tracked successfully:', result);
+                } else {
+                    console.warn('Failed to track interaction:', response.status, response.statusText);
+                }
+                
+            } catch (error) {
+                console.error('Error tracking interaction:', error);
+            }
+        }
+
+        async function submitFeedback(type, button) {
+            try {
+                // Disable feedback buttons
+                const feedbackButtons = button.parentElement.querySelectorAll('.feedback-btn');
+                feedbackButtons.forEach(btn => btn.disabled = true);
+                
+                let comment = '';
+                if (type === 'negative') {
+                    comment = prompt('Tell us what went wrong (optional):') || '';
+                }
+                
+                // Prepare feedback data
+                const feedbackData = {
+                    user_id: userEmail,
+                    session_id: sessionId,
+                    interaction_id: lastInteractionId,
+                    update_mode: true,
+                    feedback_type: type,
+                    feedback_comment: comment,
+                    service_name: "chatbot",
+                    platform: "AICCRA"
+                };
+                
+                console.log('Submitting feedback:', feedbackData);
+                
+                const response = await fetch(`${AI_FEEDBACK_URL}/api/interactions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(feedbackData)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Feedback submitted successfully:', result);
+                    
+                    if (type === 'positive') {
+                        button.parentElement.innerHTML = '<small style="color: green;">✅ Thanks for your positive feedback!</small>';
+                    } else {
+                        button.parentElement.innerHTML = '<small style="color: green;">✅ Feedback submitted successfully. Thank you!</small>';
+                    }
+                } else {
+                    throw new Error('Failed to submit feedback');
+                }
+                
+            } catch (error) {
+                console.error('Error submitting feedback:', error);
+                button.parentElement.innerHTML = '<small style="color: red;">❌ Error submitting feedback. Please try again.</small>';
+                
+                // Re-enable buttons on error
+                const feedbackButtons = button.parentElement.querySelectorAll('.feedback-btn');
+                feedbackButtons.forEach(btn => btn.disabled = false);
+            }
+        }
+
+        function exportChat() {
+            let chatContent = '';
+            messages.forEach(msg => {
+                const role = msg.role === 'user' ? 'User' : 'Assistant';
+                chatContent += `${role}: ${msg.content}\n\n`;
+            });
+            
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            const blob = new Blob([chatContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `aiccra_chat_${timestamp}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function startNewSession() {
+            if (confirm('Are you sure you want to start a new session? This will clear your conversation history and reset all filters.')) {
+                // Reset session
+                sessionId = generateUUID();
+                messages = [];
+                lastInteractionId = '';
+                
+                // Reset filters
+                document.getElementById('phaseSelect').value = 'All phases';
+                document.getElementById('indicatorSelect').value = 'All indicators';
+                document.getElementById('sectionSelect').value = 'All sections';
+                updateIndicatorOptions();
+                
+                // Reset messages
+                const messagesContainer = document.getElementById('messagesContainer');
+                messagesContainer.innerHTML = `
+                    <div class="message assistant">
+                        <div class="message-content">
+                            <strong>Welcome to your intelligent assistant for MARLO-AICCRA</strong> (Accelerating Impacts of CGIAR Climate Research for Africa) data exploration.
+                            <br><br>
+                            <strong>How it works:</strong><br>
+                            🧠 <strong>Memory-enabled</strong>: Remembers your conversation and can answer follow-up questions<br>
+                            🎯 <strong>Contextual responses</strong>: Builds upon previous questions for more comprehensive answers<br>
+                            🔍 <strong>Smart filtering</strong>: Use the sidebar filters to focus on specific data subsets<br>
+                            📊 <strong>Data-driven</strong>: Provides insights from AICCRA's deliverables, innovations, contributions, and outcome impact case reports.
+                            <br><br>
+                            <strong>Get started</strong> by asking questions about clusters, indicators, innovations, or any AICCRA activities!
+                        </div>
+                        <div class="message-time">${getCurrentTime()}</div>
+                    </div>
+                `;
+                
+                console.log('New session started:', sessionId);
+            }
+        }
+    </script>
+</body>
+</html>

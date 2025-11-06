@@ -1,12 +1,9 @@
 """REST API endpoints for AICCRA Chatbot Service."""
 
 import time
-from typing import Iterator
-from fastapi.responses import StreamingResponse
 from app.utils.logger.logger_util import get_logger
-from app.utils.feedback.feedback_util import submit_feedback
 from fastapi import APIRouter, HTTPException, status
-from app.api.models import ChatRequest, ChatResponse, ErrorResponse, FeedbackRequest, FeedbackResponse
+from app.api.models import ChatRequest, ChatResponse, ErrorResponse
 
 logger = get_logger()
 
