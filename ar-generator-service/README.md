@@ -1,30 +1,52 @@
 # AICCRA Annual Report Generator Service
 
-An AI-powered service for generating comprehensive annual reports for AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa). This service combines an interface with automated report generation capabilities, leveraging vector databases and Large Language Models to produce high-quality, data-driven narratives.
+An AI-powered service for generating comprehensive annual reports for AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa). This service combines web and API interfaces with automated report generation capabilities, leveraging vector databases and Large Language Models to produce high-quality, data-driven narratives.
 
 ---
 
 ## 🌟 Features
 
 - **📊 Automated Report Generation**: AI-generated reports for various performance indicators
-- **🔍 Vector Search**: Integration with AWS Bedrock Knowledge Base and OpenSearch
+- **�️ Web User Interface**: User-friendly web interface accessible at `/web/`
+- **�🔍 Vector Search**: Integration with AWS Bedrock Knowledge Base and OpenSearch
 - **📈 Multi-Indicator Support**: Handles both IPI (Intermediate Performance Indicators) and PDO (Project Development Objective) indicators
 - **💾 Database Integration**: MySQL or SQL Server connectivity for retrieving structured data
+- **📋 Multiple Report Types**: Annual reports, summary tables, and challenges analysis
+- **📄 Export Capabilities**: Download reports in DOCX and Excel formats
+
+---
+
+## 🚀 Quick Start
+
+### Using the Web Interface
+1. Start the server: `python api_server.py`
+2. Open your browser and go to: `http://localhost:8000/web/`
+3. Select your report type, indicator, and year
+4. Generate and download your reports
+
+### Using the API
+Access the interactive API documentation at: `http://localhost:8000/docs`
 
 ---
 
 ## 🏗️ Architecture
 
-The service consists of two main components:
+The service consists of three main components:
 
-### 1. REST API Service (`app/api/`)
+### 1. Web User Interface (`web/`)
+- Modern, responsive HTML/CSS/JavaScript interface
+- Three main sections: Annual Reports, Summary Tables, Challenges & Lessons Learned
+- Automatic API URL detection for development and production environments
+
+### 2. REST API Service (`app/api/`)
 - FastAPI-based REST API with OpenAPI documentation
 - HTTP endpoints for programmatic access
 - Request/response validation with Pydantic models
 - Comprehensive error handling and logging
 - CORS support for web applications
+- Static file serving for web UI
 
-### 2. Core Processing Engine
+### 3. Core Processing Engine
 - **Vector Database Options** (choose one):
   - `app/llm/knowledge_base.py` - AWS Bedrock Knowledge Base integration
   - `app/llm/vectorize_os.py` - OpenSearch vector processing
@@ -36,6 +58,7 @@ The service consists of two main components:
 
 ## 🛠️ Technology Stack
 
+- **Frontend**: HTML5, CSS3, JavaScript ES6+, Font Awesome, Google Fonts
 - **REST API**: FastAPI, Uvicorn, Pydantic
 - **AI/ML**: AWS Bedrock (Claude 3 Sonnet)
 - **Vector Database**: OpenSearch, Supabase
@@ -142,30 +165,110 @@ curl -X POST http://localhost:8000/api/generate \
 
 ---
 
-## API Endpoints
+## API Endpoints & Web UI
+
+### Web User Interface
+- **`GET /web/`** - Main web interface for generating reports
+- **`GET /`** - API information and available endpoints
+- **`GET /docs`** - Interactive Swagger API documentation
+- **`GET /health`** - Service health check
 
 ### `POST /api/generate`
 
-Generate an AICCRA report for the specified indicator and year.
+Generate an AICCRA Mid-Year Progress Report for the specified indicator and year.
 
 **Request Body:**
 ```json
 {
   "indicator": "IPI 1.1",
-  "year": 2025
+  "year": 2025,
+  "insert_data": false
 }
 ```
 
 **Parameters:**
 - `indicator` (string, required): Indicator name (e.g., "IPI 1.1", "PDO Indicator 1")
 - `year` (integer, required): Year for report generation
+- `insert_data` (boolean, optional): Whether to refresh data in vector database (default: false)
 
 **Response (200 OK):**
 ```json
 {
   "indicator": "IPI 1.1",
   "year": 2025,
-  "content": "Generated report content...",
+  "content": "Generated mid-year progress report content...",
+  "status": "success"
+}
+```
+
+### `POST /api/generate-annual`
+
+Generate a comprehensive AICCRA Annual Report for the specified indicator and year.
+
+**Request Body:**
+```json
+{
+  "indicator": "PDO Indicator 1",
+  "year": 2024,
+  "insert_data": false
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "indicator": "PDO Indicator 1",
+  "year": 2024,
+  "content": "Comprehensive annual report with impact analysis...",
+  "status": "success"
+}
+```
+
+### `POST /api/generate-annual-tables`
+
+Generate summary tables for all indicators grouped by type (PDO, IPI 1.x, IPI 2.x, IPI 3.x).
+
+**Request Body:**
+```json
+{
+  "year": 2025,
+  "indicator": "PDO Indicator 1",
+  "insert_data": false
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "year": 2025,
+  "tables": {
+    "PDO": [...],
+    "IPI 1.x": [...],
+    "IPI 2.x": [...],
+    "IPI 3.x": [...]
+  },
+  "status": "success"
+}
+```
+
+### `POST /api/generate-challenges`
+
+Generate a cross-cluster Challenges and Lessons Learned report.
+
+**Request Body:**
+```json
+{
+  "year": 2024,
+  "indicator": "PDO Indicator 1",
+  "insert_data": false
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "year": 2024,
+  "content": "Cross-cluster challenges analysis and lessons learned...",
   "status": "success"
 }
 ```

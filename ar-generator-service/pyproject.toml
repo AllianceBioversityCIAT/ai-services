@@ -17,5 +17,6 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "mangum",
-    "python-docx"
+    "python-docx",
+    "python-multipart"
 ]
