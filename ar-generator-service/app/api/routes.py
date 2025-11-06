@@ -53,12 +53,29 @@ def _generate_indicator_tables():
         from app.llm.vectorize_os_annual import generate_indicator_tables
         return generate_indicator_tables
     except Exception as e:
-        logger.error(f"Failed to import generate_indicator_tables: {e}")
+        logger.error(f"Failed to import indicator tables: {e}")
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "Service configuration error",
-                "details": "Indicator tables generation service is not properly configured. Please check AWS credentials and configuration.",
+                "details": "Indicator tables service is not properly configured. Please check AWS credentials and configuration.",
+                "status": "error"
+            }
+        )
+
+
+def _generate_challenges_report():
+    """Lazy import of challenges report function to avoid initialization issues."""
+    try:
+        from app.llm.vectorize_os_annual import generate_challenges_report
+        return generate_challenges_report
+    except Exception as e:
+        logger.error(f"Failed to import challenges report: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Service configuration error",
+                "details": "Challenges report service is not properly configured. Please check AWS credentials and configuration.",
                 "status": "error"
             }
         )
@@ -586,6 +603,164 @@ async def generate_annual_tables(request: ChatRequest):
             "status": "success"
         }
         
+    except ValueError as e:
+        logger.error(f"Validation error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "Invalid request parameters", "details": str(e), "status": "error"}
+        )
+    except RuntimeError as e:
+        logger.error(f"Runtime error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "Service error", "details": str(e), "status": "error"}
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "Internal server error", "details": str(e), "status": "error"}
+        )
+
+
+@router.post(
+    "/api/generate-challenges",
+    tags=["Reports"],
+    summary="Generate AICCRA Challenges and Lessons Learned Report",
+    description="""
+    🎯 Generate AI-Powered AICCRA Challenges and Lessons Learned Report
+    
+    This endpoint generates a comprehensive cross-cluster report on challenges faced and lessons learned 
+    across all AICCRA clusters for the specified year. Unlike indicator-specific reports, this covers 
+    all clusters and focuses on implementation challenges and adaptive strategies.
+    
+    🎯 Report Type: Challenges and Lessons Learned Report
+    
+    - Purpose: Identify and document challenges, solutions, and best practices across clusters
+    - Scope: Cross-cluster analysis covering all regions and thematic areas
+    - Timeline: Annual challenges and lessons compilation
+    - Use Case: Learning and development, adaptive management, strategic planning, knowledge sharing
+    
+    🔍 How It Works
+    
+    1. Data Retrieval: Fetches challenges data from all clusters via OpenSearch
+    2. Cross-Analysis: Analyzes patterns and themes across different clusters and regions
+    3. AI Generation: Uses AWS Bedrock Claude 3.7 Sonnet to synthesize insights and recommendations
+    4. Categorization: Organizes findings by themes like implementation, partnerships, technology adoption
+    
+    📈 Challenges Report Content
+    
+    Generated reports include:
+    - Executive Summary: Overview of key challenges and lessons learned themes
+    - Implementation Challenges: Technical, operational, and logistical obstacles faced
+    - Partnership Dynamics: Lessons from stakeholder engagement and collaboration
+    - Technology Adoption: Challenges and successes in technology transfer and uptake
+    - Capacity Building: Insights on training, knowledge transfer, and skill development
+    - Regional Variations: Geographic and contextual differences in implementation
+    - Adaptive Strategies: Solutions developed and strategies that proved effective
+    - Best Practices: Successful approaches that can be replicated or scaled
+    - Strategic Recommendations: Forward-looking guidance for future implementation
+    - Lessons Learned Matrix: Categorized insights for easy reference and application
+    
+    🌍 Cross-Cluster Coverage
+    
+    The report synthesizes insights from:
+    - West Africa Cluster (Ghana, Mali, Senegal)
+    - East Africa Cluster (Kenya, Tanzania, Ethiopia)
+    - Southern Africa Cluster (Zambia, Malawi, Zimbabwe)
+    - South Asia Cluster (India, Bangladesh)
+    - Thematic clusters and cross-cutting initiatives
+    
+    ⚡ Performance Notes
+    
+    - Processing time: ~3-7 minutes (comprehensive cross-cluster analysis)
+    - Data source: Dedicated challenges database with cluster-specific entries
+    - AI processing: Advanced thematic analysis and pattern recognition
+    
+    📋 Example Usage
+    
+    ```bash
+    curl -X POST "http://localhost:8000/api/generate-challenges" \\
+         -H "Content-Type: application/json" \\
+         -d '{
+           "year": 2024
+         }'
+    ```
+    
+    Response includes comprehensive analysis with sections on implementation challenges, 
+    partnership lessons, technology adoption insights, and strategic recommendations.
+    """,
+    response_description="Successfully generated comprehensive challenges and lessons learned report with cross-cluster insights",
+    responses={
+        200: {
+            "description": "Challenges report generated successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "year": 2024,
+                        "content": "# Challenges and Lessons Learned Report 2024\n\n## Executive Summary\n\nAcross all AICCRA clusters in 2024, key challenges centered around climate variability impacts, technology adoption barriers, and partnership coordination...\n\n## Implementation Challenges\n\n### Technology Adoption\nClusters reported varying success rates in farmer adoption of climate technologies...",
+                        "status": "success"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Invalid request parameters (validation error)",
+            "model": ErrorResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "Invalid request parameters",
+                        "status": "error"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "model": ErrorResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "Internal server error",
+                        "status": "error"
+                    }
+                }
+            }
+        }
+    }
+)
+async def generate_challenges_report(request: ChatRequest):
+    """
+    Generate challenges and lessons learned report for the specified year.
+    
+    This endpoint generates a comprehensive cross-cluster report covering
+    implementation challenges, adaptive strategies, and lessons learned.
+    
+    - year: The year for the challenges report (must be between 2021 and 2025)
+    
+    Returns the generated challenges and lessons learned report content.
+    """
+    start_time = time.time()
+    
+    try:
+        logger.info(f"🚀 Starting challenges report generation for year: {request.year}")
+        
+        generate_challenges_func = _generate_challenges_report()
+        
+        logger.info("🔍 Executing challenges report generation...")
+        challenges_content = generate_challenges_func(request.year)
+
+        processing_time = round(time.time() - start_time, 2)
+        
+        logger.info(f"✅ Successfully generated challenges report for {request.year} in {processing_time}s")
+        
+        return {
+            "year": request.year,
+            "content": challenges_content,
+            "status": "success"
+        }
+    
     except ValueError as e:
         logger.error(f"Validation error: {str(e)}")
         raise HTTPException(
