@@ -18,5 +18,8 @@ dependencies = [
     "uvicorn",
     "mangum",
     "python-docx",
-    "python-multipart"
+    "python-multipart",
+    "python-crontab",
+    "requests",
+    "aiohttp"
 ]
