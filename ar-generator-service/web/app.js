@@ -8,7 +8,7 @@ function getUrlParameter(name) {
 }
 
 function extractUserInfoFromUrl() {
-    const email = getUrlParameter('email');
+    const email = getUrlParameter('user_email');
     const user = getUrlParameter('user');
     
     return {
