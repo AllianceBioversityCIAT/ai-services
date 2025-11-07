@@ -233,38 +233,31 @@ def save_context_to_file(context, filename, indicator, year):
 def run_pipeline(indicator, year, insert_data=False):
     try:
         if insert_data:
-            load_full_data("vw_ai_deliverables")
-            load_full_data("vw_ai_project_contribution")
-            load_full_data("vw_ai_questions")
-            load_full_data("vw_ai_oicrs")
-            load_full_data("vw_ai_innovations")
+            if opensearch.indices.exists(index=INDEX_NAME):
+                logger.info(f"🗑️ Deleting existing index: {INDEX_NAME}")
+                opensearch.indices.delete(index=INDEX_NAME)
+            create_index_if_not_exists()
+            insert_into_opensearch("vw_ai_deliverables")
+            insert_into_opensearch("vw_ai_project_contribution")
+            insert_into_opensearch("vw_ai_questions")
+            insert_into_opensearch("vw_ai_oicrs")
+            insert_into_opensearch("vw_ai_innovations")
 
+        total_expected, total_achieved, progress = calculate_summary(indicator, year)
 
-        #     if opensearch.indices.exists(index=INDEX_NAME):
-        #         logger.info(f"🗑️ Deleting existing index: {INDEX_NAME}")
-        #         opensearch.indices.delete(index=INDEX_NAME)
-        #     create_index_if_not_exists()
-        #     insert_into_opensearch("vw_ai_deliverables")
-        #     insert_into_opensearch("vw_ai_project_contribution")
-        #     insert_into_opensearch("vw_ai_questions")
-        #     insert_into_opensearch("vw_ai_oicrs")
-        #     insert_into_opensearch("vw_ai_innovations")
-
-        # total_expected, total_achieved, progress = calculate_summary(indicator, year)
-
-        # PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
+        PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
         
-        # context = retrieve_context(PROMPT, indicator, year)
+        context = retrieve_context(PROMPT, indicator, year)
 
-        # query = f"""
-        #     Using this information:\n{context}\n\n
-        #     Do the following:\n{PROMPT}
-        #     """
+        query = f"""
+            Using this information:\n{context}\n\n
+            Do the following:\n{PROMPT}
+            """
 
-        # final_report = invoke_model(query)
+        final_report = invoke_model(query)
 
-        # logger.info("✅ Report generation completed successfully.")
-        # return final_report
+        logger.info("✅ Report generation completed successfully.")
+        return final_report
 
     except Exception as e:
         logger.error(f"❌ Error in pipeline execution: {e}")
