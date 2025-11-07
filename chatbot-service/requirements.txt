@@ -9,4 +9,5 @@ opensearch-py,
 streamlit,
 fastapi,
 uvicorn,
-mangum
+mangum,
+openai
