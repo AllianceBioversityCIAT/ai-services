@@ -150,14 +150,14 @@ Processes CGIAR result metadata using LLM to improve titles, descriptions, and s
 ```json
 {
   "result_metadata": {
-    "response": {
-      "result_type_name": "Innovation Development",
-      "result_level_name": "Output",
-      "result_name": "Original Title",
-      "result_description": "Original Description",
-      "geographic_scope": ["Mexico", "Zambia"],
-      "contributing_partners": ["CIMMYT", "Local Partner"]
-    }
+    "result_id": "8",
+    "result_type_name": "Innovation Development",
+    "result_level_id": 4,
+    "result_level_name": "Output",
+    "result_name": "Original Title",
+    "result_description": "Original Description",
+    "geographic_scope": ["Mexico", "Zambia"],
+    "contributing_partners": ["CIMMYT", "Local Partner"]
   },
   "user_id": "user123"
 }
@@ -185,12 +185,12 @@ curl -X POST "http://localhost:8000/api/prms-qa" \
      -H "Content-Type: application/json" \
      -d '{
        "result_metadata": {
-         "response": {
-           "result_type_name": "Innovation Development",
-           "result_level_name": "Output",
-           "result_name": "Biofortified maize variety with enhanced zinc content",
-           "result_description": "A new maize variety developed through biotechnology"
-         }
+         "result_id": "8",
+         "result_type_name": "Innovation Development",
+         "result_level_id": 4,
+         "result_level_name": "Output",
+         "result_name": "Biofortified maize variety with enhanced zinc content",
+         "result_description": "A new maize variety developed through biotechnology"
        },
        "user_id": "user123"
      }'

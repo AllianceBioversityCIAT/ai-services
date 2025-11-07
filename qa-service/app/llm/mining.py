@@ -61,10 +61,10 @@ def improve_prms_result_metadata(result_metadata: dict, user_id: str = None):
     start_time = time.time()
 
     try:
-        result_type = result_metadata["response"].get("result_type_name", "").lower()
-        result_level = result_metadata["response"].get("result_level_name", "").lower()
-        result_title = result_metadata["response"].get("result_name", "")
-        result_description = result_metadata["response"].get("result_description", "")
+        result_type = result_metadata.get("result_type_name", "").lower()
+        result_level = result_metadata.get("result_level_name", "").lower()
+        result_title = result_metadata.get("result_name", "")
+        result_description = result_metadata.get("result_description", "")
 
         logger.info(f"🔍 Processing PRMS document with result type: {result_type}, result level: {result_level}")
         
