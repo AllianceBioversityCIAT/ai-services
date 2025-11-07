@@ -1,6 +1,6 @@
 # AICCRA Annual Report Generator Service
 
-An AI-powered service for generating comprehensive annual reports for AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa). This service combines an interface with automated report generation capabilities, leveraging vector databases and Large Language Models to produce high-quality, data-driven narratives.
+An AI-powered service for generating comprehensive annual reports for AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa). This service combines web and API interfaces with automated report generation capabilities, leveraging vector databases and Large Language Models to produce high-quality, data-driven narratives.
 
 ---
 
@@ -140,9 +140,15 @@ curl -X POST http://localhost:8000/api/generate \
 
 ---
 
-## API Endpoints
+## API Endpoints & Web UI
 
-### Generate Report
+### Web User Interface
+- **`GET /web/`** - Main web interface for generating reports
+- **`GET /`** - API information and available endpoints
+- **`GET /docs`** - Interactive Swagger API documentation
+- **`GET /health`** - Service health check
+
+### Generate Mid-Year Report
 
 **POST** `/api/generate`
 
@@ -167,7 +173,85 @@ Generate an AI-powered AICCRA report for a specific indicator and year.
 {
   "indicator": "IPI 1.1",
   "year": 2025,
-  "content": "By mid-year 2025, AICCRA had already achieved...",
+  "content": "Generated mid-year progress report content...",
+  "status": "success"
+}
+```
+
+### Generate Annual Report
+
+**POST** /api/generate-annual
+
+Generate a comprehensive AICCRA Annual Report for the specified indicator and year.
+
+**Request Body:**
+```json
+{
+  "indicator": "PDO Indicator 1",
+  "year": 2024,
+  "insert_data": false
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "indicator": "PDO Indicator 1",
+  "year": 2024,
+  "content": "Comprehensive annual report with impact analysis...",
+  "status": "success"
+}
+```
+
+### Generate Summary Tables
+
+**POST** /api/generate-annual-tables
+
+Generate summary tables for all indicators grouped by type (PDO, IPI 1.x, IPI 2.x, IPI 3.x).
+
+**Request Body:**
+```json
+{
+  "year": 2025,
+  "indicator": "PDO Indicator 1",
+  "insert_data": false
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "year": 2025,
+  "tables": {
+    "PDO": [...],
+    "IPI 1.x": [...],
+    "IPI 2.x": [...],
+    "IPI 3.x": [...]
+  },
+  "status": "success"
+}
+```
+
+### Generate Challenges and Lessons Learned Report
+
+**POST** /api/generate-challenges
+
+Generate a cross-cluster Challenges and Lessons Learned report.
+
+**Request Body:**
+```json
+{
+  "year": 2024,
+  "indicator": "PDO Indicator 1",
+  "insert_data": false
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "year": 2024,
+  "content": "Cross-cluster challenges analysis and lessons learned...",
   "status": "success"
 }
 ```

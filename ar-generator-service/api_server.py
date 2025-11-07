@@ -42,10 +42,13 @@ def main():
     
     args = parser.parse_args()
     
-    print(f"Starting AICCRA Report Generator API server...")
-    print(f"Server will be available at: http://{args.host}:{args.port}")
-    print(f"API documentation: http://{args.host}:{args.port}/docs")
-    print(f"Health check: http://{args.host}:{args.port}/health")
+    print(f"🚀 Starting AICCRA Report Generator Server...")
+    print(f"⚡ Server will be available at: http://{args.host}:{args.port}")
+    print(f"📊 API documentation: http://{args.host}:{args.port}/docs")
+    print(f"🌐 Web UI: http://{args.host}:{args.port}/web")
+    print(f"📋 API info: http://{args.host}:{args.port}/")
+    print(f"💚 Health check: http://{args.host}:{args.port}/health")
+    print("   Press Ctrl+C to stop the server\n")
     
     # Start the server
     uvicorn.run(

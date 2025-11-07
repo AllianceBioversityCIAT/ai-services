@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AICCRA Report Generator</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-blue: #0478A3;
+            --secondary-blue: #3A84A7;
+            --light-blue: #81B8C1;
+            --very-light-blue: #E7F4FF;
+            --yellow: #FFCD2A;
+            --green: #8CBF3F;
+            --orange: #F39820;
+            --white: #ffffff;
+            --gray-50: #f8fafc;
+            --gray-100: #f1f5f9;
+            --gray-200: #e2e8f0;
+            --gray-300: #cbd5e1;
+            --gray-400: #94a3b8;
+            --gray-500: #64748b;
+            --gray-600: #475569;
+            --gray-700: #334155;
+            --gray-800: #1e293b;
+            --gray-900: #0f172a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--very-light-blue) 0%, var(--white) 100%);
+            min-height: 100vh;
+            color: var(--gray-800);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem 0;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .header .subtitle {
+            font-size: 1.25rem;
+            color: var(--gray-600);
+            font-weight: 400;
+        }
+
+        .tabs {
+            display: flex;
+            background: var(--white);
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 1rem 2rem;
+            text-align: center;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            color: var(--gray-600);
+        }
+
+        .tab.active {
+            background: var(--primary-blue);
+            color: var(--white);
+            box-shadow: 0 2px 4px rgba(4, 120, 163, 0.3);
+        }
+
+        .tab:hover:not(.active) {
+            background: var(--very-light-blue);
+            color: var(--primary-blue);
+        }
+
+        .tab-content {
+            display: none;
+            background: var(--white);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--gray-700);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: var(--white);
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(4, 120, 163, 0.1);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.875rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(4, 120, 163, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--green);
+            color: var(--white);
+        }
+
+        .btn-secondary:hover {
+            background: #7aa836;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--light-blue);
+            border-top: 4px solid var(--primary-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result {
+            display: none;
+            margin-top: 2rem;
+            padding: 2rem;
+            background: var(--gray-50);
+            border-radius: 12px;
+            border-left: 4px solid var(--primary-blue);
+        }
+
+        .result.show {
+            display: block;
+        }
+
+        .result-content {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 1rem;
+            background: var(--white);
+            border-radius: 8px;
+            border: 1px solid var(--gray-200);
+            margin-bottom: 1rem;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin-top: 1rem;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--white);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .data-table th {
+            background: var(--primary-blue);
+            color: var(--white);
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .data-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--gray-200);
+            vertical-align: top;
+        }
+
+        .data-table tr:hover {
+            background: var(--very-light-blue);
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .alert-error {
+            background: #fef2f2;
+            color: #b91c1c;
+            border-left: 4px solid #ef4444;
+        }
+
+        .alert-warning {
+            background: #fffbeb;
+            color: #92400e;
+            border-left: 4px solid var(--yellow);
+        }
+
+        .disclaimer {
+            margin-top: 3rem;
+            padding: 1.5rem;
+            background: #fef3cd;
+            border-left: 4px solid var(--yellow);
+            border-radius: 8px;
+        }
+
+        .disclaimer-title {
+            font-weight: 600;
+            color: var(--gray-800);
+            margin-bottom: 0.5rem;
+        }
+
+        .disclaimer-text {
+            color: var(--gray-700);
+            font-size: 0.9rem;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .feature-card {
+            background: var(--white);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-top: 4px solid var(--secondary-blue);
+        }
+
+        .feature-card h3 {
+            color: var(--primary-blue);
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-card p {
+            color: var(--gray-600);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .tabs {
+                flex-direction: column;
+            }
+
+            .tab {
+                margin-bottom: 4px;
+            }
+
+            .data-table {
+                font-size: 0.875rem;
+            }
+
+            .data-table th,
+            .data-table td {
+                padding: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-chart-line"></i> AICCRA Report Generator</h1>
+            <p class="subtitle">AI-Powered Report Generation for Climate Research in Africa</p>
+        </div>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3><i class="fas fa-file-alt"></i> Annual Reports</h3>
+                <p>Generate comprehensive annual reports with detailed performance analysis and achievements.</p>
+            </div>
+            <div class="feature-card">
+                <h3><i class="fas fa-table"></i> Summary Tables</h3>
+                <p>Create structured tables with quantitative targets and AI-generated overviews.</p>
+            </div>
+            <div class="feature-card">
+                <h3><i class="fas fa-exclamation-triangle"></i> Challenges Reports</h3>
+                <p>Analyze implementation challenges and lessons learned across all clusters.</p>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="openTab(event, 'tab-annual')">
+                <i class="fas fa-chart-bar"></i> Annual Reports
+            </button>
+            <button class="tab" onclick="openTab(event, 'tab-tables')">
+                <i class="fas fa-table"></i> Summary Tables
+            </button>
+            <button class="tab" onclick="openTab(event, 'tab-challenges')">
+                <i class="fas fa-lightbulb"></i> Challenges & Lessons
+            </button>
+        </div>
+
+        <!-- Tab 1: Annual Reports -->
+        <div id="tab-annual" class="tab-content active">
+            <h2><i class="fas fa-chart-bar"></i> Generate Annual Report by Indicator</h2>
+            <p style="color: var(--gray-600); margin-bottom: 2rem;">Generate comprehensive annual reports for specific AICCRA indicators</p>
+            
+            <div class="form-group">
+                <label for="indicator-select">Select an Indicator:</label>
+                <select id="indicator-select" class="form-control">
+                    <option value="IPI 1.1">IPI 1.1</option>
+                    <option value="IPI 1.2">IPI 1.2</option>
+                    <option value="IPI 1.3">IPI 1.3</option>
+                    <option value="IPI 1.4">IPI 1.4</option>
+                    <option value="IPI 2.1">IPI 2.1</option>
+                    <option value="IPI 2.2">IPI 2.2</option>
+                    <option value="IPI 2.3">IPI 2.3</option>
+                    <option value="IPI 3.1">IPI 3.1</option>
+                    <option value="IPI 3.2">IPI 3.2</option>
+                    <option value="IPI 3.3">IPI 3.3</option>
+                    <option value="IPI 3.4">IPI 3.4</option>
+                    <option value="PDO Indicator 1">PDO Indicator 1</option>
+                    <option value="PDO Indicator 2">PDO Indicator 2</option>
+                    <option value="PDO Indicator 3">PDO Indicator 3</option>
+                    <option value="PDO Indicator 4">PDO Indicator 4</option>
+                    <option value="PDO Indicator 5">PDO Indicator 5</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="year-select">Select a Year:</label>
+                <select id="year-select" class="form-control">
+                    <option value="2025">2025</option>
+                </select>
+            </div>
+
+            <button id="generate-annual" class="btn btn-primary">
+                <i class="fas fa-magic"></i> Generate Annual Report
+            </button>
+
+            <div id="annual-loading" class="loading">
+                <div class="spinner"></div>
+                <p>Generating annual report... This may take a few minutes.</p>
+            </div>
+
+            <div id="annual-result" class="result">
+                <div id="annual-content" class="result-content"></div>
+                <button id="download-annual" class="btn btn-secondary">
+                    <i class="fas fa-download"></i> Download Report (DOCX)
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab 2: Summary Tables -->
+        <div id="tab-tables" class="tab-content">
+            <h2><i class="fas fa-table"></i> Generate Indicator Summary Tables</h2>
+            <p style="color: var(--gray-600); margin-bottom: 2rem;">Generate summary tables for all PDO, IPI 1.x, IPI 2.x, and IPI 3.x indicators</p>
+            
+            <div class="form-group">
+                <label for="year-tables-select">Select a Year:</label>
+                <select id="year-tables-select" class="form-control">
+                    <option value="2025">2025</option>
+                </select>
+            </div>
+
+            <button id="generate-tables" class="btn btn-primary">
+                <i class="fas fa-table"></i> Generate Tables
+            </button>
+
+            <div id="tables-loading" class="loading">
+                <div class="spinner"></div>
+                <p>Generating summary tables...</p>
+            </div>
+
+            <div id="tables-result" class="result">
+                <div id="tables-content"></div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Challenges -->
+        <div id="tab-challenges" class="tab-content">
+            <h2><i class="fas fa-lightbulb"></i> Challenges & Lessons Learned</h2>
+            <p style="color: var(--gray-600); margin-bottom: 2rem;">Generate cross-cluster reports on challenges faced and lessons learned</p>
+            
+            <div class="alert alert-warning">
+                <i class="fas fa-info-circle"></i> This report covers all clusters and is not divided by indicators
+            </div>
+
+            <div class="form-group">
+                <label for="year-challenges-select">Select a Year:</label>
+                <select id="year-challenges-select" class="form-control">
+                    <option value="2025">2025</option>
+                </select>
+            </div>
+
+            <button id="generate-challenges" class="btn btn-primary">
+                <i class="fas fa-lightbulb"></i> Generate Challenges Report
+            </button>
+
+            <div id="challenges-loading" class="loading">
+                <div class="spinner"></div>
+                <p>Generating challenges and lessons learned report...</p>
+            </div>
+
+            <div id="challenges-result" class="result">
+                <div id="challenges-content" class="result-content"></div>
+                <button id="download-challenges" class="btn btn-secondary">
+                    <i class="fas fa-download"></i> Download Report (DOCX)
+                </button>
+            </div>
+        </div>
+
+        <div class="disclaimer">
+            <div class="disclaimer-title">
+                <i class="fas fa-exclamation-triangle" style="color: var(--yellow);"></i> Disclaimer
+            </div>
+            <div class="disclaimer-text">
+                This tool is for internal AICCRA use only. Generated reports are AI-assisted and should be reviewed and validated by subject matter experts before final publication or use. The content is based on available data and may not reflect real-time updates.
+            </div>
+        </div>
+    </div>
+
+    <script src="static/app.js"></script>
+</body>
+</html>
