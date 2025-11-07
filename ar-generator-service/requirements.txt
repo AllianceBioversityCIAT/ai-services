@@ -10,3 +10,5 @@ pyodbc
 requests
 mangum
 python-multipart
+python-crontab
+aiohttp
