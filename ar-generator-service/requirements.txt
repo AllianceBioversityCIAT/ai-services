@@ -11,5 +11,4 @@ requests
 mangum
 python-multipart
 python-crontab,
-requests,
 aiohttp
