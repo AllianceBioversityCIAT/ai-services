@@ -445,45 +445,50 @@ def run_pipeline(indicator, year, insert_data=False):
             insert_into_opensearch("vw_ai_oicrs")
             insert_into_opensearch("vw_ai_innovations")
             insert_into_opensearch("vw_ai_challenges")
-        
-        ## Part 1: Generate the report with deliverables, contributions, oicrs, and innovations
-        total_expected, total_achieved, progress = calculate_summary(indicator, year)
-
-        PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
-        
-        context, questions = retrieve_context(PROMPT, indicator, year)
-        save_context_to_file(context, "context", indicator, year)
-
-        query = f"""
-            Using this information:\n{context}\n\n
-            Do the following:\n{PROMPT}
-            """
-
-        generated_report = invoke_model(query)
-
-        ## Part 2: Generate the report with dissagregated targets
-        accepted_indicators = ["PDO Indicator 1", "PDO Indicator 2", "PDO Indicator 3", "IPI 2.3"]
-
-        if indicator in accepted_indicators:
-            TARGET_PROMPT = generate_target_prompt(indicator)
             
-            query_questions = f"""
-                Using this information:\n{questions}\n\n
-                Do the following:\n{TARGET_PROMPT}
+            logger.info("✅ Data insertion completed successfully.")
+        
+        else:
+            ## Part 1: Generate the report with deliverables, contributions, oicrs, and innovations
+            total_expected, total_achieved, progress = calculate_summary(indicator, year)
+
+            PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
+            
+            context, questions = retrieve_context(PROMPT, indicator, year)
+            save_context_to_file(context, "context", indicator, year)
+
+            query = f"""
+                Using this information:\n{context}\n\n
+                Do the following:\n{PROMPT}
                 """
-            
-            logger.info("☑️  Starting disaggregated targets report generation...")
-            targets_report = invoke_model(query_questions)
-            
-            ## Combine both reports
-            targets_section = "\n\n## Disaggregated targets\n" + targets_report
-            generated_report += targets_section
-        
-        ## Part 3: Add missed links section
-        final_report = add_missed_links(generated_report, context)
 
-        logger.info("✅ Report generation completed successfully.")
-        return final_report
+            generated_report = invoke_model(query)
+
+            ## Part 2: Generate the report with dissagregated targets
+            accepted_indicators = ["PDO Indicator 1", "PDO Indicator 2", "PDO Indicator 3", "IPI 2.3"]
+
+            if indicator in accepted_indicators:
+                TARGET_PROMPT = generate_target_prompt(indicator)
+                
+                query_questions = f"""
+                    Using this information:\n{questions}\n\n
+                    Do the following:\n{TARGET_PROMPT}
+                    """
+                
+                logger.info("☑️  Starting disaggregated targets report generation...")
+                targets_report = invoke_model(query_questions)
+                
+                ## Combine both reports
+                targets_section = "\n\n## Disaggregated targets\n" + targets_report
+                generated_report += targets_section
+            
+            ## Part 3: Add missed links section
+            final_report = add_missed_links(generated_report, context)
+
+            logger.info("✅ Report generation completed successfully.")
+            
+            return final_report
 
     except Exception as e:
         logger.error(f"❌ Error in pipeline execution: {e}")
+        return None
