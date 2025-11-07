@@ -134,6 +134,7 @@ celerybeat.pid
 
 # Environments
 myenv/
+.myenv/
 .env
 .venv
 env/
@@ -188,11 +189,12 @@ chroma/
 faiss/
 .faiss/
 
-# Data files
-*.json
+# Local files
 *.csv
 *.jsonl
-*.xlsx
+*.json
 
-# Data logs
+# Chat and data logs
+chat_logs/
 data/logs/
+csv_files/
