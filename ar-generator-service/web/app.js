@@ -1,6 +1,25 @@
 // AICCRA Report Generator Web App
 const API_BASE_URL = 'https://ia.prms.cgiar.org';
 
+// URL Parameters utility
+function getUrlParameter(name) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name);
+}
+
+function extractUserInfoFromUrl() {
+    const email = getUrlParameter('email');
+    const user = getUrlParameter('user');
+    
+    return {
+        email: email,
+        user: user
+    };
+}
+
+// Initialize user info from URL
+let userInfo = extractUserInfoFromUrl();
+
 // Tab functionality
 function openTab(evt, tabName) {
     const tabContents = document.getElementsByClassName('tab-content');
@@ -108,12 +127,19 @@ function downloadAsExcel(data, filename) {
 // API call functions
 async function makeApiCall(endpoint, data) {
     try {
+        // Add user info to the request if available
+        const requestData = {
+            ...data,
+            ...(userInfo.email && { user_email: userInfo.email }),
+            ...(userInfo.user && { user_name: userInfo.user })
+        };
+
         const response = await fetch(`${API_BASE_URL}${endpoint}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(data)
+            body: JSON.stringify(requestData)
         });
 
         if (!response.ok) {
@@ -303,6 +329,9 @@ function downloadChallengesReport() {
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
+    // Display user info if available from URL
+    displayUserInfo();
+    
     // Annual report tab
     document.getElementById('generate-annual').addEventListener('click', generateAnnualReport);
     document.getElementById('download-annual').addEventListener('click', downloadAnnualReport);
@@ -317,6 +346,42 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set default active tab
     document.querySelector('.tab.active').click();
 });
+
+function displayUserInfo() {
+    if (userInfo.email || userInfo.user) {
+        // Create user info display element if it doesn't exist
+        let userInfoDisplay = document.getElementById('user-info-display');
+        if (!userInfoDisplay) {
+            userInfoDisplay = document.createElement('div');
+            userInfoDisplay.id = 'user-info-display';
+            userInfoDisplay.className = 'user-info-banner';
+            userInfoDisplay.style.cssText = `
+                background: linear-gradient(135deg, var(--very-light-blue), var(--white));
+                padding: 1rem 2rem;
+                border-radius: 8px;
+                margin-bottom: 2rem;
+                border-left: 4px solid var(--primary-blue);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            `;
+            
+            // Insert after header
+            const header = document.querySelector('.header');
+            header.parentNode.insertBefore(userInfoDisplay, header.nextSibling);
+        }
+        
+        let infoText = '<i class="fas fa-user" style="color: var(--primary-blue); margin-right: 0.5rem;"></i>';
+        
+        if (userInfo.user) {
+            infoText += `<strong>Welcome, ${userInfo.user}!</strong>`;
+        } else if (userInfo.email) {
+            // Extract username from email (part before @)
+            const emailUsername = userInfo.email.split('@')[0];
+            infoText += `<strong>Welcome, ${emailUsername}!</strong>`;
+        }
+        
+        userInfoDisplay.innerHTML = infoText;
+    }
+}
 
 // Global error handler
 window.addEventListener('error', function(e) {
