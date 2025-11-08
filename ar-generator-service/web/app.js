@@ -2,7 +2,7 @@
 const API_BASE_URL = 'https://ia.prms.cgiar.org';
 
 // Tracking configuration
-const AI_FEEDBACK_URL = 'https://clv3b6bv9d.execute-api.us-east-1.amazonaws.com';
+const AI_FEEDBACK_URL = 'https://i8s5i8c21i.execute-api.us-east-1.amazonaws.com';
 
 // URL Parameters utility
 function getUrlParameter(name) {
