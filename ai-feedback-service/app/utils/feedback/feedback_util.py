@@ -627,38 +627,6 @@ class AIInteractionService:
             )
             
             return self.registered_services[service_name]
-
-
-    # def _get_service_info(self, service_name: str, display_name: Optional[str] = None, service_description: Optional[str] = None) -> Dict[str, Any]:
-    #     """Get service information, register if unknown."""
-    #     if service_name in self.registered_services:
-    #         return self.registered_services[service_name]
-    #     else:
-    #         if display_name and service_description:
-    #             logger.info(f"🎯 Auto-registering service with provided metadata: {service_name}")
-    #             final_display_name = display_name
-    #             final_description = service_description
-    #         elif display_name:
-    #             logger.info(f"🎯 Auto-registering service with provided display name: {service_name}")
-    #             final_display_name = display_name
-    #             final_description = f"AI service: {service_name}"
-    #         elif service_description:
-    #             logger.info(f"🎯 Auto-registering service with provided description: {service_name}")
-    #             final_display_name = service_name.replace("-", " ").replace("_", " ").title()
-    #             final_description = service_description
-    #         else:
-    #             logger.info(f"🆕 Auto-registering unknown service with generated names: {service_name}")
-    #             final_display_name = service_name.replace("-", " ").replace("_", " ").title()
-    #             final_description = f"AI service: {service_name}"
-            
-    #         self.register_service(
-    #             service_name=service_name,
-    #             display_name=final_display_name,
-    #             description=final_description,
-    #             expected_context=[]
-    #         )
-            
-    #         return self.registered_services[service_name]
     
     
     def _create_interaction_record(
