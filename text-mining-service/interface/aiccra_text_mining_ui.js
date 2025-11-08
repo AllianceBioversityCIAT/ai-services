@@ -19,59 +19,88 @@ class AICCRATextMiningUI {
     init() {
         this.createHTML();
         this.bindEvents();
-        this.setInitialValues();
+        
+        // Use setTimeout to ensure DOM is fully ready
+        setTimeout(() => {
+            this.setInitialValues();
+        }, 100);
     }
 
     getURLParameters() {
         const params = new URLSearchParams(window.location.search);
-        return {
+        const urlParams = {
             user_email: params.get('user_email') || '',
             user_name: params.get('user_name') || ''
         };
+        
+        // Debug logs
+        console.log('Current URL:', window.location.href);
+        console.log('Search params:', window.location.search);
+        console.log('Parsed parameters:', urlParams);
+        
+        return urlParams;
     }
 
     setInitialValues() {
         // Set email from URL parameter if available
         const userEmailInput = document.getElementById('userEmail');
+        if (!userEmailInput) {
+            console.error('userEmail input not found');
+            return;
+        }
+
+        console.log('URL Parameters:', this.urlParams); // Debug log
+        
         if (this.urlParams.user_email) {
+            console.log('Setting email from URL:', this.urlParams.user_email); // Debug log
             userEmailInput.value = this.urlParams.user_email;
             userEmailInput.style.borderColor = '#8CBF3F';
             userEmailInput.style.backgroundColor = '#f0fff4';
             
             // Show success message
             this.showURLParameterInfo();
+            
+            // Trigger the change event
+            userEmailInput.dispatchEvent(new Event('input'));
+        } else {
+            console.log('No email parameter found in URL'); // Debug log
         }
     }
 
     showURLParameterInfo() {
-        const infoDiv = document.createElement('div');
-        infoDiv.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #8CBF3F;
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-            font-weight: 500;
-            max-width: 400px;
-        `;
-        infoDiv.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <span>✅</span>
-                <span>Email loaded from URL: ${this.urlParams.user_email}</span>
-            </div>
-        `;
-        document.body.appendChild(infoDiv);
-
-        // Remove after 5 seconds
+        if (!this.urlParams.user_email) return;
+        
+        // Add a delay to ensure the page is fully loaded
         setTimeout(() => {
-            if (infoDiv.parentNode) {
-                infoDiv.parentNode.removeChild(infoDiv);
-            }
-        }, 5000);
+            const infoDiv = document.createElement('div');
+            infoDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #8CBF3F;
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+                z-index: 1000;
+                font-weight: 500;
+                max-width: 400px;
+            `;
+            infoDiv.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span>✅</span>
+                    <span>Email loaded from URL: ${this.urlParams.user_email}</span>
+                </div>
+            `;
+            document.body.appendChild(infoDiv);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                if (infoDiv.parentNode) {
+                    infoDiv.parentNode.removeChild(infoDiv);
+                }
+            }, 3000);
+        }, 500); // Wait 500ms for page to be ready
     }
 
     createHTML() {
@@ -110,7 +139,7 @@ class AICCRATextMiningUI {
                                     <label for="userEmail">Email Address</label>
                                     <input type="email" id="userEmail" placeholder="your@email.com" />
                                     <div class="input-hint" id="emailHint" style="display: none;">
-                                        📧 Your email will be used for tracking and notifications
+                                        📧 Your email will be used for tracking
                                     </div>
                                 </div>
                                 <div class="input-group">
@@ -980,6 +1009,22 @@ class AICCRATextMiningUI {
         this.handleModeChange();
         this.updateSearchInfo();
         this.handlePromptModeChange();
+        
+        // Additional check for URL parameters after a delay (for production issues)
+        setTimeout(() => {
+            this.checkAndRetryURLParams();
+        }, 1000);
+    }
+
+    checkAndRetryURLParams() {
+        const userEmailInput = document.getElementById('userEmail');
+        
+        // If email field is empty but we have URL params, try again
+        if (userEmailInput && !userEmailInput.value && window.location.search.includes('user_email')) {
+            console.log('Retrying URL parameter extraction...');
+            this.urlParams = this.getURLParameters();
+            this.setInitialValues();
+        }
     }
 
     handleModeChange() {
