@@ -10,12 +10,68 @@ class AICCRATextMiningUI {
         
         this.defaultPlaceholderPrompt = null;
         
+        // Get URL parameters
+        this.urlParams = this.getURLParameters();
+        
         this.init();
     }
 
     init() {
         this.createHTML();
         this.bindEvents();
+        this.setInitialValues();
+    }
+
+    getURLParameters() {
+        const params = new URLSearchParams(window.location.search);
+        return {
+            user_email: params.get('user_email') || '',
+            user_name: params.get('user_name') || ''
+        };
+    }
+
+    setInitialValues() {
+        // Set email from URL parameter if available
+        const userEmailInput = document.getElementById('userEmail');
+        if (this.urlParams.user_email) {
+            userEmailInput.value = this.urlParams.user_email;
+            userEmailInput.style.borderColor = '#8CBF3F';
+            userEmailInput.style.backgroundColor = '#f0fff4';
+            
+            // Show success message
+            this.showURLParameterInfo();
+        }
+    }
+
+    showURLParameterInfo() {
+        const infoDiv = document.createElement('div');
+        infoDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #8CBF3F;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            font-weight: 500;
+            max-width: 400px;
+        `;
+        infoDiv.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span>✅</span>
+                <span>Email loaded from URL: ${this.urlParams.user_email}</span>
+            </div>
+        `;
+        document.body.appendChild(infoDiv);
+
+        // Remove after 5 seconds
+        setTimeout(() => {
+            if (infoDiv.parentNode) {
+                infoDiv.parentNode.removeChild(infoDiv);
+            }
+        }, 5000);
     }
 
     createHTML() {
@@ -53,6 +109,9 @@ class AICCRATextMiningUI {
                                 <div class="input-group">
                                     <label for="userEmail">Email Address</label>
                                     <input type="email" id="userEmail" placeholder="your@email.com" />
+                                    <div class="input-hint" id="emailHint" style="display: none;">
+                                        📧 Your email will be used for tracking and notifications
+                                    </div>
                                 </div>
                                 <div class="input-group">
                                     <label for="customPrompt">Analysis Prompt Configuration</label>
@@ -914,6 +973,9 @@ class AICCRATextMiningUI {
         // Custom prompt changes
         document.getElementById('customPrompt').addEventListener('input', () => this.handleCustomPromptChange());
 
+        // Email input changes
+        document.getElementById('userEmail').addEventListener('input', () => this.handleEmailChange());
+
         // Initial setup
         this.handleModeChange();
         this.updateSearchInfo();
@@ -1087,6 +1149,20 @@ class AICCRATextMiningUI {
         // Enable/disable download button based on content
         downloadBtn.disabled = !promptContent;
         downloadBtn.style.opacity = promptContent ? '1' : '0.6';
+    }
+
+    handleEmailChange() {
+        const emailInput = document.getElementById('userEmail');
+        const emailHint = document.getElementById('emailHint');
+        const email = emailInput.value.trim();
+        
+        if (email) {
+            emailHint.style.display = 'block';
+            emailInput.style.borderColor = '#1079A4';
+        } else {
+            emailHint.style.display = 'none';
+            emailInput.style.borderColor = '#e2e8f0';
+        }
     }
 
     showInfo(message) {
