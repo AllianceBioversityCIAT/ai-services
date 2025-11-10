@@ -115,7 +115,7 @@ def show_status():
         logger.info("✅ Cronjob configured for Annual Report Generation:")
         for job in jobs:
             logger.info(f"   Command: {job.command}")
-            schedule = job.schedule(date_from=job.next())
+            schedule = job.schedule()
             next_run = schedule.get_next()
             logger.info(f"   Next run: {next_run}")
             
