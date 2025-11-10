@@ -29,12 +29,11 @@ router = APIRouter()
          -H "Content-Type: application/json" \\
          -d '{
            "result_metadata": {
-             "response": {
-               "result_type_name": "Innovation Development",
-               "result_level_name": "Output",
-               "result_name": "Original Title",
-               "result_description": "Original Description"
-             }
+             "result_id": "8",
+             "result_type_name": "Innovation Development",
+             "result_level_name": "Output",
+             "result_name": "Original Title",
+             "result_description": "Original Description"
            },
            "user_id": "user123"
          }'

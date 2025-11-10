@@ -11,12 +11,11 @@ class PrmsRequest(BaseModel):
         ...,
         description="JSON metadata for the PRMS result, including fields like result_name, result_description, etc.",
         examples=[{
-            "response": {
-                "result_type_name": "Innovation Development",
-                "result_level_name": "Output",
-                "result_name": "Original Title",
-                "result_description": "Original Description"
-            }
+            "result_id": "8",
+            "result_type_name": "Innovation Development",
+            "result_level_name": "Output",
+            "result_name": "Original Title",
+            "result_description": "Original Description"
         }]
     )
     user_id: Optional[str] = Field(
