@@ -243,21 +243,24 @@ def run_pipeline(indicator, year, insert_data=False):
             insert_into_opensearch("vw_ai_oicrs")
             insert_into_opensearch("vw_ai_innovations")
 
-        total_expected, total_achieved, progress = calculate_summary(indicator, year)
-
-        PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
+            logger.info("✅ Data insertion completed successfully.")
         
-        context = retrieve_context(PROMPT, indicator, year)
+        else:
+            total_expected, total_achieved, progress = calculate_summary(indicator, year)
 
-        query = f"""
-            Using this information:\n{context}\n\n
-            Do the following:\n{PROMPT}
-            """
+            PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
+            
+            context = retrieve_context(PROMPT, indicator, year)
 
-        final_report = invoke_model(query)
+            query = f"""
+                Using this information:\n{context}\n\n
+                Do the following:\n{PROMPT}
+                """
 
-        logger.info("✅ Report generation completed successfully.")
-        return final_report
+            final_report = invoke_model(query)
+
+            logger.info("✅ Report generation completed successfully.")
+            return final_report
 
     except Exception as e:
         logger.error(f"❌ Error in pipeline execution: {e}")

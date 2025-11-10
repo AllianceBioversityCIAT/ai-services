@@ -1,6 +1,28 @@
 // AICCRA Report Generator Web App
 const API_BASE_URL = 'https://ia.prms.cgiar.org';
 
+// Tracking configuration
+const AI_FEEDBACK_URL = 'https://i8s5i8c21i.execute-api.us-east-1.amazonaws.com';
+
+// URL Parameters utility
+function getUrlParameter(name) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name);
+}
+
+function extractUserInfoFromUrl() {
+    const email = getUrlParameter('user_email');
+    const user = getUrlParameter('user');
+    
+    return {
+        email: email,
+        user: user
+    };
+}
+
+// Initialize user info from URL
+let userInfo = extractUserInfoFromUrl();
+
 // Tab functionality
 function openTab(evt, tabName) {
     const tabContents = document.getElementsByClassName('tab-content');
@@ -107,13 +129,22 @@ function downloadAsExcel(data, filename) {
 
 // API call functions
 async function makeApiCall(endpoint, data) {
+    const startTime = Date.now();
+    
     try {
+        // Add user info to the request if available
+        const requestData = {
+            ...data,
+            ...(userInfo.email && { user_email: userInfo.email }),
+            ...(userInfo.user && { user_name: userInfo.user })
+        };
+
         const response = await fetch(`${API_BASE_URL}${endpoint}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(data)
+            body: JSON.stringify(requestData)
         });
 
         if (!response.ok) {
@@ -121,10 +152,111 @@ async function makeApiCall(endpoint, data) {
             throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
         }
 
-        return await response.json();
+        const result = await response.json();
+        
+        // Calculate response time
+        const responseTime = (Date.now() - startTime) / 1000;
+        
+        // Track interaction
+        await trackInteraction(endpoint, data, result, responseTime, true);
+        
+        return result;
     } catch (error) {
+        // Calculate response time even for errors
+        const responseTime = (Date.now() - startTime) / 1000;
+        
+        // Track failed interaction
+        await trackInteraction(endpoint, data, null, responseTime, false, error.message);
+        
         console.error('API call failed:', error);
         throw error;
+    }
+}
+
+// Track interaction function
+async function trackInteraction(endpoint, requestData, responseData, responseTime, success, errorMessage = null) {
+    try {
+        // Determine service type based on endpoint
+        let displayName = '';
+        let serviceDescription = '';
+        let userAction = '';
+        let aiOutput = '';
+
+        console.log('Processing endpoint:', endpoint);
+        
+        switch(endpoint) {
+            case '/api/generate-annual':
+                displayName = `AR Generator Service - Annual Report`;
+                serviceDescription = `Generate comprehensive annual reports for AICCRA indicators`;
+                userAction = `Generate annual report for ${requestData.indicator} (${requestData.year})`;
+                aiOutput = success && responseData?.content ? responseData.content.substring(0, 200) + '...' : (errorMessage || 'Error generating report');
+                break;
+            case '/api/generate-annual-tables':
+                displayName = `AR Generator Service - Summary Tables`;
+                serviceDescription = `Generate indicator summary tables for all PDO and IPI indicators`;
+                userAction = `Generate summary tables for year ${requestData.year}`;
+                aiOutput = success && responseData?.tables ? 'Summary tables generated successfully' : (errorMessage || 'Error generating tables');
+                break;
+            case '/api/generate-challenges':
+                displayName = `AR Generator Service - Challenges Report`;
+                serviceDescription = `Generate challenges and lessons learned reports`;
+                userAction = `Generate challenges report for year ${requestData.year}`;
+                aiOutput = success && responseData?.content ? responseData.content.substring(0, 200) + '...' : (errorMessage || 'Error generating challenges report');
+                break;
+            default:
+                displayName = `AR Generator Service`;
+                serviceDescription = `AICCRA Report Generator Service`;
+                userAction = `API call to ${endpoint}`;
+                aiOutput = success ? 'Report generated successfully' : (errorMessage || 'Error generating report');
+        }
+
+        console.log('Endpoint:', endpoint);
+        console.log('Display Name assigned:', displayName);
+        console.log('Service Description assigned:', serviceDescription);
+        
+        const interactionData = {
+            user_id: userInfo.email || 'Unknown',
+            user_input: userAction,
+            ai_output: aiOutput,
+            service_name: 'report-generator',
+            display_name: displayName,
+            service_description: serviceDescription,
+            platform: "AICCRA",
+            context: {
+                request_params: {
+                    indicator: requestData.indicator,
+                    year: requestData.year,
+                    insert_data: requestData.insert_data
+                },
+                user_info: {
+                    user_name: userInfo.user || null
+                },
+                success: success,
+                error_message: errorMessage
+            },
+            response_time_seconds: responseTime
+        };
+        
+        console.log('Tracking interaction:', interactionData);
+        
+        const response = await fetch(`${AI_FEEDBACK_URL}/api/interactions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(interactionData)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('Interaction tracked successfully:', result);
+        } else {
+            console.warn('Failed to track interaction:', response.status, response.statusText);
+        }
+        
+    } catch (error) {
+        console.error('Error tracking interaction:', error);
+        // Don't throw here to avoid affecting the main functionality
     }
 }
 
@@ -303,6 +435,9 @@ function downloadChallengesReport() {
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
+    // Display user info if available from URL
+    displayUserInfo();
+    
     // Annual report tab
     document.getElementById('generate-annual').addEventListener('click', generateAnnualReport);
     document.getElementById('download-annual').addEventListener('click', downloadAnnualReport);
@@ -317,6 +452,42 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set default active tab
     document.querySelector('.tab.active').click();
 });
+
+function displayUserInfo() {
+    if (userInfo.email || userInfo.user) {
+        // Create user info display element if it doesn't exist
+        let userInfoDisplay = document.getElementById('user-info-display');
+        if (!userInfoDisplay) {
+            userInfoDisplay = document.createElement('div');
+            userInfoDisplay.id = 'user-info-display';
+            userInfoDisplay.className = 'user-info-banner';
+            userInfoDisplay.style.cssText = `
+                background: linear-gradient(135deg, var(--very-light-blue), var(--white));
+                padding: 1rem 2rem;
+                border-radius: 8px;
+                margin-bottom: 2rem;
+                border-left: 4px solid var(--primary-blue);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            `;
+            
+            // Insert after header
+            const header = document.querySelector('.header');
+            header.parentNode.insertBefore(userInfoDisplay, header.nextSibling);
+        }
+        
+        let infoText = '<i class="fas fa-user" style="color: var(--primary-blue); margin-right: 0.5rem;"></i>';
+        
+        if (userInfo.user) {
+            infoText += `<strong>Welcome, ${userInfo.user}!</strong>`;
+        } else if (userInfo.email) {
+            // Extract username from email (part before @)
+            const emailUsername = userInfo.email.split('@')[0];
+            infoText += `<strong>Welcome, ${emailUsername}!</strong>`;
+        }
+        
+        userInfoDisplay.innerHTML = infoText;
+    }
+}
 
 // Global error handler
 window.addEventListener('error', function(e) {
