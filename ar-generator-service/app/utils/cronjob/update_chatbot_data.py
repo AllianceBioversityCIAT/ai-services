@@ -14,7 +14,6 @@ Usage:
     python update_chatbot_data.py
 """
 
-import json
 import sys
 import asyncio
 import requests
@@ -26,13 +25,7 @@ logger = get_logger()
 notification_service = NotificationService()
 
 
-ENDPOINT_URL = "http://localhost:8000/api/chat"
-REQUEST_PAYLOAD = {
-    "user_input": "Update the data used by the chatbot",
-    "session_id": "Not applicable",
-    "memory_id": "Not applicable",
-    "insert_data": "True"
-}
+ENDPOINT_URL = "https://ia.prms.cgiar.org/api/update-chatbot-data"
 TIMEOUT_SECONDS = 3600  # 60 minutes timeout - allows for data update processing time
 
 
@@ -49,11 +42,9 @@ def make_chatbot_data_update_request():
     try:
         logger.info("Starting Chatbot data update process")
         logger.info(f"Endpoint: {ENDPOINT_URL}")
-        logger.info(f"Payload: {json.dumps(REQUEST_PAYLOAD, indent=2)}")
 
         response = requests.post(
             ENDPOINT_URL,
-            json=REQUEST_PAYLOAD,
             timeout=TIMEOUT_SECONDS,
             headers={
                 'Content-Type': 'application/json',
