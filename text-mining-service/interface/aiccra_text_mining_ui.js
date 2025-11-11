@@ -1,6 +1,6 @@
 class AICCRATextMiningUI {
     constructor() {
-        this.apiBaseUrl = 'https://oxnrkcntlheycdgcnilexrwp4i0tucqz.lambda-url.us-east-1.on.aws';
+        this.apiBaseUrl = 'https://d3djd7q7g7v7di.cloudfront.net';
         // this.apiBaseUrl = 'http://localhost:8000';
         this.bucket = 'ai-services-ibd';
         this.projectType = 'AICCRA';
