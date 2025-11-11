@@ -10,4 +10,5 @@ streamlit,
 fastapi,
 uvicorn,
 mangum,
-openai
+openai,
+pyodbc
