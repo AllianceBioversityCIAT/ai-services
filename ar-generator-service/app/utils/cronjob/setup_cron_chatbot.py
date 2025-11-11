@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 """
-Script to set up the Weekly Annual Report Generation cronjob
+Script to set up the Weekly Chatbot Data Update cronjob
 
-This script facilitates the installation of the update_ar_data.py script as a cronjob
-that will run weekly on Sundays at 2:00 AM. It must be executed with sufficient privileges
+This script facilitates the installation of the update_chatbot_data.py script as a cronjob
+that will run weekly on Sundays at 1:00 AM. It must be executed with sufficient privileges
 to modify the crontab.
 
 Usage:
-    python setup_cron.py install   # Install the cronjob
-    python setup_cron.py remove    # Remove the cronjob
-    python setup_cron.py status    # Show cronjob status
+    python setup_cron_chatbot.py install   # Install the cronjob
+    python setup_cron_chatbot.py remove    # Remove the cronjob
+    python setup_cron_chatbot.py status    # Show cronjob status
 """
 
 import os
@@ -19,10 +19,10 @@ from pathlib import Path
 from crontab import CronTab
 
 CURRENT_DIR = Path(__file__).resolve().parent
-ANNUAL_REPORT_SCRIPT = CURRENT_DIR / "update_ar_data.py"
+CHATBOT_SCRIPT = CURRENT_DIR / "update_chatbot_data.py"
 PROJECT_ROOT = CURRENT_DIR.parent.parent.parent
 LOG_DIR = PROJECT_ROOT / "data" / "logs"
-CRON_COMMENT = "annual_report_generator"
+CRON_COMMENT = "chatbot_data_updater"
 PYTHON_BIN = sys.executable
 
 sys.path.append(str(PROJECT_ROOT))
@@ -33,12 +33,12 @@ logger = get_logger()
 
 def check_requirements():
     """Checks whether the necessary requirements are met to execute the script"""
-    if not ANNUAL_REPORT_SCRIPT.exists():
-        logger.error(f"❌ Error: update_ar_data.py script not found at {ANNUAL_REPORT_SCRIPT}")
+    if not CHATBOT_SCRIPT.exists():
+        logger.error(f"❌ Error: update_chatbot_data.py script not found at {CHATBOT_SCRIPT}")
         return False
     
     try:
-        os.chmod(ANNUAL_REPORT_SCRIPT, 0o755)
+        os.chmod(CHATBOT_SCRIPT, 0o755)
     except Exception as e:
         logger.warning(f"⚠️ Warning: Failed to make script executable: {e}")
     
@@ -55,12 +55,12 @@ def check_requirements():
 
 def get_cron_command():
     """Generates the cron command using absolute paths for better reliability"""
-    log_file = LOG_DIR / "annual_report_cron.log"
-    return f"{PYTHON_BIN} {ANNUAL_REPORT_SCRIPT} >> {log_file} 2>&1"
+    log_file = LOG_DIR / "chatbot_data_cron.log"
+    return f"{PYTHON_BIN} {CHATBOT_SCRIPT} >> {log_file} 2>&1"
 
 
 def install_cron():
-    """Installs the cronjob to run the script weekly on Sundays at 2:00 AM"""
+    """Installs the cronjob to run the script weekly on Sundays at 1:00 AM"""
     if not check_requirements():
         return False
     
@@ -70,7 +70,7 @@ def install_cron():
         cron.remove_all(comment=CRON_COMMENT)
         
         job = cron.new(command=get_cron_command(), comment=CRON_COMMENT)
-        job.setall('0 2 * * 0')  # Weekly on Sunday at 2:00 AM
+        job.setall('0 3 * * 0')  # Weekly on Sunday at 3:00 AM (1 hour before AR generator)
         
         cron.write()
         
@@ -85,7 +85,7 @@ def install_cron():
 
 
 def remove_cron():
-    """Removes the Annual Report Generation cronjob"""
+    """Removes the Chatbot Data Update cronjob"""
     try:
         cron = CronTab(user=True)
         
@@ -109,10 +109,10 @@ def show_status():
         jobs = list(cron.find_comment(CRON_COMMENT))
         
         if not jobs:
-            logger.info("ℹ️  No cronjob installed for Annual Report Generation")
+            logger.info("ℹ️  No cronjob installed for Chatbot Data Update")
             return
             
-        logger.info("✅ Cronjob configured for Annual Report Generation:")
+        logger.info("✅ Cronjob configured for Chatbot Data Update:")
         for job in jobs:
             logger.info(f"   Command: {job.command}")
             schedule = job.schedule()
@@ -124,13 +124,13 @@ def show_status():
 
 
 def test_script():
-    """Runs the annual report generation script in test mode"""
+    """Runs the chatbot data update script in test mode"""
     if not check_requirements():
         return False
         
-    logger.info("🧪 Running update_ar_data.py script in test mode...")
+    logger.info("🧪 Running update_chatbot_data.py script in test mode...")
     try:
-        result = subprocess.run([PYTHON_BIN, str(ANNUAL_REPORT_SCRIPT)], 
+        result = subprocess.run([PYTHON_BIN, str(CHATBOT_SCRIPT)], 
                                capture_output=True, text=True)
         
         logger.info("\n--- SCRIPT OUTPUT ---")
@@ -154,10 +154,10 @@ def print_usage():
   Usage: {sys.argv[0]} <command>
 
   Available commands:
-    install   - Install the cronjob to run the script weekly on Sundays at 2:00 AM
+    install   - Install the cronjob to run the script weekly on Sundays at 1:00 AM
     remove    - Remove the cronjob
     status    - Show the current status of the cronjob
-    test      - Run the update_ar_data.py script in test mode
+    test      - Run the update_chatbot_data.py script in test mode
     help      - Show this help message
 """)
 
@@ -189,4 +189,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())    
+    sys.exit(main())
