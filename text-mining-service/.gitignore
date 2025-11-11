@@ -196,3 +196,5 @@ faiss/
 
 # Data logs
 data/logs/
+interface_1/
+interface_2/
