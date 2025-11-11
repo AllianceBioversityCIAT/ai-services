@@ -10,6 +10,10 @@ class AICCRATextMiningUI {
         
         this.defaultPlaceholderPrompt = null;
         
+        // Prompt configuration state
+        this.currentPromptMode = 'default';
+        this.currentCustomPrompt = '';
+        
         // Get URL parameters
         this.urlParams = this.getURLParameters();
         
@@ -30,7 +34,7 @@ class AICCRATextMiningUI {
         const params = new URLSearchParams(window.location.search);
         const urlParams = {
             user_email: params.get('user_email') || '',
-            user_name: params.get('user_name') || ''
+            user_name: params.get('user') || ''
         };
         
         // Debug logs
@@ -54,11 +58,11 @@ class AICCRATextMiningUI {
         if (this.urlParams.user_email) {
             console.log('Setting email from URL:', this.urlParams.user_email); // Debug log
             userEmailInput.value = this.urlParams.user_email;
-            userEmailInput.style.borderColor = '#8CBF3F';
+            userEmailInput.style.borderColor = 'var(--green)';
             userEmailInput.style.backgroundColor = '#f0fff4';
             
-            // Show success message
-            this.showURLParameterInfo();
+            // Show user info banner
+            this.showUserInfoBanner();
             
             // Trigger the change event
             userEmailInput.dispatchEvent(new Event('input'));
@@ -67,247 +71,333 @@ class AICCRATextMiningUI {
         }
     }
 
+    showUserInfoBanner() {
+        if (!this.urlParams.user_email) return;
+        
+        const banner = document.getElementById('user-info-banner');
+        if (banner) {
+            let infoText = '<i class="fas fa-user" style="color: var(--primary-blue); margin-right: 0.5rem;"></i>';
+            
+            if (this.urlParams.user_name) {
+                infoText += `<strong>Welcome, ${this.urlParams.user_name}!</strong>`;
+            } else {
+                // Extract username from email (part before @)
+                const emailUsername = this.urlParams.user_email.split('@')[0];
+                infoText += `<strong>Welcome, ${emailUsername}!</strong>`;
+            }
+            
+            banner.innerHTML = infoText;
+            banner.style.display = 'block';
+        }
+        
+        // Also show the temporary notification
+        this.showURLParameterInfo();
+    }
+
     showURLParameterInfo() {
         if (!this.urlParams.user_email) return;
         
-        // Add a delay to ensure the page is fully loaded
+        // Show temporary notification banner using modern design
+        const notification = document.createElement('div');
+        notification.className = 'notification success';
+        notification.innerHTML = `
+            <i class="fas fa-check-circle"></i>
+            <span>User information loaded from URL</span>
+        `;
+        
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--green);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            animation: slideInRight 0.3s ease-out;
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto-hide after 3 seconds
         setTimeout(() => {
-            const infoDiv = document.createElement('div');
-            infoDiv.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: #8CBF3F;
-                color: white;
-                padding: 1rem 1.5rem;
-                border-radius: 8px;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-                z-index: 1000;
-                font-weight: 500;
-                max-width: 400px;
-            `;
-            infoDiv.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <span>✅</span>
-                    <span>Email loaded from URL: ${this.urlParams.user_email}</span>
-                </div>
-            `;
-            document.body.appendChild(infoDiv);
-
-            // Remove after 3 seconds
+            notification.style.animation = 'slideOutRight 0.3s ease-out forwards';
             setTimeout(() => {
-                if (infoDiv.parentNode) {
-                    infoDiv.parentNode.removeChild(infoDiv);
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
                 }
-            }, 3000);
-        }, 500); // Wait 500ms for page to be ready
+            }, 300);
+        }, 3000);
     }
 
     createHTML() {
         document.body.innerHTML = `
-            <div class="app">
-                <!-- Header -->
-                <header class="header">
-                    <div class="container">
-                        <div class="logo">
-                            <span class="logo-icon">🧠</span>
-                            <h1>AICCRA Text Mining</h1>
-                        </div>
-                        <div class="subtitle">Extract insights from your documents using AI</div>
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-brain"></i> AICCRA Text Mining</h1>
+                    <p class="subtitle">Extract insights from your documents using AI</p>
+                </div>
+
+                <!-- User Info Banner (will be populated if email comes from URL) -->
+                <div id="user-info-banner" class="user-info-banner" style="display: none;"></div>
+
+                <!-- AI Warning Banner -->
+                <div class="disclaimer">
+                    <div class="disclaimer-title">
+                        <i class="fas fa-exclamation-triangle" style="color: var(--purple);"></i> AI-Powered Service
                     </div>
-                </header>
+                    <div class="disclaimer-text">
+                        This service uses AI to analyze documents. Results should be validated before use in decision-making.
+                    </div>
+                </div>
 
-                <!-- Main Content -->
-                <main class="main">
-                    <div class="container">
-                        <!-- AI Warning Banner -->
-                        <div class="ai-warning">
-                            <div class="warning-icon">⚠️</div>
-                            <div class="warning-text">
-                                This service uses AI to analyze documents. Results should be validated before use in decision-making.
+                <!-- Feature Overview -->
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3><i class="fas fa-upload"></i> Document Upload</h3>
+                        <p>Upload files directly or select from cloud storage (S3) with support for multiple formats.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3><i class="fas fa-cogs"></i> Custom Analysis</h3>
+                        <p>Use default AICCRA prompts or create custom analysis instructions for specialized extraction.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3><i class="fas fa-chart-bar"></i> Structured Results</h3>
+                        <p>Get organized, structured data extraction with JSON output and visual result presentation.</p>
+                    </div>
+                </div>
+
+                <!-- Main Content Card -->
+                <div class="main-card">
+                    <!-- Configuration Section -->
+                    <div class="section">
+                        <div class="section-header">
+                            <h2><i class="fas fa-user"></i> User Information</h2>
+                            <button id="customPromptConfigBtn" class="config-btn" title="Custom Prompt Configuration">
+                                <i class="fas fa-cog"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="userEmail">Email Address</label>
+                            <input type="email" id="userEmail" class="form-control" placeholder="your@email.com" />
+                            <div class="input-hint" id="emailHint" style="display: none;">
+                                <i class="fas fa-info-circle"></i> Your email will be used for tracking and notifications
                             </div>
                         </div>
 
-                        <!-- Settings Card -->
-                        <div class="card settings-card">
-                            <div class="card-header">
-                                <span class="icon">⚙️</span>
-                                <h3>Configuration</h3>
+                        <div class="form-group">
+                            <label>Analysis Mode</label>
+                            <div class="input-hint">
+                                <i class="fas fa-magic"></i> Using the standard AICCRA prompt optimized for extracting climate adaptation and agriculture-related information. 
+                                <span id="customPromptIndicator" style="display: none; color: var(--purple); font-weight: 600;">
+                                    <i class="fas fa-edit"></i> Custom prompt active
+                                </span>
                             </div>
-                            <div class="card-body">
-                                <div class="input-group">
-                                    <label for="userEmail">Email Address</label>
-                                    <input type="email" id="userEmail" placeholder="your@email.com" />
-                                    <div class="input-hint" id="emailHint" style="display: none;">
-                                        📧 Your email will be used for tracking
-                                    </div>
-                                </div>
-                                <div class="input-group">
-                                    <label for="customPrompt">Analysis Prompt Configuration</label>
-                                    
-                                    <!-- Prompt Mode Selector -->
-                                    <div class="prompt-mode-selector">
-                                        <div class="radio-tabs" style="margin-bottom: 1rem;">
-                                            <input type="radio" name="promptMode" value="default" id="default-prompt-tab" checked>
-                                            <label for="default-prompt-tab" class="tab-button">
-                                                <span class="tab-icon">🔧</span>
-                                                Default Prompt
-                                            </label>
-                                            
-                                            <input type="radio" name="promptMode" value="custom" id="custom-prompt-tab">
-                                            <label for="custom-prompt-tab" class="tab-button">
-                                                <span class="tab-icon">✏️</span>
-                                                Custom Prompt
-                                            </label>
-                                        </div>
-                                    </div>
+                        </div>
+                    </div>
 
-                                    <!-- Default Prompt Info -->
-                                    <div id="defaultPromptSection" class="prompt-section">
-                                        <div class="input-hint">
-                                            📝 Using the standard AICCRA prompt for document analysis. This prompt is optimized for extracting climate adaptation and agriculture-related information.
-                                        </div>
-                                    </div>
+                    <!-- Document Source Section -->
+                    <div class="section">
+                        <div class="section-header">
+                            <h2><i class="fas fa-file-alt"></i> Document Source</h2>
+                        </div>
 
-                                    <!-- Custom Prompt Section -->
-                                    <div id="customPromptSection" class="prompt-section" style="display: none;">
-                                        <div class="custom-prompt-controls">
-                                            <button type="button" id="loadPlaceholderBtn" class="btn-secondary" style="width: auto; margin-bottom: 1rem;">
-                                                <span class="btn-icon">�</span>
-                                                Load Template
-                                            </button>
-                                            <button type="button" id="downloadPromptBtn" class="btn-secondary" style="width: auto; margin-bottom: 1rem; margin-left: 0.5rem;">
-                                                <span class="btn-icon">�</span>
-                                                Download Prompt
-                                            </button>
-                                        </div>
-                                        
-                                        <textarea id="customPrompt" rows="12" placeholder="Enter your custom prompt here or click 'Load Template' to start with the default AICCRA prompt..."></textarea>
-                                        
-                                        <div class="input-hint">
-                                            🎯 <strong>Tips:</strong><br/>
-                                            • Click "Load Template" to start with the default AICCRA prompt<br/>
-                                            • Edit the prompt to customize how the AI analyzes your document<br/>
-                                            • Click "Download Prompt" to save your customized prompt as a .txt file
-                                        </div>
-                                    </div>
+                        <div class="tabs source-tabs">
+                            <input type="radio" name="mode" value="upload" id="upload-tab" checked>
+                            <label for="upload-tab" class="tab">
+                                <i class="fas fa-upload"></i> Upload File
+                            </label>
+                            
+                            <input type="radio" name="mode" value="s3" id="s3-tab">
+                            <label for="s3-tab" class="tab">
+                                <i class="fas fa-cloud"></i> From Cloud Storage
+                            </label>
+                        </div>
+
+                        <!-- Upload Section -->
+                        <div id="uploadSection" class="tab-content">
+                            <div class="file-upload-area" id="fileUploadArea">
+                                <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                                <div class="upload-text">
+                                    <p><strong>Drag & drop your file here</strong></p>
+                                    <p class="upload-subtext">or click to browse</p>
                                 </div>
+                                <input type="file" id="fileInput" accept=".pdf,.docx,.txt,.xlsx,.xls,.pptx" />
+                            </div>
+                            <div class="file-types">
+                                <i class="fas fa-file"></i> Supported: PDF, DOCX, TXT, XLSX, XLS, PPTX
+                            </div>
+                            <div id="uploadInfo" class="upload-info" style="display:none;"></div>
+                        </div>
+
+                        <!-- S3 Section -->
+                        <div id="s3Section" class="tab-content" style="display:none;">
+                            <div class="form-group">
+                                <label for="additionalPrefix">Additional Path (optional)</label>
+                                <input type="text" id="additionalPrefix" class="form-control" placeholder="subfolder/" />
+                                <div class="input-hint" id="searchInfo">
+                                    <i class="fas fa-folder"></i> Searching in default folder
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <button id="refreshBtn" class="btn btn-secondary">
+                                    <i class="fas fa-sync-alt"></i> Refresh Files
+                                </button>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="s3Select">Select File</label>
+                                <select id="s3Select" class="form-control" disabled>
+                                    <option>Loading...</option>
+                                </select>
                             </div>
                         </div>
 
-                        <!-- Document Source Card -->
-                        <div class="card">
-                            <div class="card-header">
-                                <span class="icon">📄</span>
-                                <h3>Document Source</h3>
+                        <!-- Process Button -->
+                        <div class="process-section">
+                            <button id="processBtn" class="btn btn-primary">
+                                <i class="fas fa-cogs"></i> Process Document
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading -->
+                <div id="loading" class="loading" style="display:none;">
+                    <div class="spinner"></div>
+                    <p><strong>Processing Document</strong></p>
+                    <p>Analyzing your document with AI...</p>
+                </div>
+
+                <!-- Results -->
+                <div id="results" class="result" style="display:none;">
+                    <div class="result-success">
+                        <div id="successMessage" class="success-message"></div>
+                    </div>
+
+                    <div class="result-section">
+                        <div class="result-header expandable-header" data-target="rawJson">
+                            <div class="result-title">
+                                <i class="fas fa-code"></i>
+                                <h3>Raw JSON Output</h3>
                             </div>
-                            <div class="card-body">
-                                <div class="radio-tabs">
-                                    <input type="radio" name="mode" value="upload" id="upload-tab" checked>
-                                    <label for="upload-tab" class="tab-button">
-                                        <span class="tab-icon">⬆️</span>
-                                        Upload File
+                            <i class="fas fa-chevron-down expand-icon"></i>
+                        </div>
+                        <div id="rawJson" class="result-content expandable-content" style="display:none;">
+                            <pre id="jsonContent" class="json-output"></pre>
+                        </div>
+                    </div>
+
+                    <div id="processedResults"></div>
+                </div>
+
+                <!-- Error -->
+                <div id="error" class="alert alert-error" style="display:none;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <div class="error-message"></div>
+                </div>
+
+                <!-- Custom Prompt Configuration Modal -->
+                <div id="customPromptModal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3><i class="fas fa-edit"></i> Custom Prompt Configuration</h3>
+                            <button class="modal-close" id="closeModalBtn">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>Analysis Prompt Mode</label>
+                                
+                                <div class="tabs prompt-tabs">
+                                    <input type="radio" name="promptMode" value="default" id="default-prompt-tab" checked>
+                                    <label for="default-prompt-tab" class="tab">
+                                        <i class="fas fa-magic"></i> Default Prompt
                                     </label>
                                     
-                                    <input type="radio" name="mode" value="s3" id="s3-tab">
-                                    <label for="s3-tab" class="tab-button">
-                                        <span class="tab-icon">☁️</span>
-                                        From S3
+                                    <input type="radio" name="promptMode" value="custom" id="custom-prompt-tab">
+                                    <label for="custom-prompt-tab" class="tab">
+                                        <i class="fas fa-edit"></i> Custom Prompt
                                     </label>
                                 </div>
 
-                                <!-- Upload Section -->
-                                <div id="uploadSection" class="tab-content">
-                                    <div class="file-upload-area" id="fileUploadArea">
-                                        <div class="upload-icon">📁</div>
-                                        <div class="upload-text">
-                                            <p>Drag & drop your file here</p>
-                                            <p class="upload-subtext">or click to browse</p>
-                                        </div>
-                                        <input type="file" id="fileInput" accept=".pdf,.docx,.txt,.xlsx,.xls,.pptx" />
+                                <!-- Default Prompt Info -->
+                                <div id="defaultPromptSection" class="prompt-section">
+                                    <div class="input-hint">
+                                        <i class="fas fa-magic"></i> Using the standard AICCRA prompt optimized for extracting climate adaptation and agriculture-related information.
                                     </div>
-                                    <div class="file-types">
-                                        Supported: PDF, DOCX, TXT, XLSX, XLS, PPTX
-                                    </div>
-                                    <div id="uploadInfo" class="upload-info" style="display:none;"></div>
                                 </div>
 
-                                <!-- S3 Section -->
-                                <div id="s3Section" class="tab-content" style="display:none;">
-                                    <div class="input-group">
-                                        <label for="additionalPrefix">Additional Path (optional)</label>
-                                        <input type="text" id="additionalPrefix" placeholder="subfolder/" />
-                                        <div class="input-hint" id="searchInfo"></div>
-                                    </div>
-                                    
-                                    <div class="s3-controls">
-                                        <button id="refreshBtn" class="btn-secondary">
-                                            <span class="btn-icon">🔄</span>
-                                            Refresh
+                                <!-- Custom Prompt Section -->
+                                <div id="customPromptSection" class="prompt-section" style="display: none;">
+                                    <div class="custom-prompt-controls">
+                                        <button type="button" id="loadPlaceholderBtn" class="btn btn-secondary">
+                                            <i class="fas fa-download"></i> Load Template
+                                        </button>
+                                        <button type="button" id="downloadPromptBtn" class="btn btn-secondary">
+                                            <i class="fas fa-save"></i> Download Prompt
                                         </button>
                                     </div>
-
-                                    <div class="input-group">
-                                        <label for="s3Select">Select File</label>
-                                        <select id="s3Select" disabled>
-                                            <option>Loading...</option>
-                                        </select>
+                                    
+                                    <textarea id="customPrompt" class="form-control" rows="8" 
+                                        placeholder="Enter your custom prompt here or click 'Load Template' to start with the default AICCRA prompt..."></textarea>
+                                    
+                                    <div class="input-hint">
+                                        <i class="fas fa-lightbulb"></i> <strong>Tips:</strong><br/>
+                                        • Click "Load Template" to start with the default AICCRA prompt<br/>
+                                        • Edit the prompt to customize how the AI analyzes your document<br/>
+                                        • Click "Download Prompt" to save your customized prompt
                                     </div>
                                 </div>
-
-                                <!-- Process Button -->
-                                <div class="process-section">
-                                    <button id="processBtn" class="btn-primary">
-                                        <span class="btn-icon">🚀</span>
-                                        Process Document
-                                    </button>
-                                </div>
                             </div>
                         </div>
-
-                        <!-- Loading -->
-                        <div id="loading" class="loading-card" style="display:none;">
-                            <div class="loading-content">
-                                <div class="spinner"></div>
-                                <h3>Processing Document</h3>
-                                <p>Analyzing your document with AI...</p>
-                            </div>
-                        </div>
-
-                        <!-- Results -->
-                        <div id="results" class="results-section" style="display:none;">
-                            <div class="card success-card">
-                                <div id="successMessage" class="success-message"></div>
-                            </div>
-
-                            <div class="card">
-                                <div class="card-header expandable-header" data-target="rawJson">
-                                    <div class="header-left">
-                                        <span class="icon">🔍</span>
-                                        <h3>Raw JSON Output</h3>
-                                    </div>
-                                    <span class="expand-icon">+</span>
-                                </div>
-                                <div id="rawJson" class="card-body expandable-content" style="display:none;">
-                                    <pre id="jsonContent" class="json-output"></pre>
-                                </div>
-                            </div>
-
-                            <div id="processedResults"></div>
-                        </div>
-
-                        <!-- Error -->
-                        <div id="error" class="error-card" style="display:none;">
-                            <div class="error-icon">❌</div>
-                            <div class="error-message"></div>
+                        
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" id="cancelModalBtn">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                            <button class="btn btn-primary" id="saveModalBtn">
+                                <i class="fas fa-save"></i> Apply Configuration
+                            </button>
                         </div>
                     </div>
-                </main>
+                </div>
             </div>
         `;
 
         const style = document.createElement('style');
         style.textContent = `
+            :root {
+                --primary-blue: #0478A3;
+                --secondary-blue: #3A84A7;
+                --light-blue: #81B8C1;
+                --very-light-blue: #E7F4FF;
+                --yellow: #FFCD2A;
+                --purple: #8B5CF6;
+                --green: #8CBF3F;
+                --orange: #F39820;
+                --white: #ffffff;
+                --gray-50: #f8fafc;
+                --gray-100: #f1f5f9;
+                --gray-200: #e2e8f0;
+                --gray-300: #cbd5e1;
+                --gray-400: #94a3b8;
+                --gray-500: #64748b;
+                --gray-600: #475569;
+                --gray-700: #334155;
+                --gray-800: #1e293b;
+                --gray-900: #0f172a;
+            }
+
             * {
                 margin: 0;
                 padding: 0;
@@ -315,264 +405,285 @@ class AICCRATextMiningUI {
             }
 
             body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-                background: #f8fafc;
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: linear-gradient(135deg, var(--very-light-blue) 0%, var(--white) 100%);
                 min-height: 100vh;
-                color: #333;
+                color: var(--gray-800);
                 line-height: 1.6;
             }
 
-            .app {
-                min-height: 100vh;
-            }
-
             .container {
-                width: 65%;
+                max-width: 1200px;
                 margin: 0 auto;
-                padding: 0 20px;
+                padding: 2rem;
             }
 
             /* Header */
             .header {
-                background: #1079A4;
-                padding: 2rem 0;
                 text-align: center;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+                margin-bottom: 3rem;
+                padding: 2rem 0;
             }
 
-            .logo {
+            .header h1 {
+                font-size: 3rem;
+                font-weight: 700;
+                background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                margin-bottom: 0.5rem;
+            }
+
+            .header .subtitle {
+                font-size: 1.25rem;
+                color: var(--gray-600);
+                font-weight: 400;
+            }
+
+            /* User Info Banner */
+            .user-info-banner {
+                background: linear-gradient(135deg, var(--very-light-blue), var(--white));
+                padding: 1rem 2rem;
+                border-radius: 8px;
+                margin-bottom: 2rem;
+                border-left: 4px solid var(--primary-blue);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                font-size: 0.95rem;
+                color: var(--gray-700);
+            }
+
+            /* Feature Grid */
+            .feature-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 1.5rem;
+                margin-bottom: 2rem;
+            }
+
+            .feature-card {
+                background: var(--white);
+                padding: 1.5rem;
+                border-radius: 12px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                border-top: 4px solid var(--secondary-blue);
+            }
+
+            .feature-card h3 {
+                color: var(--primary-blue);
+                margin-bottom: 0.5rem;
+                font-size: 1.1rem;
+            }
+
+            .feature-card p {
+                color: var(--gray-600);
+                font-size: 0.9rem;
+            }
+
+            /* Main Card */
+            .main-card {
+                background: var(--white);
+                border-radius: 16px;
+                padding: 2rem;
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+                margin-bottom: 2rem;
+            }
+
+            /* Sections */
+            .section {
+                margin-bottom: 2rem;
+            }
+
+            .section:last-child {
+                margin-bottom: 0;
+            }
+
+            .section-header {
+                margin-bottom: 1.5rem;
+                padding-bottom: 0.5rem;
+                border-bottom: 2px solid var(--very-light-blue);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .section-header h2 {
+                color: var(--primary-blue);
+                font-size: 1.5rem;
+                font-weight: 600;
+            }
+
+            .config-btn {
+                background: var(--purple);
+                color: var(--white);
+                border: none;
+                padding: 0.5rem;
+                border-radius: 50%;
+                width: 2.5rem;
+                height: 2.5rem;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                gap: 1rem;
-                margin-bottom: 0.5rem;
-            }
-
-            .logo-icon {
-                font-size: 2.5rem;
-            }
-
-            .logo h1 {
-                font-size: 2.5rem;
-                font-weight: 700;
-                color: white;
-                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-
-            .subtitle {
-                color: rgba(255, 255, 255, 0.95);
-                font-size: 1.1rem;
-                font-weight: 300;
-            }
-
-            /* Main Content */
-            .main {
-                padding: 2rem 0 4rem;
-                background: white;
-            }
-
-            /* Cards */
-            .card {
-                background: white;
-                border-radius: 8px;
-                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-                margin-bottom: 1.5rem;
-                overflow: hidden;
-                border: 1px solid #e2e8f0;
-            }
-
-            .card-header {
-                padding: 1rem 1.5rem;
-                border-bottom: 1px solid #e2e8f0;
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
                 cursor: pointer;
-                background: #f8fafc;
+                transition: all 0.3s ease;
+                font-size: 1rem;
             }
 
-            .expandable-header {
-                justify-content: space-between;
+            .config-btn:hover {
+                background: #7c3aed;
+                transform: scale(1.05);
             }
 
-            .header-left {
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
-            }
-
-            .card-header h3 {
-                font-size: 1.25rem;
-                font-weight: 600;
-                color: #2d3748;
-            }
-
-            .icon {
-                font-size: 1.25rem;
-            }
-
-            .expand-icon {
-                font-size: 1.5rem;
-                font-weight: bold;
-                color: #1079A4;
-                transition: transform 0.2s ease;
-            }
-
-            .card-body {
-                padding: 1.5rem;
-                background: white;
-            }
-
-            /* AI Warning */
-            .ai-warning {
-                background: #f9fda7ff;
-                border: 1px solid #dcb700ff;
-                border-radius: 8px;
-                padding: 1rem 1.5rem;
-                margin-bottom: 1.5rem;
-                display: flex;
-                align-items: center;
-                gap: 1rem;
-            }
-
-            .warning-icon {
-                font-size: 1.5rem;
-                flex-shrink: 0;
-            }
-
-            .warning-text {
-                color: #101010ff;
-                font-weight: 500;
-            }
-
-            /* Input Groups */
-            .input-group {
+            /* Form Controls */
+            .form-group {
                 margin-bottom: 1.5rem;
             }
 
-            .input-group label {
+            .form-group label {
                 display: block;
                 margin-bottom: 0.5rem;
-                font-weight: 600;
-                color: #4a5568;
-                font-size: 0.95rem;
+                font-weight: 500;
+                color: var(--gray-700);
             }
 
-            .input-group input,
-            .input-group select,
-            .input-group textarea {
+            .form-control {
                 width: 100%;
                 padding: 0.75rem 1rem;
-                border: 2px solid #e2e8f0;
+                border: 2px solid var(--gray-200);
                 border-radius: 8px;
                 font-size: 1rem;
-                transition: all 0.2s ease;
-                background: white;
+                transition: all 0.3s ease;
+                background: var(--white);
                 font-family: inherit;
-                resize: vertical;
             }
 
-            .input-group input:focus,
-            .input-group select:focus,
-            .input-group textarea:focus {
+            .form-control:focus {
                 outline: none;
-                border-color: #1079A4;
-                box-shadow: 0 0 0 3px rgba(16, 121, 164, 0.1);
+                border-color: var(--primary-blue);
+                box-shadow: 0 0 0 3px rgba(4, 120, 163, 0.1);
             }
 
-            /* Placeholder styles */
-            .input-group input::placeholder,
-            .input-group textarea::placeholder {
-                color: #ced1d6ff;
-                opacity: 1;
+            textarea.form-control {
+                resize: vertical;
+                font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                font-size: 0.9rem;
+                line-height: 1.4;
+                min-height: 150px;
+            }
+
+            .form-control::placeholder {
+                color: var(--gray-400);
                 font-style: italic;
             }
 
+            /* Input Hints */
             .input-hint {
                 margin-top: 0.5rem;
                 font-size: 0.875rem;
-                color: #718096;
-                background: #fcf7f7ff;
+                color: var(--gray-600);
+                background: var(--gray-50);
                 padding: 0.5rem;
                 border-radius: 6px;
+                border-left: 3px solid var(--light-blue);
             }
 
-            /* Radio Tabs */
-            .radio-tabs {
+            /* Tabs */
+            .tabs {
                 display: flex;
-                background: #E7F4FF;
-                border-radius: 6px;
-                padding: 3px;
+                background: var(--white);
+                border-radius: 12px;
+                padding: 4px;
                 margin-bottom: 1.5rem;
-                border: 1px solid #81B8C1;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             }
 
-            .radio-tabs input[type="radio"] {
+            .tabs input[type="radio"] {
                 display: none;
             }
 
-            .tab-button {
+            .tab {
                 flex: 1;
-                padding: 0.5rem 1rem;
+                padding: 0.75rem 1.5rem;
                 text-align: center;
-                border-radius: 4px;
+                border: none;
+                background: transparent;
+                border-radius: 8px;
                 cursor: pointer;
-                transition: all 0.2s ease;
                 font-weight: 500;
+                transition: all 0.3s ease;
+                color: var(--gray-600);
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 gap: 0.5rem;
-                color: #1079A4;
             }
 
-            .radio-tabs input[type="radio"]:checked + .tab-button {
-                background: white;
-                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-                color: #1079A4;
+            .tabs input[type="radio"]:checked + .tab {
+                background: var(--primary-blue);
+                color: var(--white);
+                box-shadow: 0 2px 4px rgba(4, 120, 163, 0.3);
             }
 
-            .tab-icon {
-                font-size: 1.1rem;
+            .tab:hover:not(:has(input:checked)) {
+                background: var(--very-light-blue);
+                color: var(--primary-blue);
             }
 
-            /* File Upload */
+            /* Tab Content */
+            .tab-content {
+                display: none;
+            }
+
+            /* Prompt Sections */
+            .prompt-section {
+                transition: all 0.3s ease;
+            }
+
+            .custom-prompt-controls {
+                display: flex;
+                gap: 0.5rem;
+                margin-bottom: 1rem;
+                flex-wrap: wrap;
+            }
+
+            /* File Upload Area */
             .file-upload-area {
-                border: 2px dashed #81B8C1;
-                border-radius: 8px;
-                padding: 2rem;
+                border: 2px dashed var(--light-blue);
+                border-radius: 12px;
+                padding: 3rem 2rem;
                 text-align: center;
-                transition: all 0.2s ease;
+                transition: all 0.3s ease;
                 cursor: pointer;
                 position: relative;
-                background: #fafbfc;
+                background: var(--gray-50);
             }
 
             .file-upload-area:hover {
-                border-color: #1079A4;
-                background: #E7F4FF;
+                border-color: var(--primary-blue);
+                background: var(--very-light-blue);
+                transform: translateY(-2px);
             }
 
             .file-upload-area.dragover {
-                border-color: #8CBF3F;
+                border-color: var(--green);
                 background: #f0fff4;
                 transform: scale(1.02);
             }
 
             .upload-icon {
-                font-size: 2.5rem;
-                margin-bottom: 0.75rem;
-                color: #81B8C1;
+                font-size: 3rem;
+                margin-bottom: 1rem;
+                color: var(--light-blue);
             }
 
             .upload-text p {
                 font-size: 1.1rem;
-                color: #4a5568;
+                color: var(--gray-600);
                 margin-bottom: 0.5rem;
             }
 
             .upload-subtext {
-                color: #718096 !important;
+                color: var(--gray-500) !important;
                 font-size: 0.9rem !important;
             }
 
@@ -590,104 +701,97 @@ class AICCRATextMiningUI {
                 margin-top: 1rem;
                 text-align: center;
                 font-size: 0.875rem;
-                color: #718096;
+                color: var(--gray-500);
             }
 
             .upload-info {
                 margin-top: 1rem;
-                padding: 0.75rem 1rem;
-                background: #E7F4FF;
-                border: 1px solid #81B8C1;
-                border-radius: 6px;
-                color: #1079A4;
-                font-size: 0.9rem;
+                padding: 1rem;
+                background: var(--very-light-blue);
+                border: 1px solid var(--light-blue);
+                border-radius: 8px;
+                color: var(--primary-blue);
             }
 
             /* Buttons */
-            .btn-primary {
-                background: #1079A4;
-                color: white;
-                border: none;
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
                 padding: 0.875rem 2rem;
-                border-radius: 6px;
+                border: none;
+                border-radius: 8px;
                 font-size: 1rem;
                 font-weight: 600;
                 cursor: pointer;
-                transition: all 0.2s ease;
-                display: flex;
-                align-items: center;
+                transition: all 0.3s ease;
+                text-decoration: none;
                 justify-content: center;
-                gap: 0.5rem;
-                width: 100%;
+                font-family: inherit;
+            }
+
+            .btn-primary {
+                background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
+                color: var(--white);
             }
 
             .btn-primary:hover {
-                background: #0d6b8a;
-                transform: translateY(-1px);
+                transform: translateY(-2px);
+                box-shadow: 0 8px 25px rgba(4, 120, 163, 0.3);
             }
 
             .btn-secondary {
-                background: white;
-                color: #1079A4;
-                border: 2px solid #1079A4;
-                padding: 0.75rem 1.5rem;
-                border-radius: 8px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.2s ease;
-                display: flex;
-                align-items: center;
-                gap: 0.5rem;
+                background: var(--green);
+                color: var(--white);
             }
 
             .btn-secondary:hover {
-                background: #1079A4;
-                color: white;
+                background: #7aa836;
+                transform: translateY(-2px);
             }
 
-            .btn-icon {
-                font-size: 1.1rem;
+            .btn:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+                transform: none !important;
             }
 
+            /* Process Section */
             .process-section {
-                margin-top: 1.5rem;
+                margin-top: 2rem;
                 padding-top: 1.5rem;
-                border-top: 1px solid #e2e8f0;
+                border-top: 1px solid var(--gray-200);
             }
 
-            .s3-controls {
-                margin-bottom: 1.5rem;
+            .process-section .btn {
+                width: 100%;
+                font-size: 1.1rem;
+                padding: 1rem 2rem;
             }
 
             /* Loading */
-            .loading-card {
-                background: white;
-                border-radius: 8px;
-                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-                border: 1px solid #e2e8f0;
-                padding: 2rem;
+            .loading {
+                display: none;
                 text-align: center;
+                padding: 3rem;
+                background: var(--white);
+                border-radius: 16px;
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+                margin-bottom: 2rem;
             }
 
-            .loading-content h3 {
-                margin: 1rem 0 0.5rem;
-                color: #2d3748;
-                font-size: 1.5rem;
-            }
-
-            .loading-content p {
-                color: #718096;
-                font-size: 1.1rem;
+            .loading.show {
+                display: block;
             }
 
             .spinner {
                 width: 50px;
                 height: 50px;
-                border: 4px solid #E7F4FF;
-                border-top: 4px solid #1079A4;
+                border: 4px solid var(--light-blue);
+                border-top: 4px solid var(--primary-blue);
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
-                margin: 0 auto;
+                margin: 0 auto 1rem;
             }
 
             @keyframes spin {
@@ -696,148 +800,308 @@ class AICCRATextMiningUI {
             }
 
             /* Results */
-            .success-card {
-                background: linear-gradient(135deg, #8CBF3F 0%, #a8d158 100%);
-                border: none;
+            .result {
+                display: none;
+                margin-top: 2rem;
+            }
+
+            .result.show {
+                display: block;
+            }
+
+            .result-success {
+                background: linear-gradient(135deg, var(--green) 0%, #a8d158 100%);
+                padding: 1rem 2rem;
+                border-radius: 12px;
+                margin-bottom: 2rem;
+                color: var(--white);
+                box-shadow: 0 4px 12px rgba(140, 191, 63, 0.3);
             }
 
             .success-message {
-                color: white;
                 font-weight: 600;
                 font-size: 1.1rem;
                 text-align: center;
-                padding: 0.5rem;
+            }
+
+            .result-section {
+                background: var(--white);
+                border-radius: 12px;
+                margin-bottom: 1.5rem;
+                overflow: hidden;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+
+            .result-header {
+                padding: 1rem 1.5rem;
+                background: var(--gray-50);
+                border-bottom: 1px solid var(--gray-200);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            }
+
+            .result-header:hover {
+                background: var(--very-light-blue);
+            }
+
+            .result-title {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+            }
+
+            .result-title h3 {
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: var(--gray-800);
+                margin: 0;
+            }
+
+            .expand-icon {
+                color: var(--primary-blue);
+                transition: transform 0.3s ease;
+            }
+
+            .result-content {
+                padding: 1.5rem;
+                transition: all 0.3s ease;
             }
 
             .json-output {
-                background: #f8f9fa;
+                background: var(--gray-50);
                 padding: 1.5rem;
                 border-radius: 8px;
                 overflow-x: auto;
                 font-size: 0.9rem;
-                border: 1px solid #e9ecef;
+                border: 1px solid var(--gray-200);
+                font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
             }
 
-            .result-item {
-                background: white;
-                border-radius: 12px;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-                margin-bottom: 1.5rem;
-                overflow: hidden;
-                border: 1px solid #e2e8f0;
-            }
-
-            .result-item h4 {
-                background: linear-gradient(135deg, #1079A4 0%, #81B8C1 100%);
-                color: white;
+            /* Alerts */
+            .alert {
                 padding: 1rem 1.5rem;
-                margin: 0;
-                font-size: 1.2rem;
+                border-radius: 8px;
+                margin: 1rem 0;
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+            }
+
+            .alert-error {
+                background: #fef2f2;
+                color: #b91c1c;
+                border-left: 4px solid #ef4444;
+            }
+
+            /* Disclaimer */
+            .disclaimer {
+                margin-bottom: 2rem;
+                padding: 1.5rem;
+                background: #f3f0ff;
+                border-left: 4px solid var(--purple);
+                border-radius: 8px;
+            }
+
+            .disclaimer-title {
+                font-weight: 600;
+                color: var(--gray-800);
+                margin-bottom: 0.5rem;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            .disclaimer-text {
+                color: var(--gray-700);
+                font-size: 0.9rem;
+            }
+
+            /* Result Item Styles */
+            .result-item {
+                margin-bottom: 1.5rem;
+                border-radius: 8px;
+                overflow: hidden;
             }
 
             .result-field {
-                padding: 0.75rem 1.5rem;
-                border-bottom: 1px solid #f0f0f0;
+                margin-bottom: 1rem;
+                padding-bottom: 0.75rem;
+                border-bottom: 1px solid var(--gray-200);
             }
 
             .result-field:last-child {
                 border-bottom: none;
+                margin-bottom: 0;
             }
 
             .result-field strong {
-                color: #2d3748;
-                display: inline-block;
-                min-width: 140px;
+                color: var(--primary-blue);
                 font-weight: 600;
+                display: block;
+                margin-bottom: 0.25rem;
             }
 
             .result-table {
-                margin-top: 0.5rem;
+                overflow-x: auto;
+                background: var(--white);
+                border-radius: 6px;
+                border: 1px solid var(--gray-200);
             }
 
             .result-table table {
                 width: 100%;
                 border-collapse: collapse;
-                font-size: 0.9rem;
-                background: white;
-                border-radius: 6px;
-                overflow: hidden;
-                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                margin: 0;
             }
 
             .result-table th {
-                background: #f7fafc;
+                background: var(--gray-50);
+                color: var(--gray-700);
+                font-weight: 600;
                 padding: 0.75rem;
                 text-align: left;
-                font-weight: 600;
-                color: #4a5568;
-                border-bottom: 2px solid #e2e8f0;
+                border-bottom: 2px solid var(--gray-200);
+                font-size: 0.875rem;
             }
 
             .result-table td {
                 padding: 0.75rem;
-                border-bottom: 1px solid #e2e8f0;
+                border-bottom: 1px solid var(--gray-100);
+                color: var(--gray-700);
+                font-size: 0.875rem;
             }
 
             .result-table tr:last-child td {
                 border-bottom: none;
             }
 
-            /* Error */
-            .error-card {
-                background: linear-gradient(135deg, #DA5350 0%, #f56565 100%);
-                border-radius: 12px;
-                padding: 1.5rem;
+            .result-table tr:hover {
+                background: var(--gray-50);
+            }
+
+            /* Modal Styles */
+            .modal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
                 display: flex;
                 align-items: center;
-                gap: 1rem;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+                justify-content: center;
+                z-index: 1000;
+                animation: fadeIn 0.3s ease-out;
             }
 
-            .error-icon {
+            .modal-content {
+                background: var(--white);
+                border-radius: 16px;
+                width: 90%;
+                max-width: 800px;
+                max-height: 90vh;
+                overflow-y: auto;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                animation: slideUp 0.3s ease-out;
+            }
+
+            .modal-header {
+                padding: 1.5rem 2rem;
+                border-bottom: 1px solid var(--gray-200);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: linear-gradient(135deg, var(--very-light-blue), var(--white));
+            }
+
+            .modal-header h3 {
+                margin: 0;
+                color: var(--primary-blue);
                 font-size: 1.5rem;
-                flex-shrink: 0;
-                color: white;
+                font-weight: 600;
             }
 
-            .error-message {
-                color: white;
-                font-weight: 500;
-                font-size: 1.1rem;
+            .modal-close {
+                background: none;
+                border: none;
+                font-size: 1.25rem;
+                color: var(--gray-500);
+                cursor: pointer;
+                padding: 0.5rem;
+                border-radius: 50%;
+                width: 2.5rem;
+                height: 2.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.3s ease;
             }
 
-            /* Responsive */
-            @media (max-width: 1200px) {
-                .container {
-                    width: 85%;
-                }
+            .modal-close:hover {
+                background: var(--gray-100);
+                color: var(--gray-700);
             }
 
+            .modal-body {
+                padding: 2rem;
+            }
+
+            .modal-footer {
+                padding: 1.5rem 2rem;
+                border-top: 1px solid var(--gray-200);
+                display: flex;
+                gap: 1rem;
+                justify-content: flex-end;
+                background: var(--gray-50);
+            }
+
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+
+            /* Responsive Design */
             @media (max-width: 768px) {
                 .container {
-                    width: 95%;
-                    padding: 0 1rem;
+                    padding: 1rem;
                 }
 
-                .logo h1 {
+                .header h1 {
                     font-size: 2rem;
                 }
 
-                .card-body {
-                    padding: 1rem;
+                .main-card {
+                    padding: 1.5rem;
+                }
+
+                .feature-grid {
+                    grid-template-columns: 1fr;
+                }
+
+                .tabs {
+                    flex-direction: column;
+                    gap: 4px;
                 }
 
                 .file-upload-area {
                     padding: 2rem 1rem;
                 }
 
-                .upload-icon {
-                    font-size: 2rem;
+                .custom-prompt-controls {
+                    flex-direction: column;
+                }
+
+                .btn {
+                    padding: 0.75rem 1.5rem;
+                    font-size: 0.9rem;
                 }
             }
 
             /* Animations */
-            .card {
+            .main-card, .result-section, .feature-card {
                 animation: slideUp 0.3s ease-out;
             }
 
@@ -852,89 +1116,31 @@ class AICCRATextMiningUI {
                 }
             }
 
-            .expandable-content {
-                transition: all 0.3s ease;
+            @keyframes slideInRight {
+                from {
+                    opacity: 0;
+                    transform: translateX(30px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateX(0);
+                }
             }
 
-            .settings-card {
-                background: #E7F4FF;
-                border: 1px solid #81B8C1;
+            @keyframes slideOutRight {
+                from {
+                    opacity: 1;
+                    transform: translateX(0);
+                }
+                to {
+                    opacity: 0;
+                    transform: translateX(30px);
+                }
             }
 
-            /* Prompt Mode Styles */
-            .prompt-mode-selector {
-                margin-bottom: 1rem;
-            }
-
-            .prompt-section {
-                transition: all 0.3s ease;
-            }
-
-            .custom-prompt-controls {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 0.5rem;
-                margin-bottom: 1rem;
-            }
-
-            .btn-secondary:disabled {
-                opacity: 0.6;
-                cursor: not-allowed;
-                background: #f8f9fa;
-                color: #6c757d;
-                border-color: #dee2e6;
-            }
-
-            .btn-secondary:disabled:hover {
-                background: #f8f9fa;
-                color: #6c757d;
-                transform: none;
-            }
-
-            .save-prompt-section {
-                background: #f8fafc;
-                padding: 1rem;
-                border-radius: 8px;
-                border: 1px solid #e2e8f0;
-                margin-top: 1rem;
-                display: none;
-            }
-
-            #customPrompt {
-                min-height: 200px;
-                font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-                font-size: 0.9rem;
-                line-height: 1.4;
-            }
-
-            /* Free-form response styles */
-            .free-form-response {
-                margin-bottom: 1rem;
-            }
-
-            .free-form-content p {
-                margin-bottom: 1rem;
-            }
-
-            .free-form-content p:last-child {
-                margin-bottom: 0;
-            }
-
-            .free-form-content strong {
-                color: #1079A4;
-                font-weight: 600;
-            }
-
-            .free-form-content em {
-                color: #6b7280;
-                font-style: italic;
-            }
-
-            .response-note {
-                display: flex;
-                align-items: flex-start;
-                gap: 0.5rem;
-            }
+            /* Hide/Show Classes */
+            .hidden { display: none !important; }
+            .show { display: block !important; }
         `;
         document.head.appendChild(style);
     }
@@ -988,11 +1194,6 @@ class AICCRATextMiningUI {
         // Additional prefix input
         document.getElementById('additionalPrefix').addEventListener('input', () => this.updateSearchInfo());
 
-        // Prompt mode switching
-        document.querySelectorAll('input[name="promptMode"]').forEach(radio => {
-            radio.addEventListener('change', () => this.handlePromptModeChange());
-        });
-
         // Load placeholder prompt
         document.getElementById('loadPlaceholderBtn').addEventListener('click', () => this.loadPlaceholderPrompt());
 
@@ -1005,10 +1206,27 @@ class AICCRATextMiningUI {
         // Email input changes
         document.getElementById('userEmail').addEventListener('input', () => this.handleEmailChange());
 
+        // Custom Prompt Modal
+        document.getElementById('customPromptConfigBtn').addEventListener('click', () => this.openCustomPromptModal());
+        document.getElementById('closeModalBtn').addEventListener('click', () => this.closeCustomPromptModal());
+        document.getElementById('cancelModalBtn').addEventListener('click', () => this.closeCustomPromptModal());
+        document.getElementById('saveModalBtn').addEventListener('click', () => this.saveCustomPromptConfig());
+
+        // Modal background click to close
+        document.getElementById('customPromptModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                this.closeCustomPromptModal();
+            }
+        });
+
+        // Modal prompt mode switching
+        document.querySelectorAll('input[name="promptMode"]').forEach(radio => {
+            radio.addEventListener('change', () => this.handleModalPromptModeChange());
+        });
+
         // Initial setup
         this.handleModeChange();
         this.updateSearchInfo();
-        this.handlePromptModeChange();
         
         // Additional check for URL parameters after a delay (for production issues)
         setTimeout(() => {
@@ -1084,22 +1302,6 @@ class AICCRATextMiningUI {
         this.searchTimeout = setTimeout(() => {
             this.loadS3Objects();
         }, 500);
-    }
-
-    handlePromptModeChange() {
-        const mode = document.querySelector('input[name="promptMode"]:checked').value;
-        const defaultSection = document.getElementById('defaultPromptSection');
-        const customSection = document.getElementById('customPromptSection');
-
-        if (mode === 'default') {
-            defaultSection.style.display = 'block';
-            customSection.style.display = 'none';
-        } else {
-            defaultSection.style.display = 'none';
-            customSection.style.display = 'block';
-            // Initialize download button state
-            this.handleCustomPromptChange();
-        }
     }
 
     async loadPlaceholderPrompt() {
@@ -1210,6 +1412,67 @@ class AICCRATextMiningUI {
         }
     }
 
+    openCustomPromptModal() {
+        const modal = document.getElementById('customPromptModal');
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        
+        // Initialize modal with current settings
+        this.handleModalPromptModeChange();
+        
+        // Focus on the modal for accessibility
+        modal.focus();
+    }
+
+    handleModalPromptModeChange() {
+        const mode = document.querySelector('input[name="promptMode"]:checked').value;
+        const defaultSection = document.getElementById('defaultPromptSection');
+        const customSection = document.getElementById('customPromptSection');
+
+        if (mode === 'default') {
+            defaultSection.style.display = 'block';
+            customSection.style.display = 'none';
+        } else {
+            defaultSection.style.display = 'none';
+            customSection.style.display = 'block';
+            // Initialize download button state
+            this.handleCustomPromptChange();
+        }
+    }
+
+    closeCustomPromptModal() {
+        const modal = document.getElementById('customPromptModal');
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto'; // Restore scrolling
+    }
+
+    saveCustomPromptConfig() {
+        const promptMode = document.querySelector('input[name="promptMode"]:checked').value;
+        const customPromptContent = document.getElementById('customPrompt').value.trim();
+        const indicator = document.getElementById('customPromptIndicator');
+        
+        if (promptMode === 'custom') {
+            if (!customPromptContent) {
+                this.showError('Please enter a custom prompt or switch to default mode.');
+                return;
+            }
+            
+            // Show custom prompt indicator
+            indicator.style.display = 'inline';
+            this.showInfo('✅ Custom prompt configuration saved!');
+        } else {
+            // Hide custom prompt indicator
+            indicator.style.display = 'none';
+            this.showInfo('✅ Using default AICCRA prompt.');
+        }
+        
+        // Store the current prompt mode for processing
+        this.currentPromptMode = promptMode;
+        this.currentCustomPrompt = customPromptContent;
+        
+        this.closeCustomPromptModal();
+    }
+
     showInfo(message) {
         // Create a temporary info message
         const infoDiv = document.createElement('div');
@@ -1310,14 +1573,15 @@ class AICCRATextMiningUI {
             return;
         }
 
-        const promptMode = document.querySelector('input[name="promptMode"]:checked').value;
+        // Use stored prompt configuration instead of querying DOM elements
+        const promptMode = this.currentPromptMode || 'default';
         let customPrompt = '';
 
         if (promptMode === 'custom') {
-            customPrompt = document.getElementById('customPrompt').value.trim();
+            customPrompt = this.currentCustomPrompt || '';
             
             if (!customPrompt) {
-                this.showError('Please enter a custom prompt or switch to default mode.');
+                this.showError('Please configure a custom prompt in the settings or switch to default mode.');
                 return;
             }
         }
@@ -1509,15 +1773,15 @@ class AICCRATextMiningUI {
         // Check if we have a free-form response (when custom prompt is used)
         if (data.freeFormResponse && results.length === 0) {
             return `
-                <div class="card">
-                    <div class="card-header">
-                        <span class="icon">💬</span>
-                        <h3>AI Analysis Response</h3>
-                        <span style="background: #8CBF3F; color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.875rem; font-weight: 600;">
-                            Custom Prompt
-                        </span>
+                <div class="result-section">
+                    <div class="result-header expandable-header" data-target="freeFormResponse">
+                        <div class="result-title">
+                            <i class="fas fa-comments"></i>
+                            <h3>AI Analysis Response</h3>
+                        </div>
+                        <i class="fas fa-chevron-down expand-icon"></i>
                     </div>
-                    <div class="card-body">
+                    <div id="freeFormResponse" class="result-content expandable-content">
                         <div class="free-form-response">
                             ${this.renderFreeFormResponse(data.freeFormResponse)}
                         </div>
@@ -1529,11 +1793,11 @@ class AICCRATextMiningUI {
         // Standard structured results display
         if (results.length === 0) {
             return `
-                <div class="card">
-                    <div class="card-body" style="text-align: center; padding: 3rem;">
+                <div class="result-section">
+                    <div class="result-content" style="text-align: center; padding: 3rem;">
                         <div style="font-size: 3rem; margin-bottom: 1rem;">📄</div>
-                        <h3 style="color: #718096; margin-bottom: 0.5rem;">No Results Found</h3>
-                        <p style="color: #a0aec0;">The document was processed but no structured data was extracted.</p>
+                        <h3 style="color: var(--gray-600); margin-bottom: 0.5rem;">No Results Found</h3>
+                        <p style="color: var(--gray-500);">The document was processed but no structured data was extracted.</p>
                         <div class="input-hint" style="margin-top: 1rem;">
                             💡 <strong>Tip:</strong> Try using the "Load Template" option in Custom Prompt mode for structured data extraction.
                         </div>
@@ -1543,24 +1807,24 @@ class AICCRATextMiningUI {
         }
 
         let html = `
-            <div class="card">
-                <div class="card-header">
-                    <span class="icon">📊</span>
-                    <h3>Extracted Results</h3>
-                    <span style="background: #1079A4; color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.875rem; font-weight: 600;">
-                        ${results.length} found
-                    </span>
+            <div class="result-section">
+                <div class="result-header expandable-header" data-target="extractedResults">
+                    <div class="result-title">
+                        <i class="fas fa-chart-bar"></i>
+                        <h3>Extracted Results (${results.length} found)</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon"></i>
                 </div>
-                <div class="card-body" style="padding: 0;">
+                <div id="extractedResults" class="result-content expandable-content">
         `;
 
         results.forEach((result, index) => {
-            html += `<div class="result-item">
-                <h4>📊 Result ${index + 1}</h4>
-                <div style="padding: 0;">
+            html += `
+                <div class="result-item" style="background: var(--gray-50); margin-bottom: 1.5rem; padding: 1.5rem; border-radius: 8px; border-left: 4px solid var(--secondary-blue);">
+                    <h4 style="color: var(--primary-blue); margin-bottom: 1rem; font-size: 1.1rem;">📊 Result ${index + 1}</h4>
                     ${this.renderResultFields(result)}
                 </div>
-            </div>`;
+            `;
         });
 
         html += `</div></div>`;
@@ -1616,43 +1880,67 @@ class AICCRATextMiningUI {
         // Clean up the response text
         let cleanResponse = response;
         
-        // Remove common markdown-like patterns if present
-        cleanResponse = cleanResponse.replace(/```[\s\S]*?```/g, ''); // Remove code blocks
-        cleanResponse = cleanResponse.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'); // Bold text
-        cleanResponse = cleanResponse.replace(/\*(.*?)\*/g, '<em>$1</em>'); // Italic text
+        // Remove code blocks but keep their content
+        cleanResponse = cleanResponse.replace(/```[\s\S]*?```/g, '');
         
-        // Convert line breaks to HTML
-        cleanResponse = cleanResponse.replace(/\n\n/g, '</p><p>');
+        // Convert markdown headers to HTML
+        cleanResponse = cleanResponse.replace(/^### (.*$)/gim, '<h3 style="color: var(--primary-blue); margin: 1.5rem 0 0.75rem 0; font-size: 1.1rem;">$1</h3>');
+        cleanResponse = cleanResponse.replace(/^## (.*$)/gim, '<h2 style="color: var(--primary-blue); margin: 1.5rem 0 0.75rem 0; font-size: 1.25rem;">$1</h2>');
+        cleanResponse = cleanResponse.replace(/^# (.*$)/gim, '<h1 style="color: var(--primary-blue); margin: 1.5rem 0 1rem 0; font-size: 1.4rem;">$1</h1>');
+        
+        // Convert markdown bold and italic
+        cleanResponse = cleanResponse.replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--gray-800);">$1</strong>');
+        cleanResponse = cleanResponse.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        
+        // Convert markdown lists
+        cleanResponse = cleanResponse.replace(/^\* (.*$)/gim, '<li style="margin: 0.25rem 0;">$1</li>');
+        cleanResponse = cleanResponse.replace(/^- (.*$)/gim, '<li style="margin: 0.25rem 0;">$1</li>');
+        cleanResponse = cleanResponse.replace(/^\d+\. (.*$)/gim, '<li style="margin: 0.25rem 0;">$1</li>');
+        
+        // Wrap consecutive list items in ul tags
+        cleanResponse = cleanResponse.replace(/(<li.*?<\/li>(?:\s*<li.*?<\/li>)*)/g, '<ul style="margin: 0.75rem 0; padding-left: 1.5rem;">$1</ul>');
+        
+        // Convert line breaks to paragraphs
+        cleanResponse = cleanResponse.replace(/\n\n+/g, '</p><p>');
         cleanResponse = cleanResponse.replace(/\n/g, '<br>');
         
+        // Clean up any multiple consecutive breaks
+        cleanResponse = cleanResponse.replace(/<br>\s*<br>/g, '<br>');
+        
         // Wrap in paragraphs if not already wrapped
-        if (!cleanResponse.includes('<p>')) {
+        if (!cleanResponse.includes('<h1>') && !cleanResponse.includes('<h2>') && !cleanResponse.includes('<h3>') && !cleanResponse.includes('<p>')) {
             cleanResponse = `<p>${cleanResponse}</p>`;
+        } else {
+            // Add paragraph tags around non-header content
+            cleanResponse = `<div>${cleanResponse}</div>`;
+            cleanResponse = cleanResponse.replace(/<div>/, '<p>').replace(/<\/div>/, '</p>');
         }
         
         return `
             <div class="free-form-content" style="
-                line-height: 1.6; 
-                color: #374151; 
+                line-height: 1.7; 
+                color: var(--gray-700); 
                 font-size: 1rem;
-                background: #f9fafb;
-                padding: 1.5rem;
-                border-radius: 8px;
-                border-left: 4px solid #8CBF3F;
+                background: var(--gray-50);
+                padding: 2rem;
+                border-radius: 12px;
+                border-left: 4px solid var(--green);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             ">
                 ${cleanResponse}
             </div>
             <div class="response-note" style="
                 margin-top: 1rem; 
-                padding: 0.75rem; 
-                background: #e7f4ff; 
-                border-radius: 6px; 
-                font-size: 0.875rem; 
-                color: #1079A4;
-                border: 1px solid #81B8C1;
+                padding: 1rem; 
+                background: linear-gradient(135deg, var(--very-light-blue), var(--white)); 
+                border-radius: 8px; 
+                font-size: 0.9rem; 
+                color: var(--primary-blue);
+                border: 1px solid var(--light-blue);
+                border-left: 4px solid var(--purple);
             ">
-                <strong>📝 Note:</strong> This is a free-form AI response based on your custom prompt. 
-                For structured data extraction, use the "Load Template" option in Custom Prompt mode.
+                <strong><i class="fas fa-info-circle"></i> Custom Analysis:</strong> This response was generated using your custom prompt. 
+                The AI adapted its output format based on your specific instructions.
             </div>
         `;
     }
