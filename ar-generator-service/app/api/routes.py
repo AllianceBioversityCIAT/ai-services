@@ -1,12 +1,13 @@
 """REST API endpoints for AICCRA Report Generator Service."""
 
-from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import StreamingResponse
 import time
 from typing import Iterator
-
-from app.api.models import ChatRequest, ChatResponse, ErrorResponse
+from fastapi.responses import StreamingResponse
+from db_conn.sql_connection import load_full_data
 from app.utils.logger.logger_util import get_logger
+from fastapi import APIRouter, HTTPException, status
+from app.api.models import ChatRequest, ChatResponse, ErrorResponse
+
 
 logger = get_logger()
 
@@ -778,4 +779,199 @@ async def generate_challenges_report(request: ChatRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": "Internal server error", "details": str(e), "status": "error"}
+        )
+
+
+@router.post(
+    "/api/update-chatbot-data",
+    tags=["Data Management"],
+    summary="Update AICCRA Chatbot Knowledge Base Data",
+    description="""
+    🔄 Update AICCRA Chatbot Knowledge Base Data Sources
+    
+    This endpoint updates all AICCRA data sources that feed into the chatbot's knowledge base 
+    by calling the load_full_data function for each table. It fetches fresh data from SQL Server, 
+    processes it, and generates both JSONL and CSV files that are used by the AICCRA chatbot 
+    for answering user queries about AICCRA indicators, deliverables, and progress.
+    
+    🎯 Purpose: Chatbot Knowledge Base Update
+    
+    - Purpose: Update chatbot knowledge base with latest AICCRA data from SQL Server
+    - Scope: Core AICCRA data tables used by the chatbot for contextual responses
+    - Output: Generates fresh JSONL and CSV files for chatbot data ingestion
+    - Use Case: Chatbot data pipeline maintenance, keeping chatbot responses current and accurate
+    
+    🔍 How It Works
+    
+    1. SQL Connection: Establishes connection to AICCRA SQL Server database
+    2. View Creation: Creates or updates all necessary database views
+    3. Data Processing: Calls load_full_data() for each chatbot data table:
+       - vw_ai_project_contribution (cluster contributions and milestone data)
+       - vw_ai_deliverables (research outputs and publications)
+       - vw_ai_questions (indicator-specific Q&A data)
+       - vw_ai_oicrs (outcome impact case reports)
+       - vw_ai_innovations (technology and innovation pipeline)
+    4. File Generation: Creates JSONL and CSV files for each data source
+    5. File Splitting: Generates individual CSV files for optimized chatbot processing
+    
+    📊 Chatbot Knowledge Base Sources
+    
+    - **Project Contributions**: Enables chatbot to answer questions about cluster progress and milestones
+    - **Deliverables**: Provides chatbot with research publication and deliverable information
+    - **Questions**: Supplies chatbot with indicator-specific context and explanations
+    - **OICRs**: Gives chatbot access to impact case studies and outcome narratives
+    - **Innovations**: Allows chatbot to discuss technology adoption and innovation readiness
+    
+    🤖 Chatbot Integration
+    
+    The generated files are used by the AICCRA chatbot to:
+    - Answer user questions about AICCRA indicators and progress
+    - Provide contextual information about cluster activities
+    - Reference specific deliverables and publications with DOI links
+    - Share impact stories and case studies from OICRs
+    - Discuss innovation pipeline and technology readiness levels
+    
+    ⚡ Performance Notes
+    
+    - Processing time: ~15-20 minutes (depends on data volume and SQL Server performance)
+    - Network dependency: Requires stable connection to SQL Server
+    - File output: Generates multiple files optimized for chatbot vector search
+    
+    ⚠️ Important Notes
+    
+    - This operation processes ALL historical data for comprehensive chatbot context
+    - Generated files overwrite existing chatbot data files
+    - Should be run regularly to keep chatbot responses current (recommended: weekly)
+    - Requires appropriate SQL Server credentials and permissions
+    - After completion, chatbot may need to re-index data for optimal performance
+    
+    📋 Example Usage
+    
+    ```bash
+    curl -X POST "http://localhost:8000/api/update-chatbot-data" \\
+         -H "Content-Type: application/json"
+    ```
+    
+    Response includes status of each table processing and files generated for chatbot use.
+    """,
+    response_description="Successfully updated AICCRA chatbot knowledge base data sources and generated files",
+    responses={
+        200: {
+            "description": "Chatbot knowledge base data update completed successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "All chatbot knowledge base data sources updated successfully",
+                        "tables_processed": [
+                            "vw_ai_project_contribution",
+                            "vw_ai_deliverables",
+                            "vw_ai_questions", 
+                            "vw_ai_oicrs",
+                            "vw_ai_innovations"
+                        ],
+                        "processing_time_seconds": 1140.5,
+                        "files_generated": {
+                            "vw_ai_project_contribution": ["vw_ai_project_contribution.jsonl", "vw_ai_project_contribution.csv"],
+                            "vw_ai_deliverables": ["vw_ai_deliverables.jsonl", "vw_ai_deliverables.csv"],
+                            "vw_ai_questions": ["vw_ai_questions.jsonl", "vw_ai_questions.csv"],
+                            "vw_ai_oicrs": ["vw_ai_oicrs.jsonl", "vw_ai_oicrs.csv"],
+                            "vw_ai_innovations": ["vw_ai_innovations.jsonl", "vw_ai_innovations.csv"]
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error during chatbot knowledge base data update",
+            "model": ErrorResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "Chatbot data update failed",
+                        "details": "Failed to connect to SQL Server or process chatbot data sources",
+                        "status": "error"
+                    }
+                }
+            }
+        }
+    }
+)
+async def update_chatbot_data():
+    """
+    Update AICCRA chatbot knowledge base data sources by calling load_full_data for each table.
+    
+    This endpoint processes all AICCRA data sources used by the chatbot, generates fresh JSONL 
+    and CSV files, and provides a comprehensive status of the knowledge base data update operation.
+    
+    Returns processing status and details of generated files for chatbot use.
+    """
+    start_time = time.time()
+    
+    try:
+        logger.info("🚀 Starting AICCRA chatbot knowledge base data update")
+        
+        tables_to_process = [
+            "vw_ai_project_contribution",
+            "vw_ai_deliverables", 
+            "vw_ai_questions",
+            "vw_ai_oicrs",
+            "vw_ai_innovations"
+        ]
+        
+        processed_tables = []
+        files_generated = {}
+        
+        for table_name in tables_to_process:
+            try:
+                logger.info(f"🔄 Processing table: {table_name}")
+
+                df = load_full_data(table_name)
+                
+                if not df.empty:
+                    processed_tables.append(table_name)
+                    files_generated[table_name] = [
+                        f"{table_name}.jsonl",
+                        f"{table_name}.csv"
+                    ]
+                    logger.info(f"✅ Successfully processed {table_name} - {len(df)} records")
+                else:
+                    logger.warning(f"⚠️ No data returned for {table_name}")
+                    
+            except Exception as table_error:
+                logger.error(f"❌ Error processing table {table_name}: {str(table_error)}")
+                # Continue with other tables even if one fails
+                continue
+        
+        processing_time = round(time.time() - start_time, 2)
+        
+        if processed_tables:
+            logger.info(f"✅ Chatbot knowledge base data update completed successfully in {processing_time}s")
+            logger.info(f"📊 Processed {len(processed_tables)} chatbot data tables: {', '.join(processed_tables)}")
+            
+            return {
+                "status": "success",
+                "message": "All chatbot knowledge base data sources updated successfully",
+                "tables_processed": processed_tables,
+                "processing_time_seconds": processing_time,
+                "files_generated": files_generated
+            }
+        else:
+            logger.error("❌ No chatbot data tables were successfully processed")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": "Chatbot data update failed", "details": "No chatbot data tables were successfully processed", "status": "error"}
+            )
+        
+    except ImportError as e:
+        logger.error(f"Import error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "Service configuration error", "details": "Failed to import chatbot data loading functions", "status": "error"}
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during chatbot data update: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "Chatbot data update failed", "details": str(e), "status": "error"}
         )
