@@ -1,6 +1,5 @@
 import boto3
 import textwrap
-# from db_conn.sql_connection import load_full_data
 from app.utils.logger.logger_util import get_logger
 from app.utils.agents_utils.filter_builder import filter_metadata
 from app.utils.config.config_util import AWS, KNOWLEDGE_BASE
@@ -27,13 +26,6 @@ bedrock_agent_runtime = boto3.client(
 
 
 def run_agent_chatbot(user_input, phase, indicator, section, session_id, memory_id, insert_data=False):
-    # if insert_data:
-    #     load_full_data("vw_ai_deliverables")
-    #     load_full_data("vw_ai_project_contribution")
-    #     load_full_data("vw_ai_questions")
-    #     load_full_data("vw_ai_oicrs")
-    #     load_full_data("vw_ai_innovations")
-
     vector_search_config = filter_metadata(phase, section, indicator)
 
     session_state = {
