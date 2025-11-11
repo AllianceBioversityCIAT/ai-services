@@ -1,6 +1,5 @@
 import boto3
 import textwrap
-# from db_conn.sql_connection import load_full_data
 from app.utils.logger.logger_util import get_logger
 from app.utils.agents_utils.filter_builder import filter_metadata
 from app.utils.config.config_util import AWS, KNOWLEDGE_BASE
@@ -12,28 +11,17 @@ agent_alias_id = KNOWLEDGE_BASE['agent_alias_id']
 KNOWLEDGE_BASE_ID = KNOWLEDGE_BASE['knowledge_base_id']
 
 bedrock_agent = boto3.client(
-    service_name='bedrock-agent', 
-    aws_access_key_id=AWS['aws_access_key'],
-    aws_secret_access_key=AWS['aws_secret_key'],
+    service_name='bedrock-agent',
     region_name=AWS['region']
 )
 
 bedrock_agent_runtime = boto3.client(
     service_name='bedrock-agent-runtime',
-    aws_access_key_id=AWS['aws_access_key'],
-    aws_secret_access_key=AWS['aws_secret_key'],
     region_name=AWS['region']
 )
 
 
 def run_agent_chatbot(user_input, phase, indicator, section, session_id, memory_id, insert_data=False):
-    # if insert_data:
-    #     load_full_data("vw_ai_deliverables")
-    #     load_full_data("vw_ai_project_contribution")
-    #     load_full_data("vw_ai_questions")
-    #     load_full_data("vw_ai_oicrs")
-    #     load_full_data("vw_ai_innovations")
-
     vector_search_config = filter_metadata(phase, section, indicator)
 
     session_state = {
