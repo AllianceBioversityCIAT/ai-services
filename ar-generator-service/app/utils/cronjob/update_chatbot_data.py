@@ -17,7 +17,12 @@ Usage:
 import sys
 import asyncio
 import requests
+from pathlib import Path
 from datetime import datetime
+
+ROOT = Path(__file__).resolve().parent.parent.parent.parent
+sys.path.append(str(ROOT))
+
 from app.utils.logger.logger_util import get_logger
 from app.utils.notification.notification_service import NotificationService
 
