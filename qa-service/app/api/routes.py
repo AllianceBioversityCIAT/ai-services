@@ -91,6 +91,16 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
     """
     try:
         logger.info(f"🔍 Processing PRMS QA for user: {request.user_id}")
+        logger.info(f"📦 DEBUG - Request type: {type(request)}")
+        logger.info(f"📦 DEBUG - result_metadata type: {type(request.result_metadata)}")
+        logger.info(f"📦 DEBUG - result_metadata keys: {list(request.result_metadata.keys())}")
+        
+        # Check for old format with 'response' wrapper
+        if "response" in request.result_metadata:
+            error_msg = "DEPRECATED FORMAT DETECTED: result_metadata contains 'response' wrapper. Please remove it and send fields directly."
+            logger.error(f"❌ {error_msg}")
+            raise ValueError(error_msg)
+        
         result = improve_prms_result_metadata(request.result_metadata, request.user_id)
         return PrmsResponse(
             time_taken=result["time_taken"],
@@ -101,14 +111,37 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
     
     except ValueError as e:
         logger.error(f"Validation error: {str(e)}")
+        import traceback
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "Invalid parameters", "details": str(e), "status": "error"}
+            detail={
+                "error": "Invalid parameters", 
+                "details": str(e), 
+                "status": "error",
+                "debug_info": {
+                    "received_keys": list(request.result_metadata.keys()),
+                    "has_response_wrapper": "response" in request.result_metadata,
+                    "traceback": traceback.format_exc()
+                }
+            }
         )
     
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"📋 Full traceback:\n{tb}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "Internal error", "details": str(e), "status": "error"}
+            detail={
+                "error": "Internal error", 
+                "details": str(e), 
+                "status": "error",
+                "debug_info": {
+                    "error_type": type(e).__name__,
+                    "received_keys": list(request.result_metadata.keys()) if hasattr(request, 'result_metadata') else [],
+                    "has_response_wrapper": "response" in request.result_metadata if hasattr(request, 'result_metadata') else False,
+                    "traceback": tb
+                }
+            }
         )
