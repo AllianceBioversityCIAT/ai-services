@@ -9,7 +9,7 @@ logs_dir = Path("/tmp/logs")
 
 logs_dir.mkdir(parents=True, exist_ok=True)
 
-logger = logging.getLogger("mining-microservice")
+logger = logging.getLogger("qa-service")
 logger.setLevel(logging.DEBUG)
 
 log_format = logging.Formatter(
