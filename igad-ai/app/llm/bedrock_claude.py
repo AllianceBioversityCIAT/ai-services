@@ -2,12 +2,19 @@ import json
 import boto3
 from app.utils.config.config_util import BR
 from app.utils.logger.logger_util import get_logger
-from app.utils.prompts.prompt_1 import DEFAULT_PROMPT
+from app.utils.prompts.prompt_1 import build_rfp_prompt
 
 logger = get_logger()
 
 bedrock_runtime = boto3.client(
     service_name='bedrock-runtime',
+    aws_access_key_id=BR['aws_access_key'],
+    aws_secret_access_key=BR['aws_secret_key'],
+    region_name='us-east-1'
+)
+
+bedrock_agent_runtime = boto3.client(
+    service_name='bedrock-agent-runtime',
     aws_access_key_id=BR['aws_access_key'],
     aws_secret_access_key=BR['aws_secret_key'],
     region_name='us-east-1'
@@ -61,23 +68,34 @@ def return_response():
 
 
 def bedrock_agent():
-    bedrock_agent = boto3.client('bedrock-agent-runtime')
-
-    # Consulta con RAG
-    response = bedrock_agent.retrieve_and_generate(
-        input={
-            'text': DEFAULT_PROMPT
-        },
-        retrieveAndGenerateConfiguration={
-            'type': 'KNOWLEDGE_BASE',
-            'knowledgeBaseConfiguration': {
-                'knowledgeBaseId': 'tu-kb-id',
-                'modelArn': 'arn:aws:bedrock:region::foundation-model/anthropic.claude-3-sonnet'
+    try:
+        DEFAULT_RFP_PROMPT = build_rfp_prompt()
+        response = bedrock_agent_runtime.retrieve_and_generate(
+            input={
+                'text': DEFAULT_RFP_PROMPT
+            },
+            retrieveAndGenerateConfiguration={
+                'type': 'KNOWLEDGE_BASE',
+                'knowledgeBaseConfiguration': {
+                    'knowledgeBaseId': 'GZXYCJHFSG',
+                    'modelArn': 'arn:aws:bedrock:us-east-1:569113802249:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0',
+                    'retrievalConfiguration': {
+                        'vectorSearchConfiguration': {
+                            'numberOfResults': 20
+                        }
+                    }
+                }
             }
-        }
-    )
+        )
 
-    answer = response['output']['text']
+        answer = response['output']['text']
+        logger.info(f"🔍 Bedrock Agent RAG response: {answer}")
+
+        return answer
+    except Exception as e:
+        logger.error(f"❌ Error in bedrock_agent: {str(e)}")
+        raise
+
 
 if __name__ == "__main__":
-    return_response()
+    bedrock_agent()
