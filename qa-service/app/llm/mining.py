@@ -3,7 +3,7 @@ import json
 import boto3
 import traceback
 from app.utils.config.config_util import AWS
-from app.utils.prompt.prompt import build_prompt
+from app.utils.prompt.main_prompt import build_main_prompt
 from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
 from app.utils.interactions.interaction_client import interaction_client
@@ -69,7 +69,8 @@ def improve_prms_result_metadata(result_metadata: dict, user_id: str = None):
 
         logger.info(f"🔍 Processing PRMS document with result type: {result_type}, result level: {result_level}")
         
-        prompt = build_prompt(result_type, result_level, result_metadata)
+        evidence_context = ""
+        prompt = build_main_prompt(result_type, result_level, result_metadata, evidence_context)
         logger.info(f"📝 Generated prompt for LLM:\n{prompt}")
 
         response_text = invoke_model(prompt)
