@@ -18,5 +18,9 @@ dependencies = [
     "uvicorn",
     "python-pptx",
     "python-multipart",
-    "mangum"
+    "mangum",
+    "playwright",
+    "pymupdf",
+    "lxml",
+    "beautifulsoup4"
 ]

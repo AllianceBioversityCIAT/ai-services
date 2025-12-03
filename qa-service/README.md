@@ -14,6 +14,7 @@ The PRMS QA Service is designed to enhance CGIAR result metadata by leveraging A
 - 📦 **Simple REST API** for PRMS metadata processing
 - 🏥 **Health monitoring** and comprehensive error handling
 - 🌐 **CORS support** for cross-origin requests
+- 🌐 **Web scraping** for evidence enrichment from multiple sources (CGSpace, PDFs, web pages)
 
 ### Use Cases
 
@@ -50,6 +51,10 @@ qa-service/
 │   │   ├── mining.py           # Core LLM processing logic
 │   │   ├── test_innovdev.json  # Test data for innovation development
 │   │   └── test_kb.json        # Test data for knowledge base
+│   ├── web_scraping/
+│   │   ├── web_scraping.py     # Web scraping service for evidence extraction
+│   │   ├── evidence_scraper.py # Evidence enrichment and context formatting
+│   │   └── WEB_SCRAPING_DOCUMENTATION.md # Complete web scraping documentation
 │   └── utils/
 │       ├── config/
 │       │   └── config_util.py  # Configuration management
@@ -64,7 +69,8 @@ qa-service/
 │       └── s3/
 │           └── s3_util.py      # AWS S3 utilities
 └── data/
-    └── logs/                   # Application logs
+    ├── logs/                   # Application logs
+    └── evidence_downloads/     # Downloaded evidence files
 ```
 
 ## Setup and Installation
@@ -95,6 +101,9 @@ source venv/bin/activate
 ```bash
 # Install all required packages
 pip install -r requirements.txt
+
+# Install Playwright browsers (required for web scraping)
+playwright install chromium
 ```
 
 ### 3. Environment Configuration
@@ -136,6 +145,98 @@ The server will start and be available at:
 - **API Documentation**: http://localhost:8000/docs
 - **Alternative Docs**: http://localhost:8000/redoc
 - **Health Check**: http://localhost:8000/health
+
+## Web Scraping Features
+
+The service includes a comprehensive web scraping module that automatically extracts evidence content from multiple sources to enrich the LLM context.
+
+### Supported Sources
+
+- **CGSpace Handles** (`hdl.handle.net`, `cgspace.cgiar.org`) - Automatically downloads and extracts PDFs from CGSpace repositories
+- **DOI Articles** (`doi.org`) - Extracts abstract and main content from scientific publications
+- **SharePoint/OneDrive** - Downloads and processes shared PDFs and Excel files
+- **Web Pages** - Intelligently scrapes main content from general websites
+- **Direct PDFs** - Downloads and extracts text from PDF URLs
+
+### Key Features
+
+✅ **Automatic source detection** - No need to specify URL type  
+✅ **Content validation** - Detects and filters authentication pages, errors, and invalid content  
+✅ **Multi-format support** - PDF, Excel, and HTML extraction  
+✅ **Robust error handling** - Continues processing even if some URLs fail  
+✅ **Token-aware truncation** - Limits content to fit LLM context windows  
+✅ **Complete logging** - Tracks entire process for debugging
+
+### Quick Start
+
+```python
+import asyncio
+from app.web_scraping.evidence_scraper import EvidenceEnhancer
+
+async def enhance_with_evidence():
+    enhancer = EvidenceEnhancer()
+    
+    evidence_urls = [
+        "https://hdl.handle.net/10568/174072",
+        "https://doi.org/10.1234/example",
+        "https://www.cgiar.org/research/publication/...",
+    ]
+    
+    result = await enhancer.enhance_prms_context(
+        result_metadata={...},
+        evidence_urls=evidence_urls,
+        max_evidences=5
+    )
+    
+    # Use result['formatted_context'] in your LLM prompt
+    print(f"Valid evidences: {result['evidence_count']}")
+    print(f"Formatted context: {result['formatted_context']}")
+
+asyncio.run(enhance_with_evidence())
+```
+
+### Configuration
+
+The `EvidenceEnhancer` supports customizable parameters:
+
+```python
+enhancer = EvidenceEnhancer(
+    download_dir="./data/evidence_downloads"  # Directory for downloaded files
+)
+
+result = await enhancer.enhance_prms_context(
+    result_metadata=metadata,
+    evidence_urls=urls,
+    max_evidences=5  # Maximum number of evidences to process
+)
+
+# Extract with token limits
+evidence_contents = await enhancer.extract_evidence_content(
+    evidence_urls=urls,
+    max_content_tokens=10000  # Maximum tokens per evidence (default: 10,000)
+)
+```
+
+### Module Files
+
+The web scraping functionality is organized in the following files:
+
+| File | Purpose |
+|------|---------|
+| [`app/web_scraping/web_scraping.py`](app/web_scraping/web_scraping.py) | Core scraping service - handles URL detection, content extraction from different sources (CGSpace, DOI, SharePoint, web pages), and content validation |
+| [`app/web_scraping/evidence_scraper.py`](app/web_scraping/evidence_scraper.py) | Evidence enrichment coordinator - processes multiple evidence URLs, formats content for LLM context, and manages token limits |
+| [`app/web_scraping/WEB_SCRAPING_DOCUMENTATION.md`](app/web_scraping/WEB_SCRAPING_DOCUMENTATION.md) | Complete technical documentation with architecture details, validation system, usage examples, and troubleshooting |
+
+### For Complete Documentation
+
+See [`app/web_scraping/WEB_SCRAPING_DOCUMENTATION.md`](app/web_scraping/WEB_SCRAPING_DOCUMENTATION.md) for:
+- Detailed architecture and data flow
+- Content validation system
+- Technology stack and comparisons
+- Advanced usage examples
+- Troubleshooting guide
+- Performance recommendations
+
 
 ## API Usage
 
