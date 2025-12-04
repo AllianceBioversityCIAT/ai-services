@@ -93,11 +93,12 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
     try:
         logger.info(f"🔍 Processing PRMS QA for user: {request.user_id}")
         
-        result = improve_prms_result_metadata(request.result_metadata, request.user_id)
+        result = await improve_prms_result_metadata(request.result_metadata, request.user_id)
         return PrmsResponse(
             time_taken=result["time_taken"],
             json_content=result["json_content"],
             interaction_id=result.get("interaction_id"),
+            evidence_metadata=result.get("evidence_metadata"),
             status="success"
         )
     
