@@ -1,7 +1,8 @@
 FROM public.ecr.aws/lambda/python:3.13
 
 ARG PYTHONPATH=
-ENV PLAYWRIGHT_BROWSERS_PATH=/tmp/pw-browsers \
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright \
+    WEB_SCRAPING_DOWNLOAD_DIR=/tmp/evidence_downloads \
     PYTHONPATH="${LAMBDA_TASK_ROOT}:${PYTHONPATH}" \
     PATH="/var/task/bin:${PATH}"
 
@@ -9,6 +10,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt -t "${LAMBDA_TASK_ROOT}"
 
 RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}" && \
+    python -m playwright install-deps chromium && \
     python -m playwright install chromium
 
 COPY app/ app/
