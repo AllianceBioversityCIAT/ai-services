@@ -4,7 +4,7 @@ import asyncio
 import pymupdf
 import requests
 import pandas as pd
-from typing import Dict
+from typing import Dict, Optional
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 from playwright.async_api import async_playwright
@@ -34,9 +34,25 @@ class WebScraperService:
     ]
     
 
-    def __init__(self, download_dir: str = "./downloads"):
-        self.download_dir = download_dir
-        os.makedirs(download_dir, exist_ok=True)
+    def __init__(self, download_dir: Optional[str] = None):
+        target_dir = download_dir or os.getenv("WEB_SCRAPING_DOWNLOAD_DIR", "/tmp/evidence_downloads")
+        self.download_dir = self._ensure_download_dir(target_dir)
+
+
+    def _ensure_download_dir(self, target_dir: str) -> str:
+        """
+        Ensures the download directory exists and is writable. Falls back to /tmp on read-only filesystems.
+        """
+        try:
+            os.makedirs(target_dir, exist_ok=True)
+            return target_dir
+        except OSError as exc:
+            fallback_dir = "/tmp/evidence_downloads"
+            if target_dir != fallback_dir:
+                logger.warning(f"⚠️ Cannot create download dir '{target_dir}' ({exc}), using '{fallback_dir}' instead")
+                os.makedirs(fallback_dir, exist_ok=True)
+                return fallback_dir
+            raise
     
 
     async def scrape_url(self, url: str) -> Dict[str, str]:

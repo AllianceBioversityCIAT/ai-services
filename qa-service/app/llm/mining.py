@@ -158,7 +158,7 @@ async def improve_prms_result_metadata(
             logger.info(f"📚 Processing {len(evidence_urls)} evidence URLs")
             
             try:
-                enhancer = EvidenceEnhancer(download_dir="./data/evidence_downloads")
+                enhancer = EvidenceEnhancer()
                 
                 evidence_data = await enhancer.enhance_prms_context(
                     result_metadata=result_metadata,

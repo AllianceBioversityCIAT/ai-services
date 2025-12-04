@@ -14,9 +14,10 @@ logger = get_logger()
 
 
 class EvidenceEnhancer:
-    def __init__(self, download_dir: str = "./data/evidence_downloads"):
+    def __init__(self, download_dir: Optional[str] = None):
         self.scraper = WebScraperService(download_dir=download_dir)
-        logger.info(f"🔍 Evidence scraper initialized with download dir: {download_dir}")
+        self.download_dir = self.scraper.download_dir
+        logger.info(f"🔍 Evidence scraper initialized with download dir: {self.download_dir}")
     
 
     async def extract_evidence_content(self, evidence_urls: List[str], max_content_length: int = 40000, cleanup_files: bool = True) -> List[Dict]:
