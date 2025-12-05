@@ -1,5 +1,5 @@
-# Base image for AWS Lambda with Python 3.13 runtime
-FROM public.ecr.aws/lambda/python:3.13
+# Change base image to Debian for better package support
+FROM debian:bullseye-slim
 
 # Optional: allow passing a custom PYTHONPATH at build time
 ARG PYTHONPATH=
@@ -13,14 +13,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
     PYTHONPATH="${LAMBDA_TASK_ROOT}:${PYTHONPATH}" \
     PATH="/var/task/bin:${PATH}"
 
-# Copy dependency file first to take advantage of Docker layer caching
-COPY requirements.txt .
-
-# Install Python dependencies into the Lambda task root (/var/task)
-# This is the standard pattern for Lambda container images
-RUN pip install --no-cache-dir -r requirements.txt -t "${LAMBDA_TASK_ROOT}"
-
-# Install missing libraries for browser support with debugging
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     apt-utils \
     software-properties-common \
@@ -45,16 +38,23 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
+# Install Python and pip
+RUN apt-get install -y python3 python3-pip && \
+    ln -s /usr/bin/python3 /usr/bin/python && \
+    pip3 install --no-cache-dir --upgrade pip
+
+# Copy dependency file first to take advantage of Docker layer caching
+COPY requirements.txt .
+
+# Install Python dependencies into the Lambda task root (/var/task)
+RUN pip install --no-cache-dir -r requirements.txt -t /var/task
+
 # Install Playwright Chromium browsers only
-# IMPORTANT:
-# - The Lambda base image already has system dependencies for Chromium
-# - We only need to download the Chromium binary
 RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}" && \
     PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH}" python -m playwright install chromium
 
 # Copy the entire application code into the Lambda task root
-# Make sure main.py contains the "handler" entrypoint defined below
-COPY . ${LAMBDA_TASK_ROOT}
+COPY . /var/task
 
-# Set the default Lambda handler (file: main.py, function: handler)
+# Set the default Lambda handler
 CMD ["main.handler"]
