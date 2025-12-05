@@ -9,7 +9,7 @@ ARG PYTHONPATH=
 #   IMPORTANT: Must NOT be /tmp because /tmp is ephemeral at runtime
 # - PYTHONPATH: include the Lambda task root so imports work correctly
 # - PATH: add /var/task/bin in case you install CLIs there
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
     PYTHONPATH="${LAMBDA_TASK_ROOT}:${PYTHONPATH}" \
     PATH="/var/task/bin:${PATH}"
 
