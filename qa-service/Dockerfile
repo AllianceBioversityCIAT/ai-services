@@ -1,17 +1,16 @@
-# Use Amazon Linux 2023 base image (has system libraries for Chromium)
-FROM public.ecr.aws/amazonlinux/amazonlinux:2023
+# Use AL2 base image (has system libraries for Chromium and better package availability)
+FROM public.ecr.aws/amazonlinux/amazonlinux:2
 
 # Install Python 3.13 and system dependencies for Playwright/Chromium
-RUN dnf update -y && \
-    dnf install -y \
+RUN yum update -y && \
+    yum install -y \
         python3.13 \
         python3.13-pip \
         python3.13-devel \
-        libnspr \
+        nspr \
         nss \
         nss-util \
         dbus \
-        at-spi2-atk \
         libxkbcommon \
         libxcb \
         libX11 \
@@ -21,13 +20,12 @@ RUN dnf update -y && \
         libXfixes \
         libXrandr \
         libgbm \
-        libudev \
         alsa-lib \
-    && dnf clean all
+    && yum clean all
 
 # Create Lambda task root directory structure
 ENV LAMBDA_TASK_ROOT=/var/task \
-    PYTHONPATH=/var/task:$PYTHONPATH \
+    PYTHONPATH=/var/task \
     PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
 
 # Copy dependency file first to take advantage of Docker layer caching
