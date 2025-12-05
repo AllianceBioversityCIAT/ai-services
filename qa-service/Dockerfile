@@ -20,8 +20,10 @@ COPY requirements.txt .
 # This is the standard pattern for Lambda container images
 RUN pip install --no-cache-dir -r requirements.txt -t "${LAMBDA_TASK_ROOT}"
 
-# Install missing libraries for browser support
+# Install missing libraries for browser support with debugging
 RUN apt-get update && apt-get install -y \
+    apt-utils \
+    software-properties-common \
     libnspr4 \
     libnss3 \
     libnssutil3 \
