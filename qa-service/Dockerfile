@@ -1,54 +1,21 @@
-# Builder con dependencias mínimas
-FROM public.ecr.aws/sam/build-python3.13 as builder
-
-WORKDIR /build
-
-# Instalar SOLO dependencias gráficas esenciales (sin libnspr/libnss3)
-RUN dnf install -y \
-    alsa-lib \
-    atk \
-    cairo \
-    cups-libs \
-    dbus-libs \
-    fontconfig \
-    freetype \
-    glib2 \
-    gtk3 \
-    libX11 \
-    libXcomposite \
-    libXcursor \
-    libXdamage \
-    libXext \
-    libXfixes \
-    libXi \
-    libXrandr \
-    libXrender \
-    libdrm \
-    libgbm \
-    mesa-libEGL \
-    pango \
-    nspr \
-    nss \
-    && dnf clean all
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    && python -m playwright install --with-deps chromium
-
-# Runtime final Lambda
+# Base image for AWS Lambda with Python 3.13 runtime
 FROM public.ecr.aws/lambda/python:3.13
 
-# Copiar libs esenciales
-COPY --from=builder /usr/lib64 /usr/lib64
-COPY --from=builder /usr/lib /usr/lib
-COPY --from=builder /usr/share/fonts /usr/share/fonts
+ARG PYTHONPATH=
 
-# Copiar Python packages y Playwright browsers
-COPY --from=builder /build ${LAMBDA_TASK_ROOT}
-COPY --from=builder /ms-playwright ${LAMBDA_TASK_ROOT}/ms-playwright
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
+    PYTHONPATH="${LAMBDA_TASK_ROOT}:${PYTHONPATH}" \
+    PATH="/var/task/bin:${PATH}"
 
-ENV PLAYWRIGHT_BROWSERS_PATH=${LAMBDA_TASK_ROOT}/ms-playwright \
-    PATH="${LAMBDA_TASK_ROOT}/bin:${PATH}"
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt -t "${LAMBDA_TASK_ROOT}"
+
+RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}" && \
+    PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH}" python -m playwright install chromium
+
 
 COPY . ${LAMBDA_TASK_ROOT}
+
+# Set the default Lambda handler (file: main.py, function: handler)
 CMD ["main.handler"]
