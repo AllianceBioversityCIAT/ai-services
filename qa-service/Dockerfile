@@ -1,60 +1,52 @@
-# Change base image to Debian for better package support
-FROM debian:bullseye-slim
+# Builder con dependencias del sistema
+FROM public.ecr.aws/sam/build-python3.13 as builder
 
-# Optional: allow passing a custom PYTHONPATH at build time
-ARG PYTHONPATH=
-
-# Environment variables:
-# - PLAYWRIGHT_BROWSERS_PATH: where Playwright will store browser binaries
-#   IMPORTANT: Must NOT be /tmp because /tmp is ephemeral at runtime
-# - PYTHONPATH: include the Lambda task root so imports work correctly
-# - PATH: add /var/task/bin in case you install CLIs there
-ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
-    PYTHONPATH="${LAMBDA_TASK_ROOT}:${PYTHONPATH}" \
-    PATH="/var/task/bin:${PATH}"
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    apt-utils \
-    software-properties-common \
-    libnspr4 \
+# Instalar solo dependencias mínimas de Playwright
+RUN dnf install -y \
+    alsa-lib \
+    atk \
+    cairo \
+    cups-libs \
+    dbus-libs \
+    expat \
+    fontconfig \
+    freetype \
+    glib2 \
+    gtk3 \
+    libX11 \
+    libXcomposite \
+    libXcursor \
+    libXdamage \
+    libXext \
+    libXfixes \
+    libXi \
+    libXrandr \
+    libXrender \
+    libdrm \
+    libgbm \
+    libnspr \
     libnss3 \
-    libnssutil3 \
-    libdbus-1-3 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libexpat1 \
-    libatspi2.0-0 \
-    libx11-6 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libxcb1 \
-    libxkbcommon0 \
-    libudev1 \
-    libasound2 \
-    --no-install-recommends && rm -rf /var/lib/apt/lists/*
+    libstdc++ \
+    mesa-libEGL \
+    pango \
+    && dnf clean all
 
-# Install Python and pip
-RUN apt-get install -y python3 python3-pip && \
-    ln -s /usr/bin/python3 /usr/bin/python && \
-    pip3 install --no-cache-dir --upgrade pip
-
-# Copy dependency file first to take advantage of Docker layer caching
+WORKDIR /build
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    && python -m playwright install chromium --with-deps
 
-# Install Python dependencies into the Lambda task root (/var/task)
-RUN pip install --no-cache-dir -r requirements.txt -t /var/task
+# Runtime final para Lambda (scratch)
+FROM public.ecr.aws/lambda/python:3.13
 
-# Install Playwright Chromium browsers only
-RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}" && \
-    PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH}" python -m playwright install chromium
+# Copiar Python site-packages y browsers
+COPY --from=builder /usr/lib64 /usr/lib64
+COPY --from=builder /usr/lib /usr/lib  
+COPY --from=builder /usr/share/fonts /usr/share/fonts
+COPY --from=builder /build/* ${LAMBDA_TASK_ROOT}/
+COPY --from=builder /ms-playwright ${LAMBDA_TASK_ROOT}/ms-playwright
 
-# Copy the entire application code into the Lambda task root
-COPY . /var/task
+ENV PLAYWRIGHT_BROWSERS_PATH=${LAMBDA_TASK_ROOT}/ms-playwright
 
-# Set the default Lambda handler
+COPY . ${LAMBDA_TASK_ROOT}
 CMD ["main.handler"]
