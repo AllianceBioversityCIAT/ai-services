@@ -1,6 +1,31 @@
 # Base image for AWS Lambda with Python 3.13 runtime
 FROM public.ecr.aws/lambda/python:3.13
 
+# 1) Install system libraries required by Chromium / Playwright
+#    Package names correspond to the missing .so libraries shown in the logs.
+#    This runs on Amazon Linux, so we use yum (NOT apt-get).
+RUN yum install -y \
+    nspr \
+    nss \
+    nss-util \
+    dbus-libs \
+    atk \
+    at-spi2-atk \
+    at-spi2-core \
+    expat \
+    libX11 \
+    libXcomposite \
+    libXdamage \
+    libXext \
+    libXfixes \
+    libXrandr \
+    mesa-libgbm \
+    libxcb \
+    libxkbcommon \
+    systemd-libs \
+    alsa-lib \
+    && yum clean all && rm -rf /var/cache/yum
+
 # Optional: allow passing a custom PYTHONPATH at build time
 ARG PYTHONPATH=
 
