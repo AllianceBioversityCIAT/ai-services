@@ -20,13 +20,12 @@ COPY requirements.txt .
 # This is the standard pattern for Lambda container images
 RUN pip install --no-cache-dir -r requirements.txt -t "${LAMBDA_TASK_ROOT}"
 
-# Install Playwright Chromium browsers only (no system deps)
+# Install Playwright Chromium browsers only
 # IMPORTANT:
 # - The Lambda base image already has system dependencies for Chromium
 # - We only need to download the Chromium binary
-# - Use --with-deps=false to skip attempting system package installation
 RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}" && \
-    PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH}" python -m playwright install --with-deps=false chromium
+    PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH}" python -m playwright install chromium
 
 # Copy the entire application code into the Lambda task root
 # Make sure main.py contains the "handler" entrypoint defined below
