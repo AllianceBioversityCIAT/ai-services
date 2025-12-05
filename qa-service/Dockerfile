@@ -1,14 +1,15 @@
-# Builder con dependencias del sistema
+# Builder con dependencias mínimas
 FROM public.ecr.aws/sam/build-python3.13 as builder
 
-# Instalar solo dependencias mínimas de Playwright
+WORKDIR /build
+
+# Instalar SOLO dependencias gráficas esenciales (sin libnspr/libnss3)
 RUN dnf install -y \
     alsa-lib \
     atk \
     cairo \
     cups-libs \
     dbus-libs \
-    expat \
     fontconfig \
     freetype \
     glib2 \
@@ -24,29 +25,30 @@ RUN dnf install -y \
     libXrender \
     libdrm \
     libgbm \
-    libnspr \
-    libnss3 \
-    libstdc++ \
     mesa-libEGL \
     pango \
+    nspr \
+    nss \
     && dnf clean all
 
-WORKDIR /build
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
-    && python -m playwright install chromium --with-deps
+    && python -m playwright install --with-deps chromium
 
-# Runtime final para Lambda (scratch)
+# Runtime final Lambda
 FROM public.ecr.aws/lambda/python:3.13
 
-# Copiar Python site-packages y browsers
+# Copiar libs esenciales
 COPY --from=builder /usr/lib64 /usr/lib64
-COPY --from=builder /usr/lib /usr/lib  
+COPY --from=builder /usr/lib /usr/lib
 COPY --from=builder /usr/share/fonts /usr/share/fonts
-COPY --from=builder /build/* ${LAMBDA_TASK_ROOT}/
+
+# Copiar Python packages y Playwright browsers
+COPY --from=builder /build ${LAMBDA_TASK_ROOT}
 COPY --from=builder /ms-playwright ${LAMBDA_TASK_ROOT}/ms-playwright
 
-ENV PLAYWRIGHT_BROWSERS_PATH=${LAMBDA_TASK_ROOT}/ms-playwright
+ENV PLAYWRIGHT_BROWSERS_PATH=${LAMBDA_TASK_ROOT}/ms-playwright \
+    PATH="${LAMBDA_TASK_ROOT}/bin:${PATH}"
 
 COPY . ${LAMBDA_TASK_ROOT}
 CMD ["main.handler"]
