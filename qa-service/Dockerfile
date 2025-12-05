@@ -1,40 +1,14 @@
 # Base image for AWS Lambda with Python 3.13 runtime
 FROM public.ecr.aws/lambda/python:3.13
 
-# 1) Install system libraries required by Chromium / Playwright
-#    Package names correspond to the missing .so libraries shown in the logs.
-#    This runs on Amazon Linux, so we use yum (NOT apt-get).
-RUN yum install -y \
-    nspr \
-    nss \
-    nss-util \
-    dbus-libs \
-    atk \
-    at-spi2-atk \
-    at-spi2-core \
-    expat \
-    libX11 \
-    libXcomposite \
-    libXdamage \
-    libXext \
-    libXfixes \
-    libXrandr \
-    mesa-libgbm \
-    libxcb \
-    libxkbcommon \
-    systemd-libs \
-    alsa-lib \
-    && yum clean all && rm -rf /var/cache/yum
-
 # Optional: allow passing a custom PYTHONPATH at build time
 ARG PYTHONPATH=
 
 # Environment variables:
-# - PLAYWRIGHT_BROWSERS_PATH: where Playwright will store browser binaries
-#   IMPORTANT: Must NOT be /tmp because /tmp is ephemeral at runtime
+# - PLAYWRIGHT_BROWSERS_PATH: where Playwright will store browser binaries (must NOT be /tmp for Lambda)
 # - PYTHONPATH: include the Lambda task root so imports work correctly
 # - PATH: add /var/task/bin in case you install CLIs there
-ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     PYTHONPATH="${LAMBDA_TASK_ROOT}:${PYTHONPATH}" \
     PATH="/var/task/bin:${PATH}"
 
@@ -46,14 +20,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt -t "${LAMBDA_TASK_ROOT}"
 
 # Install Playwright browsers at build time into a PERSISTENT path
-# IMPORTANT:
-# - We do NOT use "--with-deps" here because this image does not have "apt-get"
-#   and Playwright would fail trying to install OS-level packages.
-# - This will only download the Chromium binaries, which is what we need.
+# IMPORTANT: Do NOT use /tmp here because /tmp is ephemeral in Lambda at runtime
 RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}" && \
-    PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH}" python -m playwright install chromium
+    python -m playwright install --with-deps chromium
 
-# Copy the entire application code into the Lambda task root
+# Copy the rest of the application code into the Lambda task root
 # Make sure main.py contains the "handler" entrypoint defined below
 COPY . ${LAMBDA_TASK_ROOT}
 
