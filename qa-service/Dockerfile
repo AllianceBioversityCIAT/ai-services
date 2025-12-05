@@ -20,12 +20,13 @@ COPY requirements.txt .
 # This is the standard pattern for Lambda container images
 RUN pip install --no-cache-dir -r requirements.txt -t "${LAMBDA_TASK_ROOT}"
 
-# Install Playwright browsers at build time into a PERSISTENT path
+# Install Playwright system dependencies and browsers
 # IMPORTANT:
-# - We do NOT use "--with-deps" here because this image does not have "apt-get"
-#   and Playwright would fail trying to install OS-level packages.
-# - This will only download the Chromium binaries, which is what we need.
+# - playwright install-deps: instala las librerías del sistema que Chromium necesita
+# - playwright install chromium: descarga los binarios de Chromium
+# - Se instalan en /opt/pw-browsers (definido en ENV arriba)
 RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}" && \
+    python -m playwright install-deps chromium && \
     PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH}" python -m playwright install chromium
 
 # Copy the entire application code into the Lambda task root
