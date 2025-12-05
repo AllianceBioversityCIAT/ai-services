@@ -5,7 +5,8 @@ FROM public.ecr.aws/lambda/python:3.13
 ARG PYTHONPATH=
 
 # Environment variables:
-# - PLAYWRIGHT_BROWSERS_PATH: where Playwright will store browser binaries (must NOT be /tmp for Lambda)
+# - PLAYWRIGHT_BROWSERS_PATH: where Playwright will store browser binaries
+#   IMPORTANT: Must NOT be /tmp because /tmp is ephemeral at runtime
 # - PYTHONPATH: include the Lambda task root so imports work correctly
 # - PATH: add /var/task/bin in case you install CLIs there
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
@@ -20,11 +21,14 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt -t "${LAMBDA_TASK_ROOT}"
 
 # Install Playwright browsers at build time into a PERSISTENT path
-# IMPORTANT: Do NOT use /tmp here because /tmp is ephemeral in Lambda at runtime
+# IMPORTANT:
+# - We do NOT use "--with-deps" here because this image does not have "apt-get"
+#   and Playwright would fail trying to install OS-level packages.
+# - This will only download the Chromium binaries, which is what we need.
 RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}" && \
-    python -m playwright install --with-deps chromium
+    PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH}" python -m playwright install chromium
 
-# Copy the rest of the application code into the Lambda task root
+# Copy the entire application code into the Lambda task root
 # Make sure main.py contains the "handler" entrypoint defined below
 COPY . ${LAMBDA_TASK_ROOT}
 
