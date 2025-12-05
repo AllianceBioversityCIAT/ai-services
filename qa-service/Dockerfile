@@ -49,6 +49,9 @@ COPY requirements.txt .
 # Install Python dependencies into the Lambda task root (/var/task)
 RUN pip install --no-cache-dir -r requirements.txt -t /var/task
 
+# Install all Playwright Chromium OS-level dependencies for Debian/apt
+RUN python -m playwright install-deps chromium
+
 # Install Playwright Chromium browsers only
 RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}" && \
     PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH}" python -m playwright install chromium
