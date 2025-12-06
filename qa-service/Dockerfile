@@ -9,37 +9,6 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
 
 COPY requirements.txt .
 
-# Install system libraries required by Playwright/Chromium (Amazon Linux base)
-RUN yum install -y \
-    alsa-lib \
-    atk \
-    at-spi2-atk \
-    at-spi2-core \
-    cairo \
-    dbus-libs \
-    expat \
-    fontconfig \
-    gtk3 \
-    libX11 \
-    libXcomposite \
-    libXcursor \
-    libXdamage \
-    libXext \
-    libXfixes \
-    libXrandr \
-    libXrender \
-    libdrm \
-    libxcb \
-    libxkbcommon \
-    mesa-libgbm \
-    nspr \
-    nss \
-    nss-util \
-    pango \
-    systemd-libs \
-    xorg-x11-server-Xvfb \
-    && yum clean all && rm -rf /var/cache/yum
-
 RUN pip install --no-cache-dir -r requirements.txt -t "${LAMBDA_TASK_ROOT}"
 
 
