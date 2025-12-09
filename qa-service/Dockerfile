@@ -11,6 +11,7 @@ WORKDIR ${LAMBDA_TASK_ROOT}
 RUN dnf update -y && \
     dnf install -y \
     atk \
+    at-spi2-atk \
     cups-libs \
     libdrm \
     libXcomposite \
