@@ -8,7 +8,6 @@ RUN microdnf update && \
     atk \
     at-spi2-atk \
     cups-libs \
-    GConf2 \
     gtk3 \
     libX11 \
     libXcomposite \
