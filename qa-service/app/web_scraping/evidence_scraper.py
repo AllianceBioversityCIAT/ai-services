@@ -83,7 +83,7 @@ class EvidenceEnhancer:
                 
                 evidence_contents.append(evidence_data)
                 logger.info(f"✅ Successfully scraped: {result['title']} ({result['type']})")
-                logger.info(f"Content preview: {content[:200]}...\n")
+                logger.info(f"Content preview: {content[:2000]}...\n")
                 
                 if cleanup_files and 'file_path' in result:
                     self._cleanup_file(result['file_path'])
