@@ -193,7 +193,16 @@ class WebScraperService:
         logger.info(f"📄 Scraping CGSpace handle: {url}")
         
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--single-process",
+                    "--no-zygote",
+                ],
+            )
             page = await browser.new_page()
             
             await page.goto(url)
@@ -304,7 +313,16 @@ class WebScraperService:
         logger.info(f"🔗 Scraping DOI: {url}")
         
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--single-process",
+                    "--no-zygote",
+                ],
+            )
             page = await browser.new_page()
             
             try:
@@ -565,7 +583,16 @@ class WebScraperService:
         logger.info(f"🌐 Scraping web page: {url}")
         
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--single-process",
+                    "--no-zygote",
+                ],
+            )
             page = await browser.new_page()
             
             await page.goto(url, wait_until="domcontentloaded")
