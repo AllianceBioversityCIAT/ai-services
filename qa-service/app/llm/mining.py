@@ -14,6 +14,9 @@ from app.utils.prompt.impact_area_prompt import build_impact_area_prompt
 from app.utils.interactions.interaction_client import interaction_client
 
 
+BEDROCK_SEMAPHORE = asyncio.Semaphore(2)
+SCRAPING_SEMAPHORE = asyncio.Semaphore(3)
+
 logger = get_logger()
 
 bedrock_runtime = boto3.client(
@@ -22,77 +25,60 @@ bedrock_runtime = boto3.client(
 )
 
 
-def invoke_model(prompt, max_tokens=2000):
-    try:
-        logger.info("🚀 Invoking the model...")
-        request_body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": max_tokens,
-            "temperature": 0.1,
-            "top_k": 250,
-            "top_p": 0.999,
-            "stop_sequences": [],
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": f"{prompt}"}
-                    ]
-                }
-            ]
-        }
-        response = bedrock_runtime.invoke_model(
-            modelId="us.anthropic.claude-sonnet-4-20250514-v1:0",
-            body=json.dumps(request_body),
-            contentType="application/json",
-            accept="application/json"
-        )
-        return json.loads(response['body'].read())['content'][0]['text']
-
-    except Exception as e:
-        logger.error(f"❌ Error invoking the model: {str(e)}")
-        raise
-
-
 async def invoke_model_async(prompt, max_tokens=2000, prompt_name="unknown"):
-    """Async version of invoke_model for parallel execution."""
-    try:
-        logger.info(f"🚀 Invoking the model for {prompt_name}...")
-        request_body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": max_tokens,
-            "temperature": 0.1,
-            "top_k": 250,
-            "top_p": 0.999,
-            "stop_sequences": [],
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": f"{prompt}"}
+    """Async version of invoke_model for parallel execution with semaphore control and retry logic."""
+    async with BEDROCK_SEMAPHORE:
+        logger.info(f"🚀 Invoking Bedrock for {prompt_name}...")
+        
+        max_retries = 5
+        base_delay = 0.5  # Start with 0.5 seconds
+        
+        for attempt in range(max_retries):
+            try:
+                request_body = {
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": max_tokens,
+                    "temperature": 0.1,
+                    "top_k": 250,
+                    "top_p": 0.999,
+                    "stop_sequences": [],
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": f"{prompt}"}
+                            ]
+                        }
                     ]
                 }
-            ]
-        }
-        
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None,
-            lambda: bedrock_runtime.invoke_model(
-                modelId="us.anthropic.claude-sonnet-4-20250514-v1:0",
-                body=json.dumps(request_body),
-                contentType="application/json",
-                accept="application/json"
-            )
-        )
-        
-        result = json.loads(response['body'].read())['content'][0]['text']
-        logger.info(f"✅ Model response received for {prompt_name}")
-        return result
+                
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: bedrock_runtime.invoke_model(
+                        modelId="us.anthropic.claude-sonnet-4-20250514-v1:0",
+                        body=json.dumps(request_body),
+                        contentType="application/json",
+                        accept="application/json"
+                    )
+                )
+                
+                result = json.loads(response['body'].read())['content'][0]['text']
+                logger.info(f"✅ Model response received for {prompt_name}")
+                return result
 
-    except Exception as e:
-        logger.error(f"❌ Error invoking the model for {prompt_name}: {str(e)}")
-        raise
+            except Exception as e:
+                error_msg = str(e)
+                is_throttling = "ThrottlingException" in error_msg or "Too many tokens" in error_msg
+                
+                if is_throttling and attempt < max_retries - 1:
+                    # Exponential backoff for throttling: 0.5s, 1s, 2s
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"⏱️ Throttled for {prompt_name}, retrying in {delay}s (attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error(f"❌ Error invoking the model for {prompt_name}: {error_msg}")
+                    raise
 
 
 def is_valid_json(text):
@@ -158,13 +144,14 @@ async def improve_prms_result_metadata(
             logger.info(f"📚 Processing {len(evidence_urls)} evidence URLs")
             
             try:
-                enhancer = EvidenceEnhancer()
-                
-                evidence_data = await enhancer.enhance_prms_context(
-                    result_metadata=result_metadata,
-                    evidence_urls=evidence_urls,
-                    max_evidences=max_evidences
-                )
+                async with SCRAPING_SEMAPHORE:
+                    enhancer = EvidenceEnhancer()
+                    
+                    evidence_data = await enhancer.enhance_prms_context(
+                        result_metadata=result_metadata,
+                        evidence_urls=evidence_urls,
+                        max_evidences=max_evidences
+                    )
                 
                 evidence_context = evidence_data['formatted_context']
                 
