@@ -377,10 +377,7 @@ This metadata may include, for example:
 - Any other relevant fields.
 
 You must base your scoring only on the evidence available in this metadata. Do not assume or hallucinate objectives or impacts that are not clearly supported by the provided information.
-"""
 
-    if evidence_context:
-        prompt += f"""
 ### 3.3 Evidence Sources
 
 In addition to the result metadata, you will also receive **evidence sources** related to this result (e.g., reports, publications, datasets, project documents, outcome stories). Use these as **complementary inputs** when assigning Impact Area scores.
