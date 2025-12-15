@@ -5,9 +5,12 @@ from app.utils.logger.logger_util import get_logger
 from fastapi import APIRouter, HTTPException, status
 from app.llm.mining import improve_prms_result_metadata
 from app.api.models import PrmsRequest, PrmsResponse, ErrorResponse
+from app.utils.notification.notification_service import NotificationService
 
 logger = get_logger()
 router = APIRouter()
+
+notification_service = NotificationService()
 
 @router.post(
     "/api/prms-qa",
@@ -94,6 +97,17 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
         logger.info(f"🔍 Processing PRMS QA for user: {request.user_id}")
         
         result = await improve_prms_result_metadata(request.result_metadata, request.user_id)
+
+        await notification_service.send_slack_notification(
+            emoji=":ai: :sparkles:",
+            app_name="PRMS Reporting Tool QA-AI Service",
+            color="#36a64f",
+            title="Reporting Tool Result Processed",
+            message=f"Successfully improved result metadata\nUser: *{request.user_id or 'Unknown'}*\nResult Type: *{request.result_metadata.get('result_type_name', 'Unknown')}*",
+            time_taken=f"Processing time: *{result['time_taken']}* seconds",
+            priority="Low"
+        )
+
         return PrmsResponse(
             time_taken=result["time_taken"],
             json_content=result["json_content"],
@@ -107,6 +121,17 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
         
         if "LLM returned invalid JSON" in error_msg or "Output schema validation failed" in error_msg:
             logger.error(f"LLM/service error: {error_msg}")
+            
+            await notification_service.send_slack_notification(
+                emoji=":ai: :alert:",
+                app_name="PRMS Reporting Tool QA-AI Service",
+                color="#ff0000",
+                title="Validation Error",
+                message=f"LLM validation failed\nUser: *{request.user_id or 'Unknown'}*",
+                time_taken="Time taken: *N/A*",
+                priority="High"
+            )
+            
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail={
@@ -122,6 +147,17 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
             )
         else:
             logger.error(f"Validation error: {error_msg}")
+            
+            await notification_service.send_slack_notification(
+                emoji=":ai: :alert:",
+                app_name="PRMS Reporting Tool QA-AI Service",
+                color="#ff0000",
+                title="Validation Error",
+                message=f"Invalid data provided\nUser: *{request.user_id or 'Unknown'}*",
+                time_taken="Time taken: *N/A*",
+                priority="High"
+            )
+            
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
@@ -138,6 +174,17 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
     
     except KeyError as e:
         logger.error(f"Missing required field: {str(e)}")
+        
+        await notification_service.send_slack_notification(
+            emoji=":ai: :alert:",
+            app_name="PRMS Reporting Tool QA-AI Service",
+            color="#ff0000",
+            title="Missing Required Field",
+            message=f"Required field missing: *{str(e)}*\nUser: *{request.user_id or 'Unknown'}*",
+            time_taken="Time taken: *N/A*",
+            priority="High"
+        )
+        
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
@@ -162,7 +209,7 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
             error_code = "THROTTLING_ERROR"
             status_code = status.HTTP_429_TOO_MANY_REQUESTS
         elif "Timeout" in error_msg or "timeout" in error_msg:
-            user_message = "Your request is taking longer than expected. Try reducing the number of evidence files or try again later."
+            user_message = "The request is taking longer than expected. Try reducing the number of evidence files or try again later."
             error_code = "TIMEOUT_ERROR"
             status_code = status.HTTP_408_REQUEST_TIMEOUT
         else:
@@ -173,6 +220,16 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
         logger.error(f"Unexpected error: {error_msg}")
         tb = traceback.format_exc()
         logger.error(f"📋 Full traceback:\n{tb}")
+        
+        await notification_service.send_slack_notification(
+            emoji=":ai: :alert:",
+            app_name="PRMS Reporting Tool QA-AI Service",
+            color="#ff0000",
+            title=f"Service Error - {error_code}",
+            message=f"Unexpected error occurred\nUser: *{request.user_id or 'Unknown'}*\nError: *{user_message}*",
+            time_taken="Time taken: *N/A*",
+            priority="High"
+        )
         
         raise HTTPException(
             status_code=status_code,
