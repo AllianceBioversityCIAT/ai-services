@@ -110,7 +110,7 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail={
-                    "error": "AI service returned invalid response", 
+                    "error": "The AI service returned invalid response. Please try submitting your request again.", 
                     "message": error_msg, 
                     "status": "error",
                     "error_type": "INVALID_AI_RESPONSE",
@@ -125,7 +125,7 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
-                    "error": "Validation Error", 
+                    "error": "Some of the information you provided appears to be incomplete or in an unexpected format. Please review and try again.", 
                     "message": error_msg, 
                     "status": "error",
                     "error_type": "VALIDATION_ERROR",
@@ -141,7 +141,7 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "error": "Missing Required Field",
+                "error": "Some required information is missing. Please make sure all fields are filled out and try again.",
                 "message": f"Missing required field: {str(e)}",
                 "status": "error",
                 "error_type": "MISSING_FIELD",
@@ -162,11 +162,11 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
             error_code = "THROTTLING_ERROR"
             status_code = status.HTTP_429_TOO_MANY_REQUESTS
         elif "Timeout" in error_msg or "timeout" in error_msg:
-            user_message = "Request timed out. Please try again with fewer evidence URLs."
+            user_message = "Your request is taking longer than expected. Try reducing the number of evidence files or try again later."
             error_code = "TIMEOUT_ERROR"
             status_code = status.HTTP_408_REQUEST_TIMEOUT
         else:
-            user_message = "An unexpected error occurred. Please try again or contact support."
+            user_message = "Something unexpected happened. Please try again or contact support if the issue persists."
             error_code = "INTERNAL_ERROR"
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         

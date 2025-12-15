@@ -425,7 +425,10 @@ For each Impact Area, the output value must be either:
 - "Approved" (only if you fully agree with the user-selected score), OR
 - A single, complete sentence that recommends a different score (0, 1, or 2) and justifies it using the metadata/evidence (include the component if recommending 2).
 
-Keep in mind the above definitions, criteria, and cross-cutting rules when forming your recommendations.
+Remember:
+- Base your recommendations **solely** on the provided metadata and evidence.
+- In most cases, the overall scoring profile should include at least one Impact Area with a score of 1 or 2.
+- No more than two Impact Areas should receive a score of 2 (PRINCIPAL).
 
 --------------------------------------------------
 
