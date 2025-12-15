@@ -4,7 +4,9 @@ import boto3
 import asyncio
 import traceback
 from typing import List, Optional
+from pydantic import ValidationError
 from app.utils.config.config_util import AWS
+from app.llm.schemas import validate_output_schema
 from app.utils.logger.logger_util import get_logger
 from app.utils.prompt.main_prompt import build_main_prompt
 from app.web_scraping.evidence_scraper import EvidenceEnhancer
@@ -72,7 +74,6 @@ async def invoke_model_async(prompt, max_tokens=2000, prompt_name="unknown"):
                 is_throttling = "ThrottlingException" in error_msg or "Too many tokens" in error_msg
                 
                 if is_throttling and attempt < max_retries - 1:
-                    # Exponential backoff for throttling: 0.5s, 1s, 2s
                     delay = base_delay * (2 ** attempt)
                     logger.warning(f"⏱️ Throttled for {prompt_name}, retrying in {delay}s (attempt {attempt + 1}/{max_retries})")
                     await asyncio.sleep(delay)
@@ -112,10 +113,59 @@ async def improve_prms_result_metadata(
     start_time = time.time()
 
     try:
-        result_type = result_metadata.get("result_type_name", "").lower()
-        result_level = result_metadata.get("result_level_name", "").lower()
+        result_type = result_metadata["result_type_name"].lower()
+        result_level = result_metadata["result_level_name"].lower()
         result_title = result_metadata.get("result_name", "")
         result_description = result_metadata.get("result_description", "")
+
+        def normalize_impact_score(value):
+            return value if value is not None else "Not Defined"
+
+        def normalize_impact_component(value):
+            return value if value is not None else "Not Applicable"
+        
+        impact_tags = {
+            "Gender Equality, Youth and Social Inclusion": {
+                "user_score": normalize_impact_score(
+                    result_metadata["gender_tag_level_description"]
+                ),
+                "component": normalize_impact_component(
+                    result_metadata.get("gender_impact_area_impact_area", "")
+                )
+            },
+            "Climate Adaptation and Mitigation": {
+                "user_score": normalize_impact_score(
+                    result_metadata["climate_change_tag_level_description"]
+                ),
+                "component": normalize_impact_component(
+                    result_metadata.get("climate_impact_area_impact_area", "")
+                )
+            },
+            "Nutrition, Health and Food Security": {
+                "user_score": normalize_impact_score(
+                    result_metadata["nutrition_tag_level_description"]
+                ),
+                "component": normalize_impact_component(
+                    result_metadata.get("nutrition_impact_area_impact_area", "")
+                )
+            },
+            "Environmental Health and Biodiversity": {
+                "user_score": normalize_impact_score(
+                    result_metadata["environmental_biodiversity_tag_level_description"]
+                ),
+                "component": normalize_impact_component(
+                    result_metadata.get("environmental_biodiversity_impact_area_impact_area", "")
+                )
+            },
+            "Poverty Reduction, Livelihoods and Jobs": {
+                "user_score": normalize_impact_score(
+                    result_metadata["poverty_tag_level_description"]
+                ),
+                "component": normalize_impact_component(
+                    result_metadata.get("poverty_impact_area_impact_area", "")
+                )
+            }
+        }
 
         all_evidences = result_metadata.get("evidence", [])
         valid_evidences = []
@@ -164,11 +214,11 @@ async def improve_prms_result_metadata(
                 logger.warning(f"⚠️ Continuing without evidence context")
                 evidence_context = ""
         else:
-            logger.info("ℹ️ No evidence URLs provided, processing without additional context")
+            logger.info("ℹ️  No evidence URLs provided, processing without additional context")
         
         logger.info("📝 Building modular prompts...")
         main_prompt = build_main_prompt(result_type, result_level, result_metadata, evidence_context)
-        impact_area_prompt = build_impact_area_prompt(result_metadata, evidence_context)
+        impact_area_prompt = build_impact_area_prompt(result_metadata, evidence_context, impact_tags)
         
         tasks = [
             invoke_model_async(main_prompt, max_tokens=2000, prompt_name="main (title/description)"),
@@ -193,14 +243,26 @@ async def improve_prms_result_metadata(
         responses = await asyncio.gather(*tasks)
         
         logger.info("📦 Parsing responses...")
-        main_response = json.loads(responses[0]) if is_valid_json(responses[0]) else {"text": responses[0]}
-        impact_response = json.loads(responses[1]) if is_valid_json(responses[1]) else {"text": responses[1]}
+
+        try:
+            main_response = json.loads(responses[0])
+            impact_response = json.loads(responses[1])
+        except json.JSONDecodeError as e:
+            raise ValueError(f"LLM returned invalid JSON: {str(e)}")
         
         json_content = {
             **main_response,
             **impact_response
         }
-        
+
+        try:
+            validate_output_schema(json_content, result_type)
+            logger.info("✅ Output schema validation succeeded")
+        except ValidationError as ve:
+            error_msg = f"Output schema validation failed: {ve}"
+            logger.error(f"❌ PRMS Schema Error: {error_msg}")
+            raise ValueError(error_msg)
+
         if len(responses) > 2:
             conditional_response = json.loads(responses[2]) if is_valid_json(responses[2]) else {"text": responses[2]}
             json_content.update(conditional_response)
@@ -279,7 +341,7 @@ async def improve_prms_result_metadata(
         logger.error(f"❌ PRMS KeyError - Missing key: {str(e)}")
         logger.error(f"📦 DEBUG - Available keys: {list(result_metadata.keys())}")
         logger.error(f"📋 Full traceback:\n{traceback.format_exc()}")
-        raise ValueError(f"Missing required field: {str(e)}")
+        raise
     
     except Exception as e:
         logger.error(f"❌ PRMS Error: {str(e)}")

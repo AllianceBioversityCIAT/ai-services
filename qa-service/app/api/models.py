@@ -38,6 +38,8 @@ class ErrorResponse(BaseModel):
     """
     Error response model for PRMS QA API.
     """
-    error: str = Field(..., description="Short error message", examples=["Invalid parameters", "Internal error"])
+    error: str = Field(..., description="User-friendly error message", examples=["Validation Error", "Service is temporarily overloaded"])
     status: str = Field(default="error", description="Error status indicator", examples=["error"])
-    details: Optional[str] = Field(None, description="Additional error details")
+    message: str = Field(..., description="Technical error message", examples=["Missing required field: result_name"])
+    error_type: str = Field(..., description="Error type for frontend handling", examples=["VALIDATION_ERROR", "THROTTLING_ERROR"])
+    debug_info: Optional[Dict[str, Any]] = Field(None, description="Debug information for development")

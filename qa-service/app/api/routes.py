@@ -103,34 +103,86 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
         )
     
     except ValueError as e:
-        logger.error(f"Validation error: {str(e)}")
+        error_msg = str(e)
+        
+        if "LLM returned invalid JSON" in error_msg or "Output schema validation failed" in error_msg:
+            logger.error(f"LLM/service error: {error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    "error": "AI service returned invalid response", 
+                    "message": error_msg, 
+                    "status": "error",
+                    "error_type": "INVALID_AI_RESPONSE",
+                    "debug_info": {
+                        "has_response_wrapper": "response" in request.result_metadata,
+                        "traceback": traceback.format_exc()
+                    }
+                }
+            )
+        else:
+            logger.error(f"Validation error: {error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "Validation Error", 
+                    "message": error_msg, 
+                    "status": "error",
+                    "error_type": "VALIDATION_ERROR",
+                    "debug_info": {
+                        "has_response_wrapper": "response" in request.result_metadata,
+                        "traceback": traceback.format_exc()
+                    }
+                }
+            )
+    
+    except KeyError as e:
+        logger.error(f"Missing required field: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "error": "Invalid parameters", 
-                "details": str(e), 
+                "error": "Missing Required Field",
+                "message": f"Missing required field: {str(e)}",
                 "status": "error",
+                "error_type": "MISSING_FIELD",
                 "debug_info": {
+                    "missing_field": str(e),
                     "received_keys": list(request.result_metadata.keys()),
-                    "has_response_wrapper": "response" in request.result_metadata,
                     "traceback": traceback.format_exc()
                 }
             }
         )
     
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        error_type = type(e).__name__
+        error_msg = str(e)
+        
+        if "ThrottlingException" in error_msg:
+            user_message = "Service is temporarily overloaded. Please try again in a few minutes."
+            error_code = "THROTTLING_ERROR"
+            status_code = status.HTTP_429_TOO_MANY_REQUESTS
+        elif "Timeout" in error_msg or "timeout" in error_msg:
+            user_message = "Request timed out. Please try again with fewer evidence URLs."
+            error_code = "TIMEOUT_ERROR"
+            status_code = status.HTTP_408_REQUEST_TIMEOUT
+        else:
+            user_message = "An unexpected error occurred. Please try again or contact support."
+            error_code = "INTERNAL_ERROR"
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        
+        logger.error(f"Unexpected error: {error_msg}")
         tb = traceback.format_exc()
         logger.error(f"📋 Full traceback:\n{tb}")
+        
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status_code,
             detail={
-                "error": "Internal error", 
-                "details": str(e), 
+                "error": user_message, 
+                "message": error_msg,
                 "status": "error",
+                "error_type": error_code,
                 "debug_info": {
-                    "error_type": type(e).__name__,
-                    "received_keys": list(request.result_metadata.keys()) if hasattr(request, 'result_metadata') else [],
+                    "original_error_type": error_type,
                     "has_response_wrapper": "response" in request.result_metadata if hasattr(request, 'result_metadata') else False,
                     "traceback": tb
                 }

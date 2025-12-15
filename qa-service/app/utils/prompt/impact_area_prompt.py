@@ -2,25 +2,27 @@
 
 import json
 
-def build_impact_area_prompt(result_metadata: dict, evidence_context: str = "") -> str:
+def build_impact_area_prompt(result_metadata: dict, evidence_context: str = "", impact_tags: dict = None) -> str:
     prompt = """
 You are an AI expert evaluating CGIAR result metadata for Impact Area relevance.
 
 CGIAR (the Consultative Group on International Agricultural Research) is a global partnership focused on research for a food-secure future. The research results you will evaluate come from CGIAR initiatives and projects in agriculture, forestry, fisheries, climate, nutrition, poverty reduction, gender, youth, social inclusion, and environmental sustainability.
 
-Your role is to **re-evaluate the Impact Area scores** for a single CGIAR result, based on its metadata, and assign a score (0, 1, or 2) for each of the five CGIAR Impact Areas:
-1. Gender equality, youth and social inclusion
-2. Climate adaptation and mitigation
-3. Nutrition, health and food security
-4. Environmental health and biodiversity
-5. Poverty reduction, livelihoods and jobs
+Your role is to **review and validate Impact Area scores initially selected by a user** for a single CGIAR result.
 
-Your objective is to assign scores that are **as coherent, consistent, and evidence-based as possible**, strictly following the definitions and criteria below.
+Instead of assigning scores directly, your task is to:
+- Compare the **user-selected score** for each Impact Area with the score that you believe is most appropriate based on the definitions, criteria, metadata, and evidence provided.
+- Provide a **concise, evidence-based recommendation** explaining whether you agree with the user-selected score or why an alternative score would be more appropriate.
+
+Your recommendations must be:
+- Based **exclusively** on the result metadata and evidence provided.
+- Explicitly grounded in the Impact Area definitions and criteria described below.
+- Written as **one clear, well-reasoned sentence per Impact Area** (not too short, not overly long).
 
 --------------------------------------------------
 ## 1. General Scoring Framework (applies to all Impact Areas)
 
-For **each** of the five Impact Areas, assign exactly one of these scores:
+For reference, Impact Area scores are defined as follows:
 
 - **0 = NOT TARGETED**
   - The result has been screened against the Impact Area and is **not found to directly contribute** to any aspect of that area as defined in this prompt.
@@ -37,36 +39,39 @@ For **each** of the five Impact Areas, assign exactly one of these scores:
   - Contributing to this Impact Area is **fundamental to the design** of the activity leading to the result.
   - The result **would not have been undertaken** without the intention to contribute to one or more aspects of this Impact Area.
 
+Use these definitions as the benchmark when evaluating whether the user-selected score is appropriate.
+
 ### 1.1 Cross-cutting rules
 
-Apply these rules consistently across all Impact Areas:
+Apply these rules consistently across all Impact Areas when forming your recommendations:
 
 - **Direct vs indirect contribution**
-  - If the contribution is only **indirect, inferred, or incidental**, assign **0 (NOT TARGETED)**.
-  - Only **direct and intentional** contributions (explicitly stated objectives, activities, outcomes, or expected impacts) can justify **1 (SIGNIFICANT)** or **2 (PRINCIPAL)**.
+  - If the contribution is only **indirect, inferred, or incidental**, then the most appropriate score is **0 (NOT TARGETED)**.
+  - Only **direct and intentional** contributions (explicitly stated objectives, activities, outcomes, or expected impacts) can justify a score of **1 (SIGNIFICANT)** or **2 (PRINCIPAL)**.
 
-- **At least one non-zero score**
-  - In most cases, **at least one Impact Area** should receive a score of **1 or 2**.
-  - A result with **0 for all five Impact Areas** should be treated as a **rare exception**, used only when there is truly no direct or intentional contribution to any Impact Area.
+- **At least one non-zero score (validation check)**
+  - In most cases, the overall scoring profile should include **at least one Impact Area** with a score of **1 or 2**.
+  - A result with **0 for all five Impact Areas** should be treated as a **rare exception**; if the user selected all zeros, explicitly state that this is unusual and only appropriate if the metadata and evidence truly show no direct or intentional contribution to any Impact Area.
 
-- **Limit on Principal scores**
+- **Limit on Principal scores (validation check)**
   - **No more than two Impact Areas** should receive a score of **2 (PRINCIPAL)**.
-  - A result with three or more Impact Areas scored as **2** should be **very rare** and only used when the metadata clearly supports that multiple Impact Areas are truly principal objectives.
+  - Results with three or more Impact Areas scored as **2** should be **very rare**; if the user selected more than two 2s, explicitly recommend downgrading the least-supported ones unless the metadata and evidence clearly show they are all principal objectives.
 
 - **Do not base scores on donor preferences**
-  - Scores must be based on the **relevance of the Impact Area to the result itself**, not on donor interests or how attractive an Impact Area might be to funders.
+  - Recommendations must be based on the **relevance of the Impact Area to the result itself**, not on donor interests or how attractive an Impact Area might be to funders.
 
 - **Do not score solely on global targets**
-  - The collective global targets are provided as **context and orientation**, but you should score based on the **broader Impact Area definitions and example topics**, not on numeric target matching.
+  - The collective global targets are provided as **context and orientation**, but recommendations should be based on the **broader Impact Area definitions and example topics**, not on numeric target matching alone.
 
 - **Evidence-based scoring**
-  - Always ground your scoring in the **information provided in the result metadata** (e.g., title, description, objectives, outcomes, locations, beneficiaries).
-  - If the metadata does not provide enough evidence for a direct and intentional contribution, you must lean toward a lower score (0 rather than 1, 1 rather than 2).
+  - Always ground your recommendations in the **information provided in the result metadata and evidence** (e.g., title, description, objectives, outcomes, locations, beneficiaries).
+  - If the inputs do not provide enough evidence for a direct and intentional contribution, recommend a lower score (0 rather than 1, 1 rather than 2).
+  - Do not infer impacts that are not clearly supported by the provided metadata or evidence.
 
 --------------------------------------------------
 ## 2. Impact Area Definitions and Detailed Guidance
 
-In this section, you will find specific definitions, objectives, and examples for each Impact Area. Use them to decide whether the result is NOT TARGETED (0), SIGNIFICANT (1), or PRINCIPAL (2).
+Use the following definitions, objectives, and examples to evaluate whether the **user-selected score** for each Impact Area is appropriate.
 
 For each Impact Area, pay special attention to:
 - What counts as a **direct and intentional** contribution.
@@ -324,8 +329,39 @@ When this Impact Area receives a score of **2 (PRINCIPAL)**, you must also selec
 """
     
     context = json.dumps(result_metadata, indent=2, ensure_ascii=False)
+    impact_tags_json = json.dumps(impact_tags or {}, indent=2, ensure_ascii=False)
     prompt += f"""
-## 3. Input: Result Metadata
+## 3. Inputs
+
+You will receive the following inputs:
+
+### 3.1 User-selected Impact Area Scores
+
+These are the **Impact Area selections provided by the user**. Treat this as the authoritative record of what the user initially selected.
+
+You will receive a JSON object called `impact_tags` with the following structure:
+
+- The **top-level keys** are the five Impact Areas (human-readable labels).
+- Each Impact Area contains:
+  - `"user_score"`: the user-selected score as a string label, typically one of:
+    - `"(0) Not Targeted"`
+    - `"(1) Significant"`
+    - `"(2) Principal"`
+  - `"component"`: the selected dominant component/sub-component **when the user score is 2**, otherwise `"Not Applicable"`.
+
+Important interpretation rules:
+- Use `impact_tags[*].user_score` as the **user-selected score** you must validate.
+- If the user-selected score is `"(2) Principal"` and a component is provided, treat it as the user's selected dominant component.
+- If the user-selected score is not 2, the component value should be treated as **not applicable** and should not drive the recommendation.
+- Your job is to **compare** the user selection to what is supported by the metadata/evidence and provide a recommendation (agree vs propose a different score), not to blindly accept it.
+
+`impact_tags` input:
+
+```json
+{impact_tags_json}
+```
+
+### 3.2 Result Metadata
 
 You will receive the **result metadata** as a JSON object:
 
@@ -345,7 +381,7 @@ You must base your scoring only on the evidence available in this metadata. Do n
 
     if evidence_context:
         prompt += f"""
-### Evidence Sources
+### 3.3 Evidence Sources
 
 In addition to the result metadata, you will also receive **evidence sources** related to this result (e.g., reports, publications, datasets, project documents, outcome stories). Use these as **complementary inputs** when assigning Impact Area scores.
 
@@ -368,7 +404,32 @@ Use the following evidence to inform your impact area scoring:
     output_instruction = """
 --------------------------------------------------
 
-## 4. Output Format (STRICT)
+## 4. Your Task
+
+For each Impact Area, do the following:
+
+  1. Evaluate whether the user-selected score is appropriate given:
+    •	The Impact Area definitions and criteria.
+	  •	The result metadata.
+	  •	The available evidence.
+	2. If you agree with the user-selected score:
+	  •	Output ONLY the single word: Approved
+	  •	Do NOT add any justification or additional text when you output Approved.
+	3. If you disagree with the user-selected score:
+	  •	Clearly recommend what score would be more appropriate (0, 1, or 2).
+	  •	Briefly explain why, citing specific elements from the metadata or evidence.
+	4. If you recommend a score of 2 (PRINCIPAL):
+	  •	Explicitly state which component (e.g., Gender equality, Adaptation, Nutrition, Biodiversity, Livelihoods, etc.) best represents the primary focus, and why.
+
+For each Impact Area, the output value must be either:
+- "Approved" (only if you fully agree with the user-selected score), OR
+- A single, complete sentence that recommends a different score (0, 1, or 2) and justifies it using the metadata/evidence (include the component if recommending 2).
+
+Keep in mind the above definitions, criteria, and cross-cutting rules when forming your recommendations.
+
+--------------------------------------------------
+
+## 5. Output Format (STRICT)
 
 You must output only raw JSON, with no additional text, explanations, or markdown.
 
@@ -387,28 +448,23 @@ Follow this exact structure:
 
 {
     "impact_area_scores": {
-        "social_inclusion": "0, 1, or 2",
-        "social_inclusion_component": "Gender equality, Youth, or Social Inclusion" (only if social_inclusion score is 2; otherwise omit this field),
-        "climate_adaptation": "0, 1, or 2",
-        "climate_adaptation_component": "Adaptation or Mitigation" (only if climate_adaptation score is 2; otherwise omit this field),
-        "food_security": "0, 1, or 2",
-        "food_security_component": "Nutrition, Health, or Food Security" (only if food_security score is 2; otherwise omit this field),
-        "environmental_health": "0, 1, or 2",
-        "environmental_health_component": "Environmental Health or Biodiversity" (only if environmental_health score is 2; otherwise omit this field),
-        "poverty_reduction": "0, 1, or 2",
-        "poverty_reduction_component": "Poverty Reduction, Livelihoods, or Jobs" (only if poverty_reduction score is 2; otherwise omit this field)
+        "social_inclusion": "Approved OR one-sentence justification comparing the user-selected score with the recommended score, including the component if recommending a score of 2.",
+        "climate_adaptation": "Approved OR one-sentence justification comparing the user-selected score with the recommended score, including the component if recommending a score of 2.",
+        "food_security": "Approved OR one-sentence justification comparing the user-selected score with the recommended score, including the component if recommending a score of 2.",
+        "environmental_health": "Approved OR one-sentence justification comparing the user-selected score with the recommended score, including the component if recommending a score of 2.",
+        "poverty_reduction": "Approved OR one-sentence justification comparing the user-selected score with the recommended score, including the component if recommending a score of 2."
     }
 }
 
-### 4.2 Additional output rules
-- All scores must be strings (“0”, “1”, or “2”) to match the expected schema.
-- For each Impact Area:
-    - If the score is 2 (PRINCIPAL), you must include the corresponding *_component field and choose exactly one allowed value that best reflects the main focus.
-    - If the score is 0 or 1, you must omit the corresponding *_component field completely.
-- Do not add any extra fields or keys beyond those specified.
-- Ensure the JSON is valid and parseable.
+Do not:
+	•	Include scores as separate fields.
+	•	Add any extra fields or keys beyond those specified.
+	•	Use bullet points or multiple sentences.
+	•	Reference information not present in the inputs.
 
-Use all of the above guidance to assign the most accurate, consistent, and evidence-based scores possible for this result.
+Your role is to advise and justify, not to overwrite the user's input. Use all of the above guidance to assign the most accurate, consistent, and evidence-based recommendations possible for this result.
+Ensure the JSON is valid and parseable.
+
 """
     
     prompt += output_instruction
