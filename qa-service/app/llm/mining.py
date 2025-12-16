@@ -218,20 +218,12 @@ async def improve_prms_result_metadata(
         
         logger.info("📝 Building modular prompts...")
         main_prompt = build_main_prompt(result_type, result_level, result_metadata, evidence_context)
+        impact_area_prompt = build_impact_area_prompt(result_metadata, evidence_context, impact_tags)
         
         tasks = [
-            invoke_model_async(main_prompt, max_tokens=2000, prompt_name="main (title/description)")
+            invoke_model_async(main_prompt, max_tokens=2000, prompt_name="main (title/description)"),
+            invoke_model_async(impact_area_prompt, max_tokens=1000, prompt_name="impact_areas")
         ]
-        
-        has_evidence = bool(evidence_context and evidence_context.strip())
-        if has_evidence:
-            impact_area_prompt = build_impact_area_prompt(result_metadata, evidence_context, impact_tags)
-            tasks.append(
-                invoke_model_async(impact_area_prompt, max_tokens=1000, prompt_name="impact_areas")
-            )
-            logger.info("➕ Added impact areas prompt (evidence available)")
-        else:
-            logger.info("⏭️  Skipping impact areas prompt (no evidence available)")
         
         # if result_type == "innovation development":
         #     readiness_prompt = build_readiness_prompt(result_metadata, evidence_context)
@@ -254,22 +246,7 @@ async def improve_prms_result_metadata(
 
         try:
             main_response = json.loads(responses[0])
-            
-            if has_evidence:
-                impact_response = json.loads(responses[1])
-                logger.info("✅ Using AI-generated impact areas (evidence available)")
-            else:
-                impact_response = {
-                    "impact_area_scores": {
-                        "social_inclusion": "Unable to assess - no evidence provided or evidence could not be accessed to evaluate this impact area",
-                        "climate_adaptation": "Unable to assess - no evidence provided or evidence could not be accessed to evaluate this impact area", 
-                        "food_security": "Unable to assess - no evidence provided or evidence could not be accessed to evaluate this impact area",
-                        "environmental_health": "Unable to assess - no evidence provided or evidence could not be accessed to evaluate this impact area",
-                        "poverty_reduction": "Unable to assess - no evidence provided or evidence could not be accessed to evaluate this impact area"
-                    }
-                }
-                logger.info("✅ Using default impact areas (no evidence available)")
-                
+            impact_response = json.loads(responses[1])
         except json.JSONDecodeError as e:
             raise ValueError(f"LLM returned invalid JSON: {str(e)}")
         
@@ -285,10 +262,9 @@ async def improve_prms_result_metadata(
             error_msg = f"Output schema validation failed: {ve}"
             logger.error(f"❌ PRMS Schema Error: {error_msg}")
             raise ValueError(error_msg)
-
-        if len(responses) > (2 if has_evidence else 1):
-            conditional_index = 2 if has_evidence else 1
-            conditional_response = json.loads(responses[conditional_index]) if is_valid_json(responses[conditional_index]) else {"text": responses[conditional_index]}
+        
+        if len(responses) > 2:
+            conditional_response = json.loads(responses[2]) if is_valid_json(responses[2]) else {"text": responses[2]}
             json_content.update(conditional_response)
         
         logger.info(f"✅ Combined {len(responses)} responses successfully")

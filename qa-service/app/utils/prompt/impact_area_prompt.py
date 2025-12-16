@@ -3,7 +3,7 @@
 import json
 
 def build_impact_area_prompt(result_metadata: dict, evidence_context: str = "", impact_tags: dict = None) -> str:
-    prompt = """
+  prompt = """
 You are an AI expert evaluating CGIAR result metadata for Impact Area relevance.
 
 CGIAR (the Consultative Group on International Agricultural Research) is a global partnership focused on research for a food-secure future. The research results you will evaluate come from CGIAR initiatives and projects in agriculture, forestry, fisheries, climate, nutrition, poverty reduction, gender, youth, social inclusion, and environmental sustainability.
@@ -328,9 +328,9 @@ When this Impact Area receives a score of **2 (PRINCIPAL)**, you must also selec
 --------------------------------------------------
 """
     
-    context = json.dumps(result_metadata, indent=2, ensure_ascii=False)
-    impact_tags_json = json.dumps(impact_tags or {}, indent=2, ensure_ascii=False)
-    prompt += f"""
+  context = json.dumps(result_metadata, indent=2, ensure_ascii=False)
+  impact_tags_json = json.dumps(impact_tags or {}, indent=2, ensure_ascii=False)
+  prompt += f"""
 ## 3. Inputs
 
 You will receive the following inputs:
@@ -377,7 +377,9 @@ This metadata may include, for example:
 - Any other relevant fields.
 
 You must base your scoring only on the evidence available in this metadata. Do not assume or hallucinate objectives or impacts that are not clearly supported by the provided information.
-
+"""
+  if evidence_context:
+    prompt += f"""
 ### 3.3 Evidence Sources
 
 In addition to the result metadata, you will also receive **evidence sources** related to this result (e.g., reports, publications, datasets, project documents, outcome stories). Use these as **complementary inputs** when assigning Impact Area scores.
@@ -398,7 +400,7 @@ Use the following evidence to inform your impact area scoring:
 - Focus on **actual outcomes, beneficiaries, and impacts** described in the evidence when deciding whether contributions are direct/intentional (scores 1-2) or only indirect/incidental (score 0).
 """
 
-    output_instruction = """
+  output_instruction = """
 --------------------------------------------------
 
 ## 4. Your Task
@@ -477,6 +479,6 @@ Ensure the JSON is valid and parseable.
 
 """
     
-    prompt += output_instruction
+  prompt += output_instruction
     
-    return prompt
+  return prompt
