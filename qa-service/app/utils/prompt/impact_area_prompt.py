@@ -131,6 +131,11 @@ Youth and social inclusion focus on:
 When this Impact Area receives a score of **2 (PRINCIPAL)**, you must also select the **dominant sub-component**:
 - `"Gender equality"`, `"Youth"`, or `"Social Inclusion"`.
 
+**Sub-component definitions (use only to interpret or validate a Principal selection):**
+- **Gender equality**: Ensures equal rights, access, and control over resources for women; addresses discriminatory norms and structural barriers; promotes women's full participation and benefit in agrifood systems.
+- **Youth**: Expands economic and learning opportunities for young people, particularly those excluded from employment or training; supports pathways to dignified work and entrepreneurship.
+- **Social Inclusion**: Enables marginalized groups to participate in and benefit from food systems; removes barriers linked to poverty, geography, or social status; promotes equitable access to services, resources, and decision-making.
+
 --------------------------------------------------
 ### 2.2 Climate Adaptation and Mitigation
 
@@ -183,6 +188,10 @@ This Impact Area focuses on research that directly addresses:
 When this Impact Area receives a score of **2 (PRINCIPAL)**, you must also select the **dominant sub-component**:
 - `"Adaptation"` or `"Mitigation"`.
 
+**Sub-component definitions (use only to interpret or validate a Principal selection):**
+- **Adaptation**: Builds resilience of producers and food systems to climate shocks; reduces vulnerability through improved practices and services; strengthens capacity to anticipate, absorb, and adjust to impacts.
+- **Mitigation**: Reduces greenhouse gas emissions from agriculture and land use; promotes carbon sequestration and low-emission technologies; supports alignment with national and global climate goals.
+
 --------------------------------------------------
 ### 2.3 Nutrition, Health and Food Security
 
@@ -229,6 +238,11 @@ This Impact Area focuses on the **nutrition, health, and food security of humans
 
 When this Impact Area receives a score of **2 (PRINCIPAL)**, you must also select the **dominant sub-component**:
 - `"Nutrition"`, `"Health"`, or `"Food Security"`.
+
+**Sub-component definitions (use only to interpret or validate a Principal selection):**
+- **Nutrition**: Improves access to diverse, safe, and nutrient-rich diets; targets populations affected by malnutrition; shapes food systems that enable healthy dietary choices.
+- **Health**: Reduces foodborne, zoonotic, and environmental health risks; promotes safe production and consumption practices; advances One Health approaches across sectors.
+- **Food Security**: Ensures stable access to sufficient, safe, nutritious food; supports populations vulnerable to hunger or shocks; strengthens resilient and reliable food supply systems.
 
 --------------------------------------------------
 ### 2.4 Environmental Health and Biodiversity
@@ -284,6 +298,10 @@ This Impact Area focuses on **staying within planetary boundaries** and protecti
 When this Impact Area receives a score of **2 (PRINCIPAL)**, you must also select the **dominant sub-component**:
 - `"Environmental Health"` or `"Biodiversity"`.
 
+**Sub-component definitions (use only to interpret or validate a Principal selection):**
+- **Environmental Health**: Promotes sustainable use of water, soil, and natural resources; reduces pollution and ecological degradation; improves the environmental performance of food systems.
+- **Biodiversity**: Protects genetic, species, and ecosystem diversity; supports conservation both in situ and ex situ; maintains diversity essential for resilience and sustainability.
+
 --------------------------------------------------
 ### 2.5 Poverty Reduction, Livelihoods and Jobs
 
@@ -324,6 +342,11 @@ This Impact Area focuses on **reducing poverty**, improving **livelihoods**, and
 
 When this Impact Area receives a score of **2 (PRINCIPAL)**, you must also select the **dominant sub-component**:
 - `"Poverty Reduction"`, `"Livelihoods"`, or `"Jobs"`.
+
+**Sub-component definitions (use only to interpret or validate a Principal selection):**
+- **Poverty Reduction**: Reduces the incidence and depth of income and multidimensional poverty; improves access to assets, opportunities, and basic services; supports structural changes that lift people sustainably out of poverty.
+- **Livelihoods**: Improves income stability and access to assets for rural households; strengthens market, service, and risk management opportunities; builds long-term resilience and well-being.
+- **Jobs**: Creates decent and fair employment in agrifood systems; improves labor productivity and income opportunities; prioritizes inclusion of women, youth, and marginalized workers.
 
 --------------------------------------------------
 """
