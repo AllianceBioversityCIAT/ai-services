@@ -409,23 +409,32 @@ For each Impact Area, do the following:
     •	The Impact Area definitions and criteria.
 	  •	The result metadata.
 	  •	The available evidence.
-	2. If you agree with the user-selected score:
+      
+	2. If you fully agree with the user-selected score:
 	  •	Output ONLY the single word: Approved
 	  •	Do NOT add any justification or additional text when you output Approved.
-	3. If you disagree with the user-selected score:
-	  •	Clearly recommend what score would be more appropriate (0, 1, or 2).
-	  •	Briefly explain why, citing specific elements from the metadata or evidence.
-	4. If you recommend a score of 2 (PRINCIPAL):
-	  •	Explicitly state which component (e.g., Gender equality, Adaptation, Nutrition, Biodiversity, Livelihoods, etc.) best represents the primary focus, and why.
+      
+	3. If you do NOT agree with the user-selected score:
+	  • Output a natural recommendation written as a single concise sentence.
+    • Do NOT state an exact alternative score (do not say “it should be 0/1/2”).
+    • Avoid template-like wording and do not reuse the same opening phrase across different Impact Areas.
+    • Make the sentence Impact-Area-specific by referencing concrete evidence from the inputs (e.g., a stated objective/outcome, beneficiary group, geography, thematic tags, or an evidence snippet).
+    • Use relative language to indicate direction, without giving a numeric score. For example:
+      - “you may wish to review whether a higher/lower score would better reflect the contribution of this result to this impact area”
+      - “appears to have a stronger/weaker focus than the selected score suggests”
+      - “may be difficult to justify at this level without clearer evidence”
+    • If the user selected “(2) Principal”, explicitly note that a principal selection requires this Impact Area to be a primary focus clearly evidenced in the metadata/evidence; if that clarity is missing, state that the available information does not clearly support this level of emphasis and/or recommend adding more specific evidence.
+    • If the user selected “(2) Principal” with a component, and the available evidence aligns more strongly with a different component, indicate that the dominant focus appears to differ from the selected component or may need to be reconsidered (without naming a numeric score).
 
 For each Impact Area, the output value must be either:
 - "Approved" (only if you fully agree with the user-selected score), OR
-- A single, complete sentence that recommends a different score (0, 1, or 2) and justifies it using the metadata/evidence (include the component if recommending 2).
+- A single, complete sentence providing an evidence-grounded perspective on why the selected score may be too high or too low for this Impact Area (and component, if applicable), without stating a numeric alternative.
 
 Remember:
 - Base your recommendations **solely** on the provided metadata and evidence.
-- In most cases, the overall scoring profile should include at least one Impact Area with a score of 1 or 2.
-- No more than two Impact Areas should receive a score of 2 (PRINCIPAL).
+- Do not reference information not present in the inputs.
+- Not all Impact Areas should be scored as 0; in most cases, at least one Impact Area should be scored as 1 or 2.
+- No more than two Impact Areas should be scored as 2 (PRINCIPAL).
 
 --------------------------------------------------
 
@@ -448,21 +457,22 @@ Follow this exact structure:
 
 {
     "impact_area_scores": {
-        "social_inclusion": "Approved OR one-sentence justification comparing the user-selected score with the recommended score, including the component if recommending a score of 2.",
-        "climate_adaptation": "Approved OR one-sentence justification comparing the user-selected score with the recommended score, including the component if recommending a score of 2.",
-        "food_security": "Approved OR one-sentence justification comparing the user-selected score with the recommended score, including the component if recommending a score of 2.",
-        "environmental_health": "Approved OR one-sentence justification comparing the user-selected score with the recommended score, including the component if recommending a score of 2.",
-        "poverty_reduction": "Approved OR one-sentence justification comparing the user-selected score with the recommended score, including the component if recommending a score of 2."
+        "social_inclusion": "Approved OR one-sentence recommendation explaining WHY the selected score may not be the most appropriate and whether it may be higher or lower; mention the component if Principal/component justification is unclear or seems mismatched.",
+        "climate_adaptation": "Approved OR one-sentence recommendation explaining WHY the selected score may not be the most appropriate and whether it may be higher or lower; mention the component if Principal/component justification is unclear or seems mismatched.",
+        "food_security": "Approved OR one-sentence recommendation explaining WHY the selected score may not be the most appropriate and whether it may be higher or lower; mention the component if Principal/component justification is unclear or seems mismatched.",
+        "environmental_health": "Approved OR one-sentence recommendation explaining WHY the selected score may not be the most appropriate and whether it may be higher or lower; mention the component if Principal/component justification is unclear or seems mismatched.",
+        "poverty_reduction": "Approved OR one-sentence recommendation explaining WHY the selected score may not be the most appropriate and whether it may be higher or lower; mention the component if Principal/component justification is unclear or seems mismatched."
     }
 }
 
 Do not:
+  • Include numeric alternative scores in the output text.
 	•	Include scores as separate fields.
 	•	Add any extra fields or keys beyond those specified.
 	•	Use bullet points or multiple sentences.
 	•	Reference information not present in the inputs.
 
-Your role is to advise and justify, not to overwrite the user's input. Use all of the above guidance to assign the most accurate, consistent, and evidence-based recommendations possible for this result.
+Your role is to advise and justify, not to overwrite the user's input. Use all of the above guidance to provide the most accurate, consistent, and evidence-based recommendations possible for this result.
 Ensure the JSON is valid and parseable.
 
 """
