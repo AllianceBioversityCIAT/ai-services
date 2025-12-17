@@ -1,0 +1,700 @@
+{
+  "user_id": "daniela.gomez@cgiar.org",
+  "result_metadata": {
+       "result_id": "12616",
+        "is_replicated": 1,
+        "initiative_id": 15857,
+        "result_type_id": 7,
+        "result_type_name": "Innovation development",
+        "result_level_id": 4,
+        "result_level_name": "Output",
+        "result_name": "Yam breeding network in Africa addresses breeding challenges to develop consumer-demanded, more productive, pest and disease resistant White and Water Yam varieties; Nigeria releases five Yam varieties",
+        "result_description": "In collaboration with national yam breeding programs in Nigeria, Cote d’Ivoire, Ghana and Benin, IITA yam breeding seeks to develop and deploy end-user preferred White Yam and Water Yam varieties with higher yield, greater resistance to pests and diseases and improved quality, targeted at West Africa. Together these collaborators seek to address common yam breeding challenges: reducing lengthy crop cycles to 3-4 years, poor seed multiplication ratio, poor understanding of genetic diversity, limited breeding enabling technologies, and limited current capacity in West Africa. Significant strides were made in enhancing the efficiency of breeding programs, including defining the yam market segmentation, refining the yam product profile, deploying marker assisted selection, and use of quantitative genetics methods to optimize breeding approaches. Yam consumers participated in elite clone selection. Between 2022 and 2024, the National Root Crops Research Institute registered five white yam varieties in NIgeria, one of them in 2024.\n\n\n",
+        "gender_tag_id": "2",
+        "climate_change_tag_id": "2",
+        "nutrition_tag_level_id": "3",
+        "environmental_biodiversity_tag_level_id": "2",
+        "poverty_tag_level_id": "3",
+        "institutions_type": [],
+        "krs_url": null,
+        "is_krs": false,
+        "lead_contact_person": "A.Amele@cgiar.org - Amele, Asrat (IITA)",
+        "lead_contact_person_data": {
+            "id": 2,
+            "cn": "Amele, Asrat (IITA)",
+            "display_name": "Amele, Asrat (IITA)",
+            "mail": "A.Amele@cgiar.org",
+            "sam_account_name": "AAmele",
+            "given_name": "Asrat",
+            "sn": "Amele",
+            "user_principal_name": "A.Amele@cgiar.org",
+            "title": "Yam Breeder ",
+            "department": "Crop Improvement",
+            "company": "IITA",
+            "manager": "CN=Mushoriwa\\, Hapson (IITA),OU=GRC,OU=R4D,OU=Users,OU=Ibadan,OU=IITAHUB,DC=CGIARAD,DC=ORG",
+            "employee_id": null,
+            "employee_number": null,
+            "employee_type": null,
+            "description": "Yam Breeder  (E06040)",
+            "is_active": true,
+            "created_at": "2025-07-29T19:10:51.307Z",
+            "updated_at": "2025-07-29T19:10:51.307Z",
+            "last_synced_at": "2025-07-29T19:07:27.000Z"
+        },
+        "phase_name": "Reporting 2024",
+        "phase_year": 2024,
+        "is_discontinued": 0,
+        "discontinued_options": [],
+        "no_applicable_partner": false,
+        "institutions": [
+            {
+                "id": "30766",
+                "is_active": true,
+                "is_predicted": false,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": null,
+                "is_leading_result": null,
+                "result_id": "12616",
+                "institutions_id": 63,
+                "institution_roles_id": "2",
+                "result_kp_mqap_institution_id": null,
+                "delivery": [
+                    {
+                        "id": 34764,
+                        "partner_delivery_type_id": 1,
+                        "result_by_institution_id": "30766",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34765,
+                        "partner_delivery_type_id": 2,
+                        "result_by_institution_id": "30766",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34766,
+                        "partner_delivery_type_id": 3,
+                        "result_by_institution_id": "30766",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    }
+                ],
+                "obj_institutions": {
+                    "name": "University of Abomey Calavi",
+                    "website_link": "http://www.uac.bj/web/",
+                    "obj_institution_type_code": {
+                        "id": 60,
+                        "name": "Research organizations and universities National (Universities)"
+                    }
+                }
+            },
+            {
+                "id": "30767",
+                "is_active": true,
+                "is_predicted": false,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": null,
+                "is_leading_result": null,
+                "result_id": "12616",
+                "institutions_id": 589,
+                "institution_roles_id": "2",
+                "result_kp_mqap_institution_id": null,
+                "delivery": [
+                    {
+                        "id": 34767,
+                        "partner_delivery_type_id": 3,
+                        "result_by_institution_id": "30767",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34768,
+                        "partner_delivery_type_id": 2,
+                        "result_by_institution_id": "30767",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34769,
+                        "partner_delivery_type_id": 1,
+                        "result_by_institution_id": "30767",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    }
+                ],
+                "obj_institutions": {
+                    "name": "Centre national de recherche agronomique",
+                    "website_link": "http://www.cnra.ci",
+                    "obj_institution_type_code": {
+                        "id": 59,
+                        "name": "Research organizations and universities National (NARS)"
+                    }
+                }
+            },
+            {
+                "id": "30768",
+                "is_active": true,
+                "is_predicted": false,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": null,
+                "is_leading_result": null,
+                "result_id": "12616",
+                "institutions_id": 1591,
+                "institution_roles_id": "2",
+                "result_kp_mqap_institution_id": null,
+                "delivery": [
+                    {
+                        "id": 34770,
+                        "partner_delivery_type_id": 1,
+                        "result_by_institution_id": "30768",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34771,
+                        "partner_delivery_type_id": 2,
+                        "result_by_institution_id": "30768",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34772,
+                        "partner_delivery_type_id": 3,
+                        "result_by_institution_id": "30768",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    }
+                ],
+                "obj_institutions": {
+                    "name": "National Root Crops Research Institute",
+                    "website_link": "http://www.nrcri.gov.ng/",
+                    "obj_institution_type_code": {
+                        "id": 59,
+                        "name": "Research organizations and universities National (NARS)"
+                    }
+                }
+            },
+            {
+                "id": "30769",
+                "is_active": true,
+                "is_predicted": false,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": null,
+                "is_leading_result": null,
+                "result_id": "12616",
+                "institutions_id": 2370,
+                "institution_roles_id": "2",
+                "result_kp_mqap_institution_id": null,
+                "delivery": [
+                    {
+                        "id": 34773,
+                        "partner_delivery_type_id": 3,
+                        "result_by_institution_id": "30769",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34774,
+                        "partner_delivery_type_id": 2,
+                        "result_by_institution_id": "30769",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34775,
+                        "partner_delivery_type_id": 1,
+                        "result_by_institution_id": "30769",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    }
+                ],
+                "obj_institutions": {
+                    "name": "Council for Scientific and Industrial Research - Savanna Agricultural Research Institute",
+                    "website_link": "http://www.csir.org.gh/index.php/research-inst/120-savanna-agricultural-research-institute",
+                    "obj_institution_type_code": {
+                        "id": 59,
+                        "name": "Research organizations and universities National (NARS)"
+                    }
+                }
+            },
+            {
+                "id": "30770",
+                "is_active": true,
+                "is_predicted": false,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": null,
+                "is_leading_result": null,
+                "result_id": "12616",
+                "institutions_id": 3916,
+                "institution_roles_id": "2",
+                "result_kp_mqap_institution_id": null,
+                "delivery": [
+                    {
+                        "id": 34776,
+                        "partner_delivery_type_id": 1,
+                        "result_by_institution_id": "30770",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34777,
+                        "partner_delivery_type_id": 2,
+                        "result_by_institution_id": "30770",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34778,
+                        "partner_delivery_type_id": 3,
+                        "result_by_institution_id": "30770",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    }
+                ],
+                "obj_institutions": {
+                    "name": "Ebonyi State University",
+                    "website_link": "https://ebsu.edu.ng/",
+                    "obj_institution_type_code": {
+                        "id": 60,
+                        "name": "Research organizations and universities National (Universities)"
+                    }
+                }
+            },
+            {
+                "id": "30771",
+                "is_active": true,
+                "is_predicted": false,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": "2025-04-02T19:51:21.482Z",
+                "is_leading_result": null,
+                "result_id": "12616",
+                "institutions_id": 1400,
+                "institution_roles_id": "2",
+                "result_kp_mqap_institution_id": null,
+                "delivery": [
+                    {
+                        "id": 34779,
+                        "partner_delivery_type_id": 3,
+                        "result_by_institution_id": "30771",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34780,
+                        "partner_delivery_type_id": 2,
+                        "result_by_institution_id": "30771",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34781,
+                        "partner_delivery_type_id": 1,
+                        "result_by_institution_id": "30771",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    }
+                ],
+                "obj_institutions": {
+                    "name": "Crops Research Institute, Ghana",
+                    "website_link": "http://www.cropsresearch.org/",
+                    "obj_institution_type_code": {
+                        "id": 59,
+                        "name": "Research organizations and universities National (NARS)"
+                    }
+                }
+            },
+            {
+                "id": "30772",
+                "is_active": true,
+                "is_predicted": false,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": null,
+                "is_leading_result": null,
+                "result_id": "12616",
+                "institutions_id": 3789,
+                "institution_roles_id": "2",
+                "result_kp_mqap_institution_id": null,
+                "delivery": [
+                    {
+                        "id": 34782,
+                        "partner_delivery_type_id": 1,
+                        "result_by_institution_id": "30772",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34783,
+                        "partner_delivery_type_id": 2,
+                        "result_by_institution_id": "30772",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    }
+                ],
+                "obj_institutions": {
+                    "name": "Hikma Agro Services Limited",
+                    "website_link": "https://www.hikmaagro.com/",
+                    "obj_institution_type_code": {
+                        "id": 75,
+                        "name": "Private company (other than financial)"
+                    }
+                }
+            },
+            {
+                "id": "30773",
+                "is_active": true,
+                "is_predicted": false,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": null,
+                "is_leading_result": null,
+                "result_id": "12616",
+                "institutions_id": 3790,
+                "institution_roles_id": "2",
+                "result_kp_mqap_institution_id": null,
+                "delivery": [
+                    {
+                        "id": 34784,
+                        "partner_delivery_type_id": 1,
+                        "result_by_institution_id": "30773",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34785,
+                        "partner_delivery_type_id": 2,
+                        "result_by_institution_id": "30773",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    }
+                ],
+                "obj_institutions": {
+                    "name": "Iribov Group",
+                    "website_link": "https://www.wur.nl/en/article/Iribov-SBW-1.htm",
+                    "obj_institution_type_code": {
+                        "id": 75,
+                        "name": "Private company (other than financial)"
+                    }
+                }
+            },
+            {
+                "id": "30774",
+                "is_active": true,
+                "is_predicted": false,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": null,
+                "is_leading_result": null,
+                "result_id": "12616",
+                "institutions_id": 3819,
+                "institution_roles_id": "2",
+                "result_kp_mqap_institution_id": null,
+                "delivery": [
+                    {
+                        "id": 34786,
+                        "partner_delivery_type_id": 1,
+                        "result_by_institution_id": "30774",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34787,
+                        "partner_delivery_type_id": 2,
+                        "result_by_institution_id": "30774",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    }
+                ],
+                "obj_institutions": {
+                    "name": "Fosuah Food Chain Limited",
+                    "website_link": "https://www.businessghana.com/site/news/General/189948/Government-must-pay-attention-to-women-farmers",
+                    "obj_institution_type_code": {
+                        "id": 75,
+                        "name": "Private company (other than financial)"
+                    }
+                }
+            },
+            {
+                "id": "30775",
+                "is_active": true,
+                "is_predicted": false,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": null,
+                "is_leading_result": null,
+                "result_id": "12616",
+                "institutions_id": 7575,
+                "institution_roles_id": "2",
+                "result_kp_mqap_institution_id": null,
+                "delivery": [
+                    {
+                        "id": 34788,
+                        "partner_delivery_type_id": 1,
+                        "result_by_institution_id": "30775",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    },
+                    {
+                        "id": 34789,
+                        "partner_delivery_type_id": 2,
+                        "result_by_institution_id": "30775",
+                        "is_active": true,
+                        "created_by": 117,
+                        "created_date": "2024-07-17T22:10:49.000Z",
+                        "last_updated_by": 117,
+                        "last_updated_date": "2024-07-17T22:10:49.000Z"
+                    }
+                ],
+                "obj_institutions": {
+                    "name": "Strategic Seed Nigeria limited",
+                    "website_link": "https://strategicseedsltd.com/",
+                    "obj_institution_type_code": {
+                        "id": 75,
+                        "name": "Private company (other than financial)"
+                    }
+                }
+            }
+        ],
+        "mqap_institutions": [],
+        "contributing_np_projects": [
+            {
+                "id": 2478,
+                "grant_title": "AfricaYam: Enhancing yam breeding for increased productivity and improved quality in West Africa",
+                "center_grant_id": null,
+                "is_active": 1,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": null,
+                "results_id": "12616",
+                "lead_center": "CENTER-11",
+                "funder": 154,
+                "created_by": 117,
+                "last_updated_by": 117
+            },
+            {
+                "id": 2479,
+                "grant_title": "Institutional head farm management, breeding and product management",
+                "center_grant_id": null,
+                "is_active": 1,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": null,
+                "results_id": "12616",
+                "lead_center": "CENTER-05",
+                "funder": 315,
+                "created_by": 117,
+                "last_updated_by": 117
+            },
+            {
+                "id": 2480,
+                "grant_title": "Enabling Digitization at IITA",
+                "center_grant_id": null,
+                "is_active": 1,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": null,
+                "results_id": "12616",
+                "lead_center": "CENTER-05",
+                "funder": 315,
+                "created_by": 117,
+                "last_updated_by": 117
+            },
+            {
+                "id": 2481,
+                "grant_title": "RTB Investment: Towards building a portfolio of breeding investments in banana, cassava, potato, sweetpotato and yam benefitting African smallholder farmers, rural and urban consumers",
+                "center_grant_id": null,
+                "is_active": 1,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": null,
+                "results_id": "12616",
+                "lead_center": "CENTER-06",
+                "funder": 154,
+                "created_by": 117,
+                "last_updated_by": 117
+            }
+        ],
+        "contributing_center": [
+            {
+                "id": 21730,
+                "primary": 1,
+                "from_cgspace": 0,
+                "is_active": 1,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": "2024-10-08T14:09:55.313Z",
+                "result_id": "12616",
+                "created_by": 117,
+                "last_updated_by": null,
+                "code": "CENTER-11",
+                "name": "International Institute of Tropical Agriculture",
+                "acronym": "IITA",
+                "is_leading_result": 1
+            }
+        ],
+        "is_lead_by_partner": false,
+        "regions": [
+            {
+                "result_region_id": "8830",
+                "id": 11,
+                "result_id": "12616",
+                "is_active": 1,
+                "created_date": "2024-07-17T22:10:49.000Z",
+                "last_updated_date": null,
+                "name": "Western Africa"
+            }
+        ],
+        "countries": [],
+        "geo_scope_id": 2,
+        "has_countries": 0,
+        "has_regions": 1,
+    "evidence": [
+            {
+                "id": "22147",
+                "sp_evidence_id": null,
+                "sp_document_id": null,
+                "sp_file_name": null,
+                "sp_folder_path": null,
+                "is_public_file": false,
+                "description": "In the second page. ",
+                "is_active": 1,
+                "creation_date": "2024-07-17T22:12:04.000Z",
+                "last_updated_date": "2025-01-31T19:51:12.000Z",
+                "created_by": 117,
+                "last_updated_by": 316,
+                "gender_related": true,
+                "link": "https://www.cgiar.org/news-events/news/boosting-soil-health-and-livelihoods-innovative-biofortification-in-malawis-strip-cropping-systems-boost-soil-health-and-livelihoods/",
+                "is_sharepoint": 0,
+                "youth_related": true,
+                "nutrition_related": true,
+                "environmental_biodiversity_related": false,
+                "poverty_related": true,
+                "is_supplementary": 0,
+                "result_id": "13231",
+                "knowledge_product_related": null,
+                "innovation_readiness_related": true,
+                "innovation_use_related": false
+            },
+            {
+                "id": "30038",
+                "sp_evidence_id": null,
+                "sp_document_id": null,
+                "sp_file_name": null,
+                "sp_folder_path": null,
+                "is_public_file": false,
+                "description": null,
+                "is_active": 1,
+                "creation_date": "2025-01-24T07:57:48.684Z",
+                "last_updated_date": "2025-01-31T19:51:12.000Z",
+                "created_by": 828,
+                "last_updated_by": 316,
+                "gender_related": true,
+                "link": "https://www.cgiar.org/news-events/news/promoting-mixed-farming-system-innovations-in-malawi-a-unified-approach/",
+                "is_sharepoint": 0,
+                "youth_related": false,
+                "nutrition_related": true,
+                "environmental_biodiversity_related": false,
+                "poverty_related": false,
+                "is_supplementary": 0,
+                "result_id": "13231",
+                "knowledge_product_related": null,
+                "innovation_readiness_related": false,
+                "innovation_use_related": false
+            },
+            {
+                "id": "30040",
+                "sp_evidence_id": null,
+                "sp_document_id": null,
+                "sp_file_name": null,
+                "sp_folder_path": null,
+                "is_public_file": false,
+                "description": null,
+                "is_active": 1,
+                "creation_date": "2025-01-24T08:00:09.364Z",
+                "last_updated_date": "2025-01-31T19:51:12.000Z",
+                "created_by": 828,
+                "last_updated_by": 316,
+                "gender_related": false,
+                "link": "https://hdl.handle.net/10568/135105",
+                "is_sharepoint": 0,
+                "youth_related": true,
+                "nutrition_related": true,
+                "environmental_biodiversity_related": true,
+                "poverty_related": false,
+                "is_supplementary": 0,
+                "result_id": "13231",
+                "knowledge_product_related": "6839",
+                "innovation_readiness_related": false,
+                "innovation_use_related": false
+            }
+        ]
+    }
+}
