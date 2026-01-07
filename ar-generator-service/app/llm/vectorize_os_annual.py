@@ -113,9 +113,8 @@ def insert_into_opensearch(table_name: str):
         logger.error(f"❌ Error inserting into OpenSearch for {table_name}: {e}")
 
 
-def retrieve_context(query, indicator, year, top_k=10000):
+def retrieve_context(query, indicator, year, top_k=10000, apply_contingency_filters=False):
     try:
-        logger.info("📚 Retrieving relevant context from OpenSearch...")
         embedding = get_bedrock_embeddings([query])[0]
         
         ## VECTOR SEARCH
@@ -216,9 +215,8 @@ def retrieve_context(query, indicator, year, top_k=10000):
                 combined_chunks.append(chunk)
 
         ## FILTER KNN CHUNKS
-        filtered_knn_chunks = [
-            chunk for chunk in combined_chunks
-            if not (
+        def should_exclude_chunk(chunk):
+            base_filters = (
                 (chunk.get("table_type") == "deliverables" and chunk.get("cluster_role") == "Shared")
                 or
                 (chunk.get("table_type") == "innovations" and chunk.get("cluster_role") == "Shared")
@@ -229,7 +227,19 @@ def retrieve_context(query, indicator, year, top_k=10000):
                 or
                 (chunk.get("table_type") == "contributions" and chunk.get("phase_name") == "Progress")
             )
-        ]
+            
+            contingency_filters = (
+                (chunk.get("table_type") == "deliverables" and chunk.get("already_disseminated") == "No")
+                or
+                (chunk.get("table_type") == "deliverables" and not chunk.get("dissemination_URL"))
+            )
+            
+            if apply_contingency_filters:
+                return base_filters or contingency_filters
+            else:
+                return base_filters
+        
+        filtered_knn_chunks = [chunk for chunk in combined_chunks if not should_exclude_chunk(chunk)]
 
         ## FILTER QUESTIONS CHUNKS
         filtered_questions_chunks = [
@@ -453,7 +463,7 @@ def run_pipeline(indicator, year, insert_data=False):
 
         PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
         
-        context, questions = retrieve_context(PROMPT, indicator, year)
+        context, questions = retrieve_context(PROMPT, indicator, year, apply_contingency_filters=False)
         save_context_to_file(context, "context", indicator, year)
 
         query = f"""
@@ -461,7 +471,23 @@ def run_pipeline(indicator, year, insert_data=False):
             Do the following:\n{PROMPT}
             """
 
-        generated_report = invoke_model(query)
+        try:
+            generated_report = invoke_model(query)
+        except Exception as e:
+            if "Input is too long" in str(e):
+                logger.warning("⚠️ Input is too long. Applying contingency filters and retrying...")
+                context, questions = retrieve_context(PROMPT, indicator, year, apply_contingency_filters=True)
+                save_context_to_file(context, "context_contingency", indicator, year)
+                
+                query = f"""
+                    Using this information:\n{context}\n\n
+                    Do the following:\n{PROMPT}
+                    """
+                
+                generated_report = invoke_model(query)
+                logger.info("✅ Report generated successfully with contingency filters applied.")
+            else:
+                raise
 
         ## Part 2: Generate the report with dissagregated targets
         accepted_indicators = ["PDO Indicator 1", "PDO Indicator 2", "PDO Indicator 3", "IPI 2.3"]
@@ -490,4 +516,9 @@ def run_pipeline(indicator, year, insert_data=False):
 
     except Exception as e:
         logger.error(f"❌ Error in pipeline execution: {e}")
+        
+        if "Input is too long" in str(e):
+            logger.error("❌ Input is still too long even after applying contingency filters.")
+            return f"# Report Generation Error\n\nThe input context for indicator {indicator} in year {year} is too long for the model, even after applying data reduction filters."
+        
         return None
