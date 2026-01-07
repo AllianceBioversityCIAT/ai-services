@@ -400,6 +400,16 @@ async def generate_annual_report(request: ChatRequest) -> ChatResponse:
         # Calculate processing time
         processing_time = round(time.time() - start_time, 2)
         
+        # Check if the report generation failed
+        if full_response is None:
+            logger.error(f"❌ Failed to generate annual report for {request.indicator} - {request.year}")
+            return ChatResponse(
+                indicator=request.indicator,
+                year=request.year,
+                content="Report generation failed. Please check the logs for more details.",
+                status="error"
+            )
+        
         logger.info(f"✅ Successfully generated annual report for {request.indicator} - {request.year} in {processing_time}s")
         
         return ChatResponse(

@@ -113,8 +113,21 @@ def insert_into_opensearch(table_name: str):
         logger.error(f"❌ Error inserting into OpenSearch for {table_name}: {e}")
 
 
-def retrieve_context(query, indicator, year, top_k=10000, apply_contingency_filters=False):
+def retrieve_context(query, indicator, year, top_k=10000, contingency_level=0):
+    """
+    Retrieve context from OpenSearch with contingency levels.
+    
+    contingency_level:
+        0 = Normal (no filters, top_k as specified)
+        1 = Level 1 contingency (basic filters, top_k=5000)
+        2 = Level 2 contingency (aggressive filters, top_k=2000)
+    """
     try:
+        if contingency_level == 1:
+            top_k = 5000
+        elif contingency_level == 2:
+            top_k = 2000
+        
         embedding = get_bedrock_embeddings([query])[0]
         
         ## VECTOR SEARCH
@@ -236,7 +249,9 @@ def retrieve_context(query, indicator, year, top_k=10000, apply_contingency_filt
                 (chunk.get("table_type") == "deliverables" and chunk.get("status") != "Completed")
             )
             
-            if apply_contingency_filters:
+            if contingency_level == 0:
+                return base_filters
+            elif contingency_level == 1 or contingency_level == 2:
                 return base_filters or contingency_filters
             else:
                 return base_filters
@@ -465,7 +480,7 @@ def run_pipeline(indicator, year, insert_data=False):
 
         PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
         
-        context, questions = retrieve_context(PROMPT, indicator, year, apply_contingency_filters=False)
+        context, questions = retrieve_context(PROMPT, indicator, year, contingency_level=0)
         save_context_to_file(context, "context", indicator, year)
 
         query = f"""
@@ -477,17 +492,33 @@ def run_pipeline(indicator, year, insert_data=False):
             generated_report = invoke_model(query)
         except Exception as e:
             if "Input is too long" in str(e):
-                logger.warning("⚠️ Input is too long. Applying contingency filters and retrying...")
-                context, questions = retrieve_context(PROMPT, indicator, year, apply_contingency_filters=True)
-                save_context_to_file(context, "context_contingency", indicator, year)
-                
-                query = f"""
-                    Using this information:\n{context}\n\n
-                    Do the following:\n{PROMPT}
-                    """
-                
-                generated_report = invoke_model(query)
-                logger.info("✅ Report generated successfully with contingency filters applied.")
+                logger.warning("⚠️ Input is too long. Applying Level 1 contingency (basic filters, top_k=5000)...")
+                try:
+                    context, questions = retrieve_context(PROMPT, indicator, year, contingency_level=1)
+                    save_context_to_file(context, "context_contingency", indicator, year)
+                    
+                    query = f"""
+                        Using this information:\n{context}\n\n
+                        Do the following:\n{PROMPT}
+                        """
+                    
+                    generated_report = invoke_model(query)
+                    logger.info("✅ Report generated successfully with Level 1 contingency.")
+                except Exception as e2:
+                    if "Input is too long" in str(e2):
+                        logger.warning("⚠️ Still too long. Applying Level 2 contingency (aggressive filters, top_k=2000)...")
+                        context, questions = retrieve_context(PROMPT, indicator, year, contingency_level=2)
+                        save_context_to_file(context, "context_contingency", indicator, year)
+                        
+                        query = f"""
+                            Using this information:\n{context}\n\n
+                            Do the following:\n{PROMPT}
+                            """
+                        
+                        generated_report = invoke_model(query)
+                        logger.info("✅ Report generated successfully with Level 2 contingency.")
+                    else:
+                        raise e2
             else:
                 raise
 
