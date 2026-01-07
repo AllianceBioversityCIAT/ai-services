@@ -261,6 +261,15 @@ def retrieve_context(query, indicator, year, top_k=10000, contingency_level=0):
         
         filtered_knn_chunks = [chunk for chunk in combined_chunks if not should_exclude_chunk(chunk)]
 
+        if contingency_level == 2:
+            deliverables_chunks = [c for c in filtered_knn_chunks if c.get("table_type") == "deliverables"]
+            contributions_chunks = [c for c in filtered_knn_chunks if c.get("table_type") == "contributions"]
+            
+            deliverables_chunks = deliverables_chunks[:1000]
+            contributions_chunks = contributions_chunks[:1000]
+        
+            filtered_knn_chunks = deliverables_chunks + contributions_chunks
+
         ## FILTER QUESTIONS CHUNKS
         filtered_questions_chunks = [
             chunk for chunk in questions_chunks
