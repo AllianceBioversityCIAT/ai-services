@@ -232,6 +232,8 @@ def retrieve_context(query, indicator, year, top_k=10000, apply_contingency_filt
                 (chunk.get("table_type") == "deliverables" and chunk.get("already_disseminated") == "No")
                 or
                 (chunk.get("table_type") == "deliverables" and not chunk.get("dissemination_URL"))
+                or
+                (chunk.get("table_type") == "deliverables" and chunk.get("status") != "Completed")
             )
             
             if apply_contingency_filters:
