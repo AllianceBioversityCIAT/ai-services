@@ -411,6 +411,16 @@ async def generate_annual_report(request: ChatRequest) -> ChatResponse:
                 status="error"
             )
         
+        # Check if the response contains an error message
+        if full_response.startswith("# Report Generation Error"):
+            logger.error(f"❌ Report generation returned an error for {request.indicator} - {request.year}")
+            return ChatResponse(
+                indicator=request.indicator,
+                year=request.year,
+                content=full_response,
+                status="error"
+            )
+        
         logger.info(f"✅ Successfully generated annual report for {request.indicator} - {request.year} in {processing_time}s")
         
         return ChatResponse(

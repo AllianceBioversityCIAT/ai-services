@@ -117,15 +117,23 @@ def retrieve_context(query, indicator, year, top_k=10000, contingency_level=0):
     Retrieve context from OpenSearch with contingency levels.
     
     contingency_level:
-        0 = Normal (no filters, top_k as specified)
-        1 = Level 1 contingency (basic filters, top_k=5000)
-        2 = Level 2 contingency (aggressive filters, top_k=2000)
+        0 = Normal (search in all 4 tables)
+        1 = Level 1 contingency (search in all 4 tables with additional filters)
+        2 = Level 2 contingency (search only in deliverables and contributions with additional filters)
     """
     try:
-        if contingency_level == 1:
-            top_k = 5000
-        elif contingency_level == 2:
-            top_k = 2000
+        if contingency_level == 0 or contingency_level == 1:
+            search_tables = [
+                {"term": {"source_table": "vw_ai_deliverables"}},
+                {"term": {"source_table": "vw_ai_project_contribution"}},
+                {"term": {"source_table": "vw_ai_oicrs"}},
+                {"term": {"source_table": "vw_ai_innovations"}}
+            ]
+        else:
+            search_tables = [
+                {"term": {"source_table": "vw_ai_deliverables"}},
+                {"term": {"source_table": "vw_ai_project_contribution"}}
+            ]
         
         embedding = get_bedrock_embeddings([query])[0]
         
@@ -139,12 +147,7 @@ def retrieve_context(query, indicator, year, top_k=10000, contingency_level=0):
                         {"term": {"year": year}},
                         {
                             "bool": {
-                                "should": [
-                                    {"term": {"source_table": "vw_ai_deliverables"}},
-                                    {"term": {"source_table": "vw_ai_project_contribution"}},
-                                    {"term": {"source_table": "vw_ai_oicrs"}},
-                                    {"term": {"source_table": "vw_ai_innovations"}}
-                                ],
+                                "should": search_tables,
                                 "minimum_should_match": 1
                             }
                         }
@@ -478,7 +481,7 @@ def run_pipeline(indicator, year, insert_data=False):
             generated_report = invoke_model(query)
         except Exception as e:
             if "Input is too long" in str(e):
-                logger.warning("⚠️ Input is too long. Applying Level 1 contingency (basic filters, top_k=5000)...")
+                logger.warning("⚠️ Input is too long. Applying Level 1 contingency...")
                 try:
                     context, questions = retrieve_context(PROMPT, indicator, year, contingency_level=1)
                     
@@ -491,7 +494,7 @@ def run_pipeline(indicator, year, insert_data=False):
                     logger.info("✅ Report generated successfully with Level 1 contingency.")
                 except Exception as e2:
                     if "Input is too long" in str(e2):
-                        logger.warning("⚠️ Still too long. Applying Level 2 contingency (aggressive filters, top_k=2000)...")
+                        logger.warning("⚠️ Still too long. Applying Level 2 contingency...")
                         context, questions = retrieve_context(PROMPT, indicator, year, contingency_level=2)
                         
                         query = f"""
