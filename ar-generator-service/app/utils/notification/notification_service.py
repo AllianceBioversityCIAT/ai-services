@@ -4,7 +4,9 @@ import certifi
 import logging
 import aiohttp
 from typing import Optional
+from dotenv import load_dotenv
 
+load_dotenv()
 
 class NotificationService:
     def __init__(self):

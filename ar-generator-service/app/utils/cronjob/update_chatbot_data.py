@@ -32,9 +32,10 @@ notification_service = NotificationService()
 
 
 ENDPOINT_URL = "https://ia.prms.cgiar.org/api/update-chatbot-data"
-TIMEOUT_SECONDS = 3600  # 60 minutes timeout - allows for data update processing time
-MAX_RETRIES = 3
-RETRY_DELAY = 60
+TIMEOUT_SECONDS = 360  # 6 minutes - longer than proxy timeout to receive the 502 response
+MAX_RETRIES = 2  # Reduced retries since we only need to confirm request acceptance
+RETRY_DELAY = 30  # Delay between retries
+MIN_REQUEST_TIME = 240  # 4 minutes - if request lasts this long, server is processing in background
 
 
 def make_chatbot_data_update_request():
@@ -43,16 +44,21 @@ def make_chatbot_data_update_request():
 
     This function triggers the data refresh process that ensures the Chatbot
     has access to the most current information for generating responses.
-    Includes retry logic for handling temporary server issues.
+    
+    Note: This is a "fire-and-forget" request. The server processes the data update
+    in the background, which may take longer than the proxy timeout. A 502 error or
+    timeout after the server accepts the request is considered successful, as the
+    background job continues running on the server.
 
     Returns:
-        bool: True if the data update request was successful, False otherwise
+        bool: True if the data update request was accepted, False otherwise
     """    
     for attempt in range(1, MAX_RETRIES + 1):
         try:
+            request_start = time.time()
             logger.info(f"Attempt {attempt}/{MAX_RETRIES}: Starting Chatbot data update process")
             logger.info(f"Endpoint: {ENDPOINT_URL}")
-            logger.info(f"Timeout: {TIMEOUT_SECONDS} seconds")
+            logger.info(f"Timeout: {TIMEOUT_SECONDS} seconds (fire-and-forget mode)")
 
             response = requests.post(
                 ENDPOINT_URL,
@@ -64,32 +70,68 @@ def make_chatbot_data_update_request():
                 }
             )
             
+            request_duration = time.time() - request_start
+            
             if response.status_code == 200:
                 logger.info(f"✅ Request successful. Status code: {response.status_code}")
                 logger.info(f"Response: {response.text[:500]}...")
                 return True
-            elif response.status_code in [502, 503, 504]:
-                logger.warning(f"⚠️ Server error {response.status_code} on attempt {attempt}")
+            elif response.status_code in [502, 504]:
+                # Check if it's a proxy timeout (background job running) or real error
+                response_text = response.text.lower()
+                is_proxy_timeout = (
+                    "proxy error" in response_text or 
+                    "error reading from remote server" in response_text
+                )
+                
+                if request_duration >= MIN_REQUEST_TIME and is_proxy_timeout:
+                    logger.info(f"ℹ️ Received proxy {response.status_code} after {request_duration:.1f}s")
+                    logger.info(f"✅ Request accepted - background job is processing on server")
+                    logger.info(f"Note: Proxy timeout is expected for long-running data updates")
+                    return True
+                else:
+                    # Could be real server error or quick failure
+                    logger.warning(f"⚠️ Server error {response.status_code} on attempt {attempt}")
+                    logger.warning(f"Request duration: {request_duration:.1f}s | Is proxy timeout: {is_proxy_timeout}")
+                    if not is_proxy_timeout:
+                        logger.warning(f"Response indicates potential server issue: {response.text[:200]}")
+                    if attempt < MAX_RETRIES:
+                        logger.info(f"Retrying in {RETRY_DELAY} seconds...")
+                        time.sleep(RETRY_DELAY)
+                        continue
+                    else:
+                        logger.error(f"❌ Max retries reached. Server may be unavailable")
+                        logger.error(f"Final response: {response.text[:500]}")
+                        return False
+            elif response.status_code == 503:
+                logger.warning(f"⚠️ Service unavailable (503) on attempt {attempt}")
                 if attempt < MAX_RETRIES:
                     logger.info(f"Retrying in {RETRY_DELAY} seconds...")
                     time.sleep(RETRY_DELAY)
                     continue
                 else:
-                    logger.error(f"❌ Max retries reached. Final error: {response.status_code}")
-                    logger.error(f"Response content: {response.text}")
+                    logger.error(f"❌ Max retries reached. Service unavailable")
                     return False
             else:
                 response.raise_for_status()
                 
         except requests.exceptions.Timeout:
-            logger.warning(f"⚠️ Request timed out after {TIMEOUT_SECONDS} seconds (attempt {attempt})")
-            if attempt < MAX_RETRIES:
-                logger.info(f"Retrying in {RETRY_DELAY} seconds...")
-                time.sleep(RETRY_DELAY)
-                continue
+            request_duration = time.time() - request_start
+            # Timeout after server accepted request = background job is running
+            if request_duration >= MIN_REQUEST_TIME:
+                logger.info(f"ℹ️ Request timed out after {request_duration:.1f}s")
+                logger.info(f"✅ Request accepted - background job is processing on server")
+                logger.info(f"Note: Timeout is expected for long-running data updates")
+                return True
             else:
-                logger.error(f"❌ Max retries reached. Request timed out")
-                return False
+                logger.warning(f"⚠️ Quick timeout on attempt {attempt} (may indicate connection issue)")
+                if attempt < MAX_RETRIES:
+                    logger.info(f"Retrying in {RETRY_DELAY} seconds...")
+                    time.sleep(RETRY_DELAY)
+                    continue
+                else:
+                    logger.error(f"❌ Max retries reached. Unable to connect to server")
+                    return False
             
         except requests.exceptions.ConnectionError:
             logger.warning(f"⚠️ Failed to connect to {ENDPOINT_URL} (attempt {attempt})")
