@@ -37,7 +37,7 @@ class NotificationService:
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f"{emoji} *{app_name}*\n*{title}*\n{message}\n{time_taken}\n*Priority:* {priority}"
+                            "text": f"{emoji} *{app_name}*\n*{title}*\n{message}\n*Time Taken:* {time_taken}\n*Priority:* {priority}"
                         }
                     }
                 ],
