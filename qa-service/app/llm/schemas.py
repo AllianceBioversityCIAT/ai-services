@@ -15,6 +15,10 @@ class InnovationDevSchema(BaseModel):
     impact_area_scores: ImpactAreaScoresSchema
 
 
+class KnowledgeProductSchema(BaseModel):
+    impact_area_scores: ImpactAreaScoresSchema
+
+
 class NonInnovationDevSchema(BaseModel):
     new_title: str
     new_description: str
@@ -24,5 +28,7 @@ class NonInnovationDevSchema(BaseModel):
 def validate_output_schema(json_content: dict, result_type: str):
     if result_type == "innovation development":
         return InnovationDevSchema(**json_content)
+    elif result_type == "knowledge product":
+        return KnowledgeProductSchema(**json_content)
     else:
         return NonInnovationDevSchema(**json_content)

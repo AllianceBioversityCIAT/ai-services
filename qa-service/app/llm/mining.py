@@ -217,13 +217,21 @@ async def improve_prms_result_metadata(
             logger.info("ℹ️  No evidence URLs provided, processing without additional context")
         
         logger.info("📝 Building modular prompts...")
-        main_prompt = build_main_prompt(result_type, result_level, result_metadata, evidence_context)
         impact_area_prompt = build_impact_area_prompt(result_metadata, evidence_context, impact_tags)
         
-        tasks = [
-            invoke_model_async(main_prompt, max_tokens=2000, prompt_name="main (title/description)"),
-            invoke_model_async(impact_area_prompt, max_tokens=1000, prompt_name="impact_areas")
-        ]
+        tasks = []
+        
+        if result_type == "knowledge product":
+            tasks.append(
+                invoke_model_async(impact_area_prompt, max_tokens=1000, prompt_name="impact_areas")
+            )
+            logger.info("📋 Knowledge Product: Only executing impact areas prompt")
+        else:
+            main_prompt = build_main_prompt(result_type, result_level, result_metadata, evidence_context)
+            tasks.extend([
+                invoke_model_async(main_prompt, max_tokens=2000, prompt_name="main (title/description)"),
+                invoke_model_async(impact_area_prompt, max_tokens=1000, prompt_name="impact_areas")
+            ])
         
         # if result_type == "innovation development":
         #     readiness_prompt = build_readiness_prompt(result_metadata, evidence_context)
@@ -245,15 +253,18 @@ async def improve_prms_result_metadata(
         logger.info("📦 Parsing responses...")
 
         try:
-            main_response = json.loads(responses[0])
-            impact_response = json.loads(responses[1])
+            if result_type == "knowledge product":
+                impact_response = json.loads(responses[0])
+                json_content = impact_response
+            else:
+                main_response = json.loads(responses[0])
+                impact_response = json.loads(responses[1])
+                json_content = {
+                    **main_response,
+                    **impact_response
+                }
         except json.JSONDecodeError as e:
             raise ValueError(f"LLM returned invalid JSON: {str(e)}")
-        
-        json_content = {
-            **main_response,
-            **impact_response
-        }
 
         try:
             validate_output_schema(json_content, result_type)
@@ -278,9 +289,14 @@ async def improve_prms_result_metadata(
                 ai_output = json.dumps(json_content, indent=2, ensure_ascii=False)
                 user_input = f"PRMS Result Metadata - Result type: {result_type}, Original result title: {result_title}, Original result description: {result_description}"
 
+                if result_type == "knowledge product":
+                    prompt_types = ["impact_areas"]
+                else:
+                    prompt_types = ["main", "impact_areas"]
+                
                 tracking_context = {
                     "prompts_executed": len(tasks),
-                    "prompt_types": ["main", "impact_areas"] + (["readiness_level"] if result_type == "innovation development" else ["use_level"] if result_type == "innovation use" else []),
+                    "prompt_types": prompt_types,
                     "model_used": "claude-4-sonnet",
                     "evidence_context_length": len(evidence_context),
                     "evidence_count": evidence_data['evidence_count'] if evidence_data else 0,
