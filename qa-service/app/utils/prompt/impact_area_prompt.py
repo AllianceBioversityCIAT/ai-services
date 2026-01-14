@@ -31,7 +31,7 @@ For reference, Impact Area scores are defined as follows:
 
 - **1 = SIGNIFICANT**
   - The result **directly and intentionally contributes** to one or more aspects of the Impact Area.
-  - The Impact Area is an **important, explicit objective**, but **not the principal or primary objective** of the result.
+  - The Impact Area is an **important objective** (explicitly stated **or clearly evidenced as intentional**), but **not the principal or primary objective** of the result.
   - The result has other primary goals, but it has been formulated or adjusted to **also** contribute in a meaningful way to this Impact Area.
 
 - **2 = PRINCIPAL**
@@ -47,7 +47,7 @@ Apply these rules consistently across all Impact Areas when forming your recomme
 
 - **Direct vs indirect contribution**
   - If the contribution is only **indirect, inferred, or incidental**, then the most appropriate score is **0 (NOT TARGETED)**.
-  - Only **direct and intentional** contributions (explicitly stated objectives, activities, outcomes, or expected impacts) can justify a score of **1 (SIGNIFICANT)** or **2 (PRINCIPAL)**.
+  - Only **direct and intentional** contributions (explicitly stated **or clearly evidenced** objectives, activities, outcomes, or expected impacts) can justify a score of **1 (SIGNIFICANT)** or **2 (PRINCIPAL)**.
 
 - **At least one non-zero score (validation check)**
   - In most cases, the overall scoring profile should include **at least one Impact Area** with a score of **1 or 2**.
@@ -114,7 +114,7 @@ Youth and social inclusion focus on:
   - References to biological sex of animals or plants (e.g., male/female animals, male/female plant traits) are **not** gender equality topics and should not lead to a non-zero score.
 
 - **1 = SIGNIFICANT**
-  - The result includes a **direct and explicit** consideration of gender equality, youth, or social inclusion, but these are **secondary objectives**.
+  - The result includes a **direct and intentional** consideration of gender equality, youth, or social inclusion (explicitly stated **or clearly evidenced by the described activities/outcomes/targeting**), but these are **secondary objectives**.
   - Examples:
     - A technology trial where the main objective is productivity, but the result includes a substantial analysis of gendered adoption, youth participation, or access differences.
     - A value-chain study focused on markets and competitiveness, which also assesses how benefits and opportunities differ for women, youth, or marginalized groups and draws conclusions relevant for more inclusive policies.
@@ -175,7 +175,7 @@ This Impact Area focuses on research that directly addresses:
   - Examples:
     - A productivity-focused intervention where climate resilience is explicitly considered and measured, but secondary to yield gains.
     - A policy study whose main focus is governance, but it also directly informs NAPs, NDCs, or climate investment decisions.
-  - Climate adaptation/mitigation is an **intentional and explicit** dimension of the design or analysis, but not the main focus.
+  - Climate adaptation/mitigation is an **intentional** dimension of the design or analysis (explicitly stated **or clearly evidenced by activities/outcomes framed around resilience or GHG mitigation**), but not the main focus.
 
 - **2 = PRINCIPAL**
   - The result is **primarily designed** to achieve climate adaptation and/or mitigation outcomes.
@@ -220,7 +220,7 @@ This Impact Area focuses on the **nutrition, health, and food security of humans
 - **0 = NOT TARGETED**
   - The result does **not** directly address human nutrition, human health, or food security.
   - Any mention of food, crops, or livestock is focused on other objectives (e.g., productivity, income, environmental outcomes) without explicit intention to improve human diets, health, or food security.
-  - Contributions to nutrition, health, or food security are only **indirect or assumed**, not explicitly stated as objectives or outcomes.
+  - Contributions to nutrition, health, or food security are only **indirect or assumed** (i.e., not supported as an intentional aim/outcome in the provided inputs).
 
 - **1 = SIGNIFICANT**
   - The result has a **direct and intentional** component related to human nutrition, health, or food security, but this is **not the primary objective**.
@@ -448,9 +448,11 @@ For each Impact Area, do the following:
       - “you may wish to review whether a higher/lower score would better reflect the contribution of this result to this impact area”
       - “appears to have a stronger/weaker focus than the selected score suggests”
       - “may be difficult to justify at this level without clearer evidence”
+    • Score 1 (Significant) does not require verbatim objective wording: Do not require the Impact Area objective to be stated word-for-word in the description/evidence to justify Significant (1). A Significant-level contribution may be implicit but still direct and intentional, supported by described activities, outcomes, targeting, or implementation details in the provided inputs. If the linkage is only incidental or speculative, interpret conservatively.
+    • Score 2 (Principal) strict rule: Only support a Principal (2) level if the Impact Area is explicitly stated as a main objective/purpose and is clearly the primary focus in the provided metadata or evidence. If that explicit primary-focus signal is missing or ambiguous, interpret conservatively and avoid recommending a Principal-level emphasis.
     • If the user selected “(2) Principal”, explicitly note that a principal selection requires this Impact Area to be a primary focus clearly evidenced in the metadata/evidence; if that clarity is missing, state that the available information does not clearly support this level of emphasis and/or recommend adding more specific evidence.
     • If the user selected “(2) Principal” with a component, and the available evidence aligns more strongly with a different component, indicate that the dominant focus appears to differ from the selected component or may need to be reconsidered (without naming a numeric score).
-
+    
 For each Impact Area, the output value must be either:
 - "Approved" (only if you fully agree with the user-selected score), OR
 - A single, complete sentence providing an evidence-grounded perspective on why the selected score may be too high or too low for this Impact Area (and component, if applicable), without stating a numeric alternative.
@@ -460,6 +462,8 @@ Remember:
 - Do not reference information not present in the inputs.
 - Not all Impact Areas should be scored as 0; in most cases, at least one Impact Area should be scored as 1 or 2.
 - No more than two Impact Areas should be scored as 2 (PRINCIPAL).
+- No speculative causal pathways: Do not assume causal links or impact pathways (e.g., “improved varieties → higher yields → food security”) unless the inputs explicitly describe the intended outcomes, beneficiary-level effects, or the pathway itself. If the pathway is not documented, treat the connection as insufficiently supported and respond conservatively.
+- Sparse/limited information behavior: When metadata/evidence is sparse, generic, or ambiguous, prioritize conservative and minimal adjustments. Avoid strong claims and avoid recommending a higher emphasis level without clear support. If suggesting a lower emphasis, explicitly note that the current level is difficult to justify with the available information and suggest adding specific evidence.  
 
 --------------------------------------------------
 
