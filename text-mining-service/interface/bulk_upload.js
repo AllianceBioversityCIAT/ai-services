@@ -5,7 +5,7 @@ const API_BASE_URL = 'https://xps47vud6h2wtznurbtxlgpr4i0qwxlg.lambda-url.us-eas
 const S3_BUCKET = 'ai-services-ibd';
 const FOLDER_PATH = 'star/text-mining/files/prod/';
 const ENVIRONMENT_URL = 'https://management-allianceindicatorstest.ciat.cgiar.org/api/';
-const STAR_API_URL = 'https://main-allianceindicatorstest.ciat.cgiar.org/api/results/ai/formalize/bulk';
+const STAR_API_URL = 'https://main-star.alliance.cgiar.org/api/results/ai/formalize/bulk';
 
 // =========================
 // State Management
