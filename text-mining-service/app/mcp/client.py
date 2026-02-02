@@ -1,5 +1,6 @@
 import os
 import json
+import base64
 import boto3
 import uvicorn
 from typing import Optional, Union
@@ -7,7 +8,7 @@ from pydantic import BaseModel, Field
 from mcp.client.stdio import stdio_client
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from app.utils.config.config_util import AWS
+from app.utils.config.config_util import AWS, CLIENT_ID, CLIENT_SECRET
 from fastapi.middleware.cors import CORSMiddleware
 from app.utils.s3.s3_util import upload_file_to_s3
 from app.utils.logger.logger_util import get_logger
@@ -113,10 +114,39 @@ async def handle_sampling_message(message: types.CreateMessageRequestParams) -> 
 app.mount("/static", StaticFiles(directory="interface"), name="static")
 
 
+@app.get("/api/auth/token", tags=["Authentication"])
+async def get_auth_token():
+    """
+    Generate authentication token securely from backend.
+    This endpoint prevents exposing client credentials to the frontend.
+    """
+    try:
+        credentials = {
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET
+        }
+        json_string = json.dumps(credentials)
+        encoded_token = base64.b64encode(json_string.encode('utf-8')).decode('utf-8')
+        
+        return {
+            "status": "success",
+            "token": encoded_token
+        }
+    except Exception as e:
+        logger.error(f"Error generating auth token: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate authentication token")
+
+
 @app.get("/ui", tags=["AICCRA Project"])
 async def serve_ui_alt():
     """Alternative endpoint for the UI"""
     return FileResponse('interface/index.html')
+
+
+@app.get("/bulk-upload", tags=["STAR Project"])
+async def serve_bulk_upload():
+    """Serve the bulk upload interface"""
+    return FileResponse('interface/bulk_upload.html')
 
 
 @app.get("/aiccra/prompt", tags=["AICCRA Project"])
@@ -157,6 +187,42 @@ async def list_s3_objects(request: S3ListRequest):
     except (BotoCoreError, ClientError) as e:
         raise HTTPException(status_code=500, detail=f"S3 listing error: {str(e)}")
     except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+
+@app.get("/s3/list", tags=["S3 Management"])
+async def list_s3_objects_get(bucket: str, prefix: str = "", max_items: int = 1000):
+    """
+    List objects in S3 bucket with given prefix (GET method for frontend).
+    Returns objects ordered by LastModified (desc).
+    """
+    try:
+        s3 = boto3.client("s3")
+        
+        paginator = s3.get_paginator("list_objects_v2")
+        pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
+        
+        items = []
+        for page in pages:
+            for obj in page.get("Contents", []):
+                items.append((obj["Key"], obj["LastModified"]))
+                if len(items) >= max_items:
+                    break
+        
+        items.sort(key=lambda x: x[1], reverse=True)
+        objects = [k for k, _ in items]
+        
+        return {
+            "status": "success",
+            "objects": objects,
+            "count": len(objects)
+        }
+        
+    except (BotoCoreError, ClientError) as e:
+        logger.error(f"S3 listing error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"S3 listing error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Unexpected error in S3 listing: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 
