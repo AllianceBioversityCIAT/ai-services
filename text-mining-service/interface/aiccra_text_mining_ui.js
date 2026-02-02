@@ -1,10 +1,10 @@
 class AICCRATextMiningUI {
     constructor() {
-        this.apiBaseUrl = 'https://d3djd7q7g7v7di.cloudfront.net';
+        this.apiBaseUrl = 'https://xps47vud6h2wtznurbtxlgpr4i0qwxlg.lambda-url.us-east-1.on.aws';
         // this.apiBaseUrl = 'http://localhost:8000';
         this.bucket = 'ai-services-ibd';
         this.projectType = 'AICCRA';
-        this.folderPath = 'aiccra/text-mining/files/test/';
+        this.folderPath = 'aiccra/text-mining/files/prod/';
         this.lastResult = null;
         this.searchTimeout = null;
         
