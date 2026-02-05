@@ -1,7 +1,8 @@
 // =========================
 // Configuration & Constants
 // =========================
-const API_BASE_URL = 'https://oxnrkcntlheycdgcnilexrwp4i0tucqz.lambda-url.us-east-1.on.aws';
+// const API_BASE_URL = 'https://oxnrkcntlheycdgcnilexrwp4i0tucqz.lambda-url.us-east-1.on.aws';
+const API_BASE_URL = 'http://localhost:8000';
 const S3_BUCKET = 'ai-services-ibd';
 const FOLDER_PATH = 'star/text-mining/files/test/';
 const ENVIRONMENT_URL = 'https://management-allianceindicatorstest.ciat.cgiar.org/api/';
@@ -17,6 +18,8 @@ let s3Objects = [];
 let editedData = [];
 let currentPage = 1;
 let resultsPerPage = 10;
+let currentFileName = null;
+let recordStatuses = {}; // { recordId: { status: 'pending'|'complete'|'failed', link: '...' } }
 
 // =========================
 // Helper Functions
@@ -183,6 +186,64 @@ function downloadCSV(content, filename) {
 }
 
 // =========================
+// DynamoDB Functions
+// =========================
+async function loadRecordStatusesFromDynamo(fileName) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/dynamo/bulk-upload-records/${encodeURIComponent(fileName)}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            if (response.status === 404) {
+                // No existe registro previo, retornar objeto vacío
+                return { complete: [], failed: [], links: {} };
+            }
+            throw new Error(`Failed to load record statuses: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error loading record statuses:', error);
+        return { complete: [], failed: [], links: {} };
+    }
+}
+
+async function saveRecordStatusToDynamo(fileName, recordId, status, link = null) {
+    try {
+        const payload = {
+            fileName: fileName,
+            recordId: String(recordId), // Ensure recordId is always a string
+            status: status,
+            link: link
+        };
+        
+        const response = await fetch(`${API_BASE_URL}/dynamo/bulk-upload-records`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('DynamoDB save error:', errorText);
+            throw new Error(`Failed to save record status: ${response.status} - ${errorText}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('Error saving record status:', error);
+        throw error;
+    }
+}
+
+// =========================
 // API Calls
 // =========================
 async function processDocument(mode, file = null, s3Key = null) {
@@ -207,8 +268,11 @@ async function processDocument(mode, file = null, s3Key = null) {
         const fullKey = FOLDER_PATH + file.name;
         formData.append('file', file);
         formData.append('key', fullKey);
+        currentFileName = file.name;
     } else if (mode === 's3' && s3Key) {
         formData.append('key', s3Key);
+        // Extraer nombre del archivo de la key de S3
+        currentFileName = s3Key.split('/').pop();
     } else {
         showError('Invalid document source');
         return;
@@ -250,8 +314,9 @@ async function processDocument(mode, file = null, s3Key = null) {
 function formatResultForSTAR(result) {
     const formatted = { ...result };
     
-    // Remove batch_number
+    // Remove batch_number and id (id is for internal tracking only)
     delete formatted.batch_number;
+    delete formatted.id;
     
     // Ensure year is a string (@IsString in DTO)
     if (formatted.year !== undefined && formatted.year !== null) {
@@ -351,6 +416,11 @@ async function submitToSTAR(selectedResults) {
         return;
     }
     
+    if (!currentFileName) {
+        showError('File name not available. Please process a document first.');
+        return;
+    }
+    
     try {
         showLoading(`Submitting ${selectedResults.length} records to STAR platform...`);
         
@@ -374,6 +444,14 @@ async function submitToSTAR(selectedResults) {
         }
         
         const starResponse = await response.json();
+        
+        // Procesar respuesta y actualizar estados
+        await processSTARResponse(starResponse, selectedResults);
+        
+        // Recargar la tabla para mostrar los estados actualizados
+        // Usar editedData para preservar las ediciones del usuario
+        renderResultsTable(editedData);
+        
         displaySTARResults(starResponse, selectedResults.length);
         
     } catch (error) {
@@ -382,16 +460,113 @@ async function submitToSTAR(selectedResults) {
     }
 }
 
+async function processSTARResponse(starResponse, submittedResults) {
+    const resultsCreated = starResponse.data?.results_created || [];
+    const resultsErrors = starResponse.data?.results_errors || [];
+    
+    // Crear un mapa de resultados enviados por título para identificarlos
+    const resultsByTitle = new Map();
+    submittedResults.forEach(result => {
+        resultsByTitle.set(result.title, result);
+    });
+    
+    // Procesar registros exitosos
+    for (const created of resultsCreated) {
+        if (created.error === false && created.title) {
+            const originalResult = resultsByTitle.get(created.title);
+            if (originalResult && originalResult.id) {
+                const recordId = originalResult.id;
+                const starLink = `https://allianceindicatorstest.ciat.cgiar.org/result/STAR-${created.result_official_code}`;
+                
+                // Actualizar estado local
+                recordStatuses[recordId] = {
+                    status: 'complete',
+                    link: starLink
+                };
+                
+                // Guardar en DynamoDB
+                try {
+                    await saveRecordStatusToDynamo(currentFileName, recordId, 'complete', starLink);
+                } catch (error) {
+                    console.error(`Failed to save status for record ${recordId}:`, error);
+                }
+            }
+        }
+    }
+    
+    // Procesar registros con error
+    for (const errorResult of resultsErrors) {
+        if (errorResult.error === true && errorResult.title) {
+            const originalResult = resultsByTitle.get(errorResult.title);
+            if (originalResult && originalResult.id) {
+                const recordId = originalResult.id;
+                
+                // Actualizar estado local
+                recordStatuses[recordId] = {
+                    status: 'failed',
+                    link: null,
+                    errorMessage: errorResult.message_error
+                };
+                
+                // Guardar en DynamoDB
+                try {
+                    await saveRecordStatusToDynamo(currentFileName, recordId, 'failed', null);
+                } catch (error) {
+                    console.error(`Failed to save status for record ${recordId}:`, error);
+                }
+            }
+        }
+    }
+}
+
 // =========================
 // UI Rendering
 // =========================
-function displayResults(rawResult, elapsed) {
+async function displayResults(rawResult, elapsed) {
     const payload = extractInnerResults(rawResult);
     const results = payload.results || [];
     
     currentResults = results;
     editedData = JSON.parse(JSON.stringify(results)); // Deep clone
     currentPage = 1; // Reset to first page when displaying new results
+    
+    // Cargar estados desde DynamoDB si existe el archivo
+    if (currentFileName) {
+        showLoading('Loading previous statuses...');
+        const savedStatuses = await loadRecordStatusesFromDynamo(currentFileName);
+        
+        // Construir el objeto recordStatuses
+        recordStatuses = {};
+        
+        // Marcar registros completados
+        savedStatuses.complete?.forEach(recordId => {
+            recordStatuses[String(recordId)] = {
+                status: 'complete',
+                link: savedStatuses.links?.[recordId] || null
+            };
+        });
+        
+        // Marcar registros fallidos
+        savedStatuses.failed?.forEach(recordId => {
+            recordStatuses[String(recordId)] = {
+                status: 'failed',
+                link: null
+            };
+        });
+        
+        // Los que no están en ninguno de los dos, están en pending
+        results.forEach(result => {
+            const resultId = String(result.id); // Convert to string
+            if (result.id && !recordStatuses[resultId]) {
+                recordStatuses[resultId] = {
+                    status: 'pending',
+                    link: null
+                };
+            }
+        });
+        
+        hideLoading();
+    }
     
     // Show results section
     document.getElementById('resultsSection').style.display = 'block';
@@ -478,6 +653,9 @@ function renderResultsTable(results) {
     // Define columns
     const columns = [
         { key: 'select', label: 'Select', type: 'checkbox' },
+        { key: 'id', label: 'ID', type: 'text', readonly: true },
+        { key: 'status', label: 'Status', type: 'status', readonly: true },
+        { key: 'star_link', label: 'STAR Link', type: 'link', readonly: true },
         { key: 'indicator', label: 'Indicator', type: 'text' },
         { key: 'title', label: 'Title', type: 'text', required: true },
         { key: 'description', label: 'Description', type: 'textarea' },
@@ -538,6 +716,21 @@ function renderResultsTable(results) {
                 ${columns.map(col => {
                     if (col.type === 'checkbox') {
                         return `<td><input type="checkbox" class="row-select" data-index="${globalIdx}"></td>`;
+                    } else if (col.type === 'status') {
+                        const recordId = String(result.id); // Convert to string
+                        const statusInfo = recordStatuses[recordId] || { status: 'pending' };
+                        const statusClass = statusInfo.status === 'complete' ? 'status-complete' : 
+                                          statusInfo.status === 'failed' ? 'status-failed' : 'status-pending';
+                        const statusText = statusInfo.status === 'complete' ? '✓ Complete' : 
+                                         statusInfo.status === 'failed' ? '✗ Failed' : '⏳ Pending';
+                        return `<td><span class="${statusClass}">${statusText}</span></td>`;
+                    } else if (col.type === 'link') {
+                        const recordId = String(result.id); // Convert to string
+                        const statusInfo = recordStatuses[recordId] || { status: 'pending', link: null };
+                        if (statusInfo.status === 'complete' && statusInfo.link) {
+                            return `<td><a href="${statusInfo.link}" target="_blank" class="star-link">🔗 View in STAR</a></td>`;
+                        }
+                        return `<td>-</td>`;
                     } else if (col.type === 'select') {
                         const value = getNestedValue(result, col.key) || '';
                         const options = col.options || [];
@@ -560,6 +753,9 @@ function renderResultsTable(results) {
                         return `<td><textarea data-index="${globalIdx}" data-field="${col.key}" rows="3">${value || ''}</textarea></td>`;
                     } else {
                         const value = getNestedValue(result, col.key) || '';
+                        if (col.readonly) {
+                            return `<td><input type="text" value="${value}" readonly style="background-color: #f5f5f5; cursor: not-allowed;"></td>`;
+                        }
                         return `<td><input type="text" value="${value}" data-index="${globalIdx}" data-field="${col.key}"></td>`;
                     }
                 }).join('')}
