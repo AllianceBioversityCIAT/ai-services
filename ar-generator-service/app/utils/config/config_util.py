@@ -38,5 +38,6 @@ OPENSEARCH = {
 }
 
 KNOWLEDGE_BASE = {
-    "knowledge_base_id": os.getenv("KNOWLEDGE_BASE_ID")
+    "knowledge_base_id": os.getenv("KNOWLEDGE_BASE_ID"),
+    "data_source_id": os.getenv("DATA_SOURCE_ID")
 }
