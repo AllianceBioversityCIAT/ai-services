@@ -107,7 +107,7 @@ app = FastAPI(
     servers=[
         {"url": "https://oxnrkcntlheycdgcnilexrwp4i0tucqz.lambda-url.us-east-1.on.aws", "description": "Test server"},
         {"url": "http://localhost:8000", "description": "Local server"},
-        {"url": "https://d3djd7q7g7v7di.cloudfront.net", "description": "Production server"}
+        {"url": "https://xps47vud6h2wtznurbtxlgpr4i0qwxlg.lambda-url.us-east-1.on.aws", "description": "Production server"}
     ]
 )
 

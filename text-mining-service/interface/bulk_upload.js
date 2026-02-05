@@ -1,8 +1,7 @@
 // =========================
 // Configuration & Constants
 // =========================
-// const API_BASE_URL = 'https://oxnrkcntlheycdgcnilexrwp4i0tucqz.lambda-url.us-east-1.on.aws';
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'https://oxnrkcntlheycdgcnilexrwp4i0tucqz.lambda-url.us-east-1.on.aws';
 const S3_BUCKET = 'ai-services-ibd';
 const FOLDER_PATH = 'star/text-mining/files/test/';
 const ENVIRONMENT_URL = 'https://management-allianceindicatorstest.ciat.cgiar.org/api/';
