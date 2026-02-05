@@ -475,7 +475,7 @@ async function processSTARResponse(starResponse, submittedResults) {
             const originalResult = resultsByTitle.get(created.title);
             if (originalResult && originalResult.id) {
                 const recordId = originalResult.id;
-                const starLink = `https://allianceindicatorstest.ciat.cgiar.org/result/STAR-${created.result_official_code}`;
+                const starLink = `https://star.alliance.cgiar.org/result/STAR-${created.result_official_code}`;
                 
                 // Actualizar estado local
                 recordStatuses[recordId] = {
