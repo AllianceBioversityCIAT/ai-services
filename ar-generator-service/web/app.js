@@ -453,51 +453,22 @@ function downloadChallengesReport() {
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM Content Loaded');
-    
     // Display user info if available from URL
     displayUserInfo();
     
     // Reports tab (Annual and Mid-Year)
-    const generateReportBtn = document.getElementById('generate-report');
-    const downloadReportBtn = document.getElementById('download-report');
-    
-    if (generateReportBtn) {
-        console.log('Generate report button found');
-        generateReportBtn.addEventListener('click', generateReport);
-    } else {
-        console.error('Generate report button not found!');
-    }
-    
-    if (downloadReportBtn) {
-        downloadReportBtn.addEventListener('click', downloadReport);
-    } else {
-        console.error('Download report button not found!');
-    }
+    document.getElementById('generate-report').addEventListener('click', generateReport);
+    document.getElementById('download-report').addEventListener('click', downloadReport);
     
     // Tables tab
-    const generateTablesBtn = document.getElementById('generate-tables');
-    if (generateTablesBtn) {
-        generateTablesBtn.addEventListener('click', generateTables);
-    }
+    document.getElementById('generate-tables').addEventListener('click', generateTables);
     
     // Challenges tab
-    const generateChallengesBtn = document.getElementById('generate-challenges');
-    const downloadChallengesBtn = document.getElementById('download-challenges');
-    
-    if (generateChallengesBtn) {
-        generateChallengesBtn.addEventListener('click', generateChallengesReport);
-    }
-    
-    if (downloadChallengesBtn) {
-        downloadChallengesBtn.addEventListener('click', downloadChallengesReport);
-    }
+    document.getElementById('generate-challenges').addEventListener('click', generateChallengesReport);
+    document.getElementById('download-challenges').addEventListener('click', downloadChallengesReport);
     
     // Set default active tab
-    const activeTab = document.querySelector('.tab.active');
-    if (activeTab) {
-        activeTab.click();
-    }
+    document.querySelector('.tab.active').click();
 });
 
 function displayUserInfo() {
