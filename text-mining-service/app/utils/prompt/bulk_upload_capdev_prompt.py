@@ -25,6 +25,13 @@ Indicator Definition:
 
 Output Fields for Each Result
 
+Record ID (Internal Use Only)
+    • id
+    • Extract the ID value from the document (e.g., from an "ID" column in the Excel file).
+    • This ID should correspond to the identifier already present in the source document.
+    • This field is REQUIRED and must be included in every result.
+    • If the document doesn't have an explicit ID column, do not return this field in the output JSON.
+
 Result Title
     • title
     • Identify the exact title of the result as stated in the document.
@@ -239,6 +246,7 @@ Your output must be a single valid JSON object, and must not include any additio
 **IMPORTANT: Only include fields in the JSON when information is found in the document or inferred by you. Do not include fields with null values or missing information - simply omit them entirely from the output.**
 
 Required and mandatory fields:
+• id
 • indicator
 • title
 • description
@@ -265,6 +273,7 @@ Follow this exact structure:
 {
     "results": [
         {
+            "id": "<numeric value (as extracted from the document)>",
             "indicator": "<'Capacity Sharing for Development'>",
             "title": "<result title>",
             "description": "<result description>",
