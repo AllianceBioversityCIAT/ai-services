@@ -319,20 +319,38 @@ function formatResultForSTAR(result) {
     delete formatted.batch_number;
     delete formatted.id;
     
-    // Ensure year is a string (@IsString in DTO)
+    // ========================================
+    // STEP 1: Remove fields NOT used in CapDev bulk upload
+    // ========================================
+    const nonCapDevFields = [
+        'evidence_for_stage', 'policy_type', 'stage_in_policy_process',
+        'short_title', 'innovation_nature', 'innovation_type', 
+        'anticipated_users', 'assess_readiness', 'innovation_actors_detailed',
+        'organizations', 'organization_type', 'organization_sub_type', 
+        'other_organization_type'
+    ];
+    nonCapDevFields.forEach(field => delete formatted[field]);
+    
+    // ========================================
+    // STEP 2: Convert year to string (@IsString in DTO)
+    // ========================================
     if (formatted.year !== undefined && formatted.year !== null) {
         formatted.year = String(formatted.year);
     }
     
-    // Convert numeric fields to numbers (@IsNumber in DTO)
-    const numericFields = ['total_participants', 'male_participants', 'female_participants', 'non_binary_participants', 'assess_readiness'];
+    // ========================================
+    // STEP 3: Convert numeric fields to numbers (@IsNumber in DTO)
+    // ========================================
+    const numericFields = ['total_participants', 'male_participants', 'female_participants', 'non_binary_participants'];
     numericFields.forEach(field => {
         if (formatted[field] !== undefined && formatted[field] !== null && formatted[field] !== '') {
             formatted[field] = Number(formatted[field]);
         }
     });
     
-    // Convert regions to array of numbers (@IsNumber({}, { each: true }) in DTO)
+    // ========================================
+    // STEP 4: Convert regions to array of numbers (@IsNumber({}, { each: true }) in DTO)
+    // ========================================
     if (formatted.regions) {
         if (typeof formatted.regions === 'string') {
             try {
@@ -349,46 +367,106 @@ function formatResultForSTAR(result) {
         }
     }
     
-    // Convert similarity_score to number in nested objects (@IsNumber in DTO)
-    // AiRawInstitution: trainee_affiliation
-    if (formatted.trainee_affiliation) {
-        if (formatted.trainee_affiliation.similarity_score !== undefined) {
+    // ========================================
+    // STEP 5: Process and validate trainee_affiliation (AiRawInstitution)
+    // ========================================
+    if (formatted.trainee_affiliation && typeof formatted.trainee_affiliation === 'object') {
+        // Convert similarity_score to number (@IsNumber)
+        if (formatted.trainee_affiliation.similarity_score !== undefined && formatted.trainee_affiliation.similarity_score !== null) {
             formatted.trainee_affiliation.similarity_score = Number(formatted.trainee_affiliation.similarity_score);
         }
-        // institution_id should be string (@IsString in DTO)
+        // Convert institution_id to string (@IsString @IsOptional)
         if (formatted.trainee_affiliation.institution_id !== undefined && formatted.trainee_affiliation.institution_id !== null) {
             formatted.trainee_affiliation.institution_id = String(formatted.trainee_affiliation.institution_id);
         }
+        // Validate required field institution_name exists (@IsNotEmpty)
+        if (!formatted.trainee_affiliation.institution_name || !formatted.trainee_affiliation.similarity_score) {
+            delete formatted.trainee_affiliation;
+        }
     }
     
-    // AiRawUser: training_supervisor and main_contact_person
-    if (formatted.training_supervisor && formatted.training_supervisor.similarity_score !== undefined) {
-        formatted.training_supervisor.similarity_score = Number(formatted.training_supervisor.similarity_score);
+    // ========================================
+    // STEP 6: Process and validate training_supervisor (AiRawUser)
+    // ========================================
+    if (formatted.training_supervisor && typeof formatted.training_supervisor === 'object') {
+        // Convert similarity_score to number (@IsNumber)
+        if (formatted.training_supervisor.similarity_score !== undefined && formatted.training_supervisor.similarity_score !== null) {
+            formatted.training_supervisor.similarity_score = Number(formatted.training_supervisor.similarity_score);
+        }
+        // Convert code to string (@IsString @IsOptional)
+        if (formatted.training_supervisor.code !== undefined && formatted.training_supervisor.code !== null) {
+            formatted.training_supervisor.code = String(formatted.training_supervisor.code);
+        }
+        // Validate required field name exists (@IsNotEmpty)
+        if (!formatted.training_supervisor.name || !formatted.training_supervisor.similarity_score) {
+            delete formatted.training_supervisor;
+        }
     }
     
-    if (formatted.main_contact_person && formatted.main_contact_person.similarity_score !== undefined) {
-        formatted.main_contact_person.similarity_score = Number(formatted.main_contact_person.similarity_score);
+    // ========================================
+    // STEP 7: Process and validate main_contact_person (AiRawUser)
+    // ========================================
+    if (formatted.main_contact_person && typeof formatted.main_contact_person === 'object') {
+        // Convert similarity_score to number (@IsNumber)
+        if (formatted.main_contact_person.similarity_score !== undefined && formatted.main_contact_person.similarity_score !== null) {
+            formatted.main_contact_person.similarity_score = Number(formatted.main_contact_person.similarity_score);
+        }
+        // Convert code to string (@IsString @IsOptional)
+        if (formatted.main_contact_person.code !== undefined && formatted.main_contact_person.code !== null) {
+            formatted.main_contact_person.code = String(formatted.main_contact_person.code);
+        }
+        // Validate required field name exists (@IsNotEmpty)
+        if (!formatted.main_contact_person.name || !formatted.main_contact_person.similarity_score) {
+            delete formatted.main_contact_person;
+        }
     }
     
-    // Convert partners: institution_id to string, similarity_score to number
-    if (formatted.partners && Array.isArray(formatted.partners)) {
-        formatted.partners = formatted.partners.map(p => {
-            if (typeof p === 'object') {
-                const partner = { ...p };
-                if (partner.similarity_score !== undefined) {
-                    partner.similarity_score = Number(partner.similarity_score);
+    // ========================================
+    // STEP 8: Process and validate language (AiRawLanguage)
+    // ========================================
+    if (formatted.language && typeof formatted.language === 'object') {
+        // Ensure name and code are strings
+        if (formatted.language.name) {
+            formatted.language.name = String(formatted.language.name);
+        }
+        if (formatted.language.code) {
+            formatted.language.code = String(formatted.language.code);
+        }
+        // Validate required fields exist (@IsNotEmpty)
+        if (!formatted.language.name || !formatted.language.code) {
+            delete formatted.language;
+        }
+    }
+    
+    // ========================================
+    // STEP 9: Process and validate trainee_nationality (AiRawCountry)
+    // ========================================
+    if (formatted.trainee_nationality && typeof formatted.trainee_nationality === 'object') {
+        // Ensure code is string (@IsString @IsNotEmpty)
+        if (formatted.trainee_nationality.code) {
+            formatted.trainee_nationality.code = String(formatted.trainee_nationality.code);
+        }
+        // Validate areas is array of strings (@IsOptional @IsArray @IsString({ each: true }))
+        if (formatted.trainee_nationality.areas) {
+            if (Array.isArray(formatted.trainee_nationality.areas)) {
+                formatted.trainee_nationality.areas = formatted.trainee_nationality.areas.map(a => String(a));
+                if (formatted.trainee_nationality.areas.length === 0) {
+                    delete formatted.trainee_nationality.areas;
                 }
-                if (partner.institution_id !== undefined && partner.institution_id !== null) {
-                    partner.institution_id = String(partner.institution_id);
-                }
-                return partner;
+            } else {
+                delete formatted.trainee_nationality.areas;
             }
-            return p;
-        });
+        }
+        // Validate required field code exists
+        if (!formatted.trainee_nationality.code) {
+            delete formatted.trainee_nationality;
+        }
     }
     
-    // Parse JSON strings for array/object fields
-    const jsonFields = ['keywords', 'sdg_targets', 'countries', 'evidences'];
+    // ========================================
+    // STEP 10: Parse JSON strings for array/object fields
+    // ========================================
+    const jsonFields = ['keywords', 'sdg_targets', 'countries', 'evidences', 'partners'];
     jsonFields.forEach(field => {
         if (formatted[field] && typeof formatted[field] === 'string') {
             try {
@@ -399,14 +477,161 @@ function formatResultForSTAR(result) {
         }
     });
     
-    // Parse partners if it's a string
-    if (formatted.partners && typeof formatted.partners === 'string') {
-        try {
-            formatted.partners = JSON.parse(formatted.partners);
-        } catch (e) {
-            formatted.partners = [];
+    // ========================================
+    // STEP 11: Validate and clean partners array (AiRawInstitution[])
+    // ========================================
+    if (formatted.partners !== undefined) {
+        if (!Array.isArray(formatted.partners) || formatted.partners.length === 0) {
+            delete formatted.partners;
+        } else {
+            formatted.partners = formatted.partners.map(p => {
+                if (typeof p === 'object' && p !== null) {
+                    const partner = { ...p };
+                    // Convert similarity_score to number
+                    if (partner.similarity_score !== undefined && partner.similarity_score !== null) {
+                        partner.similarity_score = Number(partner.similarity_score);
+                    }
+                    // Convert institution_id to string
+                    if (partner.institution_id !== undefined && partner.institution_id !== null) {
+                        partner.institution_id = String(partner.institution_id);
+                    }
+                    return partner;
+                }
+                return p;
+            }).filter(p => p && typeof p === 'object' && p.institution_name && p.similarity_score !== undefined);
+            
+            if (formatted.partners.length === 0) {
+                delete formatted.partners;
+            }
         }
     }
+    
+    // ========================================
+    // STEP 12: Validate and clean countries array (AiRawCountry[])
+    // ========================================
+    if (formatted.countries !== undefined) {
+        if (!Array.isArray(formatted.countries) || formatted.countries.length === 0) {
+            delete formatted.countries;
+        } else {
+            formatted.countries = formatted.countries.map(c => {
+                if (typeof c === 'object' && c !== null) {
+                    const country = { ...c };
+                    // Ensure code is string
+                    if (country.code) {
+                        country.code = String(country.code);
+                    }
+                    // Validate areas is array of strings
+                    if (country.areas) {
+                        if (Array.isArray(country.areas)) {
+                            country.areas = country.areas.map(a => String(a));
+                            if (country.areas.length === 0) {
+                                delete country.areas;
+                            }
+                        } else {
+                            delete country.areas;
+                        }
+                    }
+                    return country;
+                }
+                return c;
+            }).filter(c => c && typeof c === 'object' && c.code);
+            
+            if (formatted.countries.length === 0) {
+                delete formatted.countries;
+            }
+        }
+    }
+    
+    // ========================================
+    // STEP 13: Validate and clean evidences array (AiRawEvidence[])
+    // ========================================
+    if (formatted.evidences !== undefined) {
+        if (!Array.isArray(formatted.evidences) || formatted.evidences.length === 0) {
+            delete formatted.evidences;
+        } else {
+            formatted.evidences = formatted.evidences.map(e => {
+                if (typeof e === 'object' && e !== null) {
+                    const evidence = { ...e };
+                    // Ensure both fields are strings
+                    if (evidence.evidence_link) {
+                        evidence.evidence_link = String(evidence.evidence_link);
+                    }
+                    if (evidence.evidence_description) {
+                        evidence.evidence_description = String(evidence.evidence_description);
+                    }
+                    return evidence;
+                }
+                return e;
+            }).filter(e => e && typeof e === 'object' && e.evidence_link && e.evidence_description);
+            
+            if (formatted.evidences.length === 0) {
+                delete formatted.evidences;
+            }
+        }
+    }
+    
+    // ========================================
+    // STEP 14: Clean optional array fields (keywords, sdg_targets)
+    // ========================================
+    ['keywords', 'sdg_targets'].forEach(field => {
+        if (formatted[field] !== undefined) {
+            if (!Array.isArray(formatted[field]) || formatted[field].length === 0) {
+                delete formatted[field];
+            } else {
+                // Ensure all items are strings
+                formatted[field] = formatted[field].map(item => String(item));
+            }
+        }
+    });
+    
+    // ========================================
+    // STEP 15: Clean regions array
+    // ========================================
+    if (formatted.regions !== undefined) {
+        if (!Array.isArray(formatted.regions) || formatted.regions.length === 0) {
+            delete formatted.regions;
+        }
+    }
+    
+    // ========================================
+    // STEP 16: Remove optional string fields if null/undefined/empty
+    // ========================================
+    const optionalStringFields = [
+        'description', 'geoscope_level', 'training_category', 'training_purpose',
+        'trainee_name', 'trainee_gender', 'training_type', 'delivery_modality',
+        'start_date', 'end_date', 'length_of_training', 
+        'alliance_main_contact_person_first_name', 'alliance_main_contact_person_last_name',
+        'degree'
+    ];
+    
+    optionalStringFields.forEach(field => {
+        if (formatted[field] === null || formatted[field] === undefined || formatted[field] === '') {
+            delete formatted[field];
+        } else if (formatted[field] !== undefined) {
+            // Ensure it's a string
+            formatted[field] = String(formatted[field]);
+        }
+    });
+    
+    // ========================================
+    // STEP 17: Remove optional numeric fields if null/undefined
+    // ========================================
+    numericFields.forEach(field => {
+        if (formatted[field] === null || formatted[field] === undefined) {
+            delete formatted[field];
+        }
+    });
+    
+    // ========================================
+    // STEP 18: Remove optional nested objects if null/empty
+    // ========================================
+    const optionalNestedObjects = ['trainee_affiliation', 'training_supervisor', 'main_contact_person', 'language', 'trainee_nationality'];
+    optionalNestedObjects.forEach(field => {
+        if (formatted[field] === null || formatted[field] === undefined || 
+            (typeof formatted[field] === 'object' && Object.keys(formatted[field]).length === 0)) {
+            delete formatted[field];
+        }
+    });
     
     return formatted;
 }
