@@ -19,6 +19,8 @@ let currentPage = 1;
 let resultsPerPage = 10;
 let currentFileName = null;
 let recordStatuses = {}; // { recordId: { status: 'pending'|'complete'|'failed', link: '...' } }
+let activeFilters = {}; // { columnKey: [selectedValues] }
+let openFilterColumn = null; // Track which filter is currently open
 
 // =========================
 // Helper Functions
@@ -567,6 +569,10 @@ async function displayResults(rawResult, elapsed) {
         hideLoading();
     }
     
+    // Reset filters when new data is loaded
+    activeFilters = {};
+    openFilterColumn = null;
+    
     // Show results section
     document.getElementById('resultsSection').style.display = 'block';
     
@@ -643,11 +649,14 @@ function renderResultsTable(results) {
     const thead = document.getElementById('tableHead');
     const tbody = document.getElementById('tableBody');
     
+    // Apply filters
+    const filteredResults = applyFilters(results);
+    
     // Calculate pagination
-    const totalPages = Math.ceil(results.length / resultsPerPage);
+    const totalPages = Math.ceil(filteredResults.length / resultsPerPage);
     const startIndex = (currentPage - 1) * resultsPerPage;
-    const endIndex = Math.min(startIndex + resultsPerPage, results.length);
-    const paginatedResults = results.slice(startIndex, endIndex);
+    const endIndex = Math.min(startIndex + resultsPerPage, filteredResults.length);
+    const paginatedResults = filteredResults.slice(startIndex, endIndex);
     
     // Define columns
     const columns = [
@@ -702,7 +711,18 @@ function renderResultsTable(results) {
                 if (col.type === 'checkbox') {
                     return `<th><input type="checkbox" id="selectAllCheckbox" title="Select/Deselect All"></th>`;
                 }
-                return `<th>${col.label}</th>`;
+                // Add filter icon for filterable columns
+                if (col.readonly || col.type === 'status' || col.type === 'link') {
+                    return `<th>${col.label}</th>`;
+                }
+                const hasActiveFilter = activeFilters[col.key] && activeFilters[col.key].length > 0;
+                const filterClass = hasActiveFilter ? 'filter-active' : '';
+                return `<th>
+                    <div class="th-content">
+                        <span>${col.label}</span>
+                        <span class="filter-icon ${filterClass}" data-column="${col.key}" title="Filter">▼</span>
+                    </div>
+                </th>`;
             }).join('')}
         </tr>
     `;
@@ -762,8 +782,17 @@ function renderResultsTable(results) {
         `;
     }).join('');
     
-    // Render pagination controls
-    renderPaginationControls(results.length, totalPages);
+    // Render pagination controls with filtered count
+    renderPaginationControls(filteredResults.length, totalPages);
+    
+    // Add event listeners for filter icons
+    thead.querySelectorAll('.filter-icon').forEach(icon => {
+        icon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const columnKey = icon.dataset.column;
+            toggleFilterPanel(columnKey, icon, results);
+        });
+    });
     
     // Add event listeners for edits
     tbody.querySelectorAll('input, select, textarea').forEach(input => {
@@ -896,6 +925,170 @@ function setNestedValue(obj, path, value) {
         current = current[part];
     }
     current[parts[parts.length - 1]] = value;
+}
+
+function applyFilters(results) {
+    if (Object.keys(activeFilters).length === 0) {
+        return results;
+    }
+    
+    return results.filter(result => {
+        // Check all active filters
+        for (const [columnKey, selectedValues] of Object.entries(activeFilters)) {
+            if (selectedValues.length === 0) continue;
+            
+            const cellValue = getNestedValue(result, columnKey);
+            const cellValueStr = formatCellValueForFilter(cellValue);
+            
+            // If value is not in selected values, filter out this row
+            if (!selectedValues.includes(cellValueStr)) {
+                return false;
+            }
+        }
+        return true;
+    });
+}
+
+function formatCellValueForFilter(value) {
+    if (value === null || value === undefined) return '(Empty)';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+}
+
+function getUniqueValues(results, columnKey) {
+    const values = new Set();
+    results.forEach(result => {
+        const value = getNestedValue(result, columnKey);
+        values.add(formatCellValueForFilter(value));
+    });
+    return Array.from(values).sort();
+}
+
+function toggleFilterPanel(columnKey, iconElement, results) {
+    // Close any open filter panel
+    const existingPanel = document.querySelector('.filter-panel');
+    if (existingPanel) {
+        if (openFilterColumn === columnKey) {
+            existingPanel.remove();
+            openFilterColumn = null;
+            return;
+        }
+        existingPanel.remove();
+    }
+    
+    openFilterColumn = columnKey;
+    
+    // Get unique values for this column
+    const uniqueValues = getUniqueValues(results, columnKey);
+    const currentFilters = activeFilters[columnKey] || [];
+    
+    // Create filter panel
+    const panel = document.createElement('div');
+    panel.className = 'filter-panel';
+    panel.innerHTML = `
+        <div class="filter-panel-header">
+            <input type="text" class="filter-search" placeholder="Search...">
+        </div>
+        <div class="filter-options">
+            <label class="filter-option">
+                <input type="checkbox" value="__select_all__" ${currentFilters.length === 0 ? 'checked' : ''}>
+                <span>(Select All)</span>
+            </label>
+            ${uniqueValues.map(value => `
+                <label class="filter-option">
+                    <input type="checkbox" value="${value.replace(/"/g, '&quot;')}" 
+                        ${currentFilters.length === 0 || currentFilters.includes(value) ? 'checked' : ''}>
+                    <span>${value}</span>
+                </label>
+            `).join('')}
+        </div>
+        <div class="filter-panel-footer">
+            <button class="filter-btn filter-btn-clear">Clear</button>
+            <button class="filter-btn filter-btn-apply">Apply</button>
+        </div>
+    `;
+    
+    // Position panel below icon
+    const iconRect = iconElement.getBoundingClientRect();
+    panel.style.position = 'absolute';
+    panel.style.top = `${iconRect.bottom + window.scrollY + 5}px`;
+    panel.style.left = `${iconRect.left + window.scrollX}px`;
+    
+    document.body.appendChild(panel);
+    
+    // Handle search
+    const searchInput = panel.querySelector('.filter-search');
+    searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        panel.querySelectorAll('.filter-option').forEach((option, index) => {
+            if (index === 0) return; // Skip "Select All"
+            const text = option.textContent.toLowerCase();
+            option.style.display = text.includes(searchTerm) ? 'flex' : 'none';
+        });
+    });
+    
+    // Handle select all
+    const selectAllCheckbox = panel.querySelector('input[value="__select_all__"]');
+    const valueCheckboxes = Array.from(panel.querySelectorAll('.filter-option input')).slice(1);
+    
+    selectAllCheckbox.addEventListener('change', (e) => {
+        valueCheckboxes.forEach(cb => {
+            if (cb.closest('.filter-option').style.display !== 'none') {
+                cb.checked = e.target.checked;
+            }
+        });
+    });
+    
+    valueCheckboxes.forEach(cb => {
+        cb.addEventListener('change', () => {
+            const allChecked = valueCheckboxes.filter(c => 
+                c.closest('.filter-option').style.display !== 'none'
+            ).every(c => c.checked);
+            selectAllCheckbox.checked = allChecked;
+        });
+    });
+    
+    // Handle clear button
+    panel.querySelector('.filter-btn-clear').addEventListener('click', () => {
+        delete activeFilters[columnKey];
+        panel.remove();
+        openFilterColumn = null;
+        currentPage = 1;
+        renderResultsTable(editedData);
+    });
+    
+    // Handle apply button
+    panel.querySelector('.filter-btn-apply').addEventListener('click', () => {
+        const selectedValues = valueCheckboxes
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+        
+        if (selectedValues.length === uniqueValues.length) {
+            // All selected = no filter
+            delete activeFilters[columnKey];
+        } else if (selectedValues.length > 0) {
+            activeFilters[columnKey] = selectedValues;
+        } else {
+            // None selected = show nothing
+            activeFilters[columnKey] = [];
+        }
+        
+        panel.remove();
+        openFilterColumn = null;
+        currentPage = 1;
+        renderResultsTable(editedData);
+    });
+    
+    // Close panel when clicking outside
+    setTimeout(() => {
+        document.addEventListener('click', function closePanel(e) {
+            if (!panel.contains(e.target) && e.target !== iconElement) {
+                panel.remove();
+                openFilterColumn = null;
+                document.removeEventListener('click', closePanel);
+            }
+        });
+    }, 0);
 }
 
 function handleCellEdit(event) {
