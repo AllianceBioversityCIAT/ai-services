@@ -42,6 +42,133 @@ body {
     margin: 0;
 }
 
+/* Filter Styles */
+.th-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.filter-icon {
+    cursor: pointer;
+    font-size: 0.7rem;
+    color: var(--gray-400);
+    padding: 0.25rem;
+    border-radius: 3px;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.filter-icon:hover {
+    background: var(--gray-200);
+    color: var(--primary-medium);
+}
+
+.filter-icon.filter-active {
+    color: var(--primary-medium);
+    font-weight: bold;
+}
+
+.filter-panel {
+    background: var(--white);
+    border: 1px solid var(--gray-300);
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    width: 280px;
+    max-height: 400px;
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+}
+
+.filter-panel-header {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.filter-search {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.filter-search:focus {
+    outline: none;
+    border-color: var(--primary-medium);
+}
+
+.filter-options {
+    overflow-y: auto;
+    max-height: 250px;
+    padding: 0.5rem;
+}
+
+.filter-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.filter-option:hover {
+    background: var(--gray-100);
+}
+
+.filter-option input[type="checkbox"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+.filter-option span {
+    font-size: 0.9rem;
+    color: var(--gray-700);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.filter-panel-footer {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-top: 1px solid var(--gray-200);
+    justify-content: flex-end;
+}
+
+.filter-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.filter-btn-clear {
+    background: var(--gray-200);
+    color: var(--gray-700);
+}
+
+.filter-btn-clear:hover {
+    background: var(--gray-300);
+}
+
+.filter-btn-apply {
+    background: var(--primary-medium);
+    color: var(--white);
+}
+
+.filter-btn-apply:hover {
+    background: var(--primary-dark);
+}
+
 /* Testing Environment Badge */
 .testing-env-badge {
     position: fixed;
