@@ -149,6 +149,30 @@ function extractUnmappedInstitutions(results) {
                 }
             }
         }
+        
+        // Check trainees_description
+        if (result.trainees_description && Array.isArray(result.trainees_description)) {
+            result.trainees_description.forEach(trainee => {
+                const institutionId = trainee.institution_id;
+                const similarityScore = trainee.similarity_score || 0;
+                const institutionName = trainee.institution_name || 'Unknown Institution';
+                
+                if ((institutionId === null && similarityScore === 0) || similarityScore < 70) {
+                    const key = institutionName.toLowerCase().trim();
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        unmapped.push({
+                            record_id: recordId,
+                            record_title: title,
+                            source_field: 'trainees_description',
+                            institution_name: institutionName,
+                            institution_id: institutionId,
+                            similarity_score: similarityScore
+                        });
+                    }
+                }
+            });
+        }
     });
     
     return unmapped;
@@ -466,7 +490,7 @@ function formatResultForSTAR(result) {
     // ========================================
     // STEP 10: Parse JSON strings for array/object fields
     // ========================================
-    const jsonFields = ['keywords', 'sdg_targets', 'countries', 'evidences', 'partners'];
+    const jsonFields = ['keywords', 'sdg_targets', 'countries', 'evidences', 'partners', 'trainees_description'];
     jsonFields.forEach(field => {
         if (formatted[field] && typeof formatted[field] === 'string') {
             try {
@@ -502,6 +526,35 @@ function formatResultForSTAR(result) {
             
             if (formatted.partners.length === 0) {
                 delete formatted.partners;
+            }
+        }
+    }
+    
+    // ========================================
+    // STEP 11.5: Validate and clean trainees_description array (AiRawInstitution[])
+    // ========================================
+    if (formatted.trainees_description !== undefined) {
+        if (!Array.isArray(formatted.trainees_description) || formatted.trainees_description.length === 0) {
+            delete formatted.trainees_description;
+        } else {
+            formatted.trainees_description = formatted.trainees_description.map(t => {
+                if (typeof t === 'object' && t !== null) {
+                    const trainee = { ...t };
+                    // Convert similarity_score to number
+                    if (trainee.similarity_score !== undefined && trainee.similarity_score !== null) {
+                        trainee.similarity_score = Number(trainee.similarity_score);
+                    }
+                    // Convert institution_id to string
+                    if (trainee.institution_id !== undefined && trainee.institution_id !== null) {
+                        trainee.institution_id = String(trainee.institution_id);
+                    }
+                    return trainee;
+                }
+                return t;
+            }).filter(t => t && typeof t === 'object' && t.institution_name && t.similarity_score !== undefined);
+            
+            if (formatted.trainees_description.length === 0) {
+                delete formatted.trainees_description;
             }
         }
     }
@@ -594,14 +647,53 @@ function formatResultForSTAR(result) {
     }
     
     // ========================================
-    // STEP 16: Remove optional string fields if null/undefined/empty
+    // STEP 16: Process IP Rights fields
+    // ========================================
+    // Convert asset_ip_owner_id to number if it's still a string
+    if (formatted.asset_ip_owner_id !== undefined && formatted.asset_ip_owner_id !== null && formatted.asset_ip_owner_id !== '') {
+        if (typeof formatted.asset_ip_owner_id === 'string') {
+            const nameToIdMap = {
+                'International Center for Tropical Agriculture - CIAT': 1,
+                'Bioversity International': 2,
+                'Bioversity International and International Center for Tropical Agriculture - CIAT': 3,
+                'Others': 4
+            };
+            formatted.asset_ip_owner_id = nameToIdMap[formatted.asset_ip_owner_id] || Number(formatted.asset_ip_owner_id);
+        } else {
+            formatted.asset_ip_owner_id = Number(formatted.asset_ip_owner_id);
+        }
+    } else {
+        delete formatted.asset_ip_owner_id;
+    }
+    
+    // Clean IP Rights description fields
+    ['asset_ip_owner_description', 'publicity_restriction_description', 
+     'potential_asset_description', 'requires_further_development_description'].forEach(field => {
+        if (formatted[field] === null || formatted[field] === undefined || formatted[field] === '') {
+            delete formatted[field];
+        } else if (formatted[field] !== undefined) {
+            formatted[field] = String(formatted[field]);
+        }
+    });
+    
+    // Clean IP Rights Yes/No fields
+    ['publicity_restriction', 'potential_asset', 'requires_further_development'].forEach(field => {
+        if (formatted[field] === null || formatted[field] === undefined || formatted[field] === '') {
+            delete formatted[field];
+        } else if (formatted[field] !== undefined) {
+            formatted[field] = String(formatted[field]);
+        }
+    });
+    
+    // ========================================
+    // STEP 17: Remove optional string fields if null/undefined/empty
     // ========================================
     const optionalStringFields = [
         'description', 'geoscope_level', 'training_category', 'training_purpose',
         'trainee_name', 'trainee_gender', 'training_type', 'delivery_modality',
         'start_date', 'end_date', 'length_of_training', 
         'alliance_main_contact_person_first_name', 'alliance_main_contact_person_last_name',
-        'degree'
+        'degree', 'trainees'
     ];
     
     optionalStringFields.forEach(field => {
@@ -614,7 +706,7 @@ function formatResultForSTAR(result) {
     });
     
     // ========================================
-    // STEP 17: Remove optional numeric fields if null/undefined
+    // STEP 18: Remove optional numeric fields if null/undefined
     // ========================================
     numericFields.forEach(field => {
         if (formatted[field] === null || formatted[field] === undefined) {
@@ -623,7 +715,7 @@ function formatResultForSTAR(result) {
     });
     
     // ========================================
-    // STEP 18: Remove optional nested objects if null/empty
+    // STEP 19: Remove optional nested objects if null/empty
     // ========================================
     const optionalNestedObjects = ['trainee_affiliation', 'training_supervisor', 'main_contact_person', 'language', 'trainee_nationality'];
     optionalNestedObjects.forEach(field => {
@@ -923,10 +1015,25 @@ function renderResultsTable(results) {
         { key: 'language.name', label: 'Language', type: 'text' },
         { key: 'language.code', label: 'Language Code', type: 'text' },
         { key: 'partners', label: 'Partners', type: 'textarea' },
+        { key: 'trainees', label: 'Trainees', type: 'select', options: ['Yes', 'No'] },
+        { key: 'trainees_description', label: 'Trainees Organizations', type: 'textarea' },
         { key: 'countries', label: 'Countries', type: 'textarea' },
         { key: 'regions', label: 'Regions', type: 'textarea' },
         { key: 'evidences', label: 'Evidences', type: 'textarea' },
         { key: 'trainee_nationality.code', label: 'Trainee Nationality Code', type: 'text' },
+        { key: 'asset_ip_owner_id', label: 'Asset IP Owner', type: 'select', options: [
+            'International Center for Tropical Agriculture - CIAT',
+            'Bioversity International',
+            'Bioversity International and International Center for Tropical Agriculture - CIAT',
+            'Others'
+        ]},
+        { key: 'asset_ip_owner_description', label: 'Asset IP Owner Description', type: 'text' },
+        { key: 'publicity_restriction', label: 'Publicity Restriction', type: 'select', options: ['Yes', 'No'] },
+        { key: 'publicity_restriction_description', label: 'Publicity Restriction Description', type: 'textarea' },
+        { key: 'potential_asset', label: 'Potential Asset', type: 'select', options: ['Yes', 'No'] },
+        { key: 'potential_asset_description', label: 'Potential Asset Description', type: 'textarea' },
+        { key: 'requires_further_development', label: 'Requires Further Development', type: 'select', options: ['Yes', 'No'] },
+        { key: 'requires_further_development_description', label: 'Further Development Description', type: 'textarea' },
     ];
     
     // Build header
@@ -976,7 +1083,20 @@ function renderResultsTable(results) {
                         }
                         return `<td>-</td>`;
                     } else if (col.type === 'select') {
-                        const value = getNestedValue(result, col.key) || '';
+                        let value = getNestedValue(result, col.key);
+                        // Special handling for asset_ip_owner_id: convert number to name for display
+                        if (col.key === 'asset_ip_owner_id' && typeof value === 'number') {
+                            const idToNameMap = {
+                                1: 'International Center for Tropical Agriculture - CIAT',
+                                2: 'Bioversity International',
+                                3: 'Bioversity International and International Center for Tropical Agriculture - CIAT',
+                                4: 'Others'
+                            };
+                            value = idToNameMap[value] || '';
+                        }
+                        if (!value) {
+                            value = '';
+                        }
                         const options = col.options || [];
                         return `
                             <td>
@@ -1322,8 +1442,19 @@ function handleCellEdit(event) {
     const field = input.dataset.field;
     let value = input.value;
     
+    // Special handling for asset_ip_owner_id: convert name to number
+    if (field === 'asset_ip_owner_id' && value) {
+        const nameToIdMap = {
+            'International Center for Tropical Agriculture - CIAT': 1,
+            'Bioversity International': 2,
+            'Bioversity International and International Center for Tropical Agriculture - CIAT': 3,
+            'Others': 4
+        };
+        value = nameToIdMap[value] || value;
+    }
+    
     // Parse JSON for array/object fields
-    if (input.tagName === 'TEXTAREA' && ['keywords', 'partners', 'countries', 'regions', 'evidences', 'sdg_targets'].includes(field)) {
+    if (input.tagName === 'TEXTAREA' && ['keywords', 'partners', 'countries', 'regions', 'evidences', 'sdg_targets', 'trainees_description'].includes(field)) {
         try {
             value = JSON.parse(value);
         } catch (e) {

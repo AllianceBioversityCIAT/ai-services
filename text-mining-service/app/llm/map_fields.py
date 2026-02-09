@@ -20,6 +20,10 @@ def map_fields_with_opensearch(mining_result, mapping_service_url, max_retries=1
         if partner_name := partner.get("institution_name"):
             entries.append({"value": partner_name, "type": "institution"})
 
+    for trainee in mining_result.get("trainees_description", []):
+        if trainee_name := trainee.get("institution_name"):
+            entries.append({"value": trainee_name, "type": "institution"})
+
     if not entries:
         return mining_result
 
@@ -102,6 +106,14 @@ def _apply_mapped_results(mining_result, mapped_dict):
                 partner["institution_id"] = m.get("mapped_id")
                 partner["similarity_score"] = m.get("score", 0)
 
+    for trainee in mining_result.get("trainees_description", []):
+        if trainee_name := trainee.get("institution_name"):
+            key = (trainee_name, "institution")
+            if key in mapped_dict:
+                m = mapped_dict[key]
+                trainee["institution_id"] = m.get("mapped_id")
+                trainee["similarity_score"] = m.get("score", 0)
+
 
 def _apply_default_values(mining_result):
     if "main_contact_person" in mining_result and mining_result["main_contact_person"].get("name"):
@@ -128,3 +140,10 @@ def _apply_default_values(mining_result):
                 partner["institution_id"] = None
             if "similarity_score" not in partner:
                 partner["similarity_score"] = 0
+
+    for trainee in mining_result.get("trainees_description", []):
+        if trainee.get("institution_name"):
+            if "institution_id" not in trainee:
+                trainee["institution_id"] = None
+            if "similarity_score" not in trainee:
+                trainee["similarity_score"] = 0
