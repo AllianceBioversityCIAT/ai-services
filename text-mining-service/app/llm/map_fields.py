@@ -1,8 +1,28 @@
 import time
 import requests
+import threading
 from app.utils.logger.logger_util import get_logger
 
 logger = get_logger()
+
+# Global cache for mapped fields (thread-safe)
+_mapping_cache = {}
+_cache_lock = threading.Lock()
+
+def clear_mapping_cache():
+    """Clear the mapping cache (useful between different file processing)"""
+    global _mapping_cache
+    with _cache_lock:
+        _mapping_cache.clear()
+        logger.info("🧹 Mapping cache cleared")
+
+def get_cache_stats():
+    """Get cache statistics"""
+    with _cache_lock:
+        return {
+            "total_entries": len(_mapping_cache),
+            "entries": list(_mapping_cache.keys())
+        }
 
 def map_fields_with_opensearch(mining_result, mapping_service_url, max_retries=10, retry_delay=4):
     entries = []
@@ -27,13 +47,37 @@ def map_fields_with_opensearch(mining_result, mapping_service_url, max_retries=1
     if not entries:
         return mining_result
 
+    # Check cache and filter out already mapped entries
+    entries_to_map = []
+    cached_results = {}
+    
+    with _cache_lock:
+        for entry in entries:
+            cache_key = (entry["value"], entry["type"])
+            if cache_key in _mapping_cache:
+                cached_results[cache_key] = _mapping_cache[cache_key]
+            else:
+                entries_to_map.append(entry)
+    
+    if cached_results:
+        logger.info(f"💾 Found {len(cached_results)} entries in cache, need to map {len(entries_to_map)} new entries")
+    
+    # If all entries are cached, apply and return immediately
+    if not entries_to_map:
+        logger.info(f"✨ All {len(entries)} entries found in cache! No API call needed.")
+        _apply_mapped_results(mining_result, cached_results)
+        return mining_result
+    
+    # Only map entries not in cache
+    mapped_dict = cached_results.copy()
+
     for attempt in range(max_retries):
         try:
-            logger.info(f"🔗 Attempting mapping (attempt {attempt + 1}/{max_retries}) for {len(entries)} entries")
+            logger.info(f"🔗 Attempting mapping (attempt {attempt + 1}/{max_retries}) for {len(entries_to_map)} new entries")
 
             response = requests.post(
                 f"{mapping_service_url}/map/fields",
-                json={"entries": entries},
+                json={"entries": entries_to_map},
                 timeout=600
             )
             response.raise_for_status()
@@ -41,12 +85,17 @@ def map_fields_with_opensearch(mining_result, mapping_service_url, max_retries=1
             mapped = response.json().get("results", [])
             logger.info(f"✅ Mapping successful on attempt {attempt + 1}")
 
-            mapped_dict = {}
-            for m in mapped:
-                key = (m["original_value"], m["type"])
-                mapped_dict[key] = m
+            # Add newly mapped results to mapped_dict and cache
+            with _cache_lock:
+                for m in mapped:
+                    key = (m["original_value"], m["type"])
+                    mapped_dict[key] = m
+                    _mapping_cache[key] = m
+                    logger.info(f"💾 Cached: {m['type']} '{m['original_value']}' → {m.get('mapped_id')}")
             
             _apply_mapped_results(mining_result, mapped_dict)
+            
+            logger.info(f"📊 Cache stats: {len(_mapping_cache)} total cached entries")
             
             return mining_result
         
