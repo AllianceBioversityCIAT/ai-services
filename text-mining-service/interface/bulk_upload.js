@@ -1519,6 +1519,37 @@ function downloadUnmappedReport() {
 // Event Listeners
 // =========================
 document.addEventListener('DOMContentLoaded', function() {
+    // Download template button
+    const downloadTemplateBtn = document.getElementById('downloadTemplateBtn');
+    if (downloadTemplateBtn) {
+        downloadTemplateBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            try {
+                showLoading('Downloading template...');
+                const response = await fetch(`${API_BASE_URL}/s3/download-template`);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to download template: ${response.status}`);
+                }
+                
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'capdev_template.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                hideLoading();
+            } catch (error) {
+                hideLoading();
+                showError(`Error downloading template: ${error.message}`);
+            }
+        });
+    }
+    
     // Document source radio buttons
     const radioButtons = document.querySelectorAll('input[name="docSource"]');
     radioButtons.forEach(radio => {

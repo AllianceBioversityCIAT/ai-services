@@ -3,10 +3,11 @@ import json
 import base64
 import boto3
 import uvicorn
+from io import BytesIO
 from typing import Optional, Union
 from pydantic import BaseModel, Field
 from mcp.client.stdio import stdio_client
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.utils.s3.s3_util import upload_file_to_s3
@@ -249,6 +250,36 @@ async def list_s3_objects_get(bucket: str, prefix: str = "", max_items: int = 10
         raise HTTPException(status_code=500, detail=f"S3 listing error: {str(e)}")
     except Exception as e:
         logger.error(f"Unexpected error in S3 listing: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+
+@app.get("/s3/download-template", tags=["S3 Management"])
+async def download_excel_template():
+    try:
+        bucket = "ai-services-ibd"
+        key = "star/text-mining/files/bulk_capdev_template.xlsx"
+        
+        s3 = boto3.client("s3")
+        
+        file_obj = s3.get_object(Bucket=bucket, Key=key)
+        file_content = file_obj["Body"].read()
+        
+        return StreamingResponse(
+            BytesIO(file_content),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": "attachment; filename=bulk_capdev_template.xlsx"
+            }
+        )
+        
+    except s3.exceptions.NoSuchKey:
+        logger.error(f"Template file not found: {key}")
+        raise HTTPException(status_code=404, detail="Template file not found in S3")
+    except (BotoCoreError, ClientError) as e:
+        logger.error(f"S3 error downloading template: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error downloading template: {str(e)}")
+    except Exception as e:
+        logger.error(f"Unexpected error downloading template: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 

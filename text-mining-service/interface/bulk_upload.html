@@ -59,6 +59,37 @@
                         </div>
                     </label>
                 </div>
+
+                <!-- Template and Guidelines Notice -->
+                <div class="guidelines-notice">
+                    <div class="notice-icon">📋</div>
+                    <div class="notice-content">
+                        <h4 class="notice-title">📥 Excel Template & Guidelines</h4>
+                        <div class="notice-body">
+                            <p><strong>⚠️ Important Requirements:</strong></p>
+                            <ul class="requirements-list">
+                                <li><strong>Format:</strong> Data must be in <strong>Excel format (.xlsx or .xls)</strong></li>
+                                <li><strong>ID Column:</strong> Must include an <strong>ID</strong> column with incremental numbers (1, 2, 3, ...n)</li>
+                                <li><strong>Project Code:</strong> Include the <strong>project code</strong> (not just the project name)</li>
+                                <li><strong>Column Names:</strong> For accurate AI mapping, use column names <strong>identical or very similar</strong> to the template</li>
+                            </ul>
+                            <div class="template-download">
+                                <a href="#" 
+                                   id="downloadTemplateBtn"
+                                   class="btn btn-template">
+                                    📄 Download Excel Template
+                                </a>
+                            </div>
+                        </div>
+                        <div class="ai-disclaimer">
+                            <span class="disclaimer-icon">🤖</span>
+                            <span class="disclaimer-text">
+                                <strong>AI-Powered Processing:</strong> This service uses artificial intelligence to extract and map information. 
+                                Please review all results carefully before submitting to ensure accuracy.
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- Main Content -->
@@ -72,7 +103,7 @@
                         <label for="fileInput" class="file-upload-label">
                             <div class="upload-icon">📁</div>
                             <div class="upload-text">Click to upload or drag and drop</div>
-                            <div class="upload-subtext">Supported: PDF, DOCX, TXT, XLSX, XLS, PPTX</div>
+                            <div class="upload-subtext">Supported: XLSX, XLS</div>
                         </label>
                         <div id="fileName" class="file-name"></div>
                     </div>
