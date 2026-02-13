@@ -29,7 +29,7 @@
         <section class="hero-banner">
             <div class="hero-overlay">
                 <h1 class="hero-title">BULK UPLOAD - TEXT MINING SERVICE</h1>
-                <p class="hero-subtitle">Upload a document or select one from S3, send it to the text-mining service, and visualize results.</p>
+                <p class="hero-subtitle">Upload a document or select a previous file, send it to the text-mining service, and visualize results.</p>
             </div>
         </section>
 
@@ -54,14 +54,15 @@
                         <input type="radio" name="docSource" value="s3">
                         <div class="radio-content">
                             <div class="radio-icon">☁️</div>
-                            <span class="radio-title">Select from S3</span>
-                            <span class="radio-description">Choose from cloud storage</span>
+                            <span class="radio-title">Select previous file</span>
+                            <span class="radio-description">Choose from saved files</span>
                         </div>
                     </label>
                 </div>
 
-                <!-- Template and Guidelines Notice -->
-                <div class="guidelines-notice">
+                <!-- Template and Guidelines Notice (Only for Upload) -->
+                <!-- Template and Guidelines (for Upload file) -->
+                <div id="uploadGuidelines" class="guidelines-notice">
                     <div class="notice-icon">📋</div>
                     <div class="notice-content">
                         <h4 class="notice-title">📥 Excel Template & Guidelines</h4>
@@ -75,9 +76,15 @@
                             </ul>
                             <div class="template-download">
                                 <a href="#" 
-                                   id="downloadTemplateBtn"
+                                   id="downloadTemplateSpanishBtn"
                                    class="btn btn-template">
-                                    📄 Download Excel Template
+                                    📄 Download Guide in Spanish
+                                </a>
+                                <a href="#" 
+                                   id="downloadTemplateEnglishBtn"
+                                   class="btn btn-template"
+                                   style="margin-left: 1rem;">
+                                    📄 Download Guide in English
                                 </a>
                             </div>
                         </div>
@@ -88,6 +95,17 @@
                                 Please review all results carefully before submitting to ensure accuracy.
                             </span>
                         </div>
+                    </div>
+                </div>
+                
+                <!-- AI Disclaimer only (for Select previous file) -->
+                <div id="s3Disclaimer" class="guidelines-notice" style="display: none;">
+                    <div class="notice-icon" style="font-size: 1.5rem;">🤖</div>
+                    <div class="notice-content">
+                        <span class="disclaimer-text" style="font-size: 0.9rem;">
+                            <strong>AI-Powered Processing:</strong> This service uses artificial intelligence to extract and map information. 
+                            Please review all results carefully before submitting to ensure accuracy.
+                        </span>
                     </div>
                 </div>
             </section>
@@ -113,7 +131,7 @@
                 <!-- S3 Mode -->
                 <div id="s3Mode" class="mode-content" style="display: none;">
                     <div class="s3-search-box">
-                        <h4>S3 Search Options</h4>
+                        <h4>File Search Options</h4>
                         <div class="form-group">
                             <label for="s3Prefix">Additional prefix (optional)</label>
                             <input type="text" id="s3Prefix" placeholder="Enter additional prefix">
@@ -121,7 +139,7 @@
                         <button id="refreshS3" class="btn btn-secondary">🔄 Refresh list</button>
                     </div>
                     <div class="form-group">
-                        <label for="s3Select">Select an object from S3</label>
+                        <label for="s3Select">Select a file</label>
                         <select id="s3Select" class="form-select">
                             <option value="">Loading...</option>
                         </select>

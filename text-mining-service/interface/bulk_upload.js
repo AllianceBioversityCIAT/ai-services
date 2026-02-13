@@ -4,7 +4,7 @@
 const API_BASE_URL = 'https://oxnrkcntlheycdgcnilexrwp4i0tucqz.lambda-url.us-east-1.on.aws';
 // const API_BASE_URL = 'http://localhost:8000';
 const S3_BUCKET = 'ai-services-ibd';
-const FOLDER_PATH = 'star/text-mining/files/test/';
+const FOLDER_PATH = 'star/text-mining/files/test/bulk_upload/';
 const ENVIRONMENT_URL = 'https://management-allianceindicatorstest.ciat.cgiar.org/api/';
 const STAR_API_URL = 'https://main-allianceindicatorstest.ciat.cgiar.org/api/results/ai/formalize/bulk';
 
@@ -1520,14 +1520,14 @@ function downloadUnmappedReport() {
 // Event Listeners
 // =========================
 document.addEventListener('DOMContentLoaded', function() {
-    // Download template button
-    const downloadTemplateBtn = document.getElementById('downloadTemplateBtn');
-    if (downloadTemplateBtn) {
-        downloadTemplateBtn.addEventListener('click', async function(e) {
+    // Download template button - Spanish
+    const downloadTemplateSpanishBtn = document.getElementById('downloadTemplateSpanishBtn');
+    if (downloadTemplateSpanishBtn) {
+        downloadTemplateSpanishBtn.addEventListener('click', async function(e) {
             e.preventDefault();
             try {
-                showLoading('Downloading template...');
-                const response = await fetch(`${API_BASE_URL}/s3/download-template`);
+                showLoading('Downloading guide in Spanish...');
+                const response = await fetch(`${API_BASE_URL}/s3/download-template?language=es`);
                 
                 if (!response.ok) {
                     throw new Error(`Failed to download template: ${response.status}`);
@@ -1537,7 +1537,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'capdev_template.xlsx';
+                a.download = 'capdev_guide_spanish.zip';
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
@@ -1546,7 +1546,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 hideLoading();
             } catch (error) {
                 hideLoading();
-                showError(`Error downloading template: ${error.message}`);
+                showError(`Error downloading guide: ${error.message}`);
+            }
+        });
+    }
+    
+    // Download template button - English
+    const downloadTemplateEnglishBtn = document.getElementById('downloadTemplateEnglishBtn');
+    if (downloadTemplateEnglishBtn) {
+        downloadTemplateEnglishBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            try {
+                showLoading('Downloading guide in English...');
+                const response = await fetch(`${API_BASE_URL}/s3/download-template?language=en`);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to download template: ${response.status}`);
+                }
+                
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'capdev_guide_english.zip';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                hideLoading();
+            } catch (error) {
+                hideLoading();
+                showError(`Error downloading guide: ${error.message}`);
             }
         });
     }
@@ -1557,13 +1588,19 @@ document.addEventListener('DOMContentLoaded', function() {
         radio.addEventListener('change', function() {
             const uploadMode = document.getElementById('uploadMode');
             const s3Mode = document.getElementById('s3Mode');
+            const uploadGuidelines = document.getElementById('uploadGuidelines');
+            const s3Disclaimer = document.getElementById('s3Disclaimer');
             
             if (this.value === 'upload') {
                 uploadMode.style.display = 'block';
                 s3Mode.style.display = 'none';
+                uploadGuidelines.style.display = 'flex';
+                s3Disclaimer.style.display = 'none';
             } else {
                 uploadMode.style.display = 'none';
                 s3Mode.style.display = 'block';
+                uploadGuidelines.style.display = 'none';
+                s3Disclaimer.style.display = 'flex';
                 // Load S3 objects if not already loaded
                 if (s3Objects.length === 0) {
                     loadS3Objects();
@@ -1674,8 +1711,18 @@ async function loadS3Objects() {
     const select = document.getElementById('s3Select');
     const caption = document.getElementById('s3Caption');
     
+    // Helper function to simplify path display (show only from relevant folder)
+    const simplifyPath = (fullPath) => {
+        if (fullPath.includes('bulk_upload/')) {
+            return fullPath.substring(fullPath.indexOf('bulk_upload/'));
+        } else if (fullPath.includes('test/')) {
+            return fullPath.substring(fullPath.indexOf('test/'));
+        }
+        return fullPath.split('/').pop() || fullPath;
+    };
+    
     select.innerHTML = '<option value="">Loading...</option>';
-    caption.textContent = `Searching in: ${S3_BUCKET}/${fullPrefix}`;
+    caption.textContent = `Searching files...`;
     
     try {
         const response = await fetch(`${API_BASE_URL}/s3/list?bucket=${S3_BUCKET}&prefix=${encodeURIComponent(fullPrefix)}`);
@@ -1689,16 +1736,16 @@ async function loadS3Objects() {
         
         if (s3Objects.length > 0) {
             select.innerHTML = s3Objects.map(key => 
-                `<option value="${key}">${key}</option>`
+                `<option value="${key}">${simplifyPath(key)}</option>`
             ).join('');
-            caption.textContent = `Found ${s3Objects.length} objects. Selected: ${s3Objects[0]}`;
+            caption.textContent = `Found ${s3Objects.length} file(s). Selected: ${simplifyPath(s3Objects[0])}`;
         } else {
-            select.innerHTML = '<option value="">No objects found</option>';
-            caption.textContent = 'No objects found for this bucket/prefix.';
+            select.innerHTML = '<option value="">No files found</option>';
+            caption.textContent = 'No files found.';
         }
     } catch (error) {
-        showError(`S3 listing error: ${error.message}`);
+        showError(`Error loading files: ${error.message}`);
         select.innerHTML = '<option value="">Error loading</option>';
-        caption.textContent = 'Error loading objects from S3.';
+        caption.textContent = 'Error loading files.';
     }
 }

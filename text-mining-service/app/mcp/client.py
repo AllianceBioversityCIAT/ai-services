@@ -254,10 +254,16 @@ async def list_s3_objects_get(bucket: str, prefix: str = "", max_items: int = 10
 
 
 @app.get("/s3/download-template", tags=["S3 Management"])
-async def download_excel_template():
+async def download_excel_template(language: str = "es"):
     try:
         bucket = "ai-services-ibd"
-        key = "star/text-mining/files/bulk_capdev_template.xlsx"
+        
+        if language == "en":
+            key = "star/text-mining/files/capdev_guide_english.zip"
+            filename = "capdev_guide_english.zip"
+        else:
+            key = "star/text-mining/files/capdev_guide_spanish.zip"
+            filename = "capdev_guide_spanish.zip"
         
         s3 = boto3.client("s3")
         
@@ -266,15 +272,15 @@ async def download_excel_template():
         
         return StreamingResponse(
             BytesIO(file_content),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            media_type="application/zip",
             headers={
-                "Content-Disposition": "attachment; filename=bulk_capdev_template.xlsx"
+                "Content-Disposition": f"attachment; filename={filename}"
             }
         )
         
     except s3.exceptions.NoSuchKey:
         logger.error(f"Template file not found: {key}")
-        raise HTTPException(status_code=404, detail="Template file not found in S3")
+        raise HTTPException(status_code=404, detail=f"Template file not found in S3: {key}")
     except (BotoCoreError, ClientError) as e:
         logger.error(f"S3 error downloading template: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error downloading template: {str(e)}")
@@ -748,7 +754,7 @@ async def bulk_upload_capdev_endpoint(
             file_content = await file.read()
 
             filename = file.filename
-            key = f"{STAR_BUCKET_KEY_NAME}/{filename}"
+            key = f"{STAR_BUCKET_KEY_NAME}/bulk_upload/{filename}"
 
             content_type = file.content_type
 
