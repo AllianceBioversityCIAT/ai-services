@@ -1,6 +1,7 @@
 import time
 import json
 import boto3
+import traceback
 from app.utils.config.config_util import AWS
 from app.utils.prompt.prompt import build_prompt
 from app.utils.logger.logger_util import get_logger
@@ -124,6 +125,14 @@ def improve_prms_result_metadata(result_metadata: dict, user_id: str = None):
         
         return result
 
+    except KeyError as e:
+        logger.error(f"❌ PRMS KeyError - Missing key: {str(e)}")
+        logger.error(f"📦 DEBUG - Available keys: {list(result_metadata.keys())}")
+        logger.error(f"📋 Full traceback:\n{traceback.format_exc()}")
+        raise ValueError(f"Missing required field: {str(e)}")
+    
     except Exception as e:
         logger.error(f"❌ PRMS Error: {str(e)}")
+        logger.error(f"📦 DEBUG - Error type: {type(e).__name__}")
+        logger.error(f"📋 Full traceback:\n{traceback.format_exc()}")
         raise
