@@ -495,7 +495,7 @@
 
         // Configuration - Replace with your actual endpoints
         const AI_FEEDBACK_URL = 'https://i8s5i8c21i.execute-api.us-east-1.amazonaws.com';
-        const CHATBOT_API_URL = 'https://6zhwlkdwgi.execute-api.us-east-1.amazonaws.com/api/chat';
+        const CHATBOT_API_URL = 'https://lvurhov4wryn4pygqxf6tp54uq0jdpgs.lambda-url.us-east-1.on.aws/api/chat';
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -630,9 +630,18 @@
                 
             } catch (error) {
                 console.error('Error:', error);
-                const errorMessage = error.message.includes('fetch') 
-                    ? '🌐 Connection error. Please check your internet connection and try again.'
-                    : '⚠️ An error occurred while processing your request. Please try again.';
+                let errorMessage;
+                
+                if (error.message.includes('503')) {
+                    errorMessage = '⏱️ <strong>Service Timeout</strong><br>The AI service is taking longer than expected. This could be due to:<br>• High server load<br>• Complex query processing<br>• First-time initialization<br><br>Please try again or simplify your question.';
+                } else if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
+                    errorMessage = '🌐 <strong>Connection Error</strong><br>Cannot reach the AI service. Please check your internet connection and try again.';
+                } else if (error.message.includes('500')) {
+                    errorMessage = '⚠️ <strong>Server Error</strong><br>The AI service encountered an internal error. Please try again in a few moments.';
+                } else {
+                    errorMessage = `⚠️ <strong>Error</strong><br>${error.message}<br><br>Please try again or contact support if the issue persists.`;
+                }
+                
                 addMessage('assistant', errorMessage);
             } finally {
                 setLoading(false);
@@ -774,12 +783,31 @@
                     body: JSON.stringify(requestData)
                 });
                 
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.details || `API request failed: ${response.status}`);
+                    // Try to get error details
+                    let errorMessage = `API request failed: ${response.status} ${response.statusText}`;
+                    try {
+                        const errorData = await response.json();
+                        console.log('Error data:', errorData);
+                        errorMessage = errorData.detail?.details || errorData.details || errorData.error || errorMessage;
+                    } catch (jsonError) {
+                        // If JSON parsing fails, try to get text
+                        try {
+                            const errorText = await response.text();
+                            console.log('Error text:', errorText);
+                            if (errorText) errorMessage = errorText;
+                        } catch (textError) {
+                            console.error('Could not parse error response:', textError);
+                        }
+                    }
+                    throw new Error(errorMessage);
                 }
                 
                 const data = await response.json();
+                console.log('Success data:', data);
                 
                 return data.message;
                 
