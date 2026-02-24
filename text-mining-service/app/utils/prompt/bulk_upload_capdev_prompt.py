@@ -25,6 +25,13 @@ Indicator Definition:
 
 Output Fields for Each Result
 
+Record ID (Internal Use Only)
+    • id
+    • Extract the ID value from the document (e.g., from an "ID" column in the Excel file).
+    • This ID should correspond to the identifier already present in the source document.
+    • This field is REQUIRED and must be included in every result.
+    • If the document doesn't have an explicit ID column, do not return this field in the output JSON.
+
 Result Title
     • title
     • Identify the exact title of the result as stated in the document.
@@ -133,6 +140,24 @@ Purpose of the training
     • If it is "Other", specify the purpose as "Other: <purpose description>".
     • If the document does not provide enough detail, do not return the training_purpose field in the output JSON.
 
+Trainees Organizations
+    • trainees
+    • Only include this field if the training_type is "Group training".
+    • Refers to whether the trainees were attending the training on behalf of an organization.
+    • Return "Yes" if there is clear evidence that trainees represent specific organizations.
+    • Return "No" if there is no evidence or mention of organizational representation.
+    • IMPORTANT: For Group training, you should ALWAYS return either "Yes" or "No" - do NOT omit this field unless it's impossible to determine.
+    • If you cannot determine with reasonable confidence, default to "No".
+    
+    • trainees_description
+    • Only include this field if trainees is "Yes" and training_type is "Group training".
+    • Refers to the organizations that the training attendees represent or belong to.
+    • IMPORTANT: Do not confuse with partners. Trainees organizations are represented BY the attendees at the training, while partners contribute TO the training.
+    • List all relevant organization names mentioned in the document as an array of objects with the following structure:
+        [{"institution_name": "<institution name 1>"}, {"institution_name": "<institution name 2>"}]
+    • If there are multiple organizations, they will be separated by commas, and you should list each one as a separate object in the array.
+    • If the document does not provide enough detail, do not return the trainees_description field in the output JSON.
+
 Degree Validation:
     • Only include the "degree" field **if and only if** length_of_training is "Long-term" or training_type is "Individual training".
     • If length_of_training is not "Long-term", **do not include the "degree" field at all** in the output JSON.
@@ -197,6 +222,8 @@ Delivery Modality
 Partners
     • partners
     • Refers to the partner(s) that made a significant contribution to the achievement of the result that is being submitted.
+    • These are organizations that contribute to, support, or collaborate in conducting the training or capacity building activity.
+    • IMPORTANT: Do not confuse with trainees organizations. Partners contribute TO the training, while trainees organizations are represented BY the attendees.
     • List all relevant partner names mentioned in the document as an array of objects with the following structure:
         [{"institution_name": "<institution name 1>"}, {"institution_name": "<institution name 2>"}]
     • If there are multiple partners, they will be separated by commas, and you should list each one as a separate object in the array.
@@ -228,6 +255,52 @@ Evidence
     • If either the description or the link is missing for any evidence, do not include that evidence object in the array.
     • If no evidence objects meet this requirement, do not return the evidence field in the output JSON.
 
+Intellectual Property Rights
+    • asset_ip_owner_id
+        • Refers to who owns the intellectual property rights to this asset.
+        • Look for information related to asset ownership or intellectual property ownership in the document.
+        • Return as a numeric value (1, 2, 3, or 4) corresponding to:
+            • 1: "International Center for Tropical Agriculture - CIAT"
+            • 2: "Bioversity International"
+            • 3: "Bioversity International and International Center for Tropical Agriculture - CIAT"
+            • 4: "Others"
+        • If the document does not provide enough detail, do not return the asset_ip_owner_id field in the output JSON.
+    
+    • asset_ip_owner_description
+        • Only include this field if asset_ip_owner_id is 4.
+        • Extract the specific name or description of the owner from the document.
+        • If the document does not provide enough detail, do not return the asset_ip_owner_description field in the output JSON.
+    
+    • publicity_restriction
+        • Refers to whether there are any legal restrictions for the publication of the work (confidential information or embargo periods).
+        • Return "Yes" or "No" based on information found in the document regarding legal restrictions or publication limitations.
+        • If the document does not provide enough detail, do not return the publicity_restriction field in the output JSON.
+    
+    • publicity_restriction_description
+        • Only include this field if publicity_restriction is "Yes".
+        • Extract and provide details about the legal restrictions, confidential information, or embargo periods mentioned in the document.
+        • If the document does not provide enough detail, do not return the publicity_restriction_description field in the output JSON.
+    
+    • potential_asset
+        • Refers to whether there is any potential for commercialization, release, or making available this asset.
+        • Return "Yes" or "No" based on information found in the document regarding commercialization potential or asset availability.
+        • If the document does not provide enough detail, do not return the potential_asset field in the output JSON.
+    
+    • potential_asset_description
+        • Only include this field if potential_asset is "Yes".
+        • Extract and provide details about the commercialization potential, release plans, or availability mentioned in the document.
+        • If the document does not provide enough detail, do not return the potential_asset_description field in the output JSON.
+    
+    • requires_further_development
+        • Refers to whether this asset requires further development or refinement.
+        • Return "Yes" or "No" based on information found in the document regarding the need for additional development or refinement.
+        • If the document does not provide enough detail, do not return the requires_further_development field in the output JSON.
+    
+    • requires_further_development_description
+        • Only include this field if requires_further_development is "Yes".
+        • Extract and provide details about what further development or refinement is needed as mentioned in the document.
+        • If the document does not provide enough detail, do not return the requires_further_development_description field in the output JSON.
+
 ⸻
 
 6. Output Format
@@ -239,6 +312,7 @@ Your output must be a single valid JSON object, and must not include any additio
 **IMPORTANT: Only include fields in the JSON when information is found in the document or inferred by you. Do not include fields with null values or missing information - simply omit them entirely from the output.**
 
 Required and mandatory fields:
+• id
 • indicator
 • title
 • description
@@ -265,6 +339,7 @@ Follow this exact structure:
 {
     "results": [
         {
+            "id": "<numeric value (as extracted from the document)>",
             "indicator": "<'Capacity Sharing for Development'>",
             "title": "<result title>",
             "description": "<result description>",
@@ -289,6 +364,16 @@ Follow this exact structure:
             "female_participants": <number (only if group training)>,
             "non_binary_participants": <number (only if group training)>,
             "training_purpose": "<value (only if group training)>",
+            "trainees": "<Yes or No (only if group training)>",
+            "trainees_description": [
+                {
+                    "institution_name": "<organization name 1>"
+                },
+                {
+                    "institution_name": "<organization name 2>"
+                },
+                ...
+            ] (only if trainees is Yes and training_type is Group training),
             "degree": "<value (only if length_of_training is Long-term or training_type is Individual training)>",
             "trainee_affiliation": {
                 "institution_name": "<value (only if individual training)>"
@@ -328,7 +413,15 @@ Follow this exact structure:
                     "evidence_description": "<value>",
                     "evidence_link": "<value>"
                 }
-            ]
+            ],
+            "asset_ip_owner_id": <numeric value (1, 2, 3, or 4)>,
+            "asset_ip_owner_description": "<value (only if asset_ip_owner_id is 4)>",
+            "publicity_restriction": "<Yes or No>",
+            "publicity_restriction_description": "<value (only if publicity_restriction is Yes)>",
+            "potential_asset": "<Yes or No>",
+            "potential_asset_description": "<value (only if potential_asset is Yes)>",
+            "requires_further_development": "<Yes or No>",
+            "requires_further_development_description": "<value (only if requires_further_development is Yes)>"
         }
     ]
 }

@@ -3,12 +3,12 @@ import json
 from app.utils.logger.logger_util import get_logger
 from app.llm.vectorize import get_all_reference_data
 from app.utils.s3.s3_util import read_document_from_s3
-from app.llm.map_fields import map_fields_with_opensearch
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, MAPPING_URL
 from app.utils.prompt.bulk_upload_capdev_prompt import PROMPT_BULK_UPLOAD_CAPDEV
 from app.llm.vectorize import get_embedding, store_temp_embeddings, get_relevant_chunk
 from app.llm.mining import initialize_reference_data, split_text, invoke_model, is_valid_json
+from app.llm.map_fields import map_fields_with_opensearch, clear_mapping_cache, get_cache_stats
 
 logger = get_logger()
 mapping_service_url = MAPPING_URL
@@ -236,6 +236,10 @@ def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAP
     start_time = time.time()
 
     try:
+        # Clear mapping cache at the start of each document processing
+        clear_mapping_cache()
+        logger.info(f"🚀 Starting document processing: {file_key}")
+        
         reference_file_regions = f"{STAR_BUCKET_KEY_NAME}/clarisa_regions.xlsx"
         reference_file_countries = f"{STAR_BUCKET_KEY_NAME}/clarisa_countries.xlsx"
         initialize_reference_data(
@@ -262,11 +266,14 @@ def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAP
             
             end_time = time.time()
             elapsed_time = end_time - start_time
+
+            cache_stats = get_cache_stats()
             
             logger.info(f"✅ Successfully processed all {len(batches)} batches in sequential groups")
             logger.info(f"📊 Total results: {len(final_result.get('results', []))}")
             logger.info(f"⏱️ Total processing time: {elapsed_time:.2f} seconds")
             logger.info(f"🚀 Used {max_workers} workers per group, {group_size} batches per group")
+            logger.info(f"💾 Cache performance: {cache_stats['total_entries']} unique entities cached")
 
             logger.info(f"✅ Successfully generated response:\n{json.dumps(final_result, indent=2, ensure_ascii=False)}")
             

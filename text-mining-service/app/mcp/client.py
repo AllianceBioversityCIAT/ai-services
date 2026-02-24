@@ -1,24 +1,30 @@
 import os
 import json
+import base64
 import boto3
 import uvicorn
+from io import BytesIO
 from typing import Optional, Union
 from pydantic import BaseModel, Field
 from mcp.client.stdio import stdio_client
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from app.utils.config.config_util import AWS
 from fastapi.middleware.cors import CORSMiddleware
 from app.utils.s3.s3_util import upload_file_to_s3
 from app.utils.logger.logger_util import get_logger
 from botocore.exceptions import BotoCoreError, ClientError
 from mcp import ClientSession, StdioServerParameters, types
-from fastapi import FastAPI, HTTPException, Body, UploadFile, File, Form
-from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, AICCRA_BUCKET_KEY_NAME
 from app.utils.prompt.prompt_aiccra import DEFAULT_PROMPT_AICCRA
+from app.utils.config.config_util import AWS, CLIENT_ID, CLIENT_SECRET
+from fastapi import FastAPI, HTTPException, Body, UploadFile, File, Form
+from app.utils.dynamo.create_bulk_table import create_bulk_upload_table_if_not_exists
+from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, AICCRA_BUCKET_KEY_NAME
 
 
 logger = get_logger()
+
+dynamodb = boto3.resource('dynamodb', region_name=AWS.get('region', 'us-east-1'))
+BULK_UPLOAD_TABLE_NAME = 'bulk_upload_records'
 
 server_params = StdioServerParameters(
     command="python",
@@ -53,6 +59,21 @@ class S3ListRequest(BaseModel):
     max_items: int = 1000
 
 
+class RecordStatusUpdate(BaseModel):
+    fileName: str = Field(..., description="Name of the file")
+    recordId: str = Field(..., description="ID of the record")
+    status: str = Field(..., description="Status of the record: 'complete' or 'failed'")
+    link: Optional[str] = Field(None, description="Link to the result in STAR (only if status is 'complete')")
+
+
+class BulkUploadRecord(BaseModel):
+    fileName: str = Field(..., description="Name of the file (Primary Key)")
+    complete: list[str] = Field(default_factory=list, description="List of completed record IDs")
+    failed: list[str] = Field(default_factory=list, description="List of failed record IDs")
+    links: dict[str, str] = Field(default_factory=dict, description="Dictionary of {recordId: starLink}")
+    lastUpdated: str = Field(..., description="Timestamp of last update")
+
+
 app = FastAPI(
     title="CGIAR Text Mining Service API",
     description="""
@@ -85,7 +106,7 @@ app = FastAPI(
         "url": "https://opensource.org/licenses/MIT"
     },
     servers=[
-        {"url": "https://d3djd7q7g7v7di.cloudfront.net", "description": "Production server"},
+        {"url": "https://xps47vud6h2wtznurbtxlgpr4i0qwxlg.lambda-url.us-east-1.on.aws", "description": "Production server"},
         {"url": "https://oxnrkcntlheycdgcnilexrwp4i0tucqz.lambda-url.us-east-1.on.aws", "description": "Test server"},
         {"url": "http://localhost:8000", "description": "Local server"}
     ]
@@ -98,6 +119,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Create table on startup
+try:
+    create_bulk_upload_table_if_not_exists()
+except Exception as e:
+    logger.warning(f"Could not verify/create DynamoDB table: {str(e)}")
 
 
 async def handle_sampling_message(message: types.CreateMessageRequestParams) -> types.CreateMessageResult:
@@ -113,10 +141,39 @@ async def handle_sampling_message(message: types.CreateMessageRequestParams) -> 
 app.mount("/static", StaticFiles(directory="interface"), name="static")
 
 
+@app.get("/api/auth/token", tags=["Authentication"])
+async def get_auth_token():
+    """
+    Generate authentication token securely from backend.
+    This endpoint prevents exposing client credentials to the frontend.
+    """
+    try:
+        credentials = {
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET
+        }
+        json_string = json.dumps(credentials)
+        encoded_token = base64.b64encode(json_string.encode('utf-8')).decode('utf-8')
+        
+        return {
+            "status": "success",
+            "token": encoded_token
+        }
+    except Exception as e:
+        logger.error(f"Error generating auth token: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate authentication token")
+
+
 @app.get("/ui", tags=["AICCRA Project"])
 async def serve_ui_alt():
     """Alternative endpoint for the UI"""
     return FileResponse('interface/index.html')
+
+
+@app.get("/bulk-upload", tags=["STAR Project"])
+async def serve_bulk_upload():
+    """Serve the bulk upload interface"""
+    return FileResponse('interface/bulk_upload.html')
 
 
 @app.get("/aiccra/prompt", tags=["AICCRA Project"])
@@ -158,6 +215,250 @@ async def list_s3_objects(request: S3ListRequest):
         raise HTTPException(status_code=500, detail=f"S3 listing error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+
+@app.get("/s3/list", tags=["S3 Management"])
+async def list_s3_objects_get(bucket: str, prefix: str = "", max_items: int = 1000):
+    """
+    List objects in S3 bucket with given prefix (GET method for frontend).
+    Returns objects ordered by LastModified (desc).
+    """
+    try:
+        s3 = boto3.client("s3")
+        
+        paginator = s3.get_paginator("list_objects_v2")
+        pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
+        
+        items = []
+        for page in pages:
+            for obj in page.get("Contents", []):
+                items.append((obj["Key"], obj["LastModified"]))
+                if len(items) >= max_items:
+                    break
+        
+        items.sort(key=lambda x: x[1], reverse=True)
+        objects = [k for k, _ in items]
+        
+        return {
+            "status": "success",
+            "objects": objects,
+            "count": len(objects)
+        }
+        
+    except (BotoCoreError, ClientError) as e:
+        logger.error(f"S3 listing error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"S3 listing error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Unexpected error in S3 listing: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+
+@app.get("/s3/download-template", tags=["S3 Management"])
+async def download_excel_template(language: str = "es"):
+    try:
+        bucket = "ai-services-ibd"
+        
+        if language == "en":
+            key = "star/text-mining/files/capdev_guide_english.zip"
+            filename = "capdev_guide_english.zip"
+        else:
+            key = "star/text-mining/files/capdev_guide_spanish.zip"
+            filename = "capdev_guide_spanish.zip"
+        
+        s3 = boto3.client("s3")
+        
+        file_obj = s3.get_object(Bucket=bucket, Key=key)
+        file_content = file_obj["Body"].read()
+        
+        return StreamingResponse(
+            BytesIO(file_content),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+        
+    except s3.exceptions.NoSuchKey:
+        logger.error(f"Template file not found: {key}")
+        raise HTTPException(status_code=404, detail=f"Template file not found in S3: {key}")
+    except (BotoCoreError, ClientError) as e:
+        logger.error(f"S3 error downloading template: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error downloading template: {str(e)}")
+    except Exception as e:
+        logger.error(f"Unexpected error downloading template: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+
+@app.get("/dynamo/bulk-upload-records/{file_name}",
+         summary="Get Record Statuses",
+         description="""
+         Retrieve the status of records for a specific file from DynamoDB.
+         
+         Returns:
+         - complete: List of record IDs that were successfully uploaded
+         - failed: List of record IDs that failed to upload
+         - links: Dictionary mapping record IDs to their STAR URLs
+         - lastUpdated: Timestamp of last update
+         
+         If the file has not been processed before, returns 404.
+         """,
+         responses={
+             200: {"description": "Record statuses retrieved successfully"},
+             404: {"description": "File not found in database"},
+             500: {"description": "Internal server error"}
+         },
+         tags=["Bulk Upload Status"])
+async def get_record_statuses(file_name: str):
+    """
+    Get the status of records for a specific file from DynamoDB.
+    
+    Args:
+        file_name: Name of the file (URL encoded)
+    
+    Returns:
+        dict: Record statuses including complete, failed, and links
+    """
+    try:
+        table = dynamodb.Table(BULK_UPLOAD_TABLE_NAME)
+        
+        response = table.get_item(Key={'fileName': file_name})
+        
+        if 'Item' not in response:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Record not found for file: {file_name}"
+            )
+        
+        item = response['Item']
+        
+        return {
+            "fileName": item.get('fileName'),
+            "complete": item.get('complete', []),
+            "failed": item.get('failed', []),
+            "links": item.get('links', {}),
+            "lastUpdated": item.get('lastUpdated')
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving record statuses for {file_name}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving record statuses: {str(e)}"
+        )
+
+
+@app.post("/dynamo/bulk-upload-records",
+          summary="Update Record Status",
+          description="""
+          Update the status of a specific record in DynamoDB.
+          
+          This endpoint handles the state management for bulk upload records:
+          - Creates a new file record if it doesn't exist
+          - Updates the status of a record (complete or failed)
+          - Manages the links to STAR for completed records
+          
+          Status Logic:
+          - 'complete': Adds record to complete list, removes from failed, stores STAR link
+          - 'failed': Adds record to failed list, removes from complete, removes link
+          
+          The endpoint is idempotent - calling it multiple times with the same data is safe.
+          """,
+          responses={
+              200: {"description": "Record status updated successfully"},
+              400: {"description": "Invalid request - status must be 'complete' or 'failed'"},
+              500: {"description": "Internal server error"}
+          },
+          tags=["Bulk Upload Status"])
+async def update_record_status(data: RecordStatusUpdate):
+    """
+    Update the status of a specific record in DynamoDB.
+    
+    Args:
+        data: RecordStatusUpdate containing fileName, recordId, status, and optional link
+    
+    Returns:
+        dict: Success confirmation with updated record details
+    """
+    if data.status not in ["complete", "failed"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Status must be either 'complete' or 'failed'"
+        )
+    
+    try:
+        from datetime import datetime
+        
+        table = dynamodb.Table(BULK_UPLOAD_TABLE_NAME)
+        
+        # Get existing record or create new one
+        response = table.get_item(Key={'fileName': data.fileName})
+        
+        if 'Item' in response:
+            item = response['Item']
+        else:
+            # Create new record
+            item = {
+                'fileName': data.fileName,
+                'complete': [],
+                'failed': [],
+                'links': {}
+            }
+        
+        # Convert to standard Python types
+        complete_list = list(item.get('complete', []))
+        failed_list = list(item.get('failed', []))
+        links_dict = dict(item.get('links', {}))
+        
+        # Update based on status
+        if data.status == "complete":
+            # Add to complete, remove from failed
+            if data.recordId not in complete_list:
+                complete_list.append(data.recordId)
+            if data.recordId in failed_list:
+                failed_list.remove(data.recordId)
+            # Update link
+            if data.link:
+                links_dict[data.recordId] = data.link
+        
+        elif data.status == "failed":
+            # Add to failed, remove from complete
+            if data.recordId not in failed_list:
+                failed_list.append(data.recordId)
+            if data.recordId in complete_list:
+                complete_list.remove(data.recordId)
+            # Remove link if exists
+            if data.recordId in links_dict:
+                del links_dict[data.recordId]
+        
+        # Save to DynamoDB
+        table.put_item(
+            Item={
+                'fileName': data.fileName,
+                'complete': complete_list,
+                'failed': failed_list,
+                'links': links_dict,
+                'lastUpdated': datetime.now().isoformat()
+            }
+        )
+        
+        logger.info(f"✅ Updated status for record {data.recordId} in file {data.fileName}: {data.status}")
+        
+        return {
+            "success": True,
+            "fileName": data.fileName,
+            "recordId": data.recordId,
+            "status": data.status,
+            "message": "Record status updated successfully"
+        }
+    
+    except Exception as e:
+        logger.error(f"Error updating record status: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating record status: {str(e)}"
+        )
 
 
 
@@ -453,7 +754,7 @@ async def bulk_upload_capdev_endpoint(
             file_content = await file.read()
 
             filename = file.filename
-            key = f"{STAR_BUCKET_KEY_NAME}/{filename}"
+            key = f"{STAR_BUCKET_KEY_NAME}/bulk_upload/{filename}"
 
             content_type = file.content_type
 

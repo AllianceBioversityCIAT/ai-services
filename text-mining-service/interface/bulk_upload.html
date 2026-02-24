@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 Bulk Upload - Text Mining Service</title>
+    <link rel="stylesheet" href="static/bulk_upload.css">
+</head>
+<body>
+    <!-- Production Environment Badge -->
+    <div class="production-env-badge">
+        Production Environment
+    </div>
+
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <div class="logo-section">
+                    <div class="logo-icon">🧠</div>
+                    <span class="app-name">Text Mining Service</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Hero Banner -->
+        <section class="hero-banner">
+            <div class="hero-overlay">
+                <h1 class="hero-title">BULK UPLOAD - TEXT MINING SERVICE</h1>
+                <p class="hero-subtitle">Upload a document or select a previous file, send it to the text-mining service, and visualize results.</p>
+            </div>
+        </section>
+
+        <!-- Main Content Wrapper -->
+        <div class="main-wrapper">
+            <!-- Document Source Selection -->
+            <section class="source-section">
+                <div class="section-header">
+                    <h2 class="section-title">Document source</h2>
+                    <p class="section-description">Choose how you want to provide your document.</p>
+                </div>
+                <div class="radio-group">
+                    <label class="radio-card">
+                        <input type="radio" name="docSource" value="upload" checked>
+                        <div class="radio-content">
+                            <div class="radio-icon">📤</div>
+                            <span class="radio-title">Upload file</span>
+                            <span class="radio-description">Upload from your computer</span>
+                        </div>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="docSource" value="s3">
+                        <div class="radio-content">
+                            <div class="radio-icon">☁️</div>
+                            <span class="radio-title">Select previous file</span>
+                            <span class="radio-description">Choose from saved files</span>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Template and Guidelines Notice (Only for Upload) -->
+                <!-- Template and Guidelines (for Upload file) -->
+                <div id="uploadGuidelines" class="guidelines-notice">
+                    <div class="notice-icon">📋</div>
+                    <div class="notice-content">
+                        <h4 class="notice-title">📥 Excel Template & Guidelines</h4>
+                        <div class="notice-body">
+                            <p><strong>⚠️ Important Requirements:</strong></p>
+                            <ul class="requirements-list">
+                                <li><strong>Format:</strong> Data must be in <strong>Excel format (.xlsx or .xls)</strong></li>
+                                <li><strong>Filename:</strong> Try to give the Excel file you are going to upload a <strong>distinctive name</strong> (for example, with your name and/or date) so that you can easily identify it in the list once it has been uploaded.</li>
+                                <li><strong>ID Column:</strong> Must include an <strong>ID</strong> column with incremental numbers (1, 2, 3, ...n)</li>
+                                <li><strong>Project Code:</strong> Include the <strong>project code</strong> (not just the project name)</li>
+                                <li><strong>Column Names:</strong> For accurate AI mapping, use column names <strong>identical or very similar</strong> to the template</li>
+                            </ul>
+                            <div class="template-download">
+                                <a href="#" 
+                                   id="downloadTemplateSpanishBtn"
+                                   class="btn btn-template">
+                                    📄 Download Guide in Spanish
+                                </a>
+                                <a href="#" 
+                                   id="downloadTemplateEnglishBtn"
+                                   class="btn btn-template"
+                                   style="margin-left: 1rem;">
+                                    📄 Download Guide in English
+                                </a>
+                            </div>
+                        </div>
+                        <div class="ai-disclaimer">
+                            <span class="disclaimer-icon">🤖</span>
+                            <span class="disclaimer-text">
+                                <strong>AI-Powered Processing:</strong> This service uses artificial intelligence to extract and map information. 
+                                Please review all results carefully before submitting to ensure accuracy.
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- AI Disclaimer only (for Select previous file) -->
+                <div id="s3Disclaimer" class="guidelines-notice" style="display: none;">
+                    <div class="notice-icon" style="font-size: 1.5rem;">🤖</div>
+                    <div class="notice-content">
+                        <span class="disclaimer-text" style="font-size: 0.9rem;">
+                            <strong>AI-Powered Processing:</strong> This service uses artificial intelligence to extract and map information. 
+                            Please review all results carefully before submitting to ensure accuracy.
+                        </span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Main Content -->
+            <div class="main-content">
+            <!-- Left Column -->
+            <div class="left-column">
+                <!-- Upload Mode -->
+                <div id="uploadMode" class="mode-content">
+                    <div class="file-upload-area">
+                        <input type="file" id="fileInput" accept=".pdf,.docx,.txt,.xlsx,.xls,.pptx" hidden>
+                        <label for="fileInput" class="file-upload-label">
+                            <div class="upload-icon">📁</div>
+                            <div class="upload-text">Click to upload or drag and drop</div>
+                            <div class="upload-subtext">Supported: XLSX, XLS</div>
+                        </label>
+                        <div id="fileName" class="file-name"></div>
+                    </div>
+                    <div id="uploadInfo" class="info-box" style="display: none;"></div>
+                </div>
+
+                <!-- S3 Mode -->
+                <div id="s3Mode" class="mode-content" style="display: none;">
+                    <div class="s3-search-box">
+                        <h4>File Search Options</h4>
+                        <div class="form-group">
+                            <label for="s3Prefix">Additional prefix (optional)</label>
+                            <input type="text" id="s3Prefix" placeholder="Enter additional prefix">
+                        </div>
+                        <button id="refreshS3" class="btn btn-secondary">🔄 Refresh list</button>
+                    </div>
+                    <div class="form-group">
+                        <label for="s3Select">Select a file</label>
+                        <select id="s3Select" class="form-select">
+                            <option value="">Loading...</option>
+                        </select>
+                        <small id="s3Caption" class="help-text"></small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="right-column">
+                <button id="processBtn" class="btn btn-primary btn-large">🚀 Process document</button>
+                <p class="tip-text">Tip: Filter by prefix to quickly find your files.</p>
+            </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+            <div class="spinner"></div>
+            <p id="loadingText">Processing...</p>
+        </div>
+
+        <!-- Results Section -->
+        <section id="resultsSection" class="results-section" style="display: none;">
+            <div class="success-message">
+                <span id="successMessage"></span>
+            </div>
+
+            <!-- Raw JSON Toggle -->
+            <details class="collapsible">
+                <summary>🔎 Raw JSON output</summary>
+                <pre id="rawJson" class="json-output"></pre>
+            </details>
+
+            <!-- Institution Mapping Report -->
+            <div id="institutionReport" class="institution-report" style="display: none;">
+                <h3>🏢 Institution Mapping Report</h3>
+                <div id="institutionReportContent"></div>
+            </div>
+
+            <!-- Results Table -->
+            <div id="resultsTableSection" class="results-table-section" style="display: none;">
+                <h3>📊 Results</h3>
+                <p class="section-subtitle">Select records to submit to STAR platform:</p>
+                
+                <div class="results-controls">
+                    <div class="results-info">
+                        <span id="recordsCount"></span>
+                    </div>
+                    <button id="submitToStar" class="btn btn-primary" disabled>🚀 Submit to STAR</button>
+                </div>
+
+                <!-- Table Container -->
+                <div class="table-container">
+                    <table id="resultsTable" class="results-table">
+                        <thead id="tableHead"></thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination Controls -->
+                <div id="paginationControls"></div>
+
+                <div id="selectionInfo" class="selection-info" style="display: none;"></div>
+            </div>
+        </section>
+
+        <!-- STAR Submission Results -->
+        <div id="starSubmissionResults" class="star-results" style="display: none;">
+            <h3>✅ STAR Submission Results</h3>
+            <details class="collapsible" open>
+                <summary>📋 STAR Submission Details</summary>
+                <pre id="starResponseJson" class="json-output"></pre>
+            </details>
+            <button id="clearSelections" class="btn btn-secondary">🔄 Clear Selections</button>
+        </div>
+
+        <!-- Error Messages -->
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+    </div>
+
+    <script src="static/bulk_upload.js"></script>
+</body>
+</html>
