@@ -1,0 +1,17 @@
+[project]
+name = "clarisa_mapping"
+version = "1.0.0"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "openai",
+    "pandas",
+    "tqdm",
+    "boto3",
+    "python-dotenv",
+    "openpyxl",
+    "requests",
+    "supabase",
+    "rapidfuzz",
+    "numpy"
+]
