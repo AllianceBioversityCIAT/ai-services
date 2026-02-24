@@ -1,7 +1,9 @@
+import os
 import pyodbc
 import pandas as pd
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import SQL_SERVER
+from app.utils.s3.upload_file_to_s3 import upload_file_to_s3
 from app.utils.s3.divide_jsonl_files import split_jsonl_to_individual_csv_files
 
 logger = get_logger()
@@ -146,6 +148,28 @@ def load_data(table_name):
         
         else:
             df["table_type"] = "challenges"
+        
+        jsonl_file = f'{table_name}_ar.jsonl'
+        csv_file = f'{table_name}_ar.csv'
+        
+        try:
+            df.to_json(jsonl_file, orient='records', lines=True, force_ascii=False)
+            df.to_csv(csv_file, index=False)
+            
+            file_key_jsonl = f"aiccra/reports_generation/files/{table_name}_ar.jsonl"
+            file_key_csv = f"aiccra/reports_generation/files/{table_name}_ar.csv"
+            upload_file_to_s3(file_key_jsonl, jsonl_file)
+            upload_file_to_s3(file_key_csv, csv_file)
+            
+            logger.info(f"✅ Files uploaded to S3 successfully")
+            
+        finally:
+            if os.path.exists(jsonl_file):
+                os.remove(jsonl_file)
+                logger.info(f"🗑️ Deleted local file: {jsonl_file}")
+            if os.path.exists(csv_file):
+                os.remove(csv_file)
+                logger.info(f"🗑️ Deleted local file: {csv_file}")
                         
         return df
 
@@ -242,8 +266,18 @@ def load_full_data(table_name):
         df.to_json(f'{table_name}.jsonl', orient='records', lines=True, force_ascii=False)
         df.to_csv(f'{table_name}.csv', index=False)
 
-        split_jsonl_to_individual_csv_files(f'{table_name}.jsonl')
-        
+        try:
+            file_key_jsonl = f"aiccra/chatbot/files/{table_name}.jsonl"
+            file_key_csv = f"aiccra/chatbot/files/{table_name}.csv"
+            upload_file_to_s3(file_key_jsonl, f'{table_name}.jsonl')
+            upload_file_to_s3(file_key_csv, f'{table_name}.csv')
+            logger.info(f"✅ Files uploaded to S3 successfully")
+
+            split_jsonl_to_individual_csv_files(f'{table_name}.jsonl')
+            
+        except Exception as e:
+            logger.error(f"❌ Error uploading data files to S3: {e}")
+
         return df
 
     except Exception as e:

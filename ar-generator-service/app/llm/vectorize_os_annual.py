@@ -112,9 +112,29 @@ def insert_into_opensearch(table_name: str):
         logger.error(f"❌ Error inserting into OpenSearch for {table_name}: {e}")
 
 
-def retrieve_context(query, indicator, year, top_k=10000):
+def retrieve_context(query, indicator, year, top_k=10000, contingency_level=0):
+    """
+    Retrieve context from OpenSearch with contingency levels.
+    
+    contingency_level:
+        0 = Normal (search in all 4 tables)
+        1 = Level 1 contingency (search in all 4 tables with additional filters)
+        2 = Level 2 contingency (search only in deliverables and contributions with additional filters)
+    """
     try:
-        logger.info("📚 Retrieving relevant context from OpenSearch...")
+        if contingency_level == 0 or contingency_level == 1:
+            search_tables = [
+                {"term": {"source_table": "vw_ai_deliverables"}},
+                {"term": {"source_table": "vw_ai_project_contribution"}},
+                {"term": {"source_table": "vw_ai_oicrs"}},
+                {"term": {"source_table": "vw_ai_innovations"}}
+            ]
+        else:
+            search_tables = [
+                {"term": {"source_table": "vw_ai_deliverables"}},
+                {"term": {"source_table": "vw_ai_project_contribution"}}
+            ]
+        
         embedding = get_bedrock_embeddings([query])[0]
         
         ## VECTOR SEARCH
@@ -127,12 +147,7 @@ def retrieve_context(query, indicator, year, top_k=10000):
                         {"term": {"year": year}},
                         {
                             "bool": {
-                                "should": [
-                                    {"term": {"source_table": "vw_ai_deliverables"}},
-                                    {"term": {"source_table": "vw_ai_project_contribution"}},
-                                    {"term": {"source_table": "vw_ai_oicrs"}},
-                                    {"term": {"source_table": "vw_ai_innovations"}}
-                                ],
+                                "should": search_tables,
                                 "minimum_should_match": 1
                             }
                         }
@@ -215,9 +230,8 @@ def retrieve_context(query, indicator, year, top_k=10000):
                 combined_chunks.append(chunk)
 
         ## FILTER KNN CHUNKS
-        filtered_knn_chunks = [
-            chunk for chunk in combined_chunks
-            if not (
+        def should_exclude_chunk(chunk):
+            base_filters = (
                 (chunk.get("table_type") == "deliverables" and chunk.get("cluster_role") == "Shared")
                 or
                 (chunk.get("table_type") == "innovations" and chunk.get("cluster_role") == "Shared")
@@ -228,7 +242,32 @@ def retrieve_context(query, indicator, year, top_k=10000):
                 or
                 (chunk.get("table_type") == "contributions" and chunk.get("phase_name") == "Progress")
             )
-        ]
+            
+            contingency_filters = (
+                (chunk.get("table_type") == "deliverables" and chunk.get("already_disseminated") == "No")
+                or
+                (chunk.get("table_type") == "deliverables" and not chunk.get("dissemination_URL"))
+                or
+                (chunk.get("table_type") == "deliverables" and chunk.get("status") != "Completed")
+            )
+            
+            if contingency_level == 0:
+                return base_filters
+            elif contingency_level == 1 or contingency_level == 2:
+                return base_filters or contingency_filters
+            else:
+                return base_filters
+        
+        filtered_knn_chunks = [chunk for chunk in combined_chunks if not should_exclude_chunk(chunk)]
+
+        if contingency_level == 2:
+            deliverables_chunks = [c for c in filtered_knn_chunks if c.get("table_type") == "deliverables"]
+            contributions_chunks = [c for c in filtered_knn_chunks if c.get("table_type") == "contributions"]
+            
+            deliverables_chunks = deliverables_chunks[:200]
+            contributions_chunks = contributions_chunks[:1000]
+        
+            filtered_knn_chunks = deliverables_chunks + contributions_chunks
 
         ## FILTER QUESTIONS CHUNKS
         filtered_questions_chunks = [
@@ -435,44 +474,79 @@ def run_pipeline(indicator, year, insert_data=False):
 
             logger.info("✅ Data insertion completed successfully.")
         
-        else:
-            ## Part 1: Generate the report with deliverables, contributions, oicrs, and innovations
-            total_expected, total_achieved, progress = calculate_summary(indicator, year)
+        ## Part 1: Generate the report with deliverables, contributions, oicrs, and innovations
+        total_expected, total_achieved, progress = calculate_summary(indicator, year)
 
-            PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
-            
-            context, questions = retrieve_context(PROMPT, indicator, year)
+        PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
+        
+        context, questions = retrieve_context(PROMPT, indicator, year, contingency_level=0)
 
-            query = f"""
-                Using this information:\n{context}\n\n
-                Do the following:\n{PROMPT}
-                """
+        query = f"""
+            Using this information:\n{context}\n\n
+            Do the following:\n{PROMPT}
+            """
 
+        try:
             generated_report = invoke_model(query)
+        except Exception as e:
+            if "Input is too long" in str(e):
+                logger.warning("⚠️ Input is too long. Applying Level 1 contingency...")
+                try:
+                    context, questions = retrieve_context(PROMPT, indicator, year, contingency_level=1)
+                    
+                    query = f"""
+                        Using this information:\n{context}\n\n
+                        Do the following:\n{PROMPT}
+                        """
+                    
+                    generated_report = invoke_model(query)
+                    logger.info("✅ Report generated successfully with Level 1 contingency.")
+                except Exception as e2:
+                    if "Input is too long" in str(e2):
+                        logger.warning("⚠️ Still too long. Applying Level 2 contingency...")
+                        context, questions = retrieve_context(PROMPT, indicator, year, contingency_level=2)
+                        
+                        query = f"""
+                            Using this information:\n{context}\n\n
+                            Do the following:\n{PROMPT}
+                            """
+                        
+                        generated_report = invoke_model(query)
+                        logger.info("✅ Report generated successfully with Level 2 contingency.")
+                    else:
+                        raise e2
+            else:
+                raise
 
-            ## Part 2: Generate the report with dissagregated targets
-            accepted_indicators = ["PDO Indicator 1", "PDO Indicator 2", "PDO Indicator 3", "IPI 2.3"]
+        ## Part 2: Generate the report with dissagregated targets
+        accepted_indicators = ["PDO Indicator 1", "PDO Indicator 2", "PDO Indicator 3", "IPI 2.3"]
 
-            if indicator in accepted_indicators:
-                TARGET_PROMPT = generate_target_prompt(indicator)
-                
-                query_questions = f"""
-                    Using this information:\n{questions}\n\n
-                    Do the following:\n{TARGET_PROMPT}
-                    """
-                
-                logger.info("☑️  Starting disaggregated targets report generation...")
-                targets_report = invoke_model(query_questions)
-                
-                ## Combine both reports
-                targets_section = "\n\n## Disaggregated targets\n" + targets_report
-                generated_report += targets_section
+        if indicator in accepted_indicators:
+            TARGET_PROMPT = generate_target_prompt(indicator)
             
-            ## Part 3: Add missed links section
-            final_report = add_missed_links(generated_report, context)
+            query_questions = f"""
+                Using this information:\n{questions}\n\n
+                Do the following:\n{TARGET_PROMPT}
+                """
+            
+            logger.info("☑️  Starting disaggregated targets report generation...")
+            targets_report = invoke_model(query_questions)
+            
+            ## Combine both reports
+            targets_section = "\n\n## Disaggregated targets\n" + targets_report
+            generated_report += targets_section
+        
+        ## Part 3: Add missed links section
+        final_report = add_missed_links(generated_report, context)
 
-            logger.info("✅ Report generation completed successfully.")
-            return final_report
+        logger.info("✅ Report generation completed successfully.")
+        return final_report
 
     except Exception as e:
         logger.error(f"❌ Error in pipeline execution: {e}")
+        
+        if "Input is too long" in str(e):
+            logger.error("❌ Input is still too long even after applying contingency filters.")
+            return f"# Report Generation Error\n\nThe input context for indicator {indicator} in year {year} is too long for the model, even after applying data reduction filters."
+        
+        return None

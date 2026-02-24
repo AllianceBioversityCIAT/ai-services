@@ -4,7 +4,9 @@ import certifi
 import logging
 import aiohttp
 from typing import Optional
+from dotenv import load_dotenv
 
+load_dotenv()
 
 class NotificationService:
     def __init__(self):
@@ -35,7 +37,7 @@ class NotificationService:
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f"{emoji} *{app_name}*\n*{title}*\n{message}\n{time_taken}\n*Priority:* {priority}"
+                            "text": f"{emoji} *{app_name}*\n*{title}*\n{message}\n*Time Taken:* {time_taken}\n*Priority:* {priority}"
                         }
                     }
                 ],

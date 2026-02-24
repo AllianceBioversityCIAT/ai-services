@@ -185,6 +185,12 @@ async function trackInteraction(endpoint, requestData, responseData, responseTim
         console.log('Processing endpoint:', endpoint);
         
         switch(endpoint) {
+            case '/api/generate':
+                displayName = `AR Generator Service - Mid-Year Report`;
+                serviceDescription = `Generate mid-year progress reports for AICCRA indicators`;
+                userAction = `Generate mid-year report for ${requestData.indicator} (${requestData.year})`;
+                aiOutput = success && responseData?.content ? responseData.content.substring(0, 200) + '...' : (errorMessage || 'Error generating report');
+                break;
             case '/api/generate-annual':
                 displayName = `AR Generator Service - Annual Report`;
                 serviceDescription = `Generate comprehensive annual reports for AICCRA indicators`;
@@ -260,38 +266,49 @@ async function trackInteraction(endpoint, requestData, responseData, responseTim
     }
 }
 
-// Tab 1: Annual Reports
-async function generateAnnualReport() {
-    const button = document.getElementById('generate-annual');
+// Tab 1: Reports (Annual and Mid-Year)
+async function generateReport() {
+    const button = document.getElementById('generate-report');
     const indicator = document.getElementById('indicator-select').value;
     const year = parseInt(document.getElementById('year-select').value);
+    const reportType = document.getElementById('report-type-select').value;
     
     button.disabled = true;
-    hideResult('annual-result');
-    showLoading('annual-loading');
+    hideResult('report-result');
+    showLoading('report-loading');
+    
+    // Update loading text based on report type
+    const loadingText = reportType === 'annual' 
+        ? 'Generating annual report... This may take a few minutes.'
+        : 'Generating mid-year report... This may take a few minutes.';
+    document.getElementById('report-loading-text').textContent = loadingText;
+    
+    // Determine endpoint based on report type
+    const endpoint = reportType === 'annual' ? '/api/generate-annual' : '/api/generate';
     
     try {
-        const data = await makeApiCall('/api/generate-annual', {
+        const data = await makeApiCall(endpoint, {
             indicator: indicator,
             year: year,
             insert_data: false
         });
         
         const content = formatMarkdown(data.content || 'No content received');
-        document.getElementById('annual-content').innerHTML = content;
+        document.getElementById('report-content').innerHTML = content;
         
         // Store data for download
-        window.lastAnnualReport = {
+        window.lastReport = {
             content: data.content,
             indicator: indicator,
-            year: year
+            year: year,
+            type: reportType
         };
         
-        showResult('annual-result');
+        showResult('report-result');
     } catch (error) {
-        showError(error.message, 'annual-result');
+        showError(error.message, 'report-result');
     } finally {
-        hideLoading('annual-loading');
+        hideLoading('report-loading');
         button.disabled = false;
     }
 }
@@ -419,10 +436,11 @@ async function generateChallengesReport() {
 }
 
 // Download functions
-function downloadAnnualReport() {
-    if (window.lastAnnualReport) {
-        const filename = `annual_report_${window.lastAnnualReport.indicator}_${window.lastAnnualReport.year}.txt`;
-        downloadAsDocx(window.lastAnnualReport.content, filename);
+function downloadReport() {
+    if (window.lastReport) {
+        const reportTypeName = window.lastReport.type === 'annual' ? 'annual_report' : 'midyear_report';
+        const filename = `${reportTypeName}_${window.lastReport.indicator}_${window.lastReport.year}.txt`;
+        downloadAsDocx(window.lastReport.content, filename);
     }
 }
 
@@ -438,9 +456,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Display user info if available from URL
     displayUserInfo();
     
-    // Annual report tab
-    document.getElementById('generate-annual').addEventListener('click', generateAnnualReport);
-    document.getElementById('download-annual').addEventListener('click', downloadAnnualReport);
+    // Reports tab (Annual and Mid-Year)
+    document.getElementById('generate-report').addEventListener('click', generateReport);
+    document.getElementById('download-report').addEventListener('click', downloadReport);
     
     // Tables tab
     document.getElementById('generate-tables').addEventListener('click', generateTables);

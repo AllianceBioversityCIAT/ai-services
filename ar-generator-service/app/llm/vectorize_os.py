@@ -245,22 +245,21 @@ def run_pipeline(indicator, year, insert_data=False):
 
             logger.info("✅ Data insertion completed successfully.")
         
-        else:
-            total_expected, total_achieved, progress = calculate_summary(indicator, year)
+        total_expected, total_achieved, progress = calculate_summary(indicator, year)
 
-            PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
-            
-            context = retrieve_context(PROMPT, indicator, year)
+        PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
+        
+        context = retrieve_context(PROMPT, indicator, year)
 
-            query = f"""
-                Using this information:\n{context}\n\n
-                Do the following:\n{PROMPT}
-                """
+        query = f"""
+            Using this information:\n{context}\n\n
+            Do the following:\n{PROMPT}
+            """
 
-            final_report = invoke_model(query)
+        final_report = invoke_model(query)
 
-            logger.info("✅ Report generation completed successfully.")
-            return final_report
+        logger.info("✅ Report generation completed successfully.")
+        return final_report
 
     except Exception as e:
         logger.error(f"❌ Error in pipeline execution: {e}")

@@ -373,8 +373,8 @@
 
         <div class="feature-grid">
             <div class="feature-card">
-                <h3><i class="fas fa-file-alt"></i> Annual Reports</h3>
-                <p>Generate comprehensive annual reports with detailed performance analysis and achievements.</p>
+                <h3><i class="fas fa-file-alt"></i> Reports</h3>
+                <p>Generate annual or mid-year reports with detailed performance analysis and achievements.</p>
             </div>
             <div class="feature-card">
                 <h3><i class="fas fa-table"></i> Summary Tables</h3>
@@ -387,8 +387,8 @@
         </div>
 
         <div class="tabs">
-            <button class="tab active" onclick="openTab(event, 'tab-annual')">
-                <i class="fas fa-chart-bar"></i> Annual Reports
+            <button class="tab active" onclick="openTab(event, 'tab-reports')">
+                <i class="fas fa-chart-bar"></i> Reports
             </button>
             <button class="tab" onclick="openTab(event, 'tab-tables')">
                 <i class="fas fa-table"></i> Summary Tables
@@ -398,11 +398,19 @@
             </button>
         </div>
 
-        <!-- Tab 1: Annual Reports -->
-        <div id="tab-annual" class="tab-content active">
-            <h2><i class="fas fa-chart-bar"></i> Generate Annual Report by Indicator</h2>
-            <p style="color: var(--gray-600); margin-bottom: 2rem;">Generate comprehensive annual reports for specific AICCRA indicators</p>
+        <!-- Tab 1: Reports -->
+        <div id="tab-reports" class="tab-content active">
+            <h2><i class="fas fa-chart-bar"></i> Generate Reports by Indicator</h2>
+            <p style="color: var(--gray-600); margin-bottom: 2rem;">Generate comprehensive reports for specific AICCRA indicators</p>
             
+            <div class="form-group">
+                <label for="report-type-select">Select Report Type:</label>
+                <select id="report-type-select" class="form-control">
+                    <option value="annual">Annual Report</option>
+                    <option value="midyear">Mid-Year Report</option>
+                </select>
+            </div>
+
             <div class="form-group">
                 <label for="indicator-select">Select an Indicator:</label>
                 <select id="indicator-select" class="form-control">
@@ -432,18 +440,18 @@
                 </select>
             </div>
 
-            <button id="generate-annual" class="btn btn-primary">
-                <i class="fas fa-magic"></i> Generate Annual Report
+            <button id="generate-report" class="btn btn-primary">
+                <i class="fas fa-magic"></i> Generate Report
             </button>
 
-            <div id="annual-loading" class="loading">
+            <div id="report-loading" class="loading">
                 <div class="spinner"></div>
-                <p>Generating annual report... This may take a few minutes.</p>
+                <p id="report-loading-text">Generating report... This may take a few minutes.</p>
             </div>
 
-            <div id="annual-result" class="result">
-                <div id="annual-content" class="result-content"></div>
-                <button id="download-annual" class="btn btn-secondary">
+            <div id="report-result" class="result">
+                <div id="report-content" class="result-content"></div>
+                <button id="download-report" class="btn btn-secondary">
                     <i class="fas fa-download"></i> Download Report (DOCX)
                 </button>
             </div>
