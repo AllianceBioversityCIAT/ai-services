@@ -1,72 +1,72 @@
-# 🚀 Guía Rápida - CLARISA Mapping
+# 🚀 Quick Guide - CLARISA Mapping
 
-## Setup Rápido (5 pasos)
+## Quick Setup (5 steps)
 
-### 1️⃣ Instalar Dependencias
+### 1️⃣ Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2️⃣ Configurar Variables de Entorno
+### 2️⃣ Configure Environment Variables
 
 ```bash
-# Copiar el archivo de ejemplo
+# Copy the example file
 cp .env.example .env
 
-# Editar .env con tus credenciales
-nano .env  # o usa tu editor favorito
+# Edit .env with your credentials
+nano .env  # or use your favorite editor
 ```
 
-**Variables requeridas:**
-- `CLARISA_API_URL` - URL de la API de CLARISA
-- `SUPABASE_URL` - URL de tu proyecto Supabase
-- `SUPABASE_KEY` - Key de Supabase (anon o service role)
-- `AWS_ACCESS_KEY_ID_BR` - AWS Access Key (para Bedrock)
-- `AWS_SECRET_ACCESS_KEY_BR` - AWS Secret Key (para Bedrock)
+**Required variables:**
+- `CLARISA_API_URL` - CLARISA API URL
+- `SUPABASE_URL` - Your Supabase project URL
+- `SUPABASE_KEY` - Supabase key (anon or service role)
+- `AWS_ACCESS_KEY_ID_BR` - AWS Access Key (for Bedrock)
+- `AWS_SECRET_ACCESS_KEY_BR` - AWS Secret Key (for Bedrock)
 
-### 3️⃣ Crear la Tabla en Supabase
+### 3️⃣ Create Table in Supabase
 
-1. Abre el **SQL Editor** en Supabase
-2. Copia y pega el contenido de `sql/create_clarisa_vector_table.sql`
-3. Ejecuta el script
+1. Open the **SQL Editor** in Supabase
+2. Copy and paste the content from `sql/create_clarisa_vector_table.sql`
+3. Execute the script
 
-Esto creará:
-- ✅ Tabla `clarisa_institutions_v2`
-- ✅ Índices vectoriales (ivfflat)
-- ✅ 3 funciones RPC para búsqueda
+This will create:
+- ✅ Table `clarisa_institutions_v2`
+- ✅ Vector indexes (ivfflat)
+- ✅ 3 RPC functions for search
 
-### 4️⃣ Poblar la Base de Datos
+### 4️⃣ Populate the Database
 
 ```bash
 python populate_clarisa_db.py
 ```
 
-**Tiempo estimado:** 10-15 minutos
+**Estimated time:** 10-15 minutes
 
-Este script:
-1. Descarga ~3000+ instituciones de CLARISA
-2. Genera embeddings con Amazon Titan (1024 dims)
-3. Inserta en Supabase en batches
+This script:
+1. Downloads ~3000+ institutions from CLARISA
+2. Generates embeddings with Amazon Titan (1024 dims)
+3. Inserts into Supabase in batches
 
-### 5️⃣ Probar la Búsqueda
+### 5️⃣ Test Search
 
 ```bash
 python search_example.py
 ```
 
-Verás 4 ejemplos de búsqueda híbrida en acción.
+You'll see 4 examples of hybrid search in action.
 
 ---
 
-## 📖 Uso Básico
+## 📖 Basic Usage
 
-### Búsqueda Simple
+### Simple Search
 
 ```python
 from search_example import search_institution_hybrid
 
-# Buscar por nombre
+# Search by name
 result = search_institution_hybrid(
     partner_name="Wageningen University",
     threshold=0.4
@@ -76,7 +76,7 @@ print(result['name'])
 print(result['final_score'])
 ```
 
-### Búsqueda con Acrónimo
+### Search with Acronym
 
 ```python
 result = search_institution_hybrid(
@@ -88,129 +88,129 @@ result = search_institution_hybrid(
 
 ---
 
-## 🔍 Cómo Funciona la Búsqueda Híbrida
+## 🔍 How Hybrid Search Works
 
 ```
 Query: "Wageningen University"
     ↓
-1. Generar Embedding (Titan) - SIN normalizar
+1. Generate Embedding (Titan) - WITHOUT normalization
    "Wageningen University" → [0.123, 0.456, ...]
     ↓
-2. Buscar Top 5 por Similitud Coseno (Supabase RPC)
-   Los embeddings en DB también están SIN normalizar
+2. Search Top 5 by Cosine Similarity (Supabase RPC)
+   Embeddings in DB are also WITHOUT normalization
     ↓
-3. Desempate con RapidFuzz - CON normalización
+3. Tiebreak with RapidFuzz - WITH normalization
    "wageningen university" vs "wageningen university and research"
     ↓
-Score Final = 50% Coseno + 40% Fuzz Name + 10% Fuzz Acronym
+Final Score = 50% Cosine + 40% Fuzz Name + 10% Fuzz Acronym
     ↓
-Mejor Match ✨
+Best Match ✨
 ```
 
-### 📝 Estrategia de Normalización
+### 📝 Normalization Strategy
 
-**Clave:** Usamos **dos niveles** de normalización:
+**Key:** We use **two normalization levels**:
 
-| Contexto | Normalización | Función |
-|----------|---------------|---------|
-| **Embeddings** | ❌ Mínima | Preserva semántica |
-| **RapidFuzz** | ✅ Completa | Mejora string matching |
+| Context | Normalization | Function |
+|---------|---------------|----------|
+| **Embeddings** | ❌ Minimal | Preserves semantics |
+| **RapidFuzz** | ✅ Complete | Improves string matching |
 
 ```python
-# Para embeddings (guardado en DB)
+# For embeddings (saved in DB)
 "Wageningen University and Research Centre (WUR)"  # Original
 
-# Para RapidFuzz (al comparar)
-"wageningen university and research centre wur"   # Normalizado
+# For RapidFuzz (when comparing)
+"wageningen university and research centre wur"   # Normalized
 ```
 
-**Ver:** [docs/NORMALIZATION_STRATEGY.md](docs/NORMALIZATION_STRATEGY.md) para más detalles.
+**See:** [docs/NORMALIZATION_STRATEGY.md](docs/NORMALIZATION_STRATEGY.md) for more details.
 
 ---
 
-## 📁 Archivos Clave
+## 📁 Key Files
 
-| Archivo | Propósito |
-|---------|-----------|
-| `populate_clarisa_db.py` | Poblar la base de datos |
-| `search_example.py` | Ejemplos de búsqueda |
-| `src/clarisa_api.py` | Cliente API de CLARISA |
-| `src/embeddings.py` | Generar embeddings con Titan |
-| `src/supabase_client.py` | Funciones de Supabase |
-| `sql/create_clarisa_vector_table.sql` | Crear tabla en Supabase |
+| File | Purpose |
+|------|---------|  
+| `populate_clarisa_db.py` | Populate database |
+| `search_example.py` | Search examples |
+| `src/clarisa_api.py` | CLARISA API client |
+| `src/embeddings.py` | Generate embeddings with Titan |
+| `src/supabase_client.py` | Supabase functions |
+| `sql/create_clarisa_vector_table.sql` | Create table in Supabase |
 
 ---
 
-## ⚙️ Configuración Avanzada
+## ⚙️ Advanced Configuration
 
-### Ajustar Pesos de Búsqueda
+### Adjust Search Weights
 
-En `search_example.py`, modifica:
+In `search_example.py`, modify:
 
 ```python
-# Score combinado
+# Combined score
 combined_score = (
-    0.50 * cosine_sim +      # ← Ajusta este peso
-    0.40 * fuzz_name +       # ← Ajusta este peso
-    0.10 * fuzz_acronym      # ← Ajusta este peso
+    0.50 * cosine_sim +      # ← Adjust this weight
+    0.40 * fuzz_name +       # ← Adjust this weight
+    0.10 * fuzz_acronym      # ← Adjust this weight
 )
 ```
 
-### Cambiar Threshold
+### Change Threshold
 
 ```python
-# Más restrictivo (menos resultados, mayor precisión)
+# More restrictive (fewer results, higher precision)
 result = search_institution_hybrid(partner_name="...", threshold=0.7)
 
-# Más permisivo (más resultados, menor precisión)
+# More permissive (more results, lower precision)
 result = search_institution_hybrid(partner_name="...", threshold=0.3)
 ```
 
 ---
 
-## 🐛 Problemas Comunes
+## 🐛 Common Issues
 
 ### ❌ ImportError: No module named 'src'
 
 ```bash
-# Asegúrate de estar en el directorio raíz del proyecto
+# Make sure you're in the project root directory
 cd clarisa-cgspace_mapping
 
-# Ejecuta desde ahí
+# Run from there
 python populate_clarisa_db.py
 ```
 
 ### ❌ Supabase: relation "clarisa_institutions_v2" does not exist
 
-Ejecuta el script SQL primero (Paso 3).
+Execute the SQL script first (Step 3).
 
 ### ❌ AWS Bedrock: Access Denied
 
-1. Verifica que tu usuario AWS tenga permisos para Bedrock
-2. Confirma que la región sea `us-east-1`
-3. Verifica que tengas acceso al modelo `amazon.titan-embed-text-v2:0`
+1. Verify your AWS user has Bedrock permissions
+2. Confirm the region is `us-east-1`
+3. Verify you have access to model `amazon.titan-embed-text-v2:0`
 
-### ❌ La tabla está vacía
+### ❌ Table is empty
 
-Ejecuta `python populate_clarisa_db.py` primero.
+Run `python populate_clarisa_db.py` first.
 
 ---
 
-## 📊 Verificar Estado
+## 📊 Check Status
 
 ```python
 from src.supabase_client import count_institutions
 
 count = count_institutions()
-print(f"Instituciones en la DB: {count}")
+print(f"Institutions in DB: {count}")
 ```
 
 ---
 
-## 📚 Más Información
+## 📚 More Information
 
-Ver [README.md](README.md) para documentación completa.
+See [README.md](README.md) for complete documentation.
 
 ---
 
-✅ **¡Listo para empezar!**
+✅ **Ready to start!**

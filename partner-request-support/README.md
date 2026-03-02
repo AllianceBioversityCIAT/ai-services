@@ -198,6 +198,72 @@ for candidate in candidates:
 print(f"Best match: {best_match['name']} (score: {best_score:.2f})")
 ```
 
+## 🌐 Web Search Fallback (NEW!)
+
+When no match is found in CLARISA, the system can automatically search for institution information on the internet using **OpenAI Web Search API**.
+
+### Key Features
+
+- ✅ **Focused Search**: If a website is provided, searches only that domain
+- ✅ **Open Search**: Without a website, searches across the web
+- ✅ **Source Tracking**: Saves URLs used for verification
+- ✅ **Official Data**: Prioritizes official sources (.edu, .org, .gov)
+
+### Configuration
+
+Add to your `.env`:
+```bash
+OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxx
+```
+
+Enable/disable in `mapping_clarisa_comparison.py`:
+```python
+ENABLE_WEB_SEARCH = True  # Enable web search fallback
+```
+
+### Excel Format (Enhanced)
+
+| Column | Name | Description | Required |
+|--------|------|-------------|----------|
+| 0 | ID | Unique identifier | Optional |
+| 1 | partner_name | Institution name | **Required** |
+| 2 | acronym | Acronym | Optional |
+| 3 | country | Country | Optional* |
+| 4 | website | Official website | Optional* |
+
+*Highly recommended for better web search accuracy.
+
+### Information Extracted
+
+- Official full name
+- Acronym (if any)
+- Country/location
+- Official website
+- Institution type (according to CGIAR classification rules)
+- Legal entity status
+- Parent organization (if not a legal entity)
+- Research mandate
+- Brief description
+
+**See full documentation:** 
+- [docs/WEB_SEARCH_FEATURE.md](docs/WEB_SEARCH_FEATURE.md) - Web search implementation
+- [docs/CGIAR_INSTITUTION_RULES.md](docs/CGIAR_INSTITUTION_RULES.md) - CGIAR validation rules
+
+### Quick Test
+
+```python
+from src.web_search import test_search
+
+test_search(
+    name="Stanford University",
+    country="United States",
+    website="https://www.stanford.edu"
+)
+```
+
+**Estimated cost:** ~$0.02-0.03 per web search
+
+
 ## 📝 Module Usage
 
 ### Fetch institutions from CLARISA

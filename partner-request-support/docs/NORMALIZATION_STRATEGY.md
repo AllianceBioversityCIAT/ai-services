@@ -1,58 +1,71 @@
-# 📝 Estrategia de Normalización de Texto
+# 📝 Text Normalization Strategy
 
-## 🎯 Resumen
+## 🎯 Summary
 
-Este proyecto usa **dos niveles de normalización** dependiendo del contexto:
+This project uses **two normalization levels** depending on context:
 
-1. **Limpieza Básica** → Para embeddings (mantiene semántica)
-2. **Normalización Completa** → Para string matching (RapidFuzz)
+1. **Basic Cleaning** → For embeddings (maintains semantics)
+2. **Complete Normalization** → For string matching (RapidFuzz)
 
 ---
 
-## 🧠 Para Embeddings (Amazon Titan)
+## 🧠 For Embeddings (Amazon Titan)
 
-### ✅ LO QUE HACEMOS
+### ✅ WHAT WE DO
 
 ```python
-# Texto original
+# Original text
 "Universidad de São Paulo (USP)"
 
-# Limpieza básica: solo espacios múltiples
-"Universidad de São Paulo (USP)"  # Mantiene acentos y mayúsculas
+# Basic cleaning: only multiple spaces
+"Universidad de São Paulo (USP)"  # Keeps accents and capitals
 ```
 
-**Función:** `clean_text_basic()` o automático en `get_embedding()`
+**Function:** `clean_text_basic()` or automatic in `get_embedding()`
 
-### ❌ LO QUE NO HACEMOS
+### ❌ WHAT WE DON'T DO
 
 ```python
-# ❌ NO convertimos a lowercase
-# ❌ NO removemos acentos
-# ❌ NO removemos caracteres especiales (paréntesis, guiones)
+# ❌ DO NOT convert to lowercase
+# ❌ DO NOT remove accents
+# ❌ DO NOT remove special characters (parentheses, hyphens)
 ```
 
-### 🤔 ¿Por qué?
+### 🤔 Why?
 
-Los modelos de embeddings modernos (como Amazon Titan) están entrenados con **texto natural**:
+Modern embedding models (like Amazon Titan) are trained with **natural text**:
 
-- ✅ Entienden mayúsculas y minúsculas
-- ✅ Entienden acentos y caracteres especiales
-- ✅ Capturan mejor el contexto semántico con el texto original
+- ✅ Understand capitals and lowercase
+- ✅ Understand accents and special characters
+- ✅ Better capture semantic context with original text
 
-**Ejemplo de similitud semántica:**
+**Example of semantic similarity:**
 
 ```python
-# Estos textos generan embeddings similares automáticamente:
+# These texts generate similar embeddings automatically:
 "Wageningen University and Research"
 "WAGENINGEN UNIVERSITY"
 "Universiteit Wageningen"
-"WUR"  # Contexto suficiente para relacionarlo
+"WUR"  # Sufficient context to relate it
 ```
 
-### 📊 Comparación
+### 📊 Comparison
 
-| Original | Normalizado Agresivo | Resultado |
-|----------|---------------------|-----------|
+| Original | Aggressive Normalization | Result |
+|----------|--------------------------|--------|
+| "CGIAR Initiative" | "cgiar initiative" | ❌ We lose info |
+| "Université de Genève" | "universite de geneve" | ❌ We lose context |
+| "MIT (Massachusetts Institute)" | "mit massachusetts institute" | ❌ We lose structure |
+
+**Titan understands the original BETTER than normalized.**
+
+---
+
+## 🔍 For String Matching (RapidFuzz)
+
+### ✅ WHAT WE DO
+
+### ✅ LO QUE HACEMOS
 | "CGIAR Initiative" | "cgiar initiative" | ❌ Perdemos info |
 | "Université de Genève" | "universite de geneve" | ❌ Perdemos contexto |
 | "MIT (Massachusetts Institute)" | "mit massachusetts institute" | ❌ Perdemos estructura |
@@ -68,37 +81,37 @@ Los modelos de embeddings modernos (como Amazon Titan) están entrenados con **t
 ```python
 from src.utils import clean_text_for_matching
 
-# Texto original
+# Original text
 "Universidad de São Paulo (USP)"
 
-# Normalización completa
-"universidad de sao paulo usp"  # lowercase + sin acentos
+# Complete normalization
+"universidad de sao paulo usp"  # lowercase + no accents
 ```
 
-**Función:** `clean_text_for_matching()`
+**Function:** `clean_text_for_matching()`
 
-### ✔️ Transformaciones:
+### ✔️ Transformations:
 
-1. ✅ Convertir a lowercase
-2. ✅ Remover acentos (São → sao)
-3. ✅ Remover puntuación (mantener paréntesis para siglas)
-4. ✅ Normalizar espacios múltiples
+1. ✅ Convert to lowercase
+2. ✅ Remove accents (São → sao)
+3. ✅ Remove punctuation (keep parentheses for acronyms)
+4. ✅ Normalize multiple spaces
 
-### 🤔 ¿Por qué?
+### 🤔 Why?
 
-RapidFuzz hace **comparación de caracteres** (no semántica):
+RapidFuzz does **character comparison** (not semantic):
 
 ```python
-# Sin normalización
+# Without normalization
 fuzz.ratio("Universität", "Universidad")  # Score: ~54%
 
-# Con normalización
+# With normalization
 fuzz.ratio("universitat", "universidad")  # Score: ~82% ✅
 ```
 
-### 📊 Comparación
+### 📊 Comparison
 
-| Query | Candidato | Sin Norm | Con Norm |
+| Query | Candidate | Without Norm | With Norm |
 |-------|-----------|----------|----------|
 | "WUR" | "wur" | 75% | **100%** ✅ |
 | "São Paulo" | "Sao Paulo" | 82% | **100%** ✅ |
@@ -106,56 +119,56 @@ fuzz.ratio("universitat", "universidad")  # Score: ~82% ✅
 
 ---
 
-## 🔄 Flujo Completo en Búsqueda Híbrida
+## 🔄 Complete Flow in Hybrid Search
 
 ```python
-# 1. Query del usuario
+# 1. User query
 query = "Wageningen University"
 acronym = "WUR"
 
-# 2. Generar embeddings (SIN normalizar)
+# 2. Generate embeddings (WITHOUT normalization)
 query_embedding = get_embedding(query)  
-# Internamente hace limpieza básica: espacios múltiples
+# Internally does basic cleaning: multiple spaces
 
-# 3. Buscar Top 5 por similitud coseno (Supabase)
+# 3. Search Top 5 by cosine similarity (Supabase)
 candidates = search_by_name_embedding(query_embedding, limit=5)
-# Los embeddings guardados TAMPOCO están normalizados
+# Saved embeddings are ALSO not normalized
 
-# 4. Desempate con RapidFuzz (CON normalización)
+# 4. Tiebreak with RapidFuzz (WITH normalization)
 from src.utils import clean_text_for_matching
 
 for candidate in candidates:
-    # Normalizar ambos para comparación justa
+    # Normalize both for fair comparison
     normalized_query = clean_text_for_matching(query)
     normalized_candidate = clean_text_for_matching(candidate['name'])
     
     fuzz_score = fuzz.ratio(normalized_query, normalized_candidate)
     
-# 5. Score combinado
+# 5. Combined score
 final_score = (0.5 * cosine_sim) + (0.4 * fuzz_score) + ...
 ```
 
 ---
 
-## 🛠️ Funciones Disponibles
+## 🛠️ Available Functions
 
 ### `clean_text_basic(text)`
-Limpieza básica para embeddings
+Basic cleaning for embeddings
 
 ```python
 from src.utils import clean_text_basic
 
 text = "Universidad   de São   Paulo  (USP)"
 clean = clean_text_basic(text)
-# "Universidad de São Paulo (USP)"  ← espacios normalizados
+# "Universidad de São Paulo (USP)"  ← normalized spaces
 ```
 
-**Úsala cuando:**
-- Preprocesamiento manual antes de embeddings (opcional)
-- El texto tiene espacios múltiples problemáticos
+**Use it when:**
+- Manual preprocessing before embeddings (optional)
+- Text has problematic multiple spaces
 
 ### `clean_text_for_matching(text)`
-Normalización completa para RapidFuzz
+Complete normalization for RapidFuzz
 
 ```python
 from src.utils import clean_text_for_matching
@@ -165,102 +178,102 @@ normalized = clean_text_for_matching(text)
 # "universidad de sao paulo usp"
 ```
 
-**Úsala cuando:**
-- ✅ Vas a comparar con RapidFuzz
-- ✅ Necesitas matching exacto de strings
-- ✅ Implementas lógica de desempate
+**Use it when:**
+- ✅ You will compare with RapidFuzz
+- ✅ You need exact string matching
+- ✅ Implementing tiebreak logic
 
 ### `clean_text(text)` (legacy)
-Alias de `clean_text_for_matching()` para compatibilidad
+Alias of `clean_text_for_matching()` for compatibility
 
 ```python
-# Código legacy sigue funcionando
+# Legacy code still works
 from src.utils import clean_text
-normalized = clean_text(text)  # Mismo comportamiento
+normalized = clean_text(text)  # Same behavior
 ```
 
 ---
 
-## 📈 Impacto en Resultados
+## 📈 Impact on Results
 
-### Búsqueda Solo por Embeddings
+### Search Only by Embeddings
 
 ```python
 # Query: "Wageningen University"
 
-# Candidato 1: "Wageningen University and Research Centre"
-# Sin normalización: cosine = 0.92 ✅
-# Con normalización agresiva: cosine = 0.88 ❌ (pierde info)
+# Candidate 1: "Wageningen University and Research Centre"
+# Without normalization: cosine = 0.92 ✅
+# With aggressive normalization: cosine = 0.88 ❌ (loses info)
 ```
 
-**Resultado:** Embeddings funcionan MEJOR sin normalización agresiva.
+**Result:** Embeddings work BETTER without aggressive normalization.
 
-### Búsqueda Híbrida (Embeddings + RapidFuzz)
+### Hybrid Search (Embeddings + RapidFuzz)
 
 ```python
 # Query: "WUR"
-# Candidato: "Wageningen University and Research Centre (WUR)"
+# Candidate: "Wageningen University and Research Centre (WUR)"
 
-# Embeddings (sin normalizar)
+# Embeddings (not normalized)
 cosine_sim = 0.75
 
-# RapidFuzz (normalizado)
+# RapidFuzz (normalized)
 fuzz.ratio("wur", "wageningen university and research centre wur") = 23%
 # vs
 fuzz.ratio("WUR", "Wageningen University and Research Centre (WUR)") = 17%
 
-# Score combinado MEJORA con normalización en RapidFuzz
+# Combined score IMPROVES with normalization in RapidFuzz
 ```
 
-**Resultado:** Estrategia híbrida da los mejores resultados.
+**Result:** Hybrid strategy gives the best results.
 
 ---
 
-## ✅ Mejores Prácticas
+## ✅ Best Practices
 
 ### DO ✅
 
-1. **Guardar texto original** en la base de datos
-2. **Generar embeddings** con texto casi original (solo limpieza de espacios)
-3. **Normalizar al momento de comparar** con RapidFuzz
-4. **Separar embeddings** de nombre y acrónimo (ya implementado)
+1. **Save original text** in the database
+2. **Generate embeddings** with almost original text (only space cleaning)
+3. **Normalize when comparing** with RapidFuzz
+4. **Separate embeddings** for name and acronym (already implemented)
 
 ### DON'T ❌
 
-1. ❌ NO normalices agresivamente antes de embeddings
-2. ❌ NO uses `.lower()` antes de generar embeddings
-3. ❌ NO remuevas acentos antes de Titan
-4. ❌ NO uses RapidFuzz sin normalizar ambos textos
+1. ❌ DO NOT normalize aggressively before embeddings
+2. ❌ DO NOT use `.lower()` before generating embeddings
+3. ❌ DO NOT remove accents before Titan
+4. ❌ DO NOT use RapidFuzz without normalizing both texts
 
 ---
 
-## 🔬 Experimentos Sugeridos
+## 🔬 Suggested Experiments
 
-Si quieres validar esta estrategia:
+If you want to validate this strategy:
 
 ```python
-# Prueba 1: Embeddings con vs sin normalización
+# Test 1: Embeddings with vs without normalization
 text_original = "Universidad de São Paulo"
 text_normalizado = "universidad de sao paulo"
 
 emb_original = get_embedding(text_original)
 emb_normalizado = get_embedding(text_normalizado)
 
-# Compara similitudes contra otras universidades
+# Compare similarities against other universities
 ```
 
 ```python
-# Prueba 2: RapidFuzz con vs sin normalización
+# Test 2: RapidFuzz with vs without normalization
 from rapidfuzz import fuzz
 from src.utils import clean_text_for_matching
 
 query = "ETH Zürich"
 candidate = "ETH ZURICH"
 
-# Sin normalizar
+# Without normalization
 score1 = fuzz.ratio(query, candidate)  # ~80%
 
-# Normalizado
+# Normalized
 score2 = fuzz.ratio(
     clean_text_for_matching(query),
     clean_text_for_matching(candidate)
@@ -269,7 +282,7 @@ score2 = fuzz.ratio(
 
 ---
 
-## 📚 Referencias
+## 📚 References
 
 - [Amazon Titan Embeddings Best Practices](https://docs.aws.amazon.com/bedrock/latest/userguide/titan-embedding-models.html)
 - [Vector Search Normalization Considerations](https://www.pinecone.io/learn/vector-search/)
@@ -277,13 +290,13 @@ score2 = fuzz.ratio(
 
 ---
 
-## 🎓 Resumen Ejecutivo
+## 🎓 Executive Summary
 
-| Contexto | Normalización | Razón |
-|----------|---------------|-------|
-| **Embeddings (Titan)** | ❌ Mínima (solo espacios) | Modelos entienden texto natural mejor |
-| **String Matching (RapidFuzz)** | ✅ Completa (lowercase + sin acentos) | Comparación carácter por carácter |
-| **Almacenamiento en DB** | ❌ Sin normalizar | Preserva información original |
-| **Búsqueda Híbrida** | 🔄 Ambas estrategias | Mejor de ambos mundos |
+| Context | Normalization | Reason |
+|---------|---------------|--------|
+| **Embeddings (Titan)** | ❌ Minimal (spaces only) | Models understand natural text better |
+| **String Matching (RapidFuzz)** | ✅ Complete (lowercase + no accents) | Character-by-character comparison |
+| **Storage in DB** | ❌ Not normalized | Preserves original information |
+| **Hybrid Search** | 🔄 Both strategies | Best of both worlds |
 
-**Conclusión:** La estrategia híbrida implementada maximiza la precisión de búsqueda. 🎯
+**Conclusion:** The implemented hybrid strategy maximizes search precision. 🎯

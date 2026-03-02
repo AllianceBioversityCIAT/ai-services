@@ -13,20 +13,21 @@ from rapidfuzz import fuzz
 from src.embeddings import get_embedding, embedding_to_list, cosine_similarity
 from src.supabase_client import search_by_name_embedding, search_combined, count_institutions
 from src.utils import clean_text_for_matching
+from src.web_search import search_institution_online
 
 load_dotenv()
 
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-THRESHOLD_EMBEDDINGS = 0.3  # Threshold for vector search (lower = more candidates)
-THRESHOLD_FINAL = 0.5       # Threshold to consider a valid match (final score)
+THRESHOLD_EMBEDDINGS = 0.2  # Threshold for vector search (lower = more candidates)
+THRESHOLD_FINAL = 0.6       # Threshold to consider a valid match (final score)
 NAME_WEIGHT = 0.7           # Weight of name in combined search (0-1)
 ACRONYM_WEIGHT = 0.3        # Weight of acronym in combined search (0-1)
 COSINE_WEIGHT = 0.50        # Weight of cosine similarity in final score
 FUZZ_NAME_WEIGHT = 0.40     # Weight of RapidFuzz name in final score
 FUZZ_ACRONYM_WEIGHT = 0.10  # Weight of RapidFuzz acronym in final score
-
+ENABLE_WEB_SEARCH = True    # Enable web search fallback when no match in CLARISA
 
 # ============================================================================
 # HYBRID SEARCH FUNCTION
@@ -200,12 +201,17 @@ def run_pipeline(excel_path):
         'fuzz_name_score': [],
         'fuzz_acronym_score': [],
         'final_score': [],
-        'match_quality': []  # 'excellent', 'good', 'fair', 'no_match'
+        'match_quality': [],  # 'excellent', 'good', 'fair', 'no_match'
+        'web_search_performed': [],
+        'web_search_result': [],
+        'web_search_sources': []
     }
     
     stats = {
         'matched': 0,
         'no_match': 0,
+        'web_search_attempted': 0,
+        'web_search_success': 0,
         'errors': 0
     }
     
@@ -242,9 +248,40 @@ def run_pipeline(excel_path):
                 else:
                     quality = 'fair'
                 results['match_quality'].append(quality)
+                results['web_search_performed'].append(False)
+                results['web_search_result'].append('')
+                results['web_search_sources'].append('')
                 
                 stats['matched'] += 1
             else:
+                # No match in CLARISA - Try web search if enabled
+                web_search_done = False
+                web_search_text = ''
+                web_search_sources = ''
+                
+                if ENABLE_WEB_SEARCH:
+                    # Get country and website from Excel if available
+                    country = None
+                    website = None
+                    
+                    # Try to get country from column 3 (if exists)
+                    if len(row) > 3 and pd.notna(row.iloc[3]):
+                        country = str(row.iloc[3]).strip()
+                    
+                    # Try to get website from column 4 (if exists)
+                    if len(row) > 4 and pd.notna(row.iloc[4]):
+                        website = str(row.iloc[4]).strip()
+                    
+                    # Perform web search
+                    stats['web_search_attempted'] += 1
+                    web_result = search_institution_online(partner_name, country, website)
+                    
+                    if web_result['success']:
+                        web_search_done = True
+                        web_search_text = web_result['data']['raw_response']
+                        web_search_sources = ' | '.join(web_result['sources']) if web_result['sources'] else ''
+                        stats['web_search_success'] += 1
+                
                 # No match
                 results['match_found'].append(False)
                 results['clarisa_id'].append('')
@@ -258,6 +295,9 @@ def run_pipeline(excel_path):
                 results['fuzz_acronym_score'].append(0)
                 results['final_score'].append(0)
                 results['match_quality'].append('no_match')
+                results['web_search_performed'].append(web_search_done)
+                results['web_search_result'].append(web_search_text)
+                results['web_search_sources'].append(web_search_sources)
                 
                 stats['no_match'] += 1
                 
@@ -276,6 +316,9 @@ def run_pipeline(excel_path):
             results['fuzz_acronym_score'].append(0)
             results['final_score'].append(0)
             results['match_quality'].append('error')
+            results['web_search_performed'].append(False)
+            results['web_search_result'].append('')
+            results['web_search_sources'].append('')
             
             stats['errors'] += 1
     
@@ -292,6 +335,9 @@ def run_pipeline(excel_path):
     df['FUZZ_ACRONYM_SCORE'] = results['fuzz_acronym_score']
     df['FINAL_SCORE'] = results['final_score']
     df['MATCH_QUALITY'] = results['match_quality']
+    df['WEB_SEARCH_PERFORMED'] = results['web_search_performed']
+    df['WEB_SEARCH_RESULT'] = results['web_search_result']
+    df['WEB_SEARCH_SOURCES'] = results['web_search_sources']
     
     # Save results
     output_file = "clarisa_mapping_results.xlsx"
@@ -307,6 +353,8 @@ def run_pipeline(excel_path):
     print(f"   Total processed:      {len(df):,}")
     print(f"   ✅ Successful matches: {stats['matched']:,} ({stats['matched']/len(df)*100:.1f}%)")
     print(f"   ❌ No match:           {stats['no_match']:,} ({stats['no_match']/len(df)*100:.1f}%)")
+    if ENABLE_WEB_SEARCH and stats['web_search_attempted'] > 0:
+        print(f"   🌐 Web search:         {stats['web_search_success']}/{stats['web_search_attempted']} successful")
     print(f"   ⚠️  Errors:             {stats['errors']:,}")
     print()
     

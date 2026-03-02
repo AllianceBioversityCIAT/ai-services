@@ -1,53 +1,53 @@
-# 📋 Cambios Implementados - Estrategia de Normalización
+# 📋 Implemented Changes - Normalization Strategy
 
-## ✅ Archivos Modificados
+## ✅ Modified Files
 
 ### 1. `src/utils.py` ✨
-**Antes:**
-- Solo `clean_text()` - normalización agresiva
+**Before:**
+- Only `clean_text()` - aggressive normalization
 
-**Después:**
-- ✅ `clean_text_basic()` - Limpieza mínima para embeddings
-- ✅ `clean_text_for_matching()` - Normalización completa para RapidFuzz
-- ✅ `clean_text()` - Alias para compatibilidad
+**After:**
+- ✅ `clean_text_basic()` - Minimal cleaning for embeddings
+- ✅ `clean_text_for_matching()` - Complete normalization for RapidFuzz
+- ✅ `clean_text()` - Alias for compatibility
 
 ```python
-# Limpieza básica (para embeddings)
+# Basic cleaning (for embeddings)
 clean_text_basic("Universidad de São Paulo")
-# → "Universidad de São Paulo"  (solo espacios)
+# → "Universidad de São Paulo"  (spaces only)
 
-# Normalización completa (para RapidFuzz)
+# Complete normalization (for RapidFuzz)
 clean_text_for_matching("Universidad de São Paulo")
-# → "universidad de sao paulo"  (lowercase + sin acentos)
+# → "universidad de sao paulo"  (lowercase + no accents)
 ```
 
 ### 2. `src/embeddings.py` ✨
-**Antes:**
+**Before:**
 ```python
 def get_embedding(text: str) -> np.ndarray:
     body = json.dumps({"inputText": text.strip()})
-    # Solo .strip()
+    # Only .strip()
 ```
 
-**Después:**
+**After:**
 ```python
 def get_embedding(text: str, normalize: bool = False) -> np.ndarray:
-    # Limpieza básica: normaliza espacios múltiples
+    # Basic cleaning: normalizes multiple spaces
     cleaned_text = ' '.join(text.split()).strip()
     body = json.dumps({"inputText": cleaned_text})
-    # Preserva acentos, mayúsculas, caracteres especiales
+    # Preserves accents, capitals, special characters
 ```
 
 ### 3. `search_example.py` ✨
-**Antes:**
+**Before:**
 ```python
-# RapidFuzz sin normalización
+# RapidFuzz without normalization
 fuzz_score = fuzz.ratio(partner_name.lower(), candidate['name'].lower())
 ```
 
-**Después:**
+**After:**
 ```python
-# RapidFuzz CON normalización completa
+# RapidFuzz WITH complete normalization
 from src.utils import clean_text_for_matching
 
 normalized_query = clean_text_for_matching(partner_name)
@@ -55,30 +55,30 @@ normalized_candidate = clean_text_for_matching(candidate['name'])
 fuzz_score = fuzz.ratio(normalized_query, normalized_candidate)
 ```
 
-## ✅ Archivos Nuevos
+## ✅ New Files
 
 ### 1. `docs/NORMALIZATION_STRATEGY.md` 📚
-**Documentación completa sobre:**
-- Por qué usar dos niveles de normalización
-- Comparaciones con ejemplos
-- Mejores prácticas
-- Experimentos sugeridos
-- Referencias técnicas
+**Complete documentation about:**
+- Why use two normalization levels
+- Comparisons with examples
+- Best practices
+- Suggested experiments
+- Technical references
 
 ### 2. `test_normalization.py` 🧪
-**Script de testing que demuestra:**
-- Test 1: Embeddings con vs sin normalización
-- Test 2: RapidFuzz con vs sin normalización
-- Test 3: Enfoque híbrido (recomendado)
+**Testing script that demonstrates:**
+- Test 1: Embeddings with vs without normalization
+- Test 2: RapidFuzz with vs without normalization
+- Test 3: Hybrid approach (recommended)
 
-**Ejecutar con:**
+**Run with:**
 ```bash
 python test_normalization.py
 ```
 
-## 📊 Flujo de Datos Actualizado
+## 📊 Updated Data Flow
 
-### Al Poblar la Base de Datos
+### When Populating the Database
 
 ```python
 # populate_clarisa_db.py
@@ -87,40 +87,40 @@ institution = {
     'acronym': 'WUR'
 }
 
-# PASO 1: Generar embeddings (SIN normalizar agresivamente)
+# STEP 1: Generate embeddings (WITHOUT aggressive normalization)
 name_embedding = get_embedding(institution['name'])
-# Texto enviado a Titan: "Wageningen University and Research Centre"
-# ✅ Preserva mayúsculas, caracteres especiales
+# Text sent to Titan: "Wageningen University and Research Centre"
+# ✅ Preserves capitals, special characters
 
 acronym_embedding = get_embedding(institution['acronym'])
-# Texto enviado a Titan: "WUR"
+# Text sent to Titan: "WUR"
 
-# PASO 2: Guardar en Supabase
+# STEP 2: Save in Supabase
 supabase.insert({
     'name': 'Wageningen University and Research Centre',  # Original
-    'name_embedding': name_embedding,  # Embedding del texto original
+    'name_embedding': name_embedding,  # Embedding of original text
     'acronym': 'WUR',
     'acronym_embedding': acronym_embedding
 })
 ```
 
-### Al Buscar Instituciones
+### When Searching for Institutions
 
 ```python
 # search_example.py
 query = "Wageningen University"
 
-# PASO 1: Generar embedding del query (SIN normalizar)
+# STEP 1: Generate query embedding (WITHOUT normalization)
 query_embedding = get_embedding(query)
-# Texto a Titan: "Wageningen University"
+# Text to Titan: "Wageningen University"
 
-# PASO 2: Búsqueda vectorial (Supabase RPC)
+# STEP 2: Vector search (Supabase RPC)
 candidates = search_by_name_embedding(query_embedding, limit=5)
-# Compara: embedding(query) vs embeddings guardados (ambos sin normalizar)
+# Compares: embedding(query) vs saved embeddings (both not normalized)
 
-# PASO 3: Desempate con RapidFuzz (CON normalización)
+# STEP 3: Tiebreak with RapidFuzz (WITH normalization)
 for candidate in candidates:
-    # Normalizar ambos textos
+    # Normalize both texts
     query_norm = clean_text_for_matching(query)
     # "wageningen university"
     
@@ -128,85 +128,86 @@ for candidate in candidates:
     # "wageningen university and research centre"
     
     fuzz_score = fuzz.ratio(query_norm, candidate_norm)
-    # Comparación justa con textos normalizados
+    # Fair comparison with normalized texts
 ```
 
-## 🎯 Beneficios de Este Enfoque
+## 🎯 Benefits of This Approach
 
-### ✅ Para Embeddings (Sin Normalizar)
+### ✅ For Embeddings (Without Normalization)
 
-| Texto Original | Normalizado | Embedding Mejor con |
-|----------------|-------------|---------------------|
+| Original Text | Normalized | Better Embedding with |
+|---------------|------------|----------------------|
 | "São Paulo University" | "sao paulo university" | **Original** ✅ |
 | "ETH Zürich" | "eth zurich" | **Original** ✅ |
 | "CGIAR Initiative" | "cgiar initiative" | **Original** ✅ |
 
-**Por qué:** Titan entiende el contexto semántico completo del texto original.
+**Why:** Titan understands the complete semantic context of the original text.
 
-### ✅ Para RapidFuzz (Con Normalizar)
+### ✅ For RapidFuzz (With Normalization)
 
-| Query | Candidato | Sin Normalizar | Con Normalizar |
-|-------|-----------|----------------|----------------|
+| Query | Candidate | Without Norm | With Norm |
+|-------|-----------|--------------|----------|
 | "WUR" | "wur" | 75% | **100%** ✅ |
 | "ETH Zürich" | "ETH ZURICH" | 80% | **100%** ✅ |
 | "São Paulo" | "Sao Paulo" | 82% | **100%** ✅ |
 
-**Por qué:** String matching necesita textos consistentes.
+**Why:** String matching needs consistent texts.
 
-## 📝 Resumen de la Estrategia
+## 📏 Strategy Summary
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    NORMALIZACIÓN HÍBRIDA                    │
+│                    HYBRID NORMALIZATION                      │
 └─────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────┐     ┌──────────────────────────────┐
 │   EMBEDDINGS         │     │   STRING MATCHING            │
 │   (Amazon Titan)     │     │   (RapidFuzz)                │
 ├──────────────────────┤     ├──────────────────────────────┤
-│ ❌ NO normalizar     │     │ ✅ SÍ normalizar            │
+│ ❌ DO NOT normalize  │     │ ✅ YES normalize             │
 │                      │     │                              │
-│ Mantener:            │     │ Aplicar:                     │
-│ • Acentos            │     │ • Lowercase                  │
-│ • Mayúsculas         │     │ • Sin acentos                │
-│ • Puntuación         │     │ • Sin puntuación             │
+│ Keep:                │     │ Apply:                       │
+│ • Accents            │     │ • Lowercase                  │
+│ • Capitals           │     │ • No accents                 │
+│ • Punctuation        │     │ • No punctuation             │
 │                      │     │                              │
-│ Solo limpiar:        │     │ Función:                     │
-│ • Espacios múltiples │     │ clean_text_for_matching()    │
+│ Only clean:          │     │ Function:                    │
+│ • Multiple spaces    │     │ clean_text_for_matching()    │
 │                      │     │                              │
-│ Función:             │     │ Cuándo:                      │
-│ get_embedding()      │     │ Al comparar con fuzz.ratio() │
+│ Function:            │     │ When:                        │
+│ get_embedding()      │     │ When comparing with          │
+│                      │     │ fuzz.ratio()                 │
 └──────────────────────┘     └──────────────────────────────┘
 ```
 
-## 🧪 Validación
+## 🧪 Validation
 
-Para validar que la estrategia funciona mejor:
+To validate that the strategy works better:
 
 ```bash
-# Ejecutar tests comparativos
+# Run comparative tests
 python test_normalization.py
 ```
 
-Esto mostrará:
-- ✅ Embeddings funcionan mejor SIN normalización
-- ✅ RapidFuzz funciona mejor CON normalización
-- ✅ Enfoque híbrido da los mejores resultados combinados
+This will show:
+- ✅ Embeddings work better WITHOUT normalization
+- ✅ RapidFuzz works better WITH normalization
+- ✅ Hybrid approach gives best combined results
 
-## 📚 Documentación Adicional
+## 📚 Additional Documentation
 
-- Ver `docs/NORMALIZATION_STRATEGY.md` para detalles técnicos completos
-- Ver `README.md` para la sección sobre normalización
-- Ver `QUICKSTART.md` para uso rápido
+- See `docs/NORMALIZATION_STRATEGY.md` for complete technical details
+- See `README.md` for normalization section
+- See `QUICKSTART.md` for quick usage
 
-## ✨ Próximos Pasos
+## ✨ Next Steps
 
-La implementación actual está lista para usar. Cuando ejecutes:
+The current implementation is ready to use. When you run:
 
-1. **`populate_clarisa_db.py`** → Guardará embeddings sin normalizar ✅
-2. **`search_example.py`** → Buscará con estrategia híbrida ✅
-3. **`test_normalization.py`** → Validará la estrategia ✅
+1. **`populate_clarisa_db.py`** → Will save embeddings without normalization ✅
+2. **`search_example.py`** → Will search with hybrid strategy ✅
+3. **`test_normalization.py`** → Will validate the strategy ✅
 
 ---
 
-**Conclusión:** La estrategia híbrida de normalización maximiza la precisión al aprovechar las fortalezas de cada enfoque. 🎯
+**Conclusion:** The hybrid normalization strategy maximizes precision by leveraging the strengths of each approach. 🎯
