@@ -6,16 +6,20 @@ Reads an Excel file, searches for each institution in CLARISA using hybrid searc
 import os
 import pandas as pd
 from tqdm import tqdm
-from dotenv import load_dotenv
 from rapidfuzz import fuzz
+from dotenv import load_dotenv
+from openpyxl.styles import Alignment
 
 # Import project modules
-from src.embeddings import get_embedding, embedding_to_list, cosine_similarity
-from src.supabase_client import search_by_name_embedding, search_combined, count_institutions
+from logger.logger_util import get_logger
 from src.utils import clean_text_for_matching
 from src.web_search import search_institution_online
+from src.embeddings import get_embedding, embedding_to_list, cosine_similarity
+from src.supabase_client import search_by_name_embedding, search_combined, count_institutions
+
 
 load_dotenv()
+logger = get_logger()
 
 # ============================================================================
 # CONFIGURATION
@@ -28,6 +32,36 @@ COSINE_WEIGHT = 0.50        # Weight of cosine similarity in final score
 FUZZ_NAME_WEIGHT = 0.40     # Weight of RapidFuzz name in final score
 FUZZ_ACRONYM_WEIGHT = 0.10  # Weight of RapidFuzz acronym in final score
 ENABLE_WEB_SEARCH = True    # Enable web search fallback when no match in CLARISA
+
+# Excel cell character limit
+EXCEL_CELL_CHAR_LIMIT = 32767
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def sanitize_for_excel(text: str) -> str:
+    """
+    Sanitize text for Excel compatibility - only truncate if needed
+    
+    Args:
+        text: Text to sanitize
+        
+    Returns:
+        str: Text safe for Excel (truncated if exceeds limit)
+    """
+    if not text:
+        return ''
+    
+    text = str(text)
+    
+    # Only truncate if exceeds Excel's character limit
+    if len(text) > EXCEL_CELL_CHAR_LIMIT:
+        logger.warning(f"Text truncated from {len(text)} to {EXCEL_CELL_CHAR_LIMIT} chars")
+        text = text[:EXCEL_CELL_CHAR_LIMIT - 50] + "\n\n[... TRUNCATED ...]"
+    
+    return text
+
 
 # ============================================================================
 # HYBRID SEARCH FUNCTION
@@ -144,50 +178,45 @@ def run_pipeline(excel_path):
         - Column 2: acronym
         - Additional columns are preserved in the output
     """
-    print("=" * 80)
-    print("🚀 MAPPING PIPELINE: CGSpace → CLARISA")
-    print("=" * 80)
-    print()
+    logger.info("=" * 80)
+    logger.info("🚀 MAPPING PIPELINE: CGSpace → CLARISA")
+    logger.info("=" * 80)
     
     # Verify that the DB has data
-    print("🔍 Verifying CLARISA database...")
+    logger.info("🔍 Verifying CLARISA database...")
     total_institutions = count_institutions()
     
     if total_institutions == 0:
-        print("❌ Error: The database is empty.")
-        print("   Run first: python populate_clarisa_db.py")
+        logger.error("❌ Error: The database is empty.")
+        logger.error("   Run first: python populate_clarisa_db.py")
         return
     
-    print(f"✅ Database ready: {total_institutions:,} institutions in CLARISA")
-    print()
+    logger.info(f"✅ Database ready: {total_institutions:,} institutions in CLARISA")
     
     # Load Excel
-    print(f"📊 Loading Excel file: {excel_path}")
+    logger.info(f"📊 Loading Excel file: {excel_path}")
     try:
         df = pd.read_excel(excel_path)
-        print(f"✅ {len(df)} rows loaded")
+        logger.info(f"✅ {len(df)} rows loaded")
     except Exception as e:
-        print(f"❌ Error loading Excel: {e}")
+        logger.error(f"❌ Error loading Excel: {e}")
         return
     
     # Verify columns
     if len(df.columns) < 3:
-        print(f"❌ Error: Excel must have at least 3 columns")
-        print(f"   Format: [ID, Name, Acronym, ...]")
-        print(f"   Found: {len(df.columns)} columns")
+        logger.error(f"❌ Error: Excel must have at least 3 columns")
+        logger.error(f"   Format: [ID, Name, Acronym, ...]")
+        logger.error(f"   Found: {len(df.columns)} columns")
         return
     
-    print()
-    print("⚙️  CONFIGURATION:")
-    print(f"   - Threshold embeddings: {THRESHOLD_EMBEDDINGS}")
-    print(f"   - Threshold final:      {THRESHOLD_FINAL}")
-    print(f"   - Name/acronym weight:  {NAME_WEIGHT}/{ACRONYM_WEIGHT}")
-    print(f"   - Final score:          {COSINE_WEIGHT*100:.0f}% cosine + {FUZZ_NAME_WEIGHT*100:.0f}% fuzz_name + {FUZZ_ACRONYM_WEIGHT*100:.0f}% fuzz_acronym")
-    print()
+    logger.info("⚙️  CONFIGURATION:")
+    logger.info(f"   - Threshold embeddings: {THRESHOLD_EMBEDDINGS}")
+    logger.info(f"   - Threshold final:      {THRESHOLD_FINAL}")
+    logger.info(f"   - Name/acronym weight:  {NAME_WEIGHT}/{ACRONYM_WEIGHT}")
+    logger.info(f"   - Final score:          {COSINE_WEIGHT*100:.0f}% cosine + {FUZZ_NAME_WEIGHT*100:.0f}% fuzz_name + {FUZZ_ACRONYM_WEIGHT*100:.0f}% fuzz_acronym")
     
     # Process each row
-    print(f"🔄 Processing {len(df)} institutions...")
-    print()
+    logger.info(f"🔄 Processing {len(df)} institutions...")
     
     results = {
         'match_found': [],
@@ -202,9 +231,7 @@ def run_pipeline(excel_path):
         'fuzz_acronym_score': [],
         'final_score': [],
         'match_quality': [],  # 'excellent', 'good', 'fair', 'no_match'
-        'web_search_performed': [],
-        'web_search_result': [],
-        'web_search_sources': []
+        'web_search_result': []  # Formatted web search result (single column)
     }
     
     stats = {
@@ -248,39 +275,35 @@ def run_pipeline(excel_path):
                 else:
                     quality = 'fair'
                 results['match_quality'].append(quality)
-                results['web_search_performed'].append(False)
-                results['web_search_result'].append('')
-                results['web_search_sources'].append('')
+                results['web_search_result'].append('')  # No web search needed when match found
                 
                 stats['matched'] += 1
             else:
                 # No match in CLARISA - Try web search if enabled
-                web_search_done = False
-                web_search_text = ''
-                web_search_sources = ''
+                web_search_formatted_result = ''
                 
                 if ENABLE_WEB_SEARCH:
                     # Get country and website from Excel if available
                     country = None
                     website = None
                     
-                    # Try to get country from column 3 (if exists)
+                    # Try to get country from column 5 (if exists)
+                    if len(row) > 5 and pd.notna(row.iloc[5]):
+                        country = str(row.iloc[5]).strip()
+                    
+                    # Try to get website from column 3 (if exists)
                     if len(row) > 3 and pd.notna(row.iloc[3]):
-                        country = str(row.iloc[3]).strip()
+                        website = str(row.iloc[3]).strip()
                     
-                    # Try to get website from column 4 (if exists)
-                    if len(row) > 4 and pd.notna(row.iloc[4]):
-                        website = str(row.iloc[4]).strip()
-                    
-                    # Perform web search
+                    # Perform TWO-PHASE web search
                     stats['web_search_attempted'] += 1
                     web_result = search_institution_online(partner_name, country, website)
                     
                     if web_result['success']:
-                        web_search_done = True
-                        web_search_text = web_result['data']['raw_response']
-                        web_search_sources = ' | '.join(web_result['sources']) if web_result['sources'] else ''
+                        web_search_formatted_result = sanitize_for_excel(web_result.get('formatted_result', ''))
                         stats['web_search_success'] += 1
+                    else:
+                        web_search_formatted_result = sanitize_for_excel(f"❌ WEB SEARCH FAILED: {web_result.get('error', 'Unknown error')}")
                 
                 # No match
                 results['match_found'].append(False)
@@ -295,15 +318,13 @@ def run_pipeline(excel_path):
                 results['fuzz_acronym_score'].append(0)
                 results['final_score'].append(0)
                 results['match_quality'].append('no_match')
-                results['web_search_performed'].append(web_search_done)
-                results['web_search_result'].append(web_search_text)
-                results['web_search_sources'].append(web_search_sources)
+                results['web_search_result'].append(web_search_formatted_result)
                 
                 stats['no_match'] += 1
                 
         except Exception as e:
             # Error processing
-            print(f"\n⚠️  Error in row {idx}: {e}")
+            logger.error(f"\n⚠️  Error in row {idx}: {e}")
             results['match_found'].append(False)
             results['clarisa_id'].append('ERROR')
             results['clarisa_name'].append(str(e))
@@ -316,9 +337,7 @@ def run_pipeline(excel_path):
             results['fuzz_acronym_score'].append(0)
             results['final_score'].append(0)
             results['match_quality'].append('error')
-            results['web_search_performed'].append(False)
             results['web_search_result'].append('')
-            results['web_search_sources'].append('')
             
             stats['errors'] += 1
     
@@ -335,28 +354,44 @@ def run_pipeline(excel_path):
     df['FUZZ_ACRONYM_SCORE'] = results['fuzz_acronym_score']
     df['FINAL_SCORE'] = results['final_score']
     df['MATCH_QUALITY'] = results['match_quality']
-    df['WEB_SEARCH_PERFORMED'] = results['web_search_performed']
     df['WEB_SEARCH_RESULT'] = results['web_search_result']
-    df['WEB_SEARCH_SOURCES'] = results['web_search_sources']
     
     # Save results
     output_file = "clarisa_mapping_results.xlsx"
-    df.to_excel(output_file, index=False)
+    logger.info(f"💾 Saving results to {output_file}...")
     
-    print()
-    print("=" * 80)
-    print("📊 RESULTS")
-    print("=" * 80)
-    print(f"✅ File saved: {output_file}")
-    print()
-    print(f"📈 Statistics:")
-    print(f"   Total processed:      {len(df):,}")
-    print(f"   ✅ Successful matches: {stats['matched']:,} ({stats['matched']/len(df)*100:.1f}%)")
-    print(f"   ❌ No match:           {stats['no_match']:,} ({stats['no_match']/len(df)*100:.1f}%)")
+    # Save with basic formatting
+    df.to_excel(output_file, sheet_name='Results', index=False, engine='openpyxl')
+    
+    # Apply text wrapping to WEB_SEARCH_RESULT column for readability
+    from openpyxl import load_workbook
+    workbook = load_workbook(output_file)
+    worksheet = workbook['Results']
+    
+    # Set column widths and enable text wrapping
+    for idx, col in enumerate(df.columns, 1):
+        col_letter = worksheet.cell(1, idx).column_letter
+        if col == 'WEB_SEARCH_RESULT':
+            worksheet.column_dimensions[col_letter].width = 80
+            # Enable text wrapping for this column
+            for row in range(2, len(df) + 2):
+                cell = worksheet.cell(row=row, column=idx)
+                cell.alignment = Alignment(wrap_text=True, vertical='top')
+    
+    workbook.save(output_file)
+    workbook.close()
+    
+    logger.info("=" * 80)
+    logger.info("📊 RESULTS")
+    logger.info("=" * 80)
+    logger.info(f"✅ File saved: {output_file}")
+    logger.info(f"📈 Statistics:")
+    logger.info(f"   Total processed:      {len(df):,}")
+    logger.info(f"   ✅ Successful matches: {stats['matched']:,} ({stats['matched']/len(df)*100:.1f}%)")
+    logger.info(f"   ❌ No match:           {stats['no_match']:,} ({stats['no_match']/len(df)*100:.1f}%)")
     if ENABLE_WEB_SEARCH and stats['web_search_attempted'] > 0:
-        print(f"   🌐 Web search:         {stats['web_search_success']}/{stats['web_search_attempted']} successful")
-    print(f"   ⚠️  Errors:             {stats['errors']:,}")
-    print()
+        logger.info(f"   🌐 Web search:         {stats['web_search_success']}/{stats['web_search_attempted']} successful")
+    logger.info(f"   ⚠️  Errors:             {stats['errors']:,}")
     
     # Breakdown by quality
     if stats['matched'] > 0:
@@ -364,11 +399,10 @@ def run_pipeline(excel_path):
         good = sum(1 for q in results['match_quality'] if q == 'good')
         fair = sum(1 for q in results['match_quality'] if q == 'fair')
         
-        print(f"🏆 Match quality:")
-        print(f"   Excellent (≥0.85): {excellent:,} ({excellent/stats['matched']*100:.1f}%)")
-        print(f"   Good (≥0.70):      {good:,} ({good/stats['matched']*100:.1f}%)")
-        print(f"   Fair (≥0.50):      {fair:,} ({fair/stats['matched']*100:.1f}%)")
-        print()
+        logger.info(f"🏆 Match quality:")
+        logger.info(f"   Excellent (≥0.85): {excellent:,} ({excellent/stats['matched']*100:.1f}%)")
+        logger.info(f"   Good (≥0.70):      {good:,} ({good/stats['matched']*100:.1f}%)")
+        logger.info(f"   Fair (≥0.50):      {fair:,} ({fair/stats['matched']*100:.1f}%)")
     
     # Average scores
     if stats['matched'] > 0:
@@ -377,50 +411,11 @@ def run_pipeline(excel_path):
         max_score = max(matched_scores) if matched_scores else 0
         min_score = min(matched_scores) if matched_scores else 0
         
-        print(f"📊 Similarity scores:")
-        print(f"   Average: {avg_score:.4f}")
-        print(f"   Maximum: {max_score:.4f}")
-        print(f"   Minimum: {min_score:.4f}")
-        print()
+        logger.info(f"📊 Similarity scores:")
+        logger.info(f"   Average: {avg_score:.4f}")
+        logger.info(f"   Maximum: {max_score:.4f}")
+        logger.info(f"   Minimum: {min_score:.4f}")
     
-    print("=" * 80)
-    print("✅ PROCESS COMPLETED")
-    print("=" * 80)
-    print()
-
-
-# ============================================================================
-# MAIN
-# ============================================================================
-
-
-if __name__ == "__main__":
-    """
-    Executes the mapping pipeline CGSpace → CLARISA
-    
-    Excel format:
-        - Column 0: ID (optional)
-        - Column 1: partner_name (REQUIRED)
-        - Column 2: acronym (optional)
-        - Other columns are preserved in the result
-    
-    Configuration:
-        Adjust constants at the beginning of the file:
-        - THRESHOLD_EMBEDDINGS: Threshold for vector search (default: 0.3)
-        - THRESHOLD_FINAL: Threshold for valid match (default: 0.5)
-        - NAME_WEIGHT / ACRONYM_WEIGHT: Weights in combined search
-        - COSINE_WEIGHT / FUZZ_NAME_WEIGHT / FUZZ_ACRONYM_WEIGHT: Weights in final score
-    """
-    # Excel file to process
-    excel_file = "File To Dani (1).xlsx"
-    
-    if not os.path.exists(excel_file):
-        print(f"❌ Error: File '{excel_file}' not found")
-        print()
-        print("📝 Expected Excel format:")
-        print("   Column 0: ID (optional)")
-        print("   Column 1: partner_name (institution name)")
-        print("   Column 2: acronym (acronym, optional)")
-        print()
-    else:
-        run_pipeline(excel_file)
+    logger.info("=" * 80)
+    logger.info("✅ PROCESS COMPLETED")
+    logger.info("=" * 80)
