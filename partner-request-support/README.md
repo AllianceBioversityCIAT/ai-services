@@ -1,26 +1,116 @@
-# CLARISA - CGSpace Mapping Project
+# Partner Request Support - CGIAR
 
-Modularized project for mapping institutions between CLARISA and CGSpace using hybrid vector search (embeddings + RapidFuzz).
+Sistema completo para procesar solicitudes de partners y mapearlas contra la base de datos CLARISA usando búsqueda híbrida (embeddings + RapidFuzz).
 
-## 🏗️ Project Structure
+## 🚀 Inicio Rápido
+
+### Opción 1: Interfaz Web (Recomendado)
+
+```bash
+# Terminal 1 - Backend API
+cd backend
+source ../.venv/bin/activate
+python api.py
+
+# Terminal 2 - Frontend
+cd frontend
+npm install
+npm run dev
+```
+
+Abre http://localhost:3000 en tu navegador.
+
+**Ver [GUIA_EJECUCION.md](GUIA_EJECUCION.md) para instrucciones detalladas**
+
+### Opción 2: Script CLI (Original)
+
+```bash
+cd backend
+source ../.venv/bin/activate
+python main.py
+```
+
+## 📁 Estructura del Proyecto
 
 ```
-clarisa-cgspace_mapping/
-├── sql/
-│   └── create_clarisa_vector_table.sql    # SQL script to create table in Supabase
-├── src/
-│   ├── __init__.py
-│   ├── clarisa_api.py                     # CLARISA API client
-│   ├── embeddings.py                      # Embedding generation with Titan
-│   ├── supabase_client.py                 # Supabase client with RPC functions
-│   └── utils.py                           # Common utilities
-├── populate_clarisa_db.py                 # Script to populate the database
-├── search_example.py                       # Hybrid search example
-├── config_util.py                         # Credentials configuration
-├── mapping_bedrock.py                     # (Legacy) Previous script
-├── mapping_clarisa_comparison.py          # (Legacy) Previous script
-└── pyproject.toml                         # Project dependencies
+partner-request-support/
+├── frontend/                   # 🎨 Interfaz web Next.js
+│   ├── app/
+│   │   ├── page.tsx           # Página principal
+│   │   ├── layout.tsx         # Layout global
+│   │   └── globals.css        # Estilos CGIAR
+│   └── README.md
+├── backend/                    # 🔧 API y procesamiento
+│   ├── api.py                 # FastAPI server (NUEVO)
+│   ├── main.py                # Script CLI original
+│   ├── src/
+│   │   ├── mapping_clarisa_comparison.py  # Pipeline principal
+│   │   ├── clarisa_api.py                 # Cliente CLARISA
+│   │   ├── embeddings.py                  # Embeddings con Titan
+│   │   ├── supabase_client.py             # Cliente Supabase
+│   │   ├── utils.py                       # Utilidades
+│   │   └── web_search.py                  # Web search fallback
+│   ├── config/                # Configuración
+│   ├── docs/                  # Documentación técnica
+│   └── sql/                   # Scripts SQL
+├── GUIA_EJECUCION.md         # 📖 Guía completa de ejecución
+├── DESARROLLO.md             # 💻 Info para desarrolladores
+└── README.md                 # Este archivo
 ```
+
+## ✨ Características
+
+### Frontend
+- 🎨 Diseño minimalista institucional (colores CGIAR)
+- 📊 Visualización interactiva de resultados
+- 🎭 Animaciones sutiles y profesionales
+- 📱 Diseño responsivo
+- 🔍 Cards expandibles con 3 secciones por partner:
+  - Información del Partner
+  - CLARISA Match con scores detallados
+  - Web Search (cuando no hay match)
+
+### Backend
+- 🔍 Búsqueda híbrida (Vector embeddings + RapidFuzz)
+- 🌐 Web search fallback automático
+- 📊 Scores detallados de matching
+- 🚀 API REST con FastAPI
+- 📈 Estadísticas en tiempo real
+
+## 🏗️ Arquitectura Técnica
+
+### Stack Tecnológico
+
+**Frontend:**
+- Next.js 16 (App Router)
+- TypeScript
+- Framer Motion (animaciones)
+- Tailwind CSS 4
+- Axios (HTTP client)
+
+**Backend:**
+- Python 3.8+
+- FastAPI (API REST)
+- AWS Bedrock (Titan embeddings)
+- Supabase (Vector database)
+- Pandas (procesamiento de datos)
+- RapidFuzz (string matching)
+
+## 🎨 Sistema de Diseño
+
+El frontend usa una paleta institucional CGIAR:
+
+- **Primary**: #5a6b3f (Olive)
+- **Forest**: #3d4a2c (Dark Green)
+- **Earth**: #8b7355 (Brown)
+- **Sand**: #d4c4a8 (Beige)
+- **Cream**: #f5f1e8 (Background)
+
+**Tipografía:**
+- Display: Crimson Pro (serif)
+- Body: Work Sans (sans-serif)
+
+## 🏗️ Project Structure (Original)
 
 ## 📊 Vector Database in Supabase
 

@@ -165,6 +165,132 @@ def search_institution_for_excel(partner_name, acronym=None):
 # ============================================================================
 
 
+def process_partners_to_json(df):
+    """
+    Process a DataFrame with partners and return results as JSON-serializable dict
+    
+    Args:
+        df: DataFrame with partners (same format as Excel input)
+        
+    Returns:
+        dict: Results with partners data and statistics
+    """
+    logger.info(f"⚙️  CONFIGURATION:")
+    logger.info(f"   - Threshold embeddings: {THRESHOLD_EMBEDDINGS}")
+    logger.info(f"   - Threshold final:      {THRESHOLD_FINAL}")
+    logger.info(f"   - Name/acronym weight:  {NAME_WEIGHT}/{ACRONYM_WEIGHT}")
+    logger.info(f"   - Final score:          {COSINE_WEIGHT*100:.0f}% cosine + {FUZZ_NAME_WEIGHT*100:.0f}% fuzz_name + {FUZZ_ACRONYM_WEIGHT*100:.0f}% fuzz_acronym")
+    
+    # Process each row
+    logger.info(f"🔄 Processing {len(df)} institutions...")
+    
+    partners_results = []
+    stats = {
+        'total': len(df),
+        'matched': 0,
+        'no_match': 0,
+        'web_search_attempted': 0,
+        'web_search_success': 0,
+        'errors': 0,
+        'excellent': 0,
+        'good': 0,
+        'fair': 0
+    }
+    
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Searching matches"):
+        # Read data from Excel
+        partner_id = row.iloc[0] if len(row) > 0 and pd.notna(row.iloc[0]) else ''
+        partner_name = row.iloc[1] if len(row) > 1 else None
+        acronym = row.iloc[2] if len(row) > 2 else None
+        website = row.iloc[3] if len(row) > 3 and pd.notna(row.iloc[3]) else None
+        country = row.iloc[5] if len(row) > 5 and pd.notna(row.iloc[5]) else None
+        
+        partner_data = {
+            'id': str(partner_id),
+            'name': str(partner_name) if partner_name else '',
+            'acronym': str(acronym) if acronym and str(acronym).lower() not in ['nan', 'none', ''] else '',
+            'website': str(website) if website else '',
+            'country': str(country) if country else '',
+            'match_found': False,
+            'clarisa_match': None,
+            'web_search': None,
+            'match_quality': 'no_match'
+        }
+        
+        try:
+            # Search for match
+            match = search_institution_for_excel(partner_name, acronym)
+            
+            if match:
+                # Match found
+                score = match['final_score']
+                if score >= 0.85:
+                    quality = 'excellent'
+                    stats['excellent'] += 1
+                elif score >= 0.70:
+                    quality = 'good'
+                    stats['good'] += 1
+                else:
+                    quality = 'fair'
+                    stats['fair'] += 1
+                
+                partner_data['match_found'] = True
+                partner_data['match_quality'] = quality
+                partner_data['clarisa_match'] = {
+                    'clarisa_id': match['clarisa_id'],
+                    'name': match['name'],
+                    'acronym': match['acronym'] or '',
+                    'countries': match['countries'],
+                    'institution_type': match['institution_type'] or '',
+                    'website': match['website'] or '',
+                    'scores': {
+                        'cosine_similarity': round(match['cosine_similarity'], 4),
+                        'fuzz_name_score': round(match['fuzz_name_score'], 4),
+                        'fuzz_acronym_score': round(match['fuzz_acronym_score'], 4),
+                        'final_score': round(match['final_score'], 4)
+                    }
+                }
+                
+                stats['matched'] += 1
+            else:
+                # No match in CLARISA - Try web search if enabled
+                if ENABLE_WEB_SEARCH:
+                    stats['web_search_attempted'] += 1
+                    web_result = search_institution_online(partner_name, country, website)
+                    
+                    if web_result['success']:
+                        partner_data['web_search'] = {
+                            'success': True,
+                            'result': web_result.get('formatted_result', '')
+                        }
+                        stats['web_search_success'] += 1
+                    else:
+                        partner_data['web_search'] = {
+                            'success': False,
+                            'error': web_result.get('error', 'Unknown error')
+                        }
+                
+                stats['no_match'] += 1
+                
+        except Exception as e:
+            # Error processing
+            logger.error(f"\n⚠️  Error in row {idx}: {e}")
+            partner_data['match_quality'] = 'error'
+            partner_data['error'] = str(e)
+            stats['errors'] += 1
+        
+        partners_results.append(partner_data)
+    
+    # Calculate percentages
+    stats['matched_percentage'] = round(stats['matched'] / stats['total'] * 100, 1) if stats['total'] > 0 else 0
+    stats['no_match_percentage'] = round(stats['no_match'] / stats['total'] * 100, 1) if stats['total'] > 0 else 0
+    
+    return {
+        'partners': partners_results,
+        'stats': stats
+    }
+
+
 def run_pipeline(excel_path):
     """
     Main pipeline: processes an Excel file with institutions and maps them to CLARISA

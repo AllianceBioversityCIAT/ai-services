@@ -64,3 +64,6 @@ config_local.py
 secrets.py
 
 *.xlsx
+
+.agent/
+.agents/

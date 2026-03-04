@@ -13,5 +13,8 @@ dependencies = [
     "requests",
     "supabase",
     "rapidfuzz",
-    "numpy"
+    "numpy",
+    "fastapi",
+    "uvicorn",
+    "python-multipart"
 ]
