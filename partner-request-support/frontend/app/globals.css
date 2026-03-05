@@ -153,12 +153,12 @@ button {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--cgiar-green);
+  background: #6B7280;
   border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-primary-dark);
+  background: #4B5563;
 }
 
 /* Selection */

@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 
 interface ClarisaMatch {
   clarisa_id: string;
@@ -64,6 +65,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [expandedPartner, setExpandedPartner] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalType, setModalType] = useState<'clarisa' | 'websearch' | null>(null);
+  const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -226,23 +230,23 @@ export default function Home() {
             <div style={{
               background: 'white',
               borderRadius: 'var(--radius-xl)',
-              padding: 'var(--space-2xl)',
+              padding: 'var(--space-md)',
               boxShadow: 'var(--shadow-md)',
-              maxWidth: '900px',
+              maxWidth: '600px',
               margin: '0 auto',
             }}>
               {/* Upload Header */}
-              <div style={{ textAlign: 'center', marginBottom: 'var(--space-xl)' }}>
+              <div style={{ textAlign: 'center', marginBottom: 'var(--space-md)' }}>
                 <h2 style={{
-                  fontSize: '2rem',
+                  fontSize: '1.25rem',
                   fontWeight: 600,
                   color: 'var(--cgiar-navy)',
-                  marginBottom: 'var(--space-sm)',
+                  marginBottom: 'var(--space-xs)',
                 }}>
                   Upload Partner Requests
                 </h2>
                 <p style={{
-                  fontSize: '1rem',
+                  fontSize: '0.875rem',
                   color: 'var(--color-text-muted)',
                 }}>
                   Upload your Excel file to match partners with the CLARISA database
@@ -251,14 +255,14 @@ export default function Home() {
 
               {/* Upload Zone */}
               <div style={{
-                border: `3px dashed ${file ? 'var(--cgiar-green)' : 'var(--cgiar-gray)'}`,
+                border: `2px dashed ${file ? 'var(--cgiar-green)' : 'var(--cgiar-gray)'}`,
                 borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-2xl)',
+                padding: 'var(--space-md)',
                 textAlign: 'center',
                 background: file ? '#F0F9E8' : 'var(--cgiar-light-gray)',
                 transition: 'all 0.3s ease',
                 cursor: 'pointer',
-                marginBottom: 'var(--space-lg)',
+                marginBottom: 'var(--space-md)',
               }}>
                 <input
                   type="file"
@@ -272,37 +276,37 @@ export default function Home() {
                   style={{ cursor: 'pointer', display: 'block' }}
                 >
                   <Upload
-                    size={56}
+                    size={40}
                     style={{
                       color: file ? 'var(--cgiar-green)' : 'var(--color-text-muted)',
-                      margin: '0 auto var(--space-md)',
+                      margin: '0 auto var(--space-sm)',
                     }}
                   />
                   {file ? (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                       <p style={{
-                        fontSize: '1.125rem',
+                        fontSize: '0.9375rem',
                         fontWeight: 600,
                         color: 'var(--cgiar-green)',
                         marginBottom: 'var(--space-xs)',
                       }}>
                         {file.name}
                       </p>
-                      <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
                         Click to change file
                       </p>
                     </motion.div>
                   ) : (
                     <div>
                       <p style={{
-                        fontSize: '1.125rem',
+                        fontSize: '0.9375rem',
                         fontWeight: 500,
                         color: 'var(--cgiar-navy)',
                         marginBottom: 'var(--space-xs)',
                       }}>
                         Drop your Excel file here
                       </p>
-                      <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
                         or click to browse
                       </p>
                     </div>
@@ -316,13 +320,13 @@ export default function Home() {
                 disabled={!file || processing}
                 style={{
                   width: '100%',
-                  padding: 'var(--space-md) var(--space-lg)',
+                  padding: 'var(--space-sm) var(--space-md)',
                   background: file && !processing
                     ? 'linear-gradient(135deg, var(--cgiar-green) 0%, #629600 100%)'
                     : 'var(--cgiar-gray)',
                   color: file && !processing ? 'white' : 'var(--color-text-muted)',
                   borderRadius: 'var(--radius-md)',
-                  fontSize: '1.125rem',
+                  fontSize: '0.9375rem',
                   fontWeight: 600,
                   cursor: file && !processing ? 'pointer' : 'not-allowed',
                   transition: 'all 0.3s ease',
@@ -347,7 +351,7 @@ export default function Home() {
                   </>
                 ) : (
                   <>
-                    <BarChart3 size={20} />
+                    <BarChart3 size={18} />
                     Analyze Partners
                   </>
                 )}
@@ -359,12 +363,12 @@ export default function Home() {
                   animate={{ opacity: 1, y: 0 }}
                   style={{
                     marginTop: 'var(--space-md)',
-                    padding: 'var(--space-md)',
+                    padding: 'var(--space-sm)',
                     background: '#FEE',
                     border: '1px solid var(--color-error)',
                     borderRadius: 'var(--radius-md)',
                     color: 'var(--color-error)',
-                    fontSize: '0.875rem',
+                    fontSize: '0.75rem',
                   }}
                 >
                   {error}
@@ -373,25 +377,25 @@ export default function Home() {
 
               {/* Info Box */}
               <div style={{
-                marginTop: 'var(--space-xl)',
-                padding: 'var(--space-lg)',
+                marginTop: 'var(--space-md)',
+                padding: 'var(--space-md)',
                 background: '#E8F4FD',
                 borderRadius: 'var(--radius-md)',
-                borderLeft: '4px solid var(--cgiar-blue)',
+                borderLeft: '3px solid var(--cgiar-blue)',
               }}>
                 <h4 style={{
-                  fontSize: '0.875rem',
+                  fontSize: '0.75rem',
                   fontWeight: 600,
                   color: 'var(--cgiar-blue)',
-                  marginBottom: 'var(--space-sm)',
+                  marginBottom: 'var(--space-xs)',
                 }}>
                   Required Excel Format
                 </h4>
                 <ul style={{
-                  paddingLeft: 'var(--space-lg)',
+                  paddingLeft: 'var(--space-md)',
                   color: 'var(--color-text-secondary)',
-                  fontSize: '0.875rem',
-                  lineHeight: 1.8,
+                  fontSize: '0.75rem',
+                  lineHeight: 1.6,
                 }}>
                   <li><strong>Column 1:</strong> Partner Name (required)</li>
                   <li><strong>Column 2:</strong> Acronym (optional)</li>
@@ -536,23 +540,429 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Partners List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-              {filteredPartners?.map((partner, index) => (
-                <PartnerCard
-                  key={index}
-                  partner={partner}
-                  index={index}
-                  expanded={expandedPartner === index}
-                  onToggle={() => setExpandedPartner(expandedPartner === index ? null : index)}
-                  getQualityColor={getQualityColor}
-                  getQualityBadge={getQualityBadge}
-                />
-              ))}
+            {/* Partners Table */}
+            <div style={{
+              background: 'white',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-sm)',
+              overflow: 'hidden',
+            }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '0.8125rem',
+                }}>
+                  <thead>
+                    <tr style={{
+                      background: 'var(--cgiar-light-gray)',
+                      borderBottom: '2px solid var(--cgiar-gray)',
+                    }}>
+                      <th style={{
+                        padding: 'var(--space-sm) var(--space-md)',
+                        textAlign: 'left',
+                        fontWeight: 600,
+                        color: 'var(--cgiar-navy)',
+                        fontSize: '0.75rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}>Partner Name</th>
+                      <th style={{
+                        padding: 'var(--space-sm) var(--space-md)',
+                        textAlign: 'left',
+                        fontWeight: 600,
+                        color: 'var(--cgiar-navy)',
+                        fontSize: '0.75rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}>Acronym</th>
+                      <th style={{
+                        padding: 'var(--space-sm) var(--space-md)',
+                        textAlign: 'left',
+                        fontWeight: 600,
+                        color: 'var(--cgiar-navy)',
+                        fontSize: '0.75rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}>Country</th>
+                      <th style={{
+                        padding: 'var(--space-sm) var(--space-md)',
+                        textAlign: 'center',
+                        fontWeight: 600,
+                        color: 'var(--cgiar-navy)',
+                        fontSize: '0.75rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}>Match Quality</th>
+                      <th style={{
+                        padding: 'var(--space-sm) var(--space-md)',
+                        textAlign: 'center',
+                        fontWeight: 600,
+                        color: 'var(--cgiar-navy)',
+                        fontSize: '0.75rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}>CLARISA</th>
+                      <th style={{
+                        padding: 'var(--space-sm) var(--space-md)',
+                        textAlign: 'center',
+                        fontWeight: 600,
+                        color: 'var(--cgiar-navy)',
+                        fontSize: '0.75rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}>Web Search</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPartners?.map((partner, index) => {
+                      const badge = getQualityBadge(partner.match_quality);
+                      return (
+                        <motion.tr
+                          key={index}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: index * 0.02 }}
+                          style={{
+                            borderBottom: '1px solid var(--cgiar-gray)',
+                            transition: 'background 0.2s',
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.background = '#FAFBFC'}
+                          onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+                        >
+                          <td style={{
+                            padding: 'var(--space-sm) var(--space-md)',
+                            color: 'var(--cgiar-navy)',
+                            fontWeight: 500,
+                          }}>
+                            <div>
+                              <div>{partner.name}</div>
+                              {partner.website && (
+                                <div style={{
+                                  fontSize: '0.6875rem',
+                                  color: 'var(--color-text-muted)',
+                                  marginTop: '2px',
+                                }}>
+                                  🌐 {partner.website}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{
+                            padding: 'var(--space-sm) var(--space-md)',
+                            color: 'var(--color-text-secondary)',
+                          }}>
+                            {partner.acronym && (
+                              <span style={{
+                                padding: '2px 8px',
+                                background: 'var(--cgiar-light-gray)',
+                                borderRadius: 'var(--radius-sm)',
+                                fontSize: '0.6875rem',
+                                fontWeight: 500,
+                              }}>
+                                {partner.acronym}
+                              </span>
+                            )}
+                          </td>
+                          <td style={{
+                            padding: 'var(--space-sm) var(--space-md)',
+                            color: 'var(--color-text-secondary)',
+                          }}>
+                            {partner.country && <span>📍 {partner.country}</span>}
+                          </td>
+                          <td style={{
+                            padding: 'var(--space-sm) var(--space-md)',
+                            textAlign: 'center',
+                          }}>
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 10px',
+                              background: `${getQualityColor(partner.match_quality)}15`,
+                              color: getQualityColor(partner.match_quality),
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                            }}>
+                              {badge.icon}
+                              {badge.label}
+                            </div>
+                          </td>
+                          <td style={{
+                            padding: 'var(--space-sm) var(--space-md)',
+                            textAlign: 'center',
+                          }}>
+                            {partner.clarisa_match ? (
+                              <button
+                                onClick={() => {
+                                  setSelectedPartner(partner);
+                                  setModalType('clarisa');
+                                  setModalOpen(true);
+                                }}
+                                style={{
+                                  padding: '6px 12px',
+                                  background: 'var(--cgiar-blue)',
+                                  color: 'white',
+                                  borderRadius: 'var(--radius-sm)',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 500,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'all 0.2s',
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
+                                onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+                              >
+                                <Database size={14} />
+                                View
+                              </button>
+                            ) : (
+                              <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>—</span>
+                            )}
+                          </td>
+                          <td style={{
+                            padding: 'var(--space-sm) var(--space-md)',
+                            textAlign: 'center',
+                          }}>
+                            {partner.web_search ? (
+                              <button
+                                onClick={() => {
+                                  setSelectedPartner(partner);
+                                  setModalType('websearch');
+                                  setModalOpen(true);
+                                }}
+                                style={{
+                                  padding: '6px 12px',
+                                  background: 'var(--cgiar-yellow)',
+                                  color: 'var(--cgiar-navy)',
+                                  borderRadius: 'var(--radius-sm)',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 500,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'all 0.2s',
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
+                                onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+                              >
+                                <Globe size={14} />
+                                View
+                              </button>
+                            ) : (
+                              <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>—</span>
+                            )}
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </motion.div>
         )}
       </main>
+
+      {/* Modal */}
+      <AnimatePresence>
+        {modalOpen && selectedPartner && (
+          <>
+            {/* Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setModalOpen(false)}
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.5)',
+                zIndex: 1000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 'var(--space-lg)',
+              }}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: 'white',
+                  borderRadius: 'var(--radius-lg)',
+                  maxWidth: '1100px',
+                  width: '100%',
+                  maxHeight: '80vh',
+                  overflow: 'auto',
+                  boxShadow: 'var(--shadow-xl)',
+                }}
+              >
+                {/* Modal Header */}
+                <div style={{
+                  padding: 'var(--space-lg)',
+                  borderBottom: '1px solid var(--cgiar-gray)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'start',
+                  background: modalType === 'clarisa' ? 'var(--cgiar-blue)' : 'var(--cgiar-yellow)',
+                  borderTopLeftRadius: 'var(--radius-lg)',
+                  borderTopRightRadius: 'var(--radius-lg)',
+                }}>
+                  <div>
+                    <h3 style={{
+                      color: modalType === 'clarisa' ? 'white' : 'var(--cgiar-navy)',
+                      fontSize: '1.125rem',
+                      fontWeight: 600,
+                      marginBottom: '4px',
+                    }}>
+                      {selectedPartner.name}
+                    </h3>
+                    <p style={{
+                      color: modalType === 'clarisa' ? 'rgba(255,255,255,0.9)' : 'var(--color-text-secondary)',
+                      fontSize: '0.875rem',
+                    }}>
+                      {modalType === 'clarisa' ? 'CLARISA Match Details' : 'Web Search Results'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setModalOpen(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: modalType === 'clarisa' ? 'white' : 'var(--cgiar-navy)',
+                      fontSize: '1.5rem',
+                      lineHeight: 1,
+                      padding: '4px',
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Modal Body */}
+                <div style={{ padding: 'var(--space-lg)' }}>
+                  {modalType === 'clarisa' && selectedPartner.clarisa_match && (
+                    <div>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                        gap: 'var(--space-md)',
+                        marginBottom: 'var(--space-lg)',
+                      }}>
+                        <DataField label="Institution" value={selectedPartner.clarisa_match.name} />
+                        <DataField label="CLARISA ID" value={selectedPartner.clarisa_match.clarisa_id} />
+                        {selectedPartner.clarisa_match.acronym && (
+                          <DataField label="Acronym" value={selectedPartner.clarisa_match.acronym} />
+                        )}
+                        {selectedPartner.clarisa_match.institution_type && (
+                          <DataField label="Type" value={selectedPartner.clarisa_match.institution_type} />
+                        )}
+                        {selectedPartner.clarisa_match.countries.length > 0 && (
+                          <DataField
+                            label="Countries"
+                            value={selectedPartner.clarisa_match.countries.join(', ')}
+                            fullWidth
+                          />
+                        )}
+                        {selectedPartner.clarisa_match.website && (
+                          <DataField
+                            label="Website"
+                            value={selectedPartner.clarisa_match.website}
+                            fullWidth
+                          />
+                        )}
+                      </div>
+
+                      <div style={{
+                        background: 'var(--cgiar-light-gray)',
+                        padding: 'var(--space-md)',
+                        borderRadius: 'var(--radius-md)',
+                      }}>
+                        <p style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: 'var(--color-text-secondary)',
+                          marginBottom: 'var(--space-sm)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                        }}>
+                          Match Confidence Scores
+                        </p>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                          gap: 'var(--space-sm)',
+                        }}>
+                          <ScoreBar
+                            label="Final Score"
+                            value={selectedPartner.clarisa_match.scores.final_score}
+                          />
+                          <ScoreBar
+                            label="Similarity"
+                            value={selectedPartner.clarisa_match.scores.cosine_similarity}
+                          />
+                          <ScoreBar
+                            label="Name Match"
+                            value={selectedPartner.clarisa_match.scores.fuzz_name_score}
+                          />
+                          <ScoreBar
+                            label="Acronym Match"
+                            value={selectedPartner.clarisa_match.scores.fuzz_acronym_score}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {modalType === 'websearch' && selectedPartner.web_search && (
+                    <div>
+                      {selectedPartner.web_search.success ? (
+                        <div className="markdown-content" style={{
+                          background: '#FAFBFC',
+                          padding: 'var(--space-md)',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '0.8125rem',
+                          lineHeight: 1.5,
+                          color: 'var(--color-text-secondary)',
+                          fontFamily: 'var(--font-primary)',
+                        }}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                            {selectedPartner.web_search.result || ''}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <div style={{
+                          padding: 'var(--space-md)',
+                          background: '#FEE',
+                          border: '1px solid var(--color-error)',
+                          borderRadius: 'var(--radius-sm)',
+                          color: 'var(--color-error)',
+                          fontSize: '0.875rem',
+                        }}>
+                          ⚠️ {selectedPartner.web_search.error}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <style jsx>{`
         .spinner {
@@ -911,7 +1321,7 @@ function PartnerCard({ partner, index, expanded, onToggle, getQualityColor, getQ
                       color: 'var(--color-text-secondary)',
                       fontFamily: 'var(--font-primary)',
                     }}>
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
                         {partner.web_search.result || ''}
                       </ReactMarkdown>
                     </div>
