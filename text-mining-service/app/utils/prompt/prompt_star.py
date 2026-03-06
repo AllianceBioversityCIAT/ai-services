@@ -154,7 +154,7 @@ Policy Type
         • "Policy or Strategy"
         • "Legal instrument"
         • "Program, Budget, or Investment"
-    • If the document does not explicitly state the type, return "Not collected".
+    • If the document does not explicitly state the type, do not return the policy_type field in the output JSON.
 
 Stage in Policy Process
     • stage_in_policy_process
@@ -163,12 +163,12 @@ Stage in Policy Process
         • "Stage 2: Policy enacted."
         • "Stage 3: Evidence of impact of policy."
     • If only the stage ID is provided (e.g., "Stage 2"), map it to the full label above.
-    • If the stage is unclear or not mentioned, return "Not collected".
+    • If the stage is unclear or not mentioned, do not return the stage_in_policy_process field in the output JSON.
 
 Evidence for Stage
     • evidence_for_stage
     • Provide a brief textual explanation (maximum 200 words) describing how the policy stage is supported by the information in the document.
-    • If no evidence is available, return "Not collected".
+    • If no evidence is available, do not return the evidence_for_stage field in the output JSON.
 
 ⸻
 
@@ -213,7 +213,7 @@ How would you assess the current readiness of this innovation?
         • Level 8: Uncontrolled Testing - The innovation is being tested for its ability to achieve a specific impact under uncontrolled conditions.
         • Level 9: Proven Innovation - The innovation is validated for its ability to achieve a specific impact under uncontrolled conditions.
     • Must be defined as a number between 0 and 9. Just use the number, not the description.
-    • If the document does not specify the readiness level, or it cannot be deduced, return "Not collected".
+    • If the document does not specify the readiness level, or it cannot be deduced, do not return the assess_readiness field in the output JSON.
     • If the document provides a specific readiness level, use that value.
     • If the document provides a description of the readiness level, map it to the corresponding number based on the Scaling Readiness Calculator.
     • If the document provides multiple readiness levels, use the highest level mentioned. For example, if it is level 7 in Kenya, level 3 in Peru and level 5 in India, only the highest score for the generic rank is retained.
@@ -233,7 +233,7 @@ Actors involved in the innovation:
     • Do not include organizations, this field is only for individual actors.
     • Include the names, types, genres and ages of all individuals mentioned in the document that are potential or actual users or beneficiaries of the innovation.
     • Return a list of objects. Each object must include:
-        • name: Full name of the actor, or "Not collected" if only the role or type is known.
+        • name: Full name of the actor, or do not include this field if only the role or type is known.
         • type: Must be one or more of the following predefined values:
             • "Farmers / (agro)pastoralist / herders / fishers"
             • "Researchers"
@@ -253,85 +253,10 @@ Actors involved in the innovation:
         • Return both youth and non-youth for that gender (e.g., ["Women: Youth", "Women: Non-youth"])
     • If the document provides age but not gender:
         • Return both genders for that age group (e.g., ["Men: Youth", "Women: Youth"])
+    • If the document does not provide any information about gender or age, do not return the gender_age field in the output JSON.
     • Do NOT create multiple entries for the same actor with different gender/age combinations.
     • If the document does not provide enough information, you may include partial entries (e.g., name and type only).
     • If anticipated_users is "This is yet to be determined", do not include this field in the output JSON.
-
-Organization(s) involved in the innovation:
-    • organizations
-    • This field is used ONLY if the anticipated_users is "Users have been determined".
-    • Include the names of all organizations mentioned in the document that are potential or actual users or beneficiaries of the innovation. These names were extracted from the anticipated_users field.
-    • Do not include individuals, this field is only for organizations.
-    • This field supports the classification of the organization_type, which is the only actor-related information displayed in the application interface.
-    • If anticipated_users is "This is yet to be determined", do not include this field in the output JSON.
-
-Organization types:
-    • organization_type
-    • This field is used ONLY if the anticipated_users is "Users have been determined".
-    • This field is used to classify the type(s) of organization(s) identified in the organizations field.
-    • Must be one or more of the following predefined values:
-        • "NGO"
-        • "Research organizations and universities"
-        • "Organization (other than financial or research)"
-        • "Government"
-        • "Financial institution"
-        • "Private company (other than financial)"
-        • "Public-Private Partnership"
-        • "Foundation"
-        • "Other"
-    • If anticipated_users is "This is yet to be determined", do not include this field in the output JSON.
-
-Organization sub-types:
-    • organization_sub_type
-    • This field is used ONLY if the organization_type is "NGO" or "Research organizations and universities" or "Organization (other than financial or research)" or "Government" or "Financial Institution".
-    • If the organization_type is "Private company (other than financial)", "Public-Private Partnership", "Foundation", or "Other", this field should not be included in the output JSON.
-    • If you have multiple organization types, you must include the organization_sub_type for each one.
-    • If you do not know the sub-type, return "Not collected".
-    • If the organization_type is "NGO", it must be one of the following predefined values:
-        • NGO International
-        • NGO International (General)
-        • NGO International (Farmers)
-        • NGO Regional
-        • NGO Regional (General)
-        • NGO Regional (Farmers)
-        • NGO National
-        • NGO National (General)
-        • NGO National (Farmers)
-        • NGO Local
-        • NGO Local (General)
-        • NGO Local (Farmers)
-    • If the organization_type is "Research organizations and universities", it must be one of the following predefined values:
-        • Research organizations and universities International
-        • Research organizations and universities International (General)
-        • Research organizations and universities International (Universities)
-        • Research organizations and universities International (CGIAR)
-        • Research organizations and universities Regional
-        • Research organizations and universities Regional (NA)
-        • Research organizations and universities Regional (Universities)
-        • Research organizations and universities National
-        • Research organizations and universities National (NARS)
-        • Research organizations and universities National (Universities)
-        • Research organizations and universities Local
-        • Research organizations and universities Local (NA)
-        • Research organizations and universities Local (Universities)
-    • If the organization_type is "Organization (other than financial or research)", it must be one of the following predefined values:
-        • Organization (other than financial or research) International
-        • Organization (other than financial or research) Regional
-    • If the organization_type is "Government", it must be one of the following predefined values:
-        • Government (National)
-        • Government (Subnational)
-    • If the organization_type is "Financial institution", it must be one of the following predefined values:
-        • Financial Institution
-        • Financial Institution International
-        • Financial Institution Regional
-        • Financial Institution National
-        • Financial Institution Local
-
-Other organization types:
-    • other_organization_type
-    • This field is used ONLY if the organization_type is "Other".
-    • If the organization_type is not "Other", this field should not be included in the output JSON.
-    • This field should contain information about the type of organization involved in the innovation that does not fit into the predefined values.
 
 ⸻
 
@@ -392,27 +317,107 @@ Follow this exact structure:
             "end_date": "<value (only if indicator is 'Capacity Sharing for Development')>",
             "length_of_training": "<Short-term or Long-term (only if indicator is 'Capacity Sharing for Development')>",
             "degree": "<value (only if length_of_training is Long-term or training_type is Individual training and indicator is 'Capacity Sharing for Development')>",
-            "evidence_for_stage": "<value or 'Not collected' (only if indicator is 'Policy Change')>",
-            "policy_type": "<'Policy or Strategy' | 'Legal instrument' | 'Program, Budget, or Investment' | 'Not collected' (only if indicator is 'Policy Change')>",
-            "stage_in_policy_process": "<Stage 1: ... | Stage 2: ... | Stage 3: ... | Not collected (only if indicator is 'Policy Change')>"
+            "evidence_for_stage": "<value (only if indicator is 'Policy Change')>",
+            "policy_type": "<'Policy or Strategy' | 'Legal instrument' | 'Program, Budget, or Investment' (only if indicator is 'Policy Change')>",
+            "stage_in_policy_process": "<Stage 1: ... | Stage 2: ... | Stage 3: ... (only if indicator is 'Policy Change')>",
             "short_title": "<value (only if indicator is 'Innovation Development')>",
             "innovation_nature": "<value or 'Other' (only if indicator is 'Innovation Development')>",
             "innovation_type": "<value or 'Other' (only if indicator is 'Innovation Development')>",
-            "assess_readiness": "<number between 0 and 9 or 'Not collected' (only if indicator is 'Innovation Development')>",
+            "assess_readiness": "<number between 0 and 9 (only if indicator is 'Innovation Development')>",
             "anticipated_users": "<This is yet to be determined | Users have been determined (only if indicator is 'Innovation Development')>",
             "innovation_actors_detailed": [
                 {
-                    "name": "<actor name or 'Not collected' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
-                    "type": "<value or 'Other' (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
-                    "other_actor_type": "<value or 'Not collected' (only if type is 'Other' and indicator is 'Innovation Development')>",
-                    "gender_age": "<[array of values] or null (only if indicator is 'Innovation Development')>"
+                    "name": "<actor name>",
+                    "type": "<value or 'Other'>",
+                    "other_actor_type": "<value (only if type is 'Other')>",
+                    "gender_age": ["<value 1>", "<value 2>", ...]
                 }
-            ],
-            "organizations": "<[array of organization names] or null (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
-            "organization_type": "<[array of organization types] or null (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
-            "organization_sub_type": "<value or 'Not collected' (only if indicator is 'Innovation Development')>",
-            "other_organization_type": "<value or 'Not collected' (only if organization_type is 'Other' and indicator is 'Innovation Development')>"
+            ] (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')
         }
     ]
 }
 """
+
+
+# Organization(s) involved in the innovation:
+#     • organizations
+#     • This field is used ONLY if the anticipated_users is "Users have been determined".
+#     • Include the names of all organizations mentioned in the document that are potential or actual users or beneficiaries of the innovation. These names were extracted from the anticipated_users field.
+#     • Do not include individuals, this field is only for organizations.
+#     • This field supports the classification of the organization_type, which is the only actor-related information displayed in the application interface.
+#     • If anticipated_users is "This is yet to be determined", do not include this field in the output JSON.
+
+# Organization types:
+#     • organization_type
+#     • This field is used ONLY if the anticipated_users is "Users have been determined".
+#     • This field is used to classify the type(s) of organization(s) identified in the organizations field.
+#     • Must be one or more of the following predefined values:
+#         • "NGO"
+#         • "Research organizations and universities"
+#         • "Organization (other than financial or research)"
+#         • "Government"
+#         • "Financial institution"
+#         • "Private company (other than financial)"
+#         • "Public-Private Partnership"
+#         • "Foundation"
+#         • "Other"
+#     • If anticipated_users is "This is yet to be determined", do not include this field in the output JSON.
+
+# Organization sub-types:
+#     • organization_sub_type
+#     • This field is used ONLY if the organization_type is "NGO" or "Research organizations and universities" or "Organization (other than financial or research)" or "Government" or "Financial Institution".
+#     • If the organization_type is "Private company (other than financial)", "Public-Private Partnership", "Foundation", or "Other", this field should not be included in the output JSON.
+#     • If you have multiple organization types, you must include the organization_sub_type for each one.
+#     • If you do not know the sub-type, return "Not collected".
+#     • If the organization_type is "NGO", it must be one of the following predefined values:
+#         • NGO International
+#         • NGO International (General)
+#         • NGO International (Farmers)
+#         • NGO Regional
+#         • NGO Regional (General)
+#         • NGO Regional (Farmers)
+#         • NGO National
+#         • NGO National (General)
+#         • NGO National (Farmers)
+#         • NGO Local
+#         • NGO Local (General)
+#         • NGO Local (Farmers)
+#     • If the organization_type is "Research organizations and universities", it must be one of the following predefined values:
+#         • Research organizations and universities International
+#         • Research organizations and universities International (General)
+#         • Research organizations and universities International (Universities)
+#         • Research organizations and universities International (CGIAR)
+#         • Research organizations and universities Regional
+#         • Research organizations and universities Regional (NA)
+#         • Research organizations and universities Regional (Universities)
+#         • Research organizations and universities National
+#         • Research organizations and universities National (NARS)
+#         • Research organizations and universities National (Universities)
+#         • Research organizations and universities Local
+#         • Research organizations and universities Local (NA)
+#         • Research organizations and universities Local (Universities)
+#     • If the organization_type is "Organization (other than financial or research)", it must be one of the following predefined values:
+#         • Organization (other than financial or research) International
+#         • Organization (other than financial or research) Regional
+#     • If the organization_type is "Government", it must be one of the following predefined values:
+#         • Government (National)
+#         • Government (Subnational)
+#     • If the organization_type is "Financial institution", it must be one of the following predefined values:
+#         • Financial Institution
+#         • Financial Institution International
+#         • Financial Institution Regional
+#         • Financial Institution National
+#         • Financial Institution Local
+
+# Other organization types:
+#     • other_organization_type
+#     • This field is used ONLY if the organization_type is "Other".
+#     • If the organization_type is not "Other", this field should not be included in the output JSON.
+#     • This field should contain information about the type of organization involved in the innovation that does not fit into the predefined values.
+
+
+
+# "organizations": "<[array of organization names] or null (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
+# "organization_type": "<[array of organization types] or null (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
+# "organization_sub_type": "<value or 'Not collected' (only if indicator is 'Innovation Development')>",
+# "other_organization_type": "<value or 'Not collected' (only if organization_type is 'Other' and indicator is 'Innovation Development')>"
