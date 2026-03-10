@@ -1,14 +1,16 @@
 """
-Módulo para interactuar con Supabase
+Module to interact with Supabase
 """
 import os
-from typing import List, Dict, Optional
-from supabase import create_client, Client
 from dotenv import load_dotenv
+from typing import List, Dict, Optional
+from logger.logger_util import get_logger
+from supabase import create_client, Client
 
 load_dotenv()
+logger = get_logger()
 
-# Cliente de Supabase
+
 supabase: Client = create_client(
     os.getenv('SUPABASE_URL'),
     os.getenv('SUPABASE_KEY')
@@ -19,32 +21,32 @@ TABLE_NAME = "clarisa_institutions_v2"
 
 def insert_institution(institution_data: Dict) -> bool:
     """
-    Inserta una institución en Supabase
+    Inserts an institution into Supabase
     
     Args:
-        institution_data: Diccionario con datos de la institución
+        institution_data: Dictionary with institution data
         
     Returns:
-        bool: True si se insertó correctamente, False en caso contrario
+        bool: True if inserted successfully, False otherwise
     """
     try:
         response = supabase.table(TABLE_NAME).insert(institution_data).execute()
         return True
     
     except Exception as e:
-        print(f"❌ Error insertando institución {institution_data.get('clarisa_id')}: {e}")
+        logger.error(f"❌ Error inserting institution {institution_data.get('clarisa_id')}: {e}")
         return False
 
 
 def upsert_institution(institution_data: Dict) -> bool:
     """
-    Inserta o actualiza una institución en Supabase (upsert)
+    Inserts or updates an institution in Supabase (upsert)
     
     Args:
-        institution_data: Diccionario con datos de la institución
+        institution_data: Dictionary with institution data
         
     Returns:
-        bool: True si se insertó/actualizó correctamente, False en caso contrario
+        bool: True if inserted/updated successfully, False otherwise
     """
     try:
         response = supabase.table(TABLE_NAME).upsert(
@@ -54,20 +56,20 @@ def upsert_institution(institution_data: Dict) -> bool:
         return True
     
     except Exception as e:
-        print(f"❌ Error en upsert de institución {institution_data.get('clarisa_id')}: {e}")
+        logger.error(f"❌ Error in upsert of institution {institution_data.get('clarisa_id')}: {e}")
         return False
 
 
 def insert_institutions_batch(institutions: List[Dict], batch_size: int = 100) -> Dict[str, int]:
     """
-    Inserta múltiples instituciones en batches
+    Inserts multiple institutions in batches
     
     Args:
-        institutions: Lista de instituciones a insertar
-        batch_size: Tamaño de cada batch
+        institutions: List of institutions to insert
+        batch_size: Size of each batch
         
     Returns:
-        Dict: Estadísticas de inserción {'success': N, 'failed': M}
+        Dict: Insertion statistics {'success': N, 'failed': M}
     """
     stats = {'success': 0, 'failed': 0}
     
@@ -81,24 +83,24 @@ def insert_institutions_batch(institutions: List[Dict], batch_size: int = 100) -
             ).execute()
             
             stats['success'] += len(batch)
-            print(f"✅ Batch {i // batch_size + 1}: {len(batch)} instituciones insertadas")
+            logger.info(f"✅ Batch {i // batch_size + 1}: {len(batch)} institutions inserted")
         
         except Exception as e:
             stats['failed'] += len(batch)
-            print(f"❌ Error en batch {i // batch_size + 1}: {e}")
+            logger.error(f"❌ Error in batch {i // batch_size + 1}: {e}")
     
     return stats
 
 
 def get_institution_by_clarisa_id(clarisa_id: int) -> Optional[Dict]:
     """
-    Obtiene una institución por su clarisa_id
+    Gets an institution by its clarisa_id
     
     Args:
-        clarisa_id: ID de CLARISA
+        clarisa_id: CLARISA ID
         
     Returns:
-        Dict: Datos de la institución o None si no existe
+        Dict: Institution data or None if not found
     """
     try:
         response = supabase.table(TABLE_NAME).select("*").eq(
@@ -111,16 +113,16 @@ def get_institution_by_clarisa_id(clarisa_id: int) -> Optional[Dict]:
         return None
     
     except Exception as e:
-        print(f"❌ Error obteniendo institución {clarisa_id}: {e}")
+        logger.error(f"❌ Error getting institution {clarisa_id}: {e}")
         return None
 
 
 def count_institutions() -> int:
     """
-    Cuenta el número total de instituciones en la tabla
+    Counts the total number of institutions in the table
     
     Returns:
-        int: Número de instituciones
+        int: Number of institutions
     """
     try:
         response = supabase.table(TABLE_NAME).select(
@@ -130,7 +132,7 @@ def count_institutions() -> int:
         return response.count if response.count else 0
     
     except Exception as e:
-        print(f"❌ Error contando instituciones: {e}")
+        logger.error(f"❌ Error counting institutions: {e}")
         return 0
 
 
@@ -138,15 +140,15 @@ def search_by_name_embedding(query_embedding: List[float],
                              threshold: float = 0.5, 
                              limit: int = 5) -> List[Dict]:
     """
-    Busca instituciones por similitud de embedding de nombre usando RPC
+    Searches institutions by name embedding similarity using RPC
     
     Args:
-        query_embedding: Vector de embedding de la consulta
-        threshold: Umbral mínimo de similitud
-        limit: Número máximo de resultados
+        query_embedding: Query embedding vector
+        threshold: Minimum similarity threshold
+        limit: Maximum number of results
         
     Returns:
-        List[Dict]: Lista de instituciones similares
+        List[Dict]: List of similar institutions
     """
     try:
         response = supabase.rpc(
@@ -161,7 +163,7 @@ def search_by_name_embedding(query_embedding: List[float],
         return response.data if response.data else []
     
     except Exception as e:
-        print(f"❌ Error en búsqueda por nombre: {e}")
+        logger.error(f"❌ Error in name search: {e}")
         return []
 
 
@@ -169,15 +171,15 @@ def search_by_acronym_embedding(query_embedding: List[float],
                                 threshold: float = 0.5, 
                                 limit: int = 5) -> List[Dict]:
     """
-    Busca instituciones por similitud de embedding de acrónimo usando RPC
+    Searches institutions by acronym embedding similarity using RPC
     
     Args:
-        query_embedding: Vector de embedding de la consulta
-        threshold: Umbral mínimo de similitud
-        limit: Número máximo de resultados
+        query_embedding: Query embedding vector
+        threshold: Minimum similarity threshold
+        limit: Maximum number of results
         
     Returns:
-        List[Dict]: Lista de instituciones similares
+        List[Dict]: List of similar institutions
     """
     try:
         response = supabase.rpc(
@@ -192,7 +194,7 @@ def search_by_acronym_embedding(query_embedding: List[float],
         return response.data if response.data else []
     
     except Exception as e:
-        print(f"❌ Error en búsqueda por acrónimo: {e}")
+        logger.error(f"❌ Error in acronym search: {e}")
         return []
 
 
@@ -203,18 +205,18 @@ def search_combined(name_embedding: List[float],
                    threshold: float = 0.5,
                    limit: int = 5) -> List[Dict]:
     """
-    Busca instituciones combinando similitud de nombre y acrónimo
+    Searches institutions by combining name and acronym similarity
     
     Args:
-        name_embedding: Vector de embedding del nombre
-        acronym_embedding: Vector de embedding del acrónimo
-        name_weight: Peso del nombre en el score combinado
-        acronym_weight: Peso del acrónimo en el score combinado
-        threshold: Umbral mínimo de similitud combinada
-        limit: Número máximo de resultados
+        name_embedding: Name embedding vector
+        acronym_embedding: Acronym embedding vector
+        name_weight: Weight of the name in the combined score
+        acronym_weight: Weight of the acronym in the combined score
+        threshold: Minimum combined similarity threshold
+        limit: Maximum number of results
         
     Returns:
-        List[Dict]: Lista de instituciones similares con scores
+        List[Dict]: List of similar institutions with scores
     """
     try:
         response = supabase.rpc(
@@ -232,5 +234,5 @@ def search_combined(name_embedding: List[float],
         return response.data if response.data else []
     
     except Exception as e:
-        print(f"❌ Error en búsqueda combinada: {e}")
+        logger.error(f"❌ Error in combined search: {e}")
         return []

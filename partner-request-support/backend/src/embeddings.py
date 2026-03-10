@@ -1,5 +1,5 @@
 """
-Módulo para generar embeddings usando Amazon Bedrock Titan
+Module to generate embeddings using Amazon Bedrock Titan
 """
 import os
 import json
@@ -7,9 +7,10 @@ import boto3
 import numpy as np
 from typing import Union, List
 from config.config_util import BR
+from logger.logger_util import get_logger
 
+logger = get_logger()
 
-# Cliente de Bedrock
 bedrock = boto3.client(
     service_name='bedrock-runtime',
     aws_access_key_id=BR['aws_access_key'],
@@ -18,27 +19,24 @@ bedrock = boto3.client(
 )
 
 MODEL_EMBED = "amazon.titan-embed-text-v2:0"
-EMBEDDING_DIMENSION = 1024  # Titan v2 genera vectores de 1024 dimensiones
+EMBEDDING_DIMENSION = 1024
 
 
 def get_embedding(text: str, normalize: bool = False) -> np.ndarray:
     """
-    Genera embedding usando Amazon Bedrock Titan
+    Generates embedding using Amazon Bedrock Titan
     
     Args:
-        text: Texto para generar embedding
-        normalize: Si True, aplica limpieza básica (espacios). 
-                   Default False para mantener texto original.
+        text: Text to generate embedding
+        normalize: If True, applies basic cleaning (spaces). 
+                   Default False to keep original text.
         
     Returns:
-        np.ndarray: Vector de embedding (1024 dimensiones)
+        np.ndarray: Embedding vector (1024 dimensions)
     """
     if not text or not isinstance(text, str) or text.strip() == "":
-        # Retorna un vector cero si el texto está vacío
         return np.zeros(EMBEDDING_DIMENSION, dtype=np.float32)
     
-    # Limpieza básica: solo espacios múltiples y trim
-    # NO removemos acentos ni lowercase para embeddings semánticos
     cleaned_text = ' '.join(text.split()).strip()
     
     try:
@@ -57,21 +55,21 @@ def get_embedding(text: str, normalize: bool = False) -> np.ndarray:
         embedding = np.array(response_body["embedding"], dtype=np.float32)
         
         return embedding
-    
+
     except Exception as e:
-        print(f"❌ Error generando embedding: {e}")
+        logger.error(f"❌ Error generating embedding: {e}")
         return np.zeros(EMBEDDING_DIMENSION, dtype=np.float32)
 
 
 def get_embeddings_batch(texts: List[str]) -> List[np.ndarray]:
     """
-    Genera embeddings para múltiples textos
+    Generates embeddings for multiple texts
     
     Args:
-        texts: Lista de textos
+        texts: List of texts
         
     Returns:
-        List[np.ndarray]: Lista de vectores de embedding
+        List[np.ndarray]: List of embedding vectors
     """
     embeddings = []
     
@@ -84,14 +82,14 @@ def get_embeddings_batch(texts: List[str]) -> List[np.ndarray]:
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     """
-    Calcula similitud coseno entre dos vectores
+    Calculates cosine similarity between two vectors
     
     Args:
-        a: Primer vector
-        b: Segundo vector
+        a: First vector
+        b: Second vector
         
     Returns:
-        float: Similitud coseno (0.0 - 1.0)
+        float: Cosine similarity (0.0 - 1.0)
     """
     norm_a = np.linalg.norm(a)
     norm_b = np.linalg.norm(b)
@@ -104,26 +102,26 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 
 def embedding_to_list(embedding: np.ndarray) -> List[float]:
     """
-    Convierte un embedding numpy a lista de Python para guardar en DB
+    Converts a numpy embedding to a Python list for storing in the DB
     
     Args:
-        embedding: Vector numpy
+        embedding: Numpy vector
         
     Returns:
-        List[float]: Lista de floats
+        List[float]: List of floats
     """
     return embedding.tolist()
 
 
 def list_to_embedding(embedding_list: Union[List[float], str]) -> np.ndarray:
     """
-    Convierte una lista o string JSON a vector numpy
+    Converts a list or JSON string to a numpy vector
     
     Args:
-        embedding_list: Lista de floats o string JSON
+        embedding_list: List of floats or JSON string
         
     Returns:
-        np.ndarray: Vector de embedding
+        np.ndarray: Embedding vector
     """
     if isinstance(embedding_list, str):
         embedding_list = json.loads(embedding_list)

@@ -31,10 +31,8 @@ load_dotenv()
 logger = get_logger()
 
 
-# OpenAI client (for Phase 1: search)
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# AWS Bedrock client (for Phase 2: analysis)
 bedrock_client = boto3.client(
     service_name='bedrock-runtime',
     region_name=os.getenv("AWS_REGION", "us-east-1"),
@@ -71,7 +69,6 @@ def _phase1_exploratory_search(
         }
     """
     try:
-        # Build search query - NO FORMAT RESTRICTIONS, just gather info
         query = f"""
 Find ALL available information about this institution: "{name}"
 """
@@ -96,11 +93,9 @@ Please gather and report ALL information you can find about:
 DO NOT format as JSON. Just provide a comprehensive narrative with all the information you find.
 Be thorough - include everything that might be relevant.
 """
-        
-        # Setup tools for search
+
         tools = [{"type": "web_search"}]
         
-        # If website provided, add focused search on that domain
         if website and str(website).strip():
             domain = _extract_domain(str(website).strip())
             if domain:
@@ -116,17 +111,15 @@ Be thorough - include everything that might be relevant.
         else:
             search_type = "open"
         
-        # Execute search with OpenAI
         response = openai_client.responses.create(
             model="gpt-5-mini",
-            reasoning={"effort": "low"},  # Low effort = faster, cheaper
+            reasoning={"effort": "low"},
             tools=tools,
             tool_choice="required",
             include=["web_search_call.action.sources"],
             input=query
         )
         
-        # Extract sources (URLs)
         sources = []
         if hasattr(response, 'web_search_call') and hasattr(response.web_search_call, 'action'):
             sources = getattr(response.web_search_call.action, 'sources', [])
@@ -174,7 +167,6 @@ def _phase2_analyze_and_format(
         str: Beautifully formatted report ready for Excel cell
     """
     try:
-        # Build analysis prompt for Claude
         prompt = f"""You are analyzing information about an institution for the CGIAR partnership database.
 
 INSTITUTION SEARCHED: {institution_name}
@@ -247,7 +239,6 @@ IMPORTANT GUIDELINES:
 
 OUTPUT ONLY THE FORMATTED REPORT. No additional commentary."""
 
-        # Call AWS Bedrock Claude Sonnet 4.6
         response = bedrock_client.invoke_model(
             modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
             contentType="application/json",
@@ -264,7 +255,6 @@ OUTPUT ONLY THE FORMATTED REPORT. No additional commentary."""
             })
         )
         
-        # Parse response
         response_body = json.loads(response['body'].read())
         formatted_result = response_body['content'][0]['text']
         logger.info("Result from Phase 2 analysis:\n" + formatted_result)
@@ -273,7 +263,6 @@ OUTPUT ONLY THE FORMATTED REPORT. No additional commentary."""
         
     except Exception as e:
         logger.error(f"⚠️  Phase 2 analysis error: {str(e)}")
-        # Return error message in same format
         return f"""================================================================================
 
 ❌ ERROR IN ANALYSIS
@@ -304,13 +293,9 @@ def _extract_domain(website: str) -> str:
     if not website:
         return ""
     
-    # Remove protocol
     domain = re.sub(r'^https?://', '', website)
-    # Remove www.
     domain = re.sub(r'^www\.', '', domain)
-    # Remove path
     domain = domain.split('/')[0]
-    # Remove port if exists
     domain = domain.split(':')[0]
     
     return domain
@@ -343,7 +328,6 @@ def search_institution_online(
         }
     """
     try:
-        # Validate input
         if not name or str(name).strip() == "":
             return {
                 "success": False,
@@ -355,7 +339,6 @@ def search_institution_online(
         
         logger.info(f"🔍 Starting TWO-PHASE search for: {name}")
         
-        # ===== PHASE 1: EXPLORATORY SEARCH =====
         logger.info("   Phase 1/2: Gathering information (OpenAI)...")
         phase1_result = _phase1_exploratory_search(name, country, website)
         
@@ -366,7 +349,6 @@ def search_institution_online(
                 "error": phase1_result["error"]
             }
         
-        # ===== PHASE 2: ANALYSIS & FORMATTING =====
         logger.info("   Phase 2/2: Analyzing and formatting (Claude Sonnet 4.6)...")
         formatted_result = _phase2_analyze_and_format(
             institution_name=name,
@@ -416,7 +398,6 @@ def test_search(name: str, country: str = None, website: str = None):
     
     result = search_institution_online(name, country, website)
     
-    # Display result
     if result["success"]:
         logger.info("\n" + result["formatted_result"])
     else:

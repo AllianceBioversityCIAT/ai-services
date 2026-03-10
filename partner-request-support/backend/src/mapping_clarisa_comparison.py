@@ -8,6 +8,7 @@ import pandas as pd
 from tqdm import tqdm
 from rapidfuzz import fuzz
 from dotenv import load_dotenv
+from openpyxl import load_workbook
 from openpyxl.styles import Alignment
 
 # Import project modules
@@ -33,7 +34,6 @@ FUZZ_NAME_WEIGHT = 0.40     # Weight of RapidFuzz name in final score
 FUZZ_ACRONYM_WEIGHT = 0.10  # Weight of RapidFuzz acronym in final score
 ENABLE_WEB_SEARCH = True    # Enable web search fallback when no match in CLARISA
 
-# Excel cell character limit
 EXCEL_CELL_CHAR_LIMIT = 32767
 
 # ============================================================================
@@ -55,7 +55,6 @@ def sanitize_for_excel(text: str) -> str:
     
     text = str(text)
     
-    # Only truncate if exceeds Excel's character limit
     if len(text) > EXCEL_CELL_CHAR_LIMIT:
         logger.warning(f"Text truncated from {len(text)} to {EXCEL_CELL_CHAR_LIMIT} chars")
         text = text[:EXCEL_CELL_CHAR_LIMIT - 50] + "\n\n[... TRUNCATED ...]"
@@ -79,20 +78,16 @@ def search_institution_for_excel(partner_name, acronym=None):
     Returns:
         dict: Result with best match and scores, or None if no match
     """
-    # Validate input
     if not partner_name or str(partner_name).lower() in ['nan', 'none', '']:
         return None
     
     partner_name = str(partner_name).strip()
     acronym = str(acronym).strip() if acronym and str(acronym).lower() not in ['nan', 'none', ''] else None
     
-    # STEP 1: Generate query embeddings
     name_embedding = get_embedding(partner_name)
     name_embedding_list = embedding_to_list(name_embedding)
     
-    # STEP 2: Vector search in Supabase (Top 5)
     if acronym:
-        # Combined search (name + acronym)
         acronym_embedding = get_embedding(acronym)
         acronym_embedding_list = embedding_to_list(acronym_embedding)
         
@@ -105,7 +100,6 @@ def search_institution_for_excel(partner_name, acronym=None):
             limit=5
         )
     else:
-        # By name only
         candidates = search_by_name_embedding(
             query_embedding=name_embedding_list,
             threshold=THRESHOLD_EMBEDDINGS,
@@ -115,27 +109,22 @@ def search_institution_for_excel(partner_name, acronym=None):
     if not candidates:
         return None
     
-    # STEP 3: Tiebreak with RapidFuzz
     best_match = None
     best_score = 0
     
     for candidate in candidates:
-        # Cosine similarity (already calculated by Supabase)
         cosine_sim = candidate.get('similarity', candidate.get('combined_similarity', 0))
         
-        # Text similarity with RapidFuzz (normalized)
         normalized_query = clean_text_for_matching(partner_name)
         normalized_candidate = clean_text_for_matching(candidate['name'])
         fuzz_name = fuzz.ratio(normalized_query, normalized_candidate) / 100
         
-        # If there's an acronym, compare it too
         fuzz_acronym = 0
         if acronym and candidate.get('acronym'):
             normalized_query_acronym = clean_text_for_matching(acronym)
             normalized_candidate_acronym = clean_text_for_matching(candidate['acronym'])
             fuzz_acronym = fuzz.ratio(normalized_query_acronym, normalized_candidate_acronym) / 100
         
-        # Combined final score
         combined_score = (
             COSINE_WEIGHT * cosine_sim +
             FUZZ_NAME_WEIGHT * fuzz_name +
@@ -181,7 +170,6 @@ def process_partners_to_json(df):
     logger.info(f"   - Name/acronym weight:  {NAME_WEIGHT}/{ACRONYM_WEIGHT}")
     logger.info(f"   - Final score:          {COSINE_WEIGHT*100:.0f}% cosine + {FUZZ_NAME_WEIGHT*100:.0f}% fuzz_name + {FUZZ_ACRONYM_WEIGHT*100:.0f}% fuzz_acronym")
     
-    # Process each row
     logger.info(f"🔄 Processing {len(df)} institutions...")
     
     partners_results = []
@@ -198,7 +186,6 @@ def process_partners_to_json(df):
     }
     
     for idx, row in tqdm(df.iterrows(), total=len(df), desc="Searching matches"):
-        # Read data from Excel
         partner_id = row.iloc[0] if len(row) > 0 and pd.notna(row.iloc[0]) else ''
         partner_name = row.iloc[1] if len(row) > 1 else None
         acronym = row.iloc[2] if len(row) > 2 else None
@@ -218,11 +205,9 @@ def process_partners_to_json(df):
         }
         
         try:
-            # Search for match
             match = search_institution_for_excel(partner_name, acronym)
             
             if match:
-                # Match found
                 score = match['final_score']
                 if score >= 0.85:
                     quality = 'excellent'
@@ -253,7 +238,6 @@ def process_partners_to_json(df):
                 
                 stats['matched'] += 1
             else:
-                # No match in CLARISA - Try web search if enabled
                 if ENABLE_WEB_SEARCH:
                     stats['web_search_attempted'] += 1
                     web_result = search_institution_online(partner_name, country, website)
@@ -273,7 +257,6 @@ def process_partners_to_json(df):
                 stats['no_match'] += 1
                 
         except Exception as e:
-            # Error processing
             logger.error(f"\n⚠️  Error in row {idx}: {e}")
             partner_data['match_quality'] = 'error'
             partner_data['error'] = str(e)
@@ -281,7 +264,6 @@ def process_partners_to_json(df):
         
         partners_results.append(partner_data)
     
-    # Calculate percentages
     stats['matched_percentage'] = round(stats['matched'] / stats['total'] * 100, 1) if stats['total'] > 0 else 0
     stats['no_match_percentage'] = round(stats['no_match'] / stats['total'] * 100, 1) if stats['total'] > 0 else 0
     
@@ -308,7 +290,6 @@ def run_pipeline(excel_path):
     logger.info("🚀 MAPPING PIPELINE: CGSpace → CLARISA")
     logger.info("=" * 80)
     
-    # Verify that the DB has data
     logger.info("🔍 Verifying CLARISA database...")
     total_institutions = count_institutions()
     
@@ -319,7 +300,6 @@ def run_pipeline(excel_path):
     
     logger.info(f"✅ Database ready: {total_institutions:,} institutions in CLARISA")
     
-    # Load Excel
     logger.info(f"📊 Loading Excel file: {excel_path}")
     try:
         df = pd.read_excel(excel_path)
@@ -328,7 +308,6 @@ def run_pipeline(excel_path):
         logger.error(f"❌ Error loading Excel: {e}")
         return
     
-    # Verify columns
     if len(df.columns) < 3:
         logger.error(f"❌ Error: Excel must have at least 3 columns")
         logger.error(f"   Format: [ID, Name, Acronym, ...]")
@@ -341,7 +320,6 @@ def run_pipeline(excel_path):
     logger.info(f"   - Name/acronym weight:  {NAME_WEIGHT}/{ACRONYM_WEIGHT}")
     logger.info(f"   - Final score:          {COSINE_WEIGHT*100:.0f}% cosine + {FUZZ_NAME_WEIGHT*100:.0f}% fuzz_name + {FUZZ_ACRONYM_WEIGHT*100:.0f}% fuzz_acronym")
     
-    # Process each row
     logger.info(f"🔄 Processing {len(df)} institutions...")
     
     results = {
@@ -369,17 +347,13 @@ def run_pipeline(excel_path):
     }
     
     for idx, row in tqdm(df.iterrows(), total=len(df), desc="Searching matches"):
-        # Read name and acronym from Excel
-        # Assuming: column 1 = partner_name, column 2 = acronym
         partner_name = row.iloc[1] if len(row) > 1 else None
         acronym = row.iloc[2] if len(row) > 2 else None
         
         try:
-            # Search for match
             match = search_institution_for_excel(partner_name, acronym)
             
             if match:
-                # Match found
                 results['match_found'].append(True)
                 results['clarisa_id'].append(match['clarisa_id'])
                 results['clarisa_name'].append(match['name'])
@@ -392,7 +366,6 @@ def run_pipeline(excel_path):
                 results['fuzz_acronym_score'].append(round(match['fuzz_acronym_score'], 4))
                 results['final_score'].append(round(match['final_score'], 4))
                 
-                # Determine match quality
                 score = match['final_score']
                 if score >= 0.85:
                     quality = 'excellent'
@@ -401,27 +374,22 @@ def run_pipeline(excel_path):
                 else:
                     quality = 'fair'
                 results['match_quality'].append(quality)
-                results['web_search_result'].append('')  # No web search needed when match found
+                results['web_search_result'].append('')
                 
                 stats['matched'] += 1
             else:
-                # No match in CLARISA - Try web search if enabled
                 web_search_formatted_result = ''
                 
                 if ENABLE_WEB_SEARCH:
-                    # Get country and website from Excel if available
                     country = None
                     website = None
                     
-                    # Try to get country from column 5 (if exists)
                     if len(row) > 5 and pd.notna(row.iloc[5]):
                         country = str(row.iloc[5]).strip()
                     
-                    # Try to get website from column 3 (if exists)
                     if len(row) > 3 and pd.notna(row.iloc[3]):
                         website = str(row.iloc[3]).strip()
                     
-                    # Perform TWO-PHASE web search
                     stats['web_search_attempted'] += 1
                     web_result = search_institution_online(partner_name, country, website)
                     
@@ -431,7 +399,6 @@ def run_pipeline(excel_path):
                     else:
                         web_search_formatted_result = sanitize_for_excel(f"❌ WEB SEARCH FAILED: {web_result.get('error', 'Unknown error')}")
                 
-                # No match
                 results['match_found'].append(False)
                 results['clarisa_id'].append('')
                 results['clarisa_name'].append('')
@@ -449,7 +416,6 @@ def run_pipeline(excel_path):
                 stats['no_match'] += 1
                 
         except Exception as e:
-            # Error processing
             logger.error(f"\n⚠️  Error in row {idx}: {e}")
             results['match_found'].append(False)
             results['clarisa_id'].append('ERROR')
@@ -467,7 +433,6 @@ def run_pipeline(excel_path):
             
             stats['errors'] += 1
     
-    # Add results to DataFrame
     df['MATCH_FOUND'] = results['match_found']
     df['CLARISA_ID'] = results['clarisa_id']
     df['CLARISA_NAME'] = results['clarisa_name']
@@ -482,24 +447,18 @@ def run_pipeline(excel_path):
     df['MATCH_QUALITY'] = results['match_quality']
     df['WEB_SEARCH_RESULT'] = results['web_search_result']
     
-    # Save results
     output_file = "clarisa_mapping_results.xlsx"
     logger.info(f"💾 Saving results to {output_file}...")
     
-    # Save with basic formatting
     df.to_excel(output_file, sheet_name='Results', index=False, engine='openpyxl')
     
-    # Apply text wrapping to WEB_SEARCH_RESULT column for readability
-    from openpyxl import load_workbook
     workbook = load_workbook(output_file)
     worksheet = workbook['Results']
     
-    # Set column widths and enable text wrapping
     for idx, col in enumerate(df.columns, 1):
         col_letter = worksheet.cell(1, idx).column_letter
         if col == 'WEB_SEARCH_RESULT':
             worksheet.column_dimensions[col_letter].width = 80
-            # Enable text wrapping for this column
             for row in range(2, len(df) + 2):
                 cell = worksheet.cell(row=row, column=idx)
                 cell.alignment = Alignment(wrap_text=True, vertical='top')

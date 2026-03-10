@@ -1,5 +1,5 @@
 """
-Utilidades comunes para el proyecto de mapeo de instituciones CLARISA
+Common utilities for the CLARISA institution mapping project
 """
 import re
 import unicodedata
@@ -7,19 +7,18 @@ import unicodedata
 
 def clean_text_basic(text):
     """
-    Limpieza BÁSICA para embeddings (mantiene acentos, mayúsculas)
-    Solo normaliza espacios y trim
+    Basic cleaning for embeddings (keeps accents, uppercase)
+    Only normalizes spaces and trims
     
     Args:
-        text: Texto a limpiar
+        text: Text to clean
         
     Returns:
-        str: Texto con limpieza básica
+        str: Text with basic cleaning
     """
     if not isinstance(text, str):
         return ""
     
-    # Solo normalizar espacios múltiples y trim
     text = re.sub(r"\s+", " ", text).strip()
     
     return text
@@ -27,57 +26,53 @@ def clean_text_basic(text):
 
 def clean_text_for_matching(text):
     """
-    Normalización COMPLETA para string matching (RapidFuzz)
-    Remueve acentos, lowercase, sin caracteres especiales
+    Full normalization for string matching (RapidFuzz)
+    Removes accents, converts to lowercase, removes special characters
     
     Args:
-        text: Texto a normalizar
+        text: Text to normalize
         
     Returns:
-        str: Texto normalizado para comparación
+        str: Normalized text for comparison
     """
     if not isinstance(text, str):
         return ""
 
     text = text.lower()
 
-    # Remover acentos
     text = ''.join(
         c for c in unicodedata.normalize('NFD', text)
         if unicodedata.category(c) != 'Mn'
     )
 
-    # Remover caracteres especiales (mantener paréntesis para siglas)
     text = re.sub(r"[^\w\s()]", "", text)
     text = re.sub(r"\s+", " ", text).strip()
 
     return text
 
 
-# Alias para compatibilidad con código legacy
 def clean_text(text):
     """
-    Alias para clean_text_for_matching (compatibilidad)
+    Alias for clean_text_for_matching (compatibility)
     """
     return clean_text_for_matching(text)
 
 
 def safe_str(value):
     """
-    Convierte un valor a string de forma segura, manejando None y NaN
+    Safely converts a value to a string, handling None and NaN
     
     Args:
-        value: Valor a convertir
+        value: Value to convert
         
     Returns:
-        str: String del valor o "" si es None/NaN
+        str: String representation of the value or "" if None/NaN
     """
     if value is None:
         return ""
     
     str_val = str(value)
     
-    # Manejar valores NaN de pandas
     if str_val.lower() in ['nan', 'none', 'null']:
         return ""
     
@@ -86,13 +81,13 @@ def safe_str(value):
 
 def format_countries(country_offices):
     """
-    Extrae los nombres de países de la estructura countryOfficeDTO de CLARISA
+    Extracts country names from the CLARISA countryOfficeDTO structure
     
     Args:
-        country_offices: Lista de diccionarios con información de oficinas
+        country_offices: List of dictionaries with office information
         
     Returns:
-        list: Lista de nombres de países (strings)
+        list: List of country names (strings)
     """
     if not country_offices or not isinstance(country_offices, list):
         return []
@@ -101,7 +96,6 @@ def format_countries(country_offices):
     for office in country_offices:
         if isinstance(office, dict) and 'name' in office:
             country_name = office.get('name')
-            # Validar que no sea None antes de hacer strip()
             if country_name and isinstance(country_name, str):
                 country_name = country_name.strip()
                 if country_name and country_name not in countries:
@@ -112,16 +106,15 @@ def format_countries(country_offices):
 
 def extract_institution_type(institution_type_dict):
     """
-    Extrae solo el nombre del tipo de institución
+    Extracts only the name of the institution type
     
     Args:
-        institution_type_dict: Diccionario con 'code' y 'name'
+        institution_type_dict: Dictionary with 'code' and 'name'
         
     Returns:
-        str: Nombre del tipo de institución o ""
+        str: Name of the institution type or "" if not available
     """
     if not institution_type_dict or not isinstance(institution_type_dict, dict):
         return ""
     
-    # Usar 'or' para manejar None correctamente
     return safe_str(institution_type_dict.get('name') or '')
