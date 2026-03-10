@@ -3,11 +3,11 @@ FROM public.ecr.aws/lambda/python:3.13
 
 # Install system dependencies required for pyodbc and ODBC Driver 18
 # Note: Lambda Python 3.13 uses Amazon Linux 2023 which uses dnf instead of yum
+# Note: curl-minimal is already included in the base image, so we don't need to install curl
 RUN dnf update -y && \
     dnf install -y \
     unixODBC \
     unixODBC-devel \
-    curl \
     tar \
     gcc-c++ \
     python3-devel \
