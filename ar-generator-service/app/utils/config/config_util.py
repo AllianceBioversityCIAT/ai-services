@@ -1,7 +1,9 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env file if it exists (for local development)
+# In Lambda, variables come from environment variables configured in the function
+load_dotenv(override=False)
 
 BR = {
     "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID_BR"),  # Optional: IAM Role used in Lambda

@@ -15,37 +15,61 @@ from app.llm.invoke_llm import invoke_model, get_bedrock_embeddings
 
 logger = get_logger()
 
-# Use IAM Role for authentication in Lambda (credentials are optional for local development)
-region = BR.get('region', 'us-east-1')
-session = boto3.Session(region_name=region)
-credentials = session.get_credentials()
+# Validate OpenSearch configuration
+if not OPENSEARCH.get('host'):
+    raise ValueError("OPENSEARCH_HOST environment variable is required. Please configure it in Lambda environment variables.")
+if not OPENSEARCH.get('index'):
+    raise ValueError("OPENSEARCH_INDEX_NAME environment variable is required. Please configure it in Lambda environment variables.")
 
-# If credentials are not available from IAM Role, try environment variables for local development
-if not credentials:
-    if OPENSEARCH.get('aws_access_key') and OPENSEARCH.get('aws_secret_key'):
-        credentials = type('obj', (object,), {
-            'access_key': OPENSEARCH['aws_access_key'],
-            'secret_key': OPENSEARCH['aws_secret_key'],
-            'token': None
-        })()
-    else:
-        raise ValueError("AWS credentials not found. Use IAM Role in Lambda or set AWS_ACCESS_KEY_ID_OS and AWS_SECRET_ACCESS_KEY_OS for local development.")
-
-awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, 'es', session_token=credentials.token)
-
-opensearch = OpenSearch(
-    hosts=[{'host': OPENSEARCH['host'], 'port': 443}],
-    http_auth=awsauth,
-    use_ssl=True,
-    verify_certs=True,
-    connection_class=RequestsHttpConnection
-)
-
+# Lazy initialization of OpenSearch client
+_opensearch_client = None
+_awsauth = None
 INDEX_NAME = OPENSEARCH['index']
+
+
+def get_opensearch_client():
+    """Get or create OpenSearch client with lazy initialization."""
+    global _opensearch_client, _awsauth
+    
+    if _opensearch_client is not None:
+        return _opensearch_client
+    
+    # Use IAM Role for authentication in Lambda (credentials are optional for local development)
+    region = BR.get('region', 'us-east-1')
+    session = boto3.Session(region_name=region)
+    credentials = session.get_credentials()
+    
+    # If credentials are not available from IAM Role, try environment variables for local development
+    if not credentials:
+        if OPENSEARCH.get('aws_access_key') and OPENSEARCH.get('aws_secret_key'):
+            credentials = type('obj', (object,), {
+                'access_key': OPENSEARCH['aws_access_key'],
+                'secret_key': OPENSEARCH['aws_secret_key'],
+                'token': None
+            })()
+        else:
+            raise ValueError("AWS credentials not found. Use IAM Role in Lambda or set AWS_ACCESS_KEY_ID_OS and AWS_SECRET_ACCESS_KEY_OS for local development.")
+    
+    _awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, 'es', session_token=credentials.token)
+    
+    _opensearch_client = OpenSearch(
+        hosts=[{'host': OPENSEARCH['host'], 'port': 443}],
+        http_auth=_awsauth,
+        use_ssl=True,
+        verify_certs=True,
+        connection_class=RequestsHttpConnection
+    )
+    
+    return _opensearch_client
+
+
+# Removed @property decorator as it doesn't work at module level
+# Use get_opensearch_client() function instead
 
 
 def create_index_if_not_exists(dimension=1024):
     try:
+        opensearch = get_opensearch_client()
         if not opensearch.indices.exists(index=INDEX_NAME):
             logger.info(f"📦 Creating OpenSearch index: {INDEX_NAME}")
             index_body = {
@@ -103,6 +127,7 @@ def insert_into_opensearch(table_name: str):
         embeddings = get_bedrock_embeddings(texts)
 
         logger.info("📥 Indexing documents in OpenSearch...")
+        opensearch = get_opensearch_client()
         for i, (row, embedding, chunk) in enumerate(zip(rows, embeddings, chunks)):
             doc = {
                 "embedding": embedding,
@@ -158,6 +183,7 @@ def retrieve_context(query, indicator, year, top_k=10000):
             }
         }
 
+        opensearch = get_opensearch_client()
         knn_response = opensearch.search(index=INDEX_NAME, body=knn_query)
         knn_chunks = [hit["_source"]["chunk"] for hit in knn_response["hits"]["hits"]]
 
@@ -242,6 +268,7 @@ def save_context_to_file(context, filename, indicator, year):
 def run_pipeline(indicator, year, insert_data=False):
     try:
         if insert_data:
+            opensearch = get_opensearch_client()
             if opensearch.indices.exists(index=INDEX_NAME):
                 logger.info(f"🗑️ Deleting existing index: {INDEX_NAME}")
                 opensearch.indices.delete(index=INDEX_NAME)

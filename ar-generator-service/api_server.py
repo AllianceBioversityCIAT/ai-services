@@ -9,8 +9,9 @@ from mangum import Mangum
 from app.api.main import app
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from .env file if it exists (for local development)
+# In Lambda, environment variables are configured in the function settings
+load_dotenv(override=False)
 
 # Create Mangum handler for AWS Lambda
 handler = Mangum(app, lifespan="off")
