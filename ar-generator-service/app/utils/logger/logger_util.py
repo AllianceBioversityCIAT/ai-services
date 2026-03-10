@@ -4,7 +4,9 @@ import logging
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
-logs_dir = Path(__file__).parent.parent.parent.parent / "data" / "logs"
+# Use /tmp for Lambda compatibility (read-only filesystem restriction)
+# In Lambda, /var/task is read-only, so we must use /tmp for any file writes
+logs_dir = Path("/tmp/logs")
 logs_dir.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger("ar-generator-service")
