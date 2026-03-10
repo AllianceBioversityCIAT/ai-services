@@ -1,64 +1,16 @@
-#!/usr/bin/env python3
 """
-Entry point for running the AICCRA Report Generator API server.
+AWS Lambda handler for AICCRA Report Generator Service.
 
-This script starts the FastAPI server with uvicorn.
+This module provides the Lambda handler using Mangum to wrap the FastAPI application.
+For local development with uvicorn, use main.py instead.
 """
 
-import uvicorn
-import argparse
-import sys
-import os
+from mangum import Mangum
+from app.api.main import app
+from dotenv import load_dotenv
 
-# Add the app directory to the Python path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Load environment variables
+load_dotenv()
 
-
-def main():
-    """Main entry point for the API server."""
-    parser = argparse.ArgumentParser(description="AICCRA Report Generator API Server")
-    parser.add_argument(
-        "--host", 
-        default="0.0.0.0", 
-        help="Host to bind the server to (default: 0.0.0.0)"
-    )
-    parser.add_argument(
-        "--port", 
-        type=int, 
-        default=8000, 
-        help="Port to bind the server to (default: 8000)"
-    )
-    parser.add_argument(
-        "--reload", 
-        action="store_true", 
-        help="Enable auto-reload for development"
-    )
-    parser.add_argument(
-        "--log-level", 
-        default="info", 
-        choices=["debug", "info", "warning", "error", "critical"],
-        help="Log level (default: info)"
-    )
-    
-    args = parser.parse_args()
-    
-    print(f"🚀 Starting AICCRA Report Generator Server...")
-    print(f"⚡ Server will be available at: http://{args.host}:{args.port}")
-    print(f"📊 API documentation: http://{args.host}:{args.port}/docs")
-    print(f"🌐 Web UI: http://{args.host}:{args.port}/web")
-    print(f"📋 API info: http://{args.host}:{args.port}/")
-    print(f"💚 Health check: http://{args.host}:{args.port}/health")
-    print("   Press Ctrl+C to stop the server\n")
-    
-    # Start the server
-    uvicorn.run(
-        "app.api.main:app",
-        host=args.host,
-        port=args.port,
-        reload=args.reload,
-        log_level=args.log_level
-    )
-
-
-if __name__ == "__main__":
-    main()
+# Create Mangum handler for AWS Lambda
+handler = Mangum(app, lifespan="off")

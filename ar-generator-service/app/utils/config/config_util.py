@@ -4,15 +4,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BR = {
-    "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID_BR"),
-    "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY_BR"),
-    "region": os.getenv("AWS_REGION")
+    "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID_BR"),  # Optional: IAM Role used in Lambda
+    "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY_BR"),  # Optional: IAM Role used in Lambda
+    "region": os.getenv("AWS_REGION", "us-east-1")
 }
 
 S3 = {
-    "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID"),
-    "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY"),
-    "aws_region": os.getenv("AWS_REGION"),
+    "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID"),  # Optional: IAM Role used in Lambda
+    "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY"),  # Optional: IAM Role used in Lambda
+    "aws_region": os.getenv("AWS_REGION", "us-east-1"),
     "bucket_name": os.getenv("BUCKET_NAME")
 }
 
@@ -33,8 +33,8 @@ SQL_SERVER = {
 OPENSEARCH = {
     "host": os.getenv("OPENSEARCH_HOST"),
     "index": os.getenv("OPENSEARCH_INDEX_NAME"),
-    "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID_OS"),
-    "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY_OS")
+    "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID_OS"),  # Optional: IAM Role used in Lambda
+    "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY_OS")  # Optional: IAM Role used in Lambda
 }
 
 KNOWLEDGE_BASE = {

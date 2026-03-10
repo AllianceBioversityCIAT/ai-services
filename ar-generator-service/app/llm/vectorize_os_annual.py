@@ -17,13 +17,22 @@ from app.utils.prompts.challenges_prompt import generate_challenges_prompt
 
 logger = get_logger()
 
-credentials = boto3.Session(
-    aws_access_key_id=OPENSEARCH['aws_access_key'],
-    aws_secret_access_key=OPENSEARCH['aws_secret_key'],
-    region_name=BR['region']
-).get_credentials()
+# Use IAM Role for authentication in Lambda (credentials are optional for local development)
+region = BR.get('region', 'us-east-1')
+session = boto3.Session(region_name=region)
+credentials = session.get_credentials()
 
-region = BR['region']
+# If credentials are not available from IAM Role, try environment variables for local development
+if not credentials:
+    if OPENSEARCH.get('aws_access_key') and OPENSEARCH.get('aws_secret_key'):
+        credentials = type('obj', (object,), {
+            'access_key': OPENSEARCH['aws_access_key'],
+            'secret_key': OPENSEARCH['aws_secret_key'],
+            'token': None
+        })()
+    else:
+        raise ValueError("AWS credentials not found. Use IAM Role in Lambda or set AWS_ACCESS_KEY_ID_OS and AWS_SECRET_ACCESS_KEY_OS for local development.")
+
 awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, 'es', session_token=credentials.token)
 
 opensearch = OpenSearch(

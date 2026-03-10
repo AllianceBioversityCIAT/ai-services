@@ -5,11 +5,12 @@ from app.utils.logger.logger_util import get_logger
 
 logger = get_logger()
 
+# Use IAM Role for authentication in Lambda (credentials are optional for local development)
 bedrock_runtime = boto3.client(
     service_name='bedrock-runtime',
-    aws_access_key_id=BR['aws_access_key'],
-    aws_secret_access_key=BR['aws_secret_key'],
-    region_name=BR['region']
+    region_name=BR.get('region', 'us-east-1')
+    # IAM Role provides credentials automatically in Lambda
+    # For local development, set AWS_ACCESS_KEY_ID_BR and AWS_SECRET_ACCESS_KEY_BR env vars
 )
 
 
