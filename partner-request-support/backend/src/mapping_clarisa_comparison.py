@@ -76,7 +76,7 @@ def search_institution_for_excel(partner_name, acronym=None):
         acronym: Optional acronym
         
     Returns:
-        dict: Result with best match and scores, or None if no match
+        dict: Result with best match, all candidates and scores, or None if no candidates
     """
     if not partner_name or str(partner_name).lower() in ['nan', 'none', '']:
         return None
@@ -109,6 +109,7 @@ def search_institution_for_excel(partner_name, acronym=None):
     if not candidates:
         return None
     
+    processed_candidates = []
     best_match = None
     best_score = 0
     
@@ -131,22 +132,32 @@ def search_institution_for_excel(partner_name, acronym=None):
             FUZZ_ACRONYM_WEIGHT * fuzz_acronym
         )
         
+        candidate_data = {
+            'clarisa_id': candidate['clarisa_id'],
+            'name': candidate['name'],
+            'acronym': candidate.get('acronym', ''),
+            'website': candidate.get('website', ''),
+            'countries': candidate.get('countries', []),
+            'institution_type': candidate.get('institution_type', ''),
+            'cosine_similarity': cosine_sim,
+            'fuzz_name_score': fuzz_name,
+            'fuzz_acronym_score': fuzz_acronym,
+            'final_score': combined_score
+        }
+        
+        processed_candidates.append(candidate_data)
+        
         if combined_score > best_score:
             best_score = combined_score
-            best_match = {
-                'clarisa_id': candidate['clarisa_id'],
-                'name': candidate['name'],
-                'acronym': candidate.get('acronym', ''),
-                'website': candidate.get('website', ''),
-                'countries': candidate.get('countries', []),
-                'institution_type': candidate.get('institution_type', ''),
-                'cosine_similarity': cosine_sim,
-                'fuzz_name_score': fuzz_name,
-                'fuzz_acronym_score': fuzz_acronym,
-                'final_score': combined_score
-            }
+            best_match = candidate_data
     
-    return best_match if best_score >= THRESHOLD_FINAL else None
+    # Sort candidates by final score (descending)
+    processed_candidates.sort(key=lambda x: x['final_score'], reverse=True)
+    
+    return {
+        'best_match': best_match if best_score >= THRESHOLD_FINAL else None,
+        'all_candidates': processed_candidates
+    }
 
 
 # ============================================================================
@@ -200,43 +211,84 @@ def process_partners_to_json(df):
             'country': str(country) if country else '',
             'match_found': False,
             'clarisa_match': None,
+            'top_candidates': [],
             'web_search': None,
             'match_quality': 'no_match'
         }
         
         try:
-            match = search_institution_for_excel(partner_name, acronym)
+            search_result = search_institution_for_excel(partner_name, acronym)
             
-            if match:
-                score = match['final_score']
-                if score >= 0.85:
-                    quality = 'excellent'
-                    stats['excellent'] += 1
-                elif score >= 0.70:
-                    quality = 'good'
-                    stats['good'] += 1
-                else:
-                    quality = 'fair'
-                    stats['fair'] += 1
+            if search_result:
+                best_match = search_result.get('best_match')
+                all_candidates = search_result.get('all_candidates', [])
                 
-                partner_data['match_found'] = True
-                partner_data['match_quality'] = quality
-                partner_data['clarisa_match'] = {
-                    'clarisa_id': match['clarisa_id'],
-                    'name': match['name'],
-                    'acronym': match['acronym'] or '',
-                    'countries': match['countries'],
-                    'institution_type': match['institution_type'] or '',
-                    'website': match['website'] or '',
-                    'scores': {
-                        'cosine_similarity': round(match['cosine_similarity'], 4),
-                        'fuzz_name_score': round(match['fuzz_name_score'], 4),
-                        'fuzz_acronym_score': round(match['fuzz_acronym_score'], 4),
-                        'final_score': round(match['final_score'], 4)
+                partner_data['top_candidates'] = [
+                    {
+                        'clarisa_id': cand['clarisa_id'],
+                        'name': cand['name'],
+                        'acronym': cand['acronym'] or '',
+                        'countries': cand['countries'],
+                        'institution_type': cand['institution_type'] or '',
+                        'website': cand['website'] or '',
+                        'scores': {
+                            'cosine_similarity': round(cand['cosine_similarity'], 4),
+                            'fuzz_name_score': round(cand['fuzz_name_score'], 4),
+                            'fuzz_acronym_score': round(cand['fuzz_acronym_score'], 4),
+                            'final_score': round(cand['final_score'], 4)
+                        }
                     }
-                }
+                    for cand in all_candidates
+                ]
                 
-                stats['matched'] += 1
+                if best_match:
+                    score = best_match['final_score']
+                    if score >= 0.85:
+                        quality = 'excellent'
+                        stats['excellent'] += 1
+                    elif score >= 0.70:
+                        quality = 'good'
+                        stats['good'] += 1
+                    else:
+                        quality = 'fair'
+                        stats['fair'] += 1
+                    
+                    partner_data['match_found'] = True
+                    partner_data['match_quality'] = quality
+                    partner_data['clarisa_match'] = {
+                        'clarisa_id': best_match['clarisa_id'],
+                        'name': best_match['name'],
+                        'acronym': best_match['acronym'] or '',
+                        'countries': best_match['countries'],
+                        'institution_type': best_match['institution_type'] or '',
+                        'website': best_match['website'] or '',
+                        'scores': {
+                            'cosine_similarity': round(best_match['cosine_similarity'], 4),
+                            'fuzz_name_score': round(best_match['fuzz_name_score'], 4),
+                            'fuzz_acronym_score': round(best_match['fuzz_acronym_score'], 4),
+                            'final_score': round(best_match['final_score'], 4)
+                        }
+                    }
+                    
+                    stats['matched'] += 1
+                else:
+                    if ENABLE_WEB_SEARCH:
+                        stats['web_search_attempted'] += 1
+                        web_result = search_institution_online(partner_name, country, website)
+                        
+                        if web_result['success']:
+                            partner_data['web_search'] = {
+                                'success': True,
+                                'result': web_result.get('formatted_result', '')
+                            }
+                            stats['web_search_success'] += 1
+                        else:
+                            partner_data['web_search'] = {
+                                'success': False,
+                                'error': web_result.get('error', 'Unknown error')
+                            }
+                    
+                    stats['no_match'] += 1
             else:
                 if ENABLE_WEB_SEARCH:
                     stats['web_search_attempted'] += 1

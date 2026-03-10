@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle2, XCircle, Globe, Database, BarChart3, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle2, XCircle, Globe, Database, BarChart3, Search, ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
@@ -37,6 +37,7 @@ interface Partner {
   country: string;
   match_found: boolean;
   clarisa_match: ClarisaMatch | null;
+  top_candidates: ClarisaMatch[];
   web_search: WebSearch | null;
   match_quality: 'excellent' | 'good' | 'fair' | 'no_match' | 'error';
 }
@@ -66,8 +67,9 @@ export default function Home() {
   const [expandedPartner, setExpandedPartner] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<'clarisa' | 'websearch' | null>(null);
+  const [modalType, setModalType] = useState<'clarisa' | 'websearch' | 'candidates' | null>(null);
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
+  const [showQualityInfo, setShowQualityInfo] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -593,7 +595,110 @@ export default function Home() {
                         fontSize: '0.75rem',
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px',
-                      }}>Match Quality</th>
+                        position: 'relative',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                          Match Quality
+                          <div
+                            style={{ position: 'relative', display: 'inline-flex' }}
+                            onMouseEnter={() => setShowQualityInfo(true)}
+                            onMouseLeave={() => setShowQualityInfo(false)}
+                          >
+                            <Info
+                              size={14}
+                              style={{
+                                cursor: 'help',
+                                color: 'var(--cgiar-blue)',
+                                transition: 'color 0.2s',
+                              }}
+                            />
+                            <AnimatePresence>
+                              {showQualityInfo && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: -5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -5 }}
+                                  transition={{ duration: 0.2 }}
+                                  style={{
+                                    position: 'absolute',
+                                    top: '24px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    background: 'white',
+                                    border: '1px solid var(--cgiar-gray)',
+                                    borderRadius: 'var(--radius-md)',
+                                    padding: 'var(--space-sm)',
+                                    boxShadow: 'var(--shadow-lg)',
+                                    zIndex: 1000,
+                                    width: '280px',
+                                    textAlign: 'left',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 400,
+                                    textTransform: 'none',
+                                    letterSpacing: 'normal',
+                                    pointerEvents: 'none',
+                                  }}
+                                >
+                                  <div style={{
+                                    fontWeight: 600,
+                                    color: 'var(--cgiar-navy)',
+                                    marginBottom: '6px',
+                                    fontSize: '0.8125rem',
+                                  }}>
+                                    Match Quality Levels
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <div style={{
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        background: 'var(--color-excellent)',
+                                      }} />
+                                      <span style={{ color: 'var(--color-text-secondary)' }}>
+                                        <strong>Excellent</strong> (≥85%): High confidence match
+                                      </span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <div style={{
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        background: 'var(--color-good)',
+                                      }} />
+                                      <span style={{ color: 'var(--color-text-secondary)' }}>
+                                        <strong>Good</strong> (≥70%): Strong match
+                                      </span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <div style={{
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        background: 'var(--color-fair)',
+                                      }} />
+                                      <span style={{ color: 'var(--color-text-secondary)' }}>
+                                        <strong>Fair</strong> (≥60%): Moderate match
+                                      </span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <div style={{
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        background: 'var(--color-no-match)',
+                                      }} />
+                                      <span style={{ color: 'var(--color-text-secondary)' }}>
+                                        <strong>No Match</strong> (&lt;60%): Below threshold
+                                      </span>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        </div>
+                      </th>
                       <th style={{
                         padding: 'var(--space-sm) var(--space-md)',
                         textAlign: 'center',
@@ -603,6 +708,15 @@ export default function Home() {
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px',
                       }}>CLARISA</th>
+                      <th style={{
+                        padding: 'var(--space-sm) var(--space-md)',
+                        textAlign: 'center',
+                        fontWeight: 600,
+                        color: 'var(--cgiar-navy)',
+                        fontSize: '0.75rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}>Top Candidates</th>
                       <th style={{
                         padding: 'var(--space-sm) var(--space-md)',
                         textAlign: 'center',
@@ -728,6 +842,48 @@ export default function Home() {
                             padding: 'var(--space-sm) var(--space-md)',
                             textAlign: 'center',
                           }}>
+                            {partner.top_candidates && partner.top_candidates.length > 0 ? (
+                              <button
+                                onClick={() => {
+                                  setSelectedPartner(partner);
+                                  setModalType('candidates');
+                                  setModalOpen(true);
+                                }}
+                                style={{
+                                  padding: '6px 12px',
+                                  background: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
+                                  color: 'white',
+                                  borderRadius: 'var(--radius-sm)',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'all 0.2s',
+                                  boxShadow: 'var(--shadow-sm)',
+                                }}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(-2px)';
+                                  e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(0)';
+                                  e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                                }}
+                              >
+                                <Search size={14} />
+                                View {partner.top_candidates.length}
+                              </button>
+                            ) : (
+                              <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>—</span>
+                            )}
+                          </td>
+                          <td style={{
+                            padding: 'var(--space-sm) var(--space-md)',
+                            textAlign: 'center',
+                          }}>
                             {partner.web_search ? (
                               <button
                                 onClick={() => {
@@ -816,13 +972,13 @@ export default function Home() {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'start',
-                  background: modalType === 'clarisa' ? 'var(--cgiar-blue)' : 'var(--cgiar-yellow)',
+                  background: modalType === 'clarisa' ? 'var(--cgiar-blue)' : modalType === 'candidates' ? 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)' : 'var(--cgiar-yellow)',
                   borderTopLeftRadius: 'var(--radius-lg)',
                   borderTopRightRadius: 'var(--radius-lg)',
                 }}>
                   <div>
                     <h3 style={{
-                      color: modalType === 'clarisa' ? 'white' : 'var(--cgiar-navy)',
+                      color: modalType === 'candidates' || modalType === 'clarisa' ? 'white' : 'var(--cgiar-navy)',
                       fontSize: '1.125rem',
                       fontWeight: 600,
                       marginBottom: '4px',
@@ -830,10 +986,10 @@ export default function Home() {
                       {selectedPartner.name}
                     </h3>
                     <p style={{
-                      color: modalType === 'clarisa' ? 'rgba(255,255,255,0.9)' : 'var(--color-text-secondary)',
+                      color: modalType === 'candidates' || modalType === 'clarisa' ? 'rgba(255,255,255,0.9)' : 'var(--color-text-secondary)',
                       fontSize: '0.875rem',
                     }}>
-                      {modalType === 'clarisa' ? 'CLARISA Match Details' : 'Web Search Results'}
+                      {modalType === 'clarisa' ? 'CLARISA Match Details' : modalType === 'candidates' ? 'Top Candidate Matches' : 'Web Search Results'}
                     </p>
                   </div>
                   <button
@@ -842,7 +998,7 @@ export default function Home() {
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
-                      color: modalType === 'clarisa' ? 'white' : 'var(--cgiar-navy)',
+                      color: modalType === 'candidates' || modalType === 'clarisa' ? 'white' : 'var(--cgiar-navy)',
                       fontSize: '1.5rem',
                       lineHeight: 1,
                       padding: '4px',
@@ -955,6 +1111,187 @@ export default function Home() {
                           ⚠️ {selectedPartner.web_search.error}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {modalType === 'candidates' && selectedPartner.top_candidates && (
+                    <div>
+                      <div style={{
+                        marginBottom: 'var(--space-md)',
+                        padding: 'var(--space-sm) var(--space-md)',
+                        background: 'linear-gradient(135deg, #F3E8FF 0%, #EDE9FE 100%)',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid #C4B5FD',
+                        borderLeft: '4px solid #8B5CF6',
+                      }}>
+                        <p style={{
+                          fontSize: '0.8125rem',
+                          color: 'var(--cgiar-navy)',
+                          lineHeight: 1.5,
+                          margin: 0,
+                        }}>
+                          <strong>ℹ️ Information:</strong> These are the top {selectedPartner.top_candidates.length} candidate matches from the CLARISA database, ranked by relevance score. {selectedPartner.match_found ? 'The first candidate exceeded the match threshold and was selected as the primary match.' : 'None of these candidates exceeded the match threshold, but they represent the closest matches found.'}
+                        </p>
+                      </div>
+
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 'var(--space-md)',
+                      }}>
+                        {selectedPartner.top_candidates.map((candidate, idx) => (
+                          <motion.div
+                            key={idx}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.05 }}
+                            style={{
+                              background: 'white',
+                              border: idx === 0 && selectedPartner.match_found ? '2px solid var(--cgiar-green)' : '1px solid var(--cgiar-gray)',
+                              borderRadius: 'var(--radius-md)',
+                              padding: 'var(--space-md)',
+                              position: 'relative',
+                              boxShadow: 'var(--shadow-sm)',
+                            }}
+                          >
+                            {/* Rank Badge */}
+                            <div style={{
+                              position: 'absolute',
+                              top: '-12px',
+                              left: 'var(--space-md)',
+                              background: idx === 0 && selectedPartner.match_found ? 'var(--cgiar-green)' : 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
+                              color: 'white',
+                              padding: '4px 12px',
+                              borderRadius: 'var(--radius-md)',
+                              fontSize: '0.6875rem',
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              boxShadow: 'var(--shadow-sm)',
+                            }}>
+                              {idx === 0 && selectedPartner.match_found && <CheckCircle2 size={12} />}
+                              #{idx + 1} {idx === 0 && selectedPartner.match_found && 'SELECTED'}
+                            </div>
+
+                            {/* Candidate Info */}
+                            <div style={{ marginTop: 'var(--space-xs)' }}>
+                              <h4 style={{
+                                fontSize: '1rem',
+                                fontWeight: 600,
+                                color: 'var(--cgiar-navy)',
+                                marginBottom: 'var(--space-xs)',
+                              }}>
+                                {candidate.name}
+                              </h4>
+                              
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                                gap: 'var(--space-sm)',
+                                marginBottom: 'var(--space-sm)',
+                              }}>
+                                {candidate.clarisa_id && (
+                                  <div style={{ fontSize: '0.75rem' }}>
+                                    <span style={{ color: 'var(--color-text-muted)', fontWeight: 500 }}>ID: </span>
+                                    <span style={{ color: 'var(--cgiar-navy)', fontWeight: 600 }}>{candidate.clarisa_id}</span>
+                                  </div>
+                                )}
+                                {candidate.acronym && (
+                                  <div style={{ fontSize: '0.75rem' }}>
+                                    <span style={{ color: 'var(--color-text-muted)', fontWeight: 500 }}>Acronym: </span>
+                                    <span style={{
+                                      padding: '2px 6px',
+                                      background: 'var(--cgiar-light-gray)',
+                                      borderRadius: 'var(--radius-sm)',
+                                      fontWeight: 600,
+                                      color: 'var(--cgiar-navy)',
+                                    }}>{candidate.acronym}</span>
+                                  </div>
+                                )}
+                                {candidate.institution_type && (
+                                  <div style={{ fontSize: '0.75rem' }}>
+                                    <span style={{ color: 'var(--color-text-muted)', fontWeight: 500 }}>Type: </span>
+                                    <span style={{ color: 'var(--color-text-secondary)' }}>{candidate.institution_type}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {candidate.countries.length > 0 && (
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  marginBottom: 'var(--space-xs)',
+                                }}>
+                                  <span style={{ color: 'var(--color-text-muted)', fontWeight: 500 }}>Countries: </span>
+                                  <span style={{ color: 'var(--color-text-secondary)' }}>{candidate.countries.join(', ')}</span>
+                                </div>
+                              )}
+
+                              {candidate.website && (
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  marginBottom: 'var(--space-sm)',
+                                }}>
+                                  <span style={{ color: 'var(--color-text-muted)', fontWeight: 500 }}>Website: </span>
+                                  <a
+                                    href={candidate.website.startsWith('http') ? candidate.website : `https://${candidate.website}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                      color: 'var(--cgiar-blue)',
+                                      textDecoration: 'none',
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    {candidate.website}
+                                  </a>
+                                </div>
+                              )}
+
+                              {/* Score Bars */}
+                              <div style={{
+                                background: 'var(--cgiar-light-gray)',
+                                padding: 'var(--space-sm)',
+                                borderRadius: 'var(--radius-sm)',
+                                marginTop: 'var(--space-sm)',
+                              }}>
+                                <p style={{
+                                  fontSize: '0.6875rem',
+                                  fontWeight: 600,
+                                  color: 'var(--color-text-secondary)',
+                                  marginBottom: 'var(--space-xs)',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                }}>
+                                  Match Scores
+                                </p>
+                                <div style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                                  gap: 'var(--space-xs)',
+                                }}>
+                                  <ScoreBar
+                                    label="Final"
+                                    value={candidate.scores.final_score}
+                                  />
+                                  <ScoreBar
+                                    label="Similarity"
+                                    value={candidate.scores.cosine_similarity}
+                                  />
+                                  <ScoreBar
+                                    label="Name"
+                                    value={candidate.scores.fuzz_name_score}
+                                  />
+                                  <ScoreBar
+                                    label="Acronym"
+                                    value={candidate.scores.fuzz_acronym_score}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
