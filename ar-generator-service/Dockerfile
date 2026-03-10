@@ -2,17 +2,22 @@
 FROM public.ecr.aws/lambda/python:3.13
 
 # Install system dependencies required for pyodbc and ODBC Driver 18
-RUN yum update -y && \
-    yum install -y \
+# Note: Lambda Python 3.13 uses Amazon Linux 2023 which uses dnf instead of yum
+RUN dnf update -y && \
+    dnf install -y \
     unixODBC \
     unixODBC-devel \
     curl \
-    && yum clean all
+    tar \
+    gcc-c++ \
+    python3-devel \
+    && dnf clean all
 
 # Install Microsoft ODBC Driver 18 for SQL Server
+# Amazon Linux 2023 is compatible with RHEL 8 packages
 RUN curl https://packages.microsoft.com/config/rhel/8/prod.repo > /etc/yum.repos.d/mssql-release.repo && \
-    ACCEPT_EULA=Y yum install -y msodbcsql18 && \
-    yum clean all
+    ACCEPT_EULA=Y dnf install -y msodbcsql18 && \
+    dnf clean all
 
 # Verify ODBC Driver installation
 RUN odbcinst -q -d
