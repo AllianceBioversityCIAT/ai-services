@@ -206,7 +206,7 @@ class InnovationActorModel(BaseModel):
     model_config = ConfigDict(exclude_none=True)
     
     name: Optional[str] = Field(None, description="Actor name (optional - can be partial entry)")
-    type: str = Field(..., description="Actor type")
+    type: Optional[str] = Field(None, description="Actor type")
     gender_age: Optional[List[str]] = Field(None, description="Gender and age information (optional)")
     other_actor_type: Optional[str] = Field(None, description="Other actor type if type is 'Other'")
 
