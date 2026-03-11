@@ -254,11 +254,20 @@ export default function Home() {
       return;
     }
 
+    if (!authToken || !authUser) {
+      setError('Authentication required. Please login first.');
+      return;
+    }
+
     setProcessing(true);
     setError(null);
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('user_email', authUser.email);
+    formData.append('user_name', authUser.name);
+    formData.append('auth_token', authToken);
+    formData.append('create_requests', 'true');
 
     try {
       const response = await axios.post<ProcessingResults>(
@@ -1142,10 +1151,14 @@ export default function Home() {
                       fontSize: '0.75rem',
                       lineHeight: 1.6,
                     }}>
-                      <li><strong>Column 1:</strong> Partner Name (required)</li>
+                      <li><strong>Column 0:</strong> ID <span style={{color: '#DC2626', fontWeight: 600}}>(required)</span></li>
+                      <li><strong>Column 1:</strong> Partner Name <span style={{color: '#DC2626', fontWeight: 600}}>(required)</span></li>
                       <li><strong>Column 2:</strong> Acronym (optional)</li>
                       <li><strong>Column 3:</strong> Website (optional)</li>
-                      <li><strong>Column 5:</strong> Country (optional)</li>
+                      <li><strong>Column 4:</strong> Institution Type <span style={{color: '#DC2626', fontWeight: 600}}>(required)</span></li>
+                      <li><strong>Column 5:</strong> Country <span style={{color: '#DC2626', fontWeight: 600}}>(required)</span></li>
+                      <li><strong>Column 6:</strong> Category 1 (optional)</li>
+                      <li><strong>Column 7:</strong> Category 2 (optional)</li>
                     </ul>
                   </div>
                 </motion.div>

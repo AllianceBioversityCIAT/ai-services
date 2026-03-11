@@ -249,7 +249,7 @@ def get_cached_result(request_id: int) -> Optional[Dict]:
 
 def get_cached_results(request_ids: List[int]) -> Dict[int, Dict]:
     """
-    Gets multiple cached results for partner requests
+    Gets multiple cached results for partner requests by ID
     
     Args:
         request_ids: List of partner request IDs
@@ -292,6 +292,63 @@ def get_cached_results(request_ids: List[int]) -> Dict[int, Dict]:
     
     except Exception as e:
         logger.error(f"❌ Error getting cached results: {e}")
+        return {}
+
+
+def get_cached_results_by_name(partner_names: List[str]) -> Dict[str, Dict]:
+    """
+    Gets multiple cached results for partner requests by NAME (not ID).
+    This allows reusing cache for duplicate partner names with different IDs.
+    
+    Args:
+        partner_names: List of partner names to search for
+        
+    Returns:
+        Dict: Dictionary mapping partner_name (lowercase) -> partner_result for found items
+    """
+    if not partner_names:
+        return {}
+    
+    try:
+        # Normalize names for comparison (lowercase, strip whitespace)
+        normalized_names = [name.strip().lower() for name in partner_names if name]
+        
+        if not normalized_names:
+            return {}
+        
+        # Query cache - search for any of these names (case-insensitive)
+        response = supabase.table(CACHE_TABLE).select("*").execute()
+        
+        cached_results = {}
+        if response.data:
+            for cache_data in response.data:
+                cached_name = cache_data.get('partner_name', '').strip().lower()
+                
+                # Check if this cached name matches any of our search names
+                if cached_name in normalized_names:
+                    partner_result = {
+                        'id': str(cache_data['request_id']),
+                        'name': cache_data['partner_name'],
+                        'acronym': cache_data['acronym'] or '',
+                        'website': cache_data['website'] or '',
+                        'country': cache_data['country'] or '',
+                        'match_found': cache_data['match_found'],
+                        'match_quality': cache_data['match_quality'],
+                        'clarisa_match': cache_data['clarisa_match'],
+                        'top_candidates': cache_data['top_candidates'] or [],
+                        'web_search': cache_data['web_search'],
+                        'api_data': cache_data['api_data']
+                    }
+                    cached_results[cached_name] = partner_result
+            
+            logger.info(f"✅ Cache by name: Found {len(cached_results)}/{len(normalized_names)} cached results")
+        else:
+            logger.info(f"⚠️  Cache by name: No cached results found")
+        
+        return cached_results
+    
+    except Exception as e:
+        logger.error(f"❌ Error getting cached results by name: {e}")
         return {}
 
 

@@ -11,10 +11,9 @@ from typing import List, Dict, Optional
 from logger.logger_util import get_logger
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, File, UploadFile, HTTPException, Body
+from fastapi import FastAPI, File, UploadFile, HTTPException, Body, Form
 from src.mapping_clarisa_comparison import process_partners_to_json
-from src.supabase_client import get_cached_results, cache_results_batch
-from src.supabase_client import get_cached_results, cache_results_batch
+from src.supabase_client import get_cached_results, get_cached_results_by_name, cache_results_batch
 
 
 logger = get_logger()
@@ -22,7 +21,12 @@ logger = get_logger()
 # Global variables
 synced_partner_requests: List[Dict] = []
 CLARISA_API_URL = "https://clarisatest-back.ciat.cgiar.org/api/partner-requests"
+CLARISA_CREATE_URL = "https://clarisatest-back.ciat.cgiar.org/api/partner-requests/create"
 CLARISA_RESPOND_URL = "https://clarisatest-back.ciat.cgiar.org/api/partner-requests/respond"
+
+# Temporary hardcoded values (REQUIRED fields - will be replaced with dynamic lookups)
+TEMP_COUNTRY_ISO = "CO"  # Colombia - REQUIRED for partner request creation
+TEMP_INSTITUTION_TYPE_CODE = 46  # REQUIRED for partner request creation
 
 app = FastAPI(
     title="Partner Request Support API",
@@ -56,21 +60,42 @@ async def health():
 
 
 @app.post("/api/process-partners")
-async def process_partners(file: UploadFile = File(...)):
+async def process_partners(
+    file: UploadFile = File(...),
+    user_email: str = Form(...),
+    user_name: str = Form(...),
+    auth_token: str = Form(...),
+    create_requests: bool = Form(default=True)
+):
     """
-    Process an Excel file with partner requests
+    Process an Excel file with partner requests.
+    First creates the partner requests in CLARISA, then processes them.
     
     Expected Excel format:
         - Column 0: ID (optional)
         - Column 1: partner_name (REQUIRED)
         - Column 2: acronym (optional)
         - Column 3: website (optional)
-        - Column 5: country (optional)
+        - Column 4: institution_type (REQUIRED - currently hardcoded, will be dynamic)
+        - Column 5: country (REQUIRED - currently hardcoded, will be dynamic)
+        - Column 6: category_1 (optional)
+        - Column 7: category_2 (optional)
+    
+    Note: Country and Institution Type are currently hardcoded (CO, code 46)
+          but will be replaced with dynamic lookups from control lists
+    
+    Args:
+        file: Excel file to process
+        user_email: Email of the user creating the requests
+        user_name: Name of the user creating the requests
+        auth_token: Authentication token for CLARISA API
+        create_requests: Whether to create partner requests in CLARISA first
     
     Returns:
         JSON with processed results including:
         - partners: List of partners with match info
         - stats: Processing statistics
+        - creation_info: Info about request creation (if create_requests=True)
     """
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(
@@ -109,8 +134,353 @@ async def process_partners(file: UploadFile = File(...)):
                 detail="Partner name column (column 1) is empty"
             )
         
-        logger.info("🚀 Starting processing pipeline...")
-        results = process_partners_to_json(df)
+        creation_info = {
+            'created': False,
+            'total_attempts': 0,
+            'found_existing': 0,
+            'created_new': 0,
+            'failed': 0,
+            'existing_ids': [],
+            'new_ids': []
+        }
+        
+        # STEP 1: Create partner requests in CLARISA (if enabled)
+        if create_requests:
+            logger.info("🔨 Processing partner requests creation in CLARISA API...")
+            creation_info['created'] = True
+            
+            # STEP 1.1: Fetch existing pending partner requests to avoid duplicates
+            logger.info("🔍 Fetching existing pending partner requests...")
+            existing_requests = []
+            try:
+                fetch_response = requests.get(
+                    CLARISA_API_URL,
+                    headers={"Authorization": f"Bearer {auth_token}"},
+                    timeout=30
+                )
+                
+                if fetch_response.status_code == 200:
+                    existing_requests = fetch_response.json()
+                    logger.info(f"📥 Fetched {len(existing_requests)} existing pending partner requests")
+                else:
+                    logger.warning(f"⚠️  Failed to fetch existing requests: {fetch_response.status_code}")
+                    
+            except Exception as e:
+                logger.error(f"❌ Error fetching existing requests: {e}")
+            
+            # Track partners to create (only new ones)
+            partners_to_create = []  # List of {idx, partner_name, acronym, payload}
+            
+            # STEP 1.2: Check each partner in Excel
+            for idx, row in df.iterrows():
+                creation_info['total_attempts'] += 1
+                
+                # Extract data from Excel
+                partner_name = row.iloc[1] if len(row) > 1 and pd.notna(row.iloc[1]) else None
+                acronym = row.iloc[2] if len(row) > 2 and pd.notna(row.iloc[2]) else ""
+                website = row.iloc[3] if len(row) > 3 and pd.notna(row.iloc[3]) else ""
+                # institution_type = row.iloc[4] if len(row) > 4 and pd.notna(row.iloc[4]) else ""
+                # country = row.iloc[5] if len(row) > 5 and pd.notna(row.iloc[5]) else ""
+                category_1 = row.iloc[6] if len(row) > 6 and pd.notna(row.iloc[6]) else ""
+                category_2 = row.iloc[7] if len(row) > 7 and pd.notna(row.iloc[7]) else ""
+                
+                if not partner_name:
+                    logger.warning(f"⚠️  Skipping row {idx}: missing partner name")
+                    creation_info['failed'] += 1
+                    continue
+                
+                # Check if partner already exists in CLARISA
+                partner_name_lower = str(partner_name).strip().lower()
+                existing_match = None
+                
+                for req in existing_requests:
+                    existing_name = req.get('partnerName', '').strip().lower()
+                    if existing_name == partner_name_lower:
+                        existing_match = req
+                        break
+                
+                if existing_match:
+                    # Partner already exists - use existing ID
+                    existing_id = existing_match.get('id')
+                    if existing_id:
+                        df.at[idx, df.columns[0]] = existing_id
+                        creation_info['found_existing'] += 1
+                        creation_info['existing_ids'].append(existing_id)
+                        logger.info(f"✅ Found existing request {existing_id} for: {partner_name}")
+                    else:
+                        logger.warning(f"⚠️  Existing match has no ID for: {partner_name}")
+                        creation_info['failed'] += 1
+                else:
+                    # Partner doesn't exist - add to create list
+                    payload = {
+                        "name": str(partner_name),
+                        "acronym": str(acronym) if acronym else "",
+                        "websiteLink": str(website) if website else "",
+                        "hqCountryIso": TEMP_COUNTRY_ISO,  # Hardcoded for now
+                        "institutionTypeCode": TEMP_INSTITUTION_TYPE_CODE,  # Hardcoded for now
+                        "category_1": str(category_1) if category_1 else "",
+                        "category_2": str(category_2) if category_2 else "",
+                        "externalUserMail": user_email,
+                        "externalUserName": user_name,
+                        "misAcronym": "CLARISA",
+                        "externalUserComments": ""
+                    }
+                    
+                    partners_to_create.append({
+                        'idx': idx,
+                        'name': str(partner_name),
+                        'acronym': str(acronym) if acronym else "",
+                        'payload': payload
+                    })
+            
+            # STEP 1.3: Create new partner requests in CLARISA
+            if partners_to_create:
+                logger.info(f"🔨 Creating {len(partners_to_create)} new partner requests...")
+                
+                for partner_info in partners_to_create:
+                    try:
+                        response = requests.post(
+                            CLARISA_CREATE_URL,
+                            json=partner_info['payload'],
+                            headers={
+                                "Authorization": f"Bearer {auth_token}",
+                                "Content-Type": "application/json"
+                            },
+                            timeout=30
+                        )
+                        
+                        if response.status_code == 201 or response.status_code == 200:
+                            creation_info['created_new'] += 1
+                            logger.info(f"✅ Created new partner request for: {partner_info['name']}")
+                        else:
+                            logger.error(f"❌ Failed to create request for {partner_info['name']}: {response.status_code} - {response.text}")
+                            creation_info['failed'] += 1
+                            
+                    except Exception as e:
+                        logger.error(f"❌ Error creating request for {partner_info['name']}: {e}")
+                        creation_info['failed'] += 1
+            
+            # STEP 1.4: Fetch IDs for newly created partners
+            newly_created_requests = []
+            
+            if creation_info['created_new'] > 0:
+                logger.info("🔍 Fetching IDs for newly created partner requests...")
+                try:
+                    fetch_response = requests.get(
+                        CLARISA_API_URL,
+                        headers={"Authorization": f"Bearer {auth_token}"},
+                        timeout=30
+                    )
+                    
+                    if fetch_response.status_code == 200:
+                        all_requests = fetch_response.json()
+                        logger.info(f"📥 Fetched {len(all_requests)} total partner requests")
+                        
+                        # Match newly created partners with fetched requests by name
+                        for partner_info in partners_to_create:
+                            partner_name_lower = partner_info['name'].strip().lower()
+                            
+                            # Find matching request
+                            matching_requests = [
+                                req for req in all_requests 
+                                if req.get('partnerName', '').strip().lower() == partner_name_lower
+                            ]
+                            
+                            if matching_requests:
+                                # Get the most recent one
+                                matched_request = matching_requests[-1]
+                                request_id = matched_request.get('id')
+                                
+                                if request_id:
+                                    # Store ID in DataFrame
+                                    df.at[partner_info['idx'], df.columns[0]] = request_id
+                                    creation_info['new_ids'].append(request_id)
+                                    newly_created_requests.append(matched_request)
+                                    logger.info(f"✅ Matched ID {request_id} to: {partner_info['name']}")
+                                else:
+                                    logger.warning(f"⚠️  No ID found for: {partner_info['name']}")
+                            else:
+                                logger.warning(f"⚠️  Could not find created request for: {partner_info['name']}")
+                        
+                        logger.info(f"✅ Retrieved {len(creation_info['new_ids'])} IDs for newly created requests")
+                        
+                        # Add newly created requests to synced_partner_requests
+                        if newly_created_requests:
+                            synced_partner_requests.extend(newly_created_requests)
+                            logger.info(f"📋 Added {len(newly_created_requests)} new requests to synced list")
+                    else:
+                        logger.error(f"❌ Failed to fetch partner requests: {fetch_response.status_code}")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Error fetching partner requests: {e}")
+            
+            # Add existing requests to synced list if not already there
+            if creation_info['existing_ids']:
+                existing_to_add = []
+                for req in existing_requests:
+                    if req.get('id') in creation_info['existing_ids']:
+                        # Check if already in synced list
+                        if not any(s.get('id') == req.get('id') for s in synced_partner_requests):
+                            existing_to_add.append(req)
+                
+                if existing_to_add:
+                    synced_partner_requests.extend(existing_to_add)
+                    logger.info(f"📋 Added {len(existing_to_add)} existing requests to synced list")
+            
+            # Log final summary
+            logger.info(f"📊 Summary: {creation_info['found_existing']} existing found, {creation_info['created_new']} newly created, {creation_info['failed']} failed")
+        
+        # STEP 2: Check cache by PARTNER NAME (not ID)
+        partner_names = []
+        for idx, row in df.iterrows():
+            partner_name = row.iloc[1] if len(row) > 1 and pd.notna(row.iloc[1]) else None
+            if partner_name:
+                partner_names.append(str(partner_name))
+        
+        cached_results_by_name = {}
+        cache_info = {
+            'total_requests': len(df),
+            'cache_hits': 0,
+            'cache_misses': len(df),
+            'from_cache': False,
+            'processed_new': False
+        }
+        
+        if partner_names:
+            logger.info(f"🔍 Checking cache by name for {len(partner_names)} partners...")
+            cached_results_by_name = get_cached_results_by_name(partner_names)
+            cache_info['cache_hits'] = len(cached_results_by_name)
+            cache_info['cache_misses'] = len(partner_names) - len(cached_results_by_name)
+            cache_info['from_cache'] = len(cached_results_by_name) > 0
+            logger.info(f"📦 Cache status: {cache_info['cache_hits']} hits, {cache_info['cache_misses']} misses")
+        
+        # STEP 3: Process only new partners (not in cache)
+        cached_partners = []
+        newly_processed_partners = []
+        processing_stats = {
+            'total': 0,
+            'matched': 0,
+            'no_match': 0,
+            'web_search_attempted': 0,
+            'web_search_success': 0,
+            'errors': 0,
+            'excellent': 0,
+            'good': 0,
+            'fair': 0
+        }
+        
+        # Filter DataFrame to only include rows not in cache (by name)
+        if cached_results_by_name:
+            cached_names_lower = set(cached_results_by_name.keys())  # Already lowercase
+            rows_to_process = []
+            
+            for idx, row in df.iterrows():
+                partner_name = row.iloc[1] if len(row) > 1 and pd.notna(row.iloc[1]) else None
+                if partner_name:
+                    name_lower = str(partner_name).strip().lower()
+                    if name_lower in cached_names_lower:
+                        # Found in cache - prepare cached result with current request_id
+                        cached_result = cached_results_by_name[name_lower].copy()
+                        
+                        # Update with current request_id from DataFrame
+                        current_request_id = row.iloc[0] if len(row) > 0 and pd.notna(row.iloc[0]) else None
+                        if current_request_id:
+                            try:
+                                cached_result['id'] = str(int(current_request_id))
+                                if cached_result.get('api_data'):
+                                    cached_result['api_data']['request_id'] = int(current_request_id)
+                            except (ValueError, TypeError):
+                                pass
+                        
+                        cached_partners.append(cached_result)
+                    else:
+                        # Not in cache - needs processing
+                        rows_to_process.append(idx)
+                else:
+                    # No name - skip
+                    rows_to_process.append(idx)
+            
+            if rows_to_process:
+                df_to_process = df.loc[rows_to_process].copy()
+                cache_info['processed_new'] = True
+            else:
+                df_to_process = pd.DataFrame()
+                logger.info("✨ All partners found in cache - no processing needed")
+        else:
+            df_to_process = df
+            cache_info['processed_new'] = True
+        
+        # Process new partners
+        if not df_to_process.empty:
+            logger.info(f"🚀 Processing {len(df_to_process)} new partners...")
+            processing_results = process_partners_to_json(df_to_process)
+            processing_stats = processing_results['stats']
+            newly_processed_partners = processing_results['partners']
+            
+            # Add api_data with request_id for caching
+            for i, partner_result in enumerate(newly_processed_partners):
+                row_idx = df_to_process.index[i]
+                request_id = df_to_process.loc[row_idx].iloc[0] if pd.notna(df_to_process.loc[row_idx].iloc[0]) else None
+                
+                if request_id:
+                    try:
+                        partner_result['api_data'] = {
+                            'request_id': int(request_id),
+                            'request_source': 'excel_upload',
+                            'external_user': user_name,
+                            'created_at': None
+                        }
+                    except (ValueError, TypeError):
+                        pass
+            
+            # Cache newly processed results
+            if newly_processed_partners:
+                cache_stats = cache_results_batch(newly_processed_partners)
+                logger.info(f"💾 Cached {cache_stats['cached']} new results")
+        else:
+            logger.info("✨ All partners found in cache - no processing needed")
+        
+        # STEP 4: Combine cached + newly processed results
+        all_partners = cached_partners + newly_processed_partners
+        
+        # Update stats to reflect all results (cached + new)
+        if cached_partners:
+            for partner in cached_partners:
+                processing_stats['total'] += 1
+                if partner.get('match_found'):
+                    processing_stats['matched'] += 1
+                    quality = partner.get('match_quality', 'no_match')
+                    if quality == 'excellent':
+                        processing_stats['excellent'] += 1
+                    elif quality == 'good':
+                        processing_stats['good'] += 1
+                    elif quality == 'fair':
+                        processing_stats['fair'] += 1
+                else:
+                    processing_stats['no_match'] += 1
+                
+                if partner.get('web_search'):
+                    processing_stats['web_search_attempted'] += 1
+                    if partner['web_search'].get('success'):
+                        processing_stats['web_search_success'] += 1
+        
+        # Recalculate percentages
+        if processing_stats['total'] > 0:
+            processing_stats['matched_percentage'] = round(
+                processing_stats['matched'] / processing_stats['total'] * 100, 1
+            )
+            processing_stats['no_match_percentage'] = round(
+                processing_stats['no_match'] / processing_stats['total'] * 100, 1
+            )
+        
+        # Add creation and cache info to results
+        results = {
+            'partners': all_partners,
+            'stats': processing_stats,
+            'creation_info': creation_info,
+            'cache_info': cache_info
+        }
+        
         logger.info("✅ Processing completed successfully")
         
         return JSONResponse(content=results)
@@ -217,8 +587,8 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
                 if pr.get('id') in partner_ids
             ]
         else:
-            # For testing, limit to last 5 partners
-            partners_to_process = synced_partner_requests[-5:]
+            # For testing, limit to last 3 partners
+            partners_to_process = synced_partner_requests[-3:]
         
         if not partners_to_process:
             raise HTTPException(
@@ -228,19 +598,29 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
         
         logger.info(f"🚀 Processing {len(partners_to_process)} partner requests from API")
         
-        # STEP 1: Check cache for already processed requests
-        request_ids = [pr.get('id') for pr in partners_to_process]
-        cached_results_dict = get_cached_results(request_ids)
+        # STEP 1: Check cache by PARTNER NAME (not ID)
+        partner_names = [pr.get('partnerName') for pr in partners_to_process if pr.get('partnerName')]
+        cached_results_by_name = get_cached_results_by_name(partner_names)
         
         # Separate cached vs. new partners
         cached_partners = []
         partners_to_compute = []
         
         for pr in partners_to_process:
-            pr_id = pr.get('id')
-            if pr_id in cached_results_dict:
-                # Found in cache - use cached result
-                cached_partners.append(cached_results_dict[pr_id])
+            partner_name = pr.get('partnerName', '').strip().lower()
+            
+            if partner_name in cached_results_by_name:
+                # Found in cache by name - use cached result but update with current request_id
+                cached_result = cached_results_by_name[partner_name].copy()
+                
+                # Update with current request_id
+                current_id = pr.get('id')
+                if current_id:
+                    cached_result['id'] = str(current_id)
+                    if cached_result.get('api_data'):
+                        cached_result['api_data']['request_id'] = current_id
+                
+                cached_partners.append(cached_result)
             else:
                 # Not in cache - need to process
                 partners_to_compute.append(pr)
