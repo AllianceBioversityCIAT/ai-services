@@ -3,16 +3,22 @@ FastAPI server for Partner Request Support
 Handles Excel file upload and processing
 """
 import os
+import uvicorn
 import tempfile
+import requests
 import pandas as pd
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-
+from typing import List, Dict, Optional
 from logger.logger_util import get_logger
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, File, UploadFile, HTTPException, Body
 from src.mapping_clarisa_comparison import process_partners_to_json
 
+
 logger = get_logger()
+
+synced_partner_requests: List[Dict] = []
+CLARISA_API_URL = "https://clarisatest-back.ciat.cgiar.org/api/partner-requests"
 
 app = FastAPI(
     title="Partner Request Support API",
@@ -20,10 +26,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS configuration - Allow frontend to communicate with backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],  # Next.js default ports
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -63,17 +68,14 @@ async def process_partners(file: UploadFile = File(...)):
         - partners: List of partners with match info
         - stats: Processing statistics
     """
-    # Validate file type
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(
             status_code=400,
             detail="Invalid file type. Please upload an Excel file (.xlsx or .xls)"
         )
     
-    # Create temporary file to save upload
     temp_file = None
     try:
-        # Save uploaded file temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as temp_file:
             contents = await file.read()
             temp_file.write(contents)
@@ -81,7 +83,6 @@ async def process_partners(file: UploadFile = File(...)):
         
         logger.info(f"📁 Processing file: {file.filename}")
         
-        # Read Excel file
         try:
             df = pd.read_excel(temp_path, engine='openpyxl')
             logger.info(f"✅ {len(df)} rows loaded from Excel")
@@ -92,21 +93,18 @@ async def process_partners(file: UploadFile = File(...)):
                 detail=f"Error reading Excel file: {str(e)}"
             )
         
-        # Validate minimum columns
         if len(df.columns) < 2:
             raise HTTPException(
                 status_code=400,
                 detail="Excel file must have at least 2 columns (ID and partner_name)"
             )
         
-        # Validate that column 1 (partner_name) has data
         if df.iloc[:, 1].isna().all():
             raise HTTPException(
                 status_code=400,
                 detail="Partner name column (column 1) is empty"
             )
         
-        # Process the data
         logger.info("🚀 Starting processing pipeline...")
         results = process_partners_to_json(df)
         logger.info("✅ Processing completed successfully")
@@ -114,7 +112,6 @@ async def process_partners(file: UploadFile = File(...)):
         return JSONResponse(content=results)
         
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
         logger.error(f"❌ Error processing file: {e}")
@@ -123,7 +120,6 @@ async def process_partners(file: UploadFile = File(...)):
             detail=f"Error processing file: {str(e)}"
         )
     finally:
-        # Clean up temporary file
         if temp_file and os.path.exists(temp_path):
             try:
                 os.unlink(temp_path)
@@ -132,6 +128,157 @@ async def process_partners(file: UploadFile = File(...)):
                 logger.warning(f"⚠️  Could not delete temporary file: {e}")
 
 
+@app.get("/api/sync-partner-requests")
+async def sync_partner_requests():
+    """
+    Synchronize partner requests from external CLARISA API
+    
+    Returns:
+        JSON with:
+        - count: Number of partner requests found
+        - pending_requests: List of pending partner requests
+    """
+    global synced_partner_requests
+    
+    try:
+        logger.info(f"🔄 Fetching partner requests from {CLARISA_API_URL}")
+        
+        # Fetch data from external API
+        response = requests.get(CLARISA_API_URL, timeout=30)
+        response.raise_for_status()
+        
+        partner_requests = response.json()
+        
+        # Filter only pending requests
+        pending_requests = [
+            pr for pr in partner_requests 
+            if pr.get('requestStatus') == 'Pending'
+        ]
+        
+        # Store in global variable
+        synced_partner_requests = pending_requests
+        
+        logger.info(f"✅ Synced {len(pending_requests)} pending partner requests")
+        
+        return {
+            "success": True,
+            "count": len(pending_requests),
+            "total_requests": len(partner_requests),
+            "pending_requests": pending_requests
+        }
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ Error fetching partner requests: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Error connecting to CLARISA API: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"❌ Error processing partner requests: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing partner requests: {str(e)}"
+        )
+
+
+@app.post("/api/process-api-partners")
+async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
+    """
+    Process partner requests from the synced API data
+    
+    Args:
+        partner_ids: Optional list of specific partner IDs to process.
+                    If None, processes all synced partners (limited to 5 for testing)
+    
+    Returns:
+        JSON with processed results including:
+        - partners: List of partners with match info
+        - stats: Processing statistics
+    """
+    global synced_partner_requests
+    
+    if not synced_partner_requests:
+        raise HTTPException(
+            status_code=400,
+            detail="No partner requests available. Please sync first using /api/sync-partner-requests"
+        )
+    
+    try:
+        # Filter partners if specific IDs provided
+        if partner_ids:
+            partners_to_process = [
+                pr for pr in synced_partner_requests 
+                if pr.get('id') in partner_ids
+            ]
+        else:
+            # For testing, limit to last 3 partners
+            partners_to_process = synced_partner_requests[-3:]
+        
+        if not partners_to_process:
+            raise HTTPException(
+                status_code=404,
+                detail="No matching partner requests found"
+            )
+        
+        logger.info(f"🚀 Processing {len(partners_to_process)} partner requests from API")
+        
+        # Convert API data to DataFrame format expected by process_partners_to_json
+        data_rows = []
+        for pr in partners_to_process:
+            row = {
+                'id': pr.get('id', ''),
+                'partner_name': pr.get('partnerName', ''),
+                'acronym': pr.get('acronym', ''),
+                'website': pr.get('webPage', ''),
+                'country': pr.get('countryDTO', {}).get('name', ''),
+                'institution_type': pr.get('institutionTypeDTO', {}).get('name', ''),
+                'request_source': pr.get('requestSource', ''),
+                'external_user': pr.get('externalUserName', ''),
+            }
+            data_rows.append(row)
+        
+        # Create DataFrame
+        df = pd.DataFrame(data_rows)
+        
+        # Reorder columns to match expected format
+        # Column 0: ID, Column 1: partner_name, Column 2: acronym, Column 3: website, Column 5: country
+        df_ordered = pd.DataFrame({
+            'id': df['id'],
+            'partner_name': df['partner_name'],
+            'acronym': df['acronym'],
+            'website': df['website'],
+            'placeholder': '',  # Column 4 placeholder
+            'country': df['country'],
+        })
+        
+        logger.info(f"📊 Created DataFrame with {len(df_ordered)} rows")
+        
+        # Process using existing pipeline
+        results = process_partners_to_json(df_ordered)
+        
+        # Add original API data to results for reference
+        for i, partner_result in enumerate(results['partners']):
+            if i < len(partners_to_process):
+                partner_result['api_data'] = {
+                    'request_id': partners_to_process[i].get('id'),
+                    'request_source': partners_to_process[i].get('requestSource'),
+                    'external_user': partners_to_process[i].get('externalUserName'),
+                    'created_at': partners_to_process[i].get('created_at'),
+                }
+        
+        logger.info("✅ API partners processing completed successfully")
+        
+        return JSONResponse(content=results)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error processing API partners: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing API partners: {str(e)}"
+        )
+
+
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

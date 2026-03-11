@@ -96,9 +96,11 @@ Be thorough - include everything that might be relevant.
 
         tools = [{"type": "web_search"}]
         
+        search_type = "open"
         if website and str(website).strip():
             domain = _extract_domain(str(website).strip())
             if domain:
+                # Valid domain - use focused search
                 tools = [{
                     "type": "web_search",
                     "filters": {
@@ -106,10 +108,11 @@ Be thorough - include everything that might be relevant.
                     }
                 }]
                 search_type = "focused"
+                logger.info(f"   Using focused search on domain: {domain}")
             else:
+                # Invalid domain - fall back to open search
+                logger.info(f"   Invalid website domain '{website}' - using open search")
                 search_type = "open"
-        else:
-            search_type = "open"
         
         response = openai_client.responses.create(
             model="gpt-5-mini",
@@ -133,13 +136,28 @@ Be thorough - include everything that might be relevant.
         }
         
     except Exception as e:
-        logger.error(f"⚠️  Phase 1 search error for '{name}': {str(e)}")
+        error_message = str(e)
+        
+        # Make error messages more user-friendly
+        if "Invalid domain" in error_message or "invalid_request_error" in error_message:
+            user_message = f"Could not perform web search: The website URL provided appears to be invalid. Performing general web search instead."
+            logger.warning(f"⚠️  Invalid domain for '{name}': {website}")
+        elif "API key" in error_message.lower():
+            user_message = "Web search temporarily unavailable (API configuration issue)"
+            logger.error(f"⚠️  API key issue for '{name}': {error_message}")
+        elif "rate limit" in error_message.lower():
+            user_message = "Web search temporarily unavailable (rate limit reached)"
+            logger.error(f"⚠️  Rate limit for '{name}': {error_message}")
+        else:
+            user_message = f"Web search could not be completed. Please try again later."
+            logger.error(f"⚠️  Phase 1 search error for '{name}': {error_message}")
+        
         return {
             "success": False,
             "raw_content": None,
             "sources": [],
             "search_type": None,
-            "error": str(e)
+            "error": user_message
         }
 
 
@@ -282,23 +300,39 @@ RAW SEARCH RESULTS (Phase 1):
 
 def _extract_domain(website: str) -> str:
     """
-    Extracts the main domain from a URL
+    Extracts and validates the main domain from a URL
     
     Args:
         website: Complete URL (e.g., "https://www.example.edu/page")
         
     Returns:
-        str: Clean domain (e.g., "example.edu")
+        str: Clean domain (e.g., "example.edu") or empty string if invalid
     """
     if not website:
         return ""
     
-    domain = re.sub(r'^https?://', '', website)
-    domain = re.sub(r'^www\.', '', domain)
-    domain = domain.split('/')[0]
-    domain = domain.split(':')[0]
-    
-    return domain
+    try:
+        # Clean the URL
+        domain = re.sub(r'^https?://', '', website)
+        domain = re.sub(r'^www\.', '', domain)
+        domain = domain.split('/')[0]
+        domain = domain.split(':')[0]
+        
+        # Validate domain format
+        # Must have at least one dot and valid characters
+        if '.' not in domain:
+            logger.warning(f"⚠️  Invalid domain format (no TLD): {website}")
+            return ""
+        
+        # Check for valid domain characters (alphanumeric, dots, hyphens)
+        if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$', domain):
+            logger.warning(f"⚠️  Invalid domain format (invalid characters): {website}")
+            return ""
+        
+        return domain
+    except Exception as e:
+        logger.warning(f"⚠️  Error extracting domain from '{website}': {e}")
+        return ""
 
 
 # ============================================================================

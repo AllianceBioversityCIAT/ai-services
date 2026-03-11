@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle2, XCircle, Globe, Database, BarChart3, Search, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Upload, FileSpreadsheet, CheckCircle2, XCircle, Globe, Database, BarChart3, Search, ChevronDown, ChevronUp, Info, RefreshCw, Cloud } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
@@ -59,6 +59,24 @@ interface ProcessingResults {
   };
 }
 
+interface ApiPartnerRequest {
+  id: number;
+  partnerName: string;
+  acronym: string;
+  webPage: string | null;
+  requestStatus: string;
+  requestSource: string;
+  externalUserName: string;
+  created_at: string;
+  countryDTO: {
+    name: string;
+    isoAlpha2: string;
+  };
+  institutionTypeDTO: {
+    name: string;
+  };
+}
+
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -70,6 +88,53 @@ export default function Home() {
   const [modalType, setModalType] = useState<'clarisa' | 'websearch' | 'candidates' | null>(null);
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
   const [showQualityInfo, setShowQualityInfo] = useState(false);
+  const [uploadMode, setUploadMode] = useState<'excel' | 'api'>('excel');
+  const [apiPartners, setApiPartners] = useState<ApiPartnerRequest[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  // Sync partner requests on component mount
+  useEffect(() => {
+    syncPartnerRequests();
+  }, []);
+
+  const syncPartnerRequests = async () => {
+    setSyncing(true);
+    setSyncError(null);
+    
+    try {
+      const response = await axios.get('http://localhost:8000/api/sync-partner-requests');
+      setApiPartners(response.data.pending_requests || []);
+    } catch (err: any) {
+      setSyncError(err.response?.data?.detail || 'Error syncing partner requests');
+      console.error('Sync error:', err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleProcessApiPartners = async () => {
+    setProcessing(true);
+    setError(null);
+
+    try {
+      const response = await axios.post<ProcessingResults>(
+        'http://localhost:8000/api/process-api-partners',
+        null,  // Will process first 5 by default
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      setResults(response.data);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error processing API partners. Please try again.');
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -234,7 +299,7 @@ export default function Home() {
               borderRadius: 'var(--radius-xl)',
               padding: 'var(--space-md)',
               boxShadow: 'var(--shadow-md)',
-              maxWidth: '600px',
+              maxWidth: '700px',
               margin: '0 auto',
             }}>
               {/* Upload Header */}
@@ -245,119 +310,370 @@ export default function Home() {
                   color: 'var(--cgiar-navy)',
                   marginBottom: 'var(--space-xs)',
                 }}>
-                  Upload Partner Requests
+                  Process Partner Requests
                 </h2>
                 <p style={{
                   fontSize: '0.875rem',
                   color: 'var(--color-text-muted)',
                 }}>
-                  Upload your Excel file to match partners with the CLARISA database
+                  Match partners with the CLARISA database using AI
                 </p>
               </div>
 
-              {/* Upload Zone */}
+              {/* Mode Selector */}
               <div style={{
-                border: `2px dashed ${file ? 'var(--cgiar-green)' : 'var(--cgiar-gray)'}`,
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-md)',
-                textAlign: 'center',
-                background: file ? '#F0F9E8' : 'var(--cgiar-light-gray)',
-                transition: 'all 0.3s ease',
-                cursor: 'pointer',
+                display: 'flex',
+                gap: 'var(--space-sm)',
                 marginBottom: 'var(--space-md)',
+                background: 'var(--cgiar-light-gray)',
+                padding: '4px',
+                borderRadius: 'var(--radius-md)',
               }}>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleFileChange}
-                  style={{ display: 'none' }}
-                  id="file-upload"
-                />
-                <label
-                  htmlFor="file-upload"
-                  style={{ cursor: 'pointer', display: 'block' }}
+                <button
+                  onClick={() => setUploadMode('excel')}
+                  style={{
+                    flex: 1,
+                    padding: 'var(--space-sm)',
+                    background: uploadMode === 'excel' ? 'white' : 'transparent',
+                    color: uploadMode === 'excel' ? 'var(--cgiar-navy)' : 'var(--color-text-muted)',
+                    border: 'none',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: uploadMode === 'excel' ? 'var(--shadow-sm)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
                 >
-                  <Upload
-                    size={40}
-                    style={{
-                      color: file ? 'var(--cgiar-green)' : 'var(--color-text-muted)',
-                      margin: '0 auto var(--space-sm)',
-                    }}
-                  />
-                  {file ? (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                      <p style={{
-                        fontSize: '0.9375rem',
-                        fontWeight: 600,
-                        color: 'var(--cgiar-green)',
-                        marginBottom: 'var(--space-xs)',
-                      }}>
-                        {file.name}
-                      </p>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                        Click to change file
-                      </p>
-                    </motion.div>
-                  ) : (
-                    <div>
-                      <p style={{
-                        fontSize: '0.9375rem',
-                        fontWeight: 500,
-                        color: 'var(--cgiar-navy)',
-                        marginBottom: 'var(--space-xs)',
-                      }}>
-                        Drop your Excel file here
-                      </p>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                        or click to browse
-                      </p>
-                    </div>
-                  )}
-                </label>
+                  <Upload size={16} />
+                  Upload Excel
+                </button>
+                <button
+                  onClick={() => setUploadMode('api')}
+                  style={{
+                    flex: 1,
+                    padding: 'var(--space-sm)',
+                    background: uploadMode === 'api' ? 'white' : 'transparent',
+                    color: uploadMode === 'api' ? 'var(--cgiar-navy)' : 'var(--color-text-muted)',
+                    border: 'none',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: uploadMode === 'api' ? 'var(--shadow-sm)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <Cloud size={16} />
+                  API Requests {apiPartners.length > 0 && `(${apiPartners.length})`}
+                </button>
               </div>
 
-              {/* Process Button */}
-              <button
-                onClick={handleUpload}
-                disabled={!file || processing}
-                style={{
-                  width: '100%',
-                  padding: 'var(--space-sm) var(--space-md)',
-                  background: file && !processing
-                    ? 'linear-gradient(135deg, var(--cgiar-green) 0%, #629600 100%)'
-                    : 'var(--cgiar-gray)',
-                  color: file && !processing ? 'white' : 'var(--color-text-muted)',
-                  borderRadius: 'var(--radius-md)',
-                  fontSize: '0.9375rem',
-                  fontWeight: 600,
-                  cursor: file && !processing ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.3s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 'var(--space-sm)',
-                  border: 'none',
-                  boxShadow: file && !processing ? 'var(--shadow-md)' : 'none',
-                }}
-                onMouseOver={(e) => {
-                  if (file && !processing) e.currentTarget.style.transform = 'translateY(-2px)';
-                }}
-                onMouseOut={(e) => {
-                  if (file && !processing) e.currentTarget.style.transform = 'translateY(0)';
-                }}
-              >
-                {processing ? (
-                  <>
-                    <div className="spinner" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <BarChart3 size={18} />
-                    Analyze Partners
-                  </>
-                )}
-              </button>
+              {/* Excel Mode */}
+              {uploadMode === 'excel' && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {/* Upload Zone */}
+                  <div style={{
+                    border: `2px dashed ${file ? 'var(--cgiar-green)' : 'var(--cgiar-gray)'}`,
+                    borderRadius: 'var(--radius-lg)',
+                    padding: 'var(--space-md)',
+                    textAlign: 'center',
+                    background: file ? '#F0F9E8' : 'var(--cgiar-light-gray)',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer',
+                    marginBottom: 'var(--space-md)',
+                  }}>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={handleFileChange}
+                      style={{ display: 'none' }}
+                      id="file-upload"
+                    />
+                    <label
+                      htmlFor="file-upload"
+                      style={{ cursor: 'pointer', display: 'block' }}
+                    >
+                      <Upload
+                        size={40}
+                        style={{
+                          color: file ? 'var(--cgiar-green)' : 'var(--color-text-muted)',
+                          margin: '0 auto var(--space-sm)',
+                        }}
+                      />
+                      {file ? (
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                          <p style={{
+                            fontSize: '0.9375rem',
+                            fontWeight: 600,
+                            color: 'var(--cgiar-green)',
+                            marginBottom: 'var(--space-xs)',
+                          }}>
+                            {file.name}
+                          </p>
+                          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                            Click to change file
+                          </p>
+                        </motion.div>
+                      ) : (
+                        <div>
+                          <p style={{
+                            fontSize: '0.9375rem',
+                            fontWeight: 500,
+                            color: 'var(--cgiar-navy)',
+                            marginBottom: 'var(--space-xs)',
+                          }}>
+                            Drop your Excel file here
+                          </p>
+                          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                            or click to browse
+                          </p>
+                        </div>
+                      )}
+                    </label>
+                  </div>
+
+                  {/* Process Button */}
+                  <button
+                    onClick={handleUpload}
+                    disabled={!file || processing}
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-sm) var(--space-md)',
+                      background: file && !processing
+                        ? 'linear-gradient(135deg, var(--cgiar-green) 0%, #629600 100%)'
+                        : 'var(--cgiar-gray)',
+                      color: file && !processing ? 'white' : 'var(--color-text-muted)',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '0.9375rem',
+                      fontWeight: 600,
+                      cursor: file && !processing ? 'pointer' : 'not-allowed',
+                      transition: 'all 0.3s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 'var(--space-sm)',
+                      border: 'none',
+                      boxShadow: file && !processing ? 'var(--shadow-md)' : 'none',
+                    }}
+                    onMouseOver={(e) => {
+                      if (file && !processing) e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      if (file && !processing) e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    {processing ? (
+                      <>
+                        <div className="spinner" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <BarChart3 size={18} />
+                        Analyze Partners
+                      </>
+                    )}
+                  </button>
+
+                  {/* Info Box */}
+                  <div style={{
+                    marginTop: 'var(--space-md)',
+                    padding: 'var(--space-md)',
+                    background: '#E8F4FD',
+                    borderRadius: 'var(--radius-md)',
+                    borderLeft: '3px solid var(--cgiar-blue)',
+                  }}>
+                    <h4 style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: 'var(--cgiar-blue)',
+                      marginBottom: 'var(--space-xs)',
+                    }}>
+                      Required Excel Format
+                    </h4>
+                    <ul style={{
+                      paddingLeft: 'var(--space-md)',
+                      color: 'var(--color-text-secondary)',
+                      fontSize: '0.75rem',
+                      lineHeight: 1.6,
+                    }}>
+                      <li><strong>Column 1:</strong> Partner Name (required)</li>
+                      <li><strong>Column 2:</strong> Acronym (optional)</li>
+                      <li><strong>Column 3:</strong> Website (optional)</li>
+                      <li><strong>Column 5:</strong> Country (optional)</li>
+                    </ul>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* API Mode */}
+              {uploadMode === 'api' && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {/* API Status */}
+                  <div style={{
+                    background: syncing ? '#F0F9E8' : apiPartners.length > 0 ? '#E8F4FD' : '#FEF3E8',
+                    border: `1px solid ${syncing ? 'var(--cgiar-green)' : apiPartners.length > 0 ? 'var(--cgiar-blue)' : 'var(--cgiar-yellow)'}`,
+                    borderRadius: 'var(--radius-md)',
+                    padding: 'var(--space-md)',
+                    marginBottom: 'var(--space-md)',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-xs)' }}>
+                      <h4 style={{
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        color: 'var(--cgiar-navy)',
+                      }}>
+                        {syncing ? 'Syncing...' : apiPartners.length > 0 ? `${apiPartners.length} Pending Partner Requests` : 'No Partner Requests'}
+                      </h4>
+                      <button
+                        onClick={syncPartnerRequests}
+                        disabled={syncing}
+                        style={{
+                          padding: '4px 10px',
+                          background: 'white',
+                          border: '1px solid var(--cgiar-gray)',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '0.75rem',
+                          fontWeight: 500,
+                          cursor: syncing ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          color: 'var(--cgiar-navy)',
+                          transition: 'all 0.2s',
+                        }}
+                        onMouseOver={(e) => {
+                          if (!syncing) e.currentTarget.style.background = 'var(--cgiar-light-gray)';
+                        }}
+                        onMouseOut={(e) => {
+                          if (!syncing) e.currentTarget.style.background = 'white';
+                        }}
+                      >
+                        <RefreshCw size={12} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
+                        Refresh
+                      </button>
+                    </div>
+                    <p style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--color-text-secondary)',
+                      lineHeight: 1.5,
+                    }}>
+                      {syncing ? 'Fetching partner requests from CLARISA API...' : 
+                       apiPartners.length > 0 ? `Ready to process first 3 partner requests (testing mode)` : 
+                       'Click Refresh to sync with CLARISA API'}
+                    </p>
+                  </div>
+
+                  {syncError && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      style={{
+                        marginBottom: 'var(--space-md)',
+                        padding: 'var(--space-sm)',
+                        background: '#FEE',
+                        border: '1px solid var(--color-error)',
+                        borderRadius: 'var(--radius-md)',
+                        color: 'var(--color-error)',
+                        fontSize: '0.75rem',
+                      }}
+                    >
+                      {syncError}
+                    </motion.div>
+                  )}
+
+                  {/* Process Button */}
+                  <button
+                    onClick={handleProcessApiPartners}
+                    disabled={apiPartners.length === 0 || processing}
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-sm) var(--space-md)',
+                      background: apiPartners.length > 0 && !processing
+                        ? 'linear-gradient(135deg, var(--cgiar-blue) 0%, #0052A3 100%)'
+                        : 'var(--cgiar-gray)',
+                      color: apiPartners.length > 0 && !processing ? 'white' : 'var(--color-text-muted)',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '0.9375rem',
+                      fontWeight: 600,
+                      cursor: apiPartners.length > 0 && !processing ? 'pointer' : 'not-allowed',
+                      transition: 'all 0.3s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 'var(--space-sm)',
+                      border: 'none',
+                      boxShadow: apiPartners.length > 0 && !processing ? 'var(--shadow-md)' : 'none',
+                    }}
+                    onMouseOver={(e) => {
+                      if (apiPartners.length > 0 && !processing) e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      if (apiPartners.length > 0 && !processing) e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    {processing ? (
+                      <>
+                        <div className="spinner" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <BarChart3 size={18} />
+                        Process Partner Requests
+                      </>
+                    )}
+                  </button>
+
+                  {/* Info Box */}
+                  <div style={{
+                    marginTop: 'var(--space-md)',
+                    padding: 'var(--space-md)',
+                    background: '#FFF4E6',
+                    borderRadius: 'var(--radius-md)',
+                    borderLeft: '3px solid var(--cgiar-yellow)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'start', gap: 'var(--space-xs)' }}>
+                      <Info size={16} style={{ color: 'var(--cgiar-yellow)', marginTop: '2px', flexShrink: 0 }} />
+                      <div>
+                        <h4 style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: 'var(--cgiar-navy)',
+                          marginBottom: '4px',
+                        }}>
+                          Testing Mode
+                        </h4>
+                        <p style={{
+                          fontSize: '0.75rem',
+                          color: 'var(--color-text-secondary)',
+                          lineHeight: 1.5,
+                          margin: 0,
+                        }}>
+                          Currently processing first 3 partner requests for testing. Full processing will be available in production mode.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
 
               {error && (
                 <motion.div
@@ -376,35 +692,6 @@ export default function Home() {
                   {error}
                 </motion.div>
               )}
-
-              {/* Info Box */}
-              <div style={{
-                marginTop: 'var(--space-md)',
-                padding: 'var(--space-md)',
-                background: '#E8F4FD',
-                borderRadius: 'var(--radius-md)',
-                borderLeft: '3px solid var(--cgiar-blue)',
-              }}>
-                <h4 style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  color: 'var(--cgiar-blue)',
-                  marginBottom: 'var(--space-xs)',
-                }}>
-                  Required Excel Format
-                </h4>
-                <ul style={{
-                  paddingLeft: 'var(--space-md)',
-                  color: 'var(--color-text-secondary)',
-                  fontSize: '0.75rem',
-                  lineHeight: 1.6,
-                }}>
-                  <li><strong>Column 1:</strong> Partner Name (required)</li>
-                  <li><strong>Column 2:</strong> Acronym (optional)</li>
-                  <li><strong>Column 3:</strong> Website (optional)</li>
-                  <li><strong>Column 5:</strong> Country (optional)</li>
-                </ul>
-              </div>
             </div>
           </motion.div>
         )}
