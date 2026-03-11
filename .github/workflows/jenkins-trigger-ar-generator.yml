@@ -17,7 +17,7 @@ jobs:
       # Step 1: Build Jenkins URL
       - name: Build Jenkins URL
         run: |
-          JENKINS_URL="https://automation.prms.cgiar.org/job/ar-generator-pro-lambda/build"
+          JENKINS_URL="https://automation.prms.cgiar.org/job/ar-generator-pro/build"
           echo "Jenkins job URL: $JENKINS_URL"
           echo "JENKINS_URL=${JENKINS_URL}" >> $GITHUB_ENV
 
