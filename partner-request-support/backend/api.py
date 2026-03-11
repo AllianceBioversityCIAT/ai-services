@@ -17,8 +17,10 @@ from src.mapping_clarisa_comparison import process_partners_to_json
 
 logger = get_logger()
 
+# Global variables
 synced_partner_requests: List[Dict] = []
 CLARISA_API_URL = "https://clarisatest-back.ciat.cgiar.org/api/partner-requests"
+CLARISA_RESPOND_URL = "https://clarisatest-back.ciat.cgiar.org/api/partner-requests/respond"
 
 app = FastAPI(
     title="Partner Request Support API",
@@ -277,6 +279,118 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
         raise HTTPException(
             status_code=500,
             detail=f"Error processing API partners: {str(e)}"
+        )
+
+
+@app.post("/api/respond-partner-request")
+async def respond_partner_request(
+    request_id: int = Body(...),
+    user_id: int = Body(...),
+    accept: bool = Body(...),
+    auth_token: str = Body(...),
+    reject_justification: Optional[str] = Body(None)
+):
+    """
+    Accept or reject a partner request
+    
+    Args:
+        request_id: ID of the partner request to respond to
+        user_id: ID of the authenticated user
+        accept: True to accept, False to reject
+        auth_token: Bearer token for authentication
+        reject_justification: Optional text when rejecting
+    
+    Returns:
+        JSON with success status and message
+    """
+    global synced_partner_requests
+    
+    try:
+        # Find the partner request in synced data
+        partner_request = None
+        for pr in synced_partner_requests:
+            if pr.get('id') == request_id:
+                partner_request = pr
+                break
+        
+        if not partner_request:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Partner request {request_id} not found. Please sync first."
+            )
+        
+        # Build the payload for CLARISA API
+        payload = {
+            "requestId": request_id,
+            "userId": user_id,
+            "accept": accept,
+            "misAcronym": partner_request.get('mis', 'CLARISA'),
+            "externalUserMail": partner_request.get('externalUserMail', ''),
+            "externalUserName": partner_request.get('externalUserName', ''),
+            "externalUserComments": partner_request.get('externalUserComments', '')
+        }
+        
+        # Add reject justification if rejecting
+        if not accept:
+            payload["rejectJustification"] = reject_justification or "No justification provided"
+        
+        # Prepare headers with authentication
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {auth_token}"
+        }
+        
+        action = "accept" if accept else "reject"
+        logger.info(f"📤 Sending {action} request for partner {request_id} to CLARISA API")
+        
+        # Send request to CLARISA API
+        response = requests.post(
+            CLARISA_RESPOND_URL,
+            json=payload,
+            headers=headers,
+            timeout=30
+        )
+        
+        response.raise_for_status()
+        
+        logger.info(f"✅ Successfully {action}ed partner request {request_id}")
+        
+        # Remove from synced_partner_requests after successful response
+        synced_partner_requests = [
+            pr for pr in synced_partner_requests 
+            if pr.get('id') != request_id
+        ]
+        
+        return {
+            "success": True,
+            "action": action,
+            "request_id": request_id,
+            "message": f"Partner request successfully {action}ed"
+        }
+        
+    except requests.exceptions.HTTPError as e:
+        error_detail = "Unknown error"
+        try:
+            error_detail = e.response.json() if e.response else str(e)
+        except:
+            error_detail = str(e)
+        
+        logger.error(f"❌ HTTP Error responding to partner request {request_id}: {error_detail}")
+        raise HTTPException(
+            status_code=e.response.status_code if e.response else 500,
+            detail=f"Error responding to partner request: {error_detail}"
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ Network error responding to partner request {request_id}: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Network error connecting to CLARISA API: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"❌ Error responding to partner request {request_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing response: {str(e)}"
         )
 
 

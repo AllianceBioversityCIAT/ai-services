@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle2, XCircle, Globe, Database, BarChart3, Search, ChevronDown, ChevronUp, Info, RefreshCw, Cloud } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle2, XCircle, Globe, Database, BarChart3, Search, ChevronDown, ChevronUp, Info, RefreshCw, Cloud, ThumbsUp, ThumbsDown, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
@@ -40,6 +40,12 @@ interface Partner {
   top_candidates: ClarisaMatch[];
   web_search: WebSearch | null;
   match_quality: 'excellent' | 'good' | 'fair' | 'no_match' | 'error';
+  api_data?: {
+    request_id: number;
+    request_source: string;
+    external_user: string;
+    created_at: string;
+  };
 }
 
 interface ProcessingResults {
@@ -77,26 +83,124 @@ interface ApiPartnerRequest {
   };
 }
 
+interface AuthUser {
+  id: number;
+  username: string;
+  name: string;
+  email: string;
+  permissions: string[];
+}
+
+interface AuthResponse {
+  access_token: string;
+  user: AuthUser;
+}
+
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
   const [results, setResults] = useState<ProcessingResults | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [expandedPartner, setExpandedPartner] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [message, setMessage] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<'clarisa' | 'websearch' | 'candidates' | null>(null);
+  const [modalType, setModalType] = useState<'clarisa' | 'websearch' | 'candidates' | 'accept' | 'reject' | null>(null);
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
   const [showQualityInfo, setShowQualityInfo] = useState(false);
   const [uploadMode, setUploadMode] = useState<'excel' | 'api'>('excel');
   const [apiPartners, setApiPartners] = useState<ApiPartnerRequest[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [rejectJustification, setRejectJustification] = useState('');
+  const [respondingToRequest, setRespondingToRequest] = useState(false);
+  const [responseMessage, setResponseMessage] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  
+  // Authentication states
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
-  // Sync partner requests on component mount
+  // Handle login
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoggingIn(true);
+    setLoginError(null);
+
+    try {
+      const response = await axios.post<AuthResponse>(
+        'https://clarisatest-back.ciat.cgiar.org/auth/login',
+        {
+          login: loginEmail,
+          password: loginPassword
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const { access_token, user } = response.data;
+      
+      setAuthToken(access_token);
+      setAuthUser(user);
+      setIsAuthenticated(true);
+      setLoginError(null);
+
+      // Clear login form
+      setLoginPassword('');
+      
+    } catch (err: any) {
+      let errorMsg = 'Unable to sign in. Please try again.';
+      
+      if (err.response) {
+        // Server responded with error
+        const status = err.response.status;
+        
+        if (status === 401 || status === 403) {
+          errorMsg = 'Invalid email or password. Please check your credentials.';
+        } else if (status === 500) {
+          errorMsg = 'Invalid credentials. Please verify your email and password.';
+        } else if (status >= 500) {
+          errorMsg = 'Authentication service is temporarily unavailable. Please try again later.';
+        } else {
+          // Try to get a message from the response
+          const responseMsg = err.response.data?.message || err.response.data?.detail;
+          if (responseMsg && responseMsg !== 'Http Exception' && !responseMsg.includes('Exception')) {
+            errorMsg = responseMsg;
+          }
+        }
+      } else if (err.request) {
+        // Request made but no response received
+        errorMsg = 'Unable to connect to authentication service. Please check your internet connection.';
+      }
+      
+      setLoginError(errorMsg);
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setAuthUser(null);
+    setAuthToken(null);
+    setResults(null);
+    setFile(null);
+    setApiPartners([]);
+  };
+
+  // Sync partner requests on component mount (only if authenticated)
   useEffect(() => {
-    syncPartnerRequests();
-  }, []);
+    if (isAuthenticated) {
+      syncPartnerRequests();
+    }
+  }, [isAuthenticated]);
 
   const syncPartnerRequests = async () => {
     setSyncing(true);
@@ -175,6 +279,138 @@ export default function Home() {
     }
   };
 
+  const handleAcceptRequest = async () => {
+    if (!selectedPartner?.api_data?.request_id) {
+      setResponseMessage({ type: 'error', message: 'No request ID available' });
+      return;
+    }
+
+    if (!authToken || !authUser) {
+      setResponseMessage({ type: 'error', message: 'Authentication required' });
+      return;
+    }
+
+    setRespondingToRequest(true);
+    setResponseMessage(null);
+
+    try {
+      const response = await axios.post(
+        'http://localhost:8000/api/respond-partner-request',
+        {
+          request_id: selectedPartner.api_data.request_id,
+          user_id: authUser.id,
+          accept: true,
+          auth_token: authToken
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      setResponseMessage({ 
+        type: 'success', 
+        message: `Partner request for "${selectedPartner.name}" successfully accepted!` 
+      });
+      
+      // Remove from results
+      if (results) {
+        const updatedPartners = results.partners.filter(
+          p => p.api_data?.request_id !== selectedPartner.api_data?.request_id
+        );
+        setResults({
+          ...results,
+          partners: updatedPartners,
+          stats: {
+            ...results.stats,
+            total: updatedPartners.length
+          }
+        });
+      }
+
+      // Close modal after short delay
+      setTimeout(() => {
+        setModalOpen(false);
+        setSelectedPartner(null);
+        setResponseMessage(null);
+      }, 2000);
+
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Error accepting partner request';
+      setResponseMessage({ type: 'error', message: errorMsg });
+    } finally {
+      setRespondingToRequest(false);
+    }
+  };
+
+  const handleRejectRequest = async () => {
+    if (!selectedPartner?.api_data?.request_id) {
+      setResponseMessage({ type: 'error', message: 'No request ID available' });
+      return;
+    }
+
+    if (!authToken || !authUser) {
+      setResponseMessage({ type: 'error', message: 'Authentication required' });
+      return;
+    }
+
+    setRespondingToRequest(true);
+    setResponseMessage(null);
+
+    try {
+      const response = await axios.post(
+        'http://localhost:8000/api/respond-partner-request',
+        {
+          request_id: selectedPartner.api_data.request_id,
+          user_id: authUser.id,
+          accept: false,
+          reject_justification: rejectJustification.trim() || 'No justification provided',
+          auth_token: authToken
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      setResponseMessage({ 
+        type: 'success', 
+        message: `Partner request for "${selectedPartner.name}" successfully rejected.` 
+      });
+      
+      // Remove from results
+      if (results) {
+        const updatedPartners = results.partners.filter(
+          p => p.api_data?.request_id !== selectedPartner.api_data?.request_id
+        );
+        setResults({
+          ...results,
+          partners: updatedPartners,
+          stats: {
+            ...results.stats,
+            total: updatedPartners.length
+          }
+        });
+      }
+
+      // Close modal after short delay
+      setTimeout(() => {
+        setModalOpen(false);
+        setSelectedPartner(null);
+        setRejectJustification('');
+        setResponseMessage(null);
+      }, 2000);
+
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Error rejecting partner request';
+      setResponseMessage({ type: 'error', message: errorMsg });
+    } finally {
+      setRespondingToRequest(false);
+    }
+  };
+
   const getQualityColor = (quality: string) => {
     switch (quality) {
       case 'excellent': return 'var(--color-excellent)';
@@ -199,7 +435,344 @@ export default function Home() {
   const filteredPartners = results?.partners.filter(partner =>
     partner.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     partner.acronym?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ) || [];
+
+  // Show login screen if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'var(--color-background)',
+        display: 'flex',
+      }}>
+        {/* Left Side - Branding */}
+        <div style={{
+          flex: '1',
+          background: 'linear-gradient(135deg, var(--cgiar-navy) 0%, #1a4d2e 100%)',
+          padding: 'var(--space-2xl)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          {/* Decorative circles */}
+          <div style={{
+            position: 'absolute',
+            width: '400px',
+            height: '400px',
+            borderRadius: '50%',
+            background: 'rgba(16, 185, 129, 0.1)',
+            top: '-200px',
+            left: '-200px',
+          }} />
+          <div style={{
+            position: 'absolute',
+            width: '300px',
+            height: '300px',
+            borderRadius: '50%',
+            background: 'rgba(16, 185, 129, 0.15)',
+            bottom: '-150px',
+            right: '-150px',
+          }} />
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            style={{
+              zIndex: 1,
+              textAlign: 'center',
+              maxWidth: '500px',
+            }}
+          >
+            {/* Logo */}
+            <div style={{
+              width: '120px',
+              height: '120px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: 'var(--radius-xl)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto var(--space-xl)',
+              border: '2px solid rgba(255, 255, 255, 0.2)',
+            }}>
+              <FileSpreadsheet size={60} color="white" />
+            </div>
+
+            <h1 style={{
+              fontSize: '2.5rem',
+              fontWeight: 700,
+              color: 'white',
+              marginBottom: 'var(--space-md)',
+              lineHeight: 1.2,
+            }}>
+              Partner Request Support
+            </h1>
+            <p style={{
+              fontSize: '1.125rem',
+              color: 'rgba(255, 255, 255, 0.8)',
+              lineHeight: 1.6,
+            }}>
+              Streamline institutional matching and partner request management with AI-powered analysis
+            </p>
+
+            {/* Features */}
+            <div style={{
+              marginTop: 'var(--space-2xl)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-md)',
+              textAlign: 'left',
+            }}>
+              {[
+                { icon: CheckCircle2, text: 'AI-powered institution matching' },
+                { icon: Database, text: 'CLARISA database integration' },
+                { icon: Globe, text: 'Automated web research' },
+              ].map((feature, idx) => (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 + idx * 0.1 }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-sm)',
+                    color: 'rgba(255, 255, 255, 0.9)',
+                  }}
+                >
+                  <feature.icon size={20} />
+                  <span style={{ fontSize: '0.9375rem' }}>{feature.text}</span>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Right Side - Login Form */}
+        <div style={{
+          flex: '1',
+          padding: 'var(--space-2xl)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'white',
+        }}>
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6 }}
+            style={{
+              width: '100%',
+              maxWidth: '480px',
+            }}
+          >
+            <div style={{ marginBottom: 'var(--space-2xl)' }}>
+              <h2 style={{
+                fontSize: '1.875rem',
+                fontWeight: 700,
+                color: 'var(--cgiar-navy)',
+                marginBottom: 'var(--space-xs)',
+              }}>
+                Welcome back
+              </h2>
+              <p style={{
+                fontSize: '0.9375rem',
+                color: 'var(--color-text-muted)',
+              }}>
+                Sign in to your account to continue
+              </p>
+            </div>
+
+            {/* Login Form */}
+            <form onSubmit={handleLogin}>
+              <div style={{ marginBottom: 'var(--space-lg)' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: 'var(--cgiar-navy)',
+                  marginBottom: 'var(--space-xs)',
+                }}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="your.email@cgiar.org"
+                  required
+                  disabled={loggingIn}
+                  style={{
+                    width: '100%',
+                    padding: '14px var(--space-md)',
+                    border: '1px solid var(--cgiar-gray)',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '0.9375rem',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.2s',
+                    background: loggingIn ? 'var(--cgiar-light-gray)' : 'white',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'var(--cgiar-green)';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'var(--cgiar-gray)';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 'var(--space-xl)' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: 'var(--cgiar-navy)',
+                  marginBottom: 'var(--space-xs)',
+                }}>
+                  Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    required
+                    disabled={loggingIn}
+                    style={{
+                      width: '100%',
+                      padding: '14px var(--space-md)',
+                      paddingRight: '48px',
+                      border: '1px solid var(--cgiar-gray)',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '0.9375rem',
+                      fontFamily: 'inherit',
+                      transition: 'all 0.2s',
+                      background: loggingIn ? 'var(--cgiar-light-gray)' : 'white',
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = 'var(--cgiar-green)';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'var(--cgiar-gray)';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={loggingIn}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: loggingIn ? 'not-allowed' : 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--color-text-muted)',
+                      transition: 'color 0.2s',
+                      opacity: loggingIn ? 0.5 : 1,
+                    }}
+                    onMouseOver={(e) => !loggingIn && (e.currentTarget.style.color = 'var(--cgiar-navy)')}
+                    onMouseOut={(e) => !loggingIn && (e.currentTarget.style.color = 'var(--color-text-muted)')}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Error Message */}
+              {loginError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  style={{
+                    marginBottom: 'var(--space-lg)',
+                    padding: 'var(--space-md)',
+                    background: '#FEF2F2',
+                    border: '1px solid #FCA5A5',
+                    borderRadius: 'var(--radius-md)',
+                    color: '#991B1B',
+                    fontSize: '0.875rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-xs)',
+                  }}
+                >
+                  <AlertCircle size={18} />
+                  {loginError}
+                </motion.div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loggingIn || !loginEmail || !loginPassword}
+                style={{
+                  width: '100%',
+                  padding: '14px var(--space-lg)',
+                  background: loggingIn || !loginEmail || !loginPassword 
+                    ? 'var(--cgiar-gray)' 
+                    : 'var(--cgiar-green)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  cursor: loggingIn || !loginEmail || !loginPassword ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseOver={(e) => {
+                  if (!loggingIn && loginEmail && loginPassword) {
+                    e.currentTarget.style.background = '#059669';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!loggingIn && loginEmail && loginPassword) {
+                    e.currentTarget.style.background = 'var(--cgiar-green)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }
+                }}
+              >
+                {loggingIn ? 'Signing in...' : 'Sign In'}
+              </button>
+            </form>
+
+            {/* Footer */}
+            <div style={{
+              marginTop: 'var(--space-2xl)',
+              paddingTop: 'var(--space-lg)',
+              borderTop: '1px solid var(--cgiar-gray)',
+              textAlign: 'center',
+            }}>
+              <p style={{
+                fontSize: '0.8125rem',
+                color: 'var(--color-text-muted)',
+              }}>
+                CGIAR Partner Request Support System
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-background)' }}>
@@ -250,6 +823,65 @@ export default function Home() {
                 CGIAR Institutional Mapping
               </p>
             </div>
+          </motion.div>
+
+          {/* User info and logout */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 'var(--space-md)',
+            }}
+          >
+            <div style={{
+              textAlign: 'right',
+              marginRight: 'var(--space-sm)',
+            }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: 'var(--cgiar-navy)',
+                marginBottom: '2px',
+              }}>
+                {authUser?.name || authUser?.username}
+              </p>
+              <p style={{
+                fontSize: '0.75rem',
+                color: 'var(--color-text-muted)',
+              }}>
+                {authUser?.email}
+              </p>
+            </div>
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: '8px 16px',
+                background: 'white',
+                color: 'var(--cgiar-navy)',
+                border: '2px solid var(--cgiar-gray)',
+                borderRadius: 'var(--radius-md)',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.borderColor = 'var(--color-error)';
+                e.currentTarget.style.color = 'var(--color-error)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.borderColor = 'var(--cgiar-gray)';
+                e.currentTarget.style.color = 'var(--cgiar-navy)';
+              }}
+            >
+              <XCircle size={16} />
+              Logout
+            </button>
           </motion.div>
         </div>
       </header>
@@ -804,7 +1436,6 @@ export default function Home() {
                     setResults(null);
                     setFile(null);
                     setSearchQuery('');
-                    setExpandedPartner(null);
                   }}
                   style={{
                     padding: '8px 16px',
@@ -1013,6 +1644,15 @@ export default function Home() {
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px',
                       }}>Web Search</th>
+                      <th style={{
+                        padding: 'var(--space-sm) var(--space-md)',
+                        textAlign: 'center',
+                        fontWeight: 600,
+                        color: 'var(--cgiar-navy)',
+                        fontSize: '0.75rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1202,6 +1842,81 @@ export default function Home() {
                               <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>—</span>
                             )}
                           </td>
+                          <td style={{
+                            padding: 'var(--space-sm) var(--space-md)',
+                            textAlign: 'center',
+                          }}>
+                            {partner.api_data ? (
+                              <div style={{
+                                display: 'flex',
+                                gap: '8px',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                              }}>
+                                <button
+                                  onClick={() => {
+                                    setSelectedPartner(partner);
+                                    setModalType('accept');
+                                    setModalOpen(true);
+                                  }}
+                                  disabled={respondingToRequest}
+                                  style={{
+                                    padding: '6px 10px',
+                                    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                                    color: 'white',
+                                    borderRadius: 'var(--radius-sm)',
+                                    border: 'none',
+                                    cursor: respondingToRequest ? 'not-allowed' : 'pointer',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 500,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    transition: 'all 0.2s',
+                                    opacity: respondingToRequest ? 0.5 : 1,
+                                  }}
+                                  onMouseOver={(e) => !respondingToRequest && (e.currentTarget.style.opacity = '0.85')}
+                                  onMouseOut={(e) => !respondingToRequest && (e.currentTarget.style.opacity = '1')}
+                                  title="Accept this partner request"
+                                >
+                                  <ThumbsUp size={14} />
+                                  Accept
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedPartner(partner);
+                                    setModalType('reject');
+                                    setRejectJustification('');
+                                    setModalOpen(true);
+                                  }}
+                                  disabled={respondingToRequest}
+                                  style={{
+                                    padding: '6px 10px',
+                                    background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+                                    color: 'white',
+                                    borderRadius: 'var(--radius-sm)',
+                                    border: 'none',
+                                    cursor: respondingToRequest ? 'not-allowed' : 'pointer',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 500,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    transition: 'all 0.2s',
+                                    opacity: respondingToRequest ? 0.5 : 1,
+                                  }}
+                                  onMouseOver={(e) => !respondingToRequest && (e.currentTarget.style.opacity = '0.85')}
+                                  onMouseOut={(e) => !respondingToRequest && (e.currentTarget.style.opacity = '1')}
+                                  title="Reject this partner request"
+                                >
+                                  <ThumbsDown size={14} />
+                                  Reject
+                                </button>
+                              </div>
+                            ) : (
+                              <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>—</span>
+                            )}
+                          </td>
                         </motion.tr>
                       );
                     })}
@@ -1259,13 +1974,13 @@ export default function Home() {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'start',
-                  background: modalType === 'clarisa' ? 'var(--cgiar-blue)' : modalType === 'candidates' ? 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)' : 'var(--cgiar-yellow)',
+                  background: modalType === 'clarisa' ? 'var(--cgiar-blue)' : modalType === 'candidates' ? 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)' : modalType === 'accept' ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)' : modalType === 'reject' ? 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)' : 'var(--cgiar-yellow)',
                   borderTopLeftRadius: 'var(--radius-lg)',
                   borderTopRightRadius: 'var(--radius-lg)',
                 }}>
                   <div>
                     <h3 style={{
-                      color: modalType === 'candidates' || modalType === 'clarisa' ? 'white' : 'var(--cgiar-navy)',
+                      color: modalType === 'candidates' || modalType === 'clarisa' || modalType === 'accept' || modalType === 'reject' ? 'white' : 'var(--cgiar-navy)',
                       fontSize: '1.125rem',
                       fontWeight: 600,
                       marginBottom: '4px',
@@ -1273,10 +1988,10 @@ export default function Home() {
                       {selectedPartner.name}
                     </h3>
                     <p style={{
-                      color: modalType === 'candidates' || modalType === 'clarisa' ? 'rgba(255,255,255,0.9)' : 'var(--color-text-secondary)',
+                      color: modalType === 'candidates' || modalType === 'clarisa' || modalType === 'accept' || modalType === 'reject' ? 'rgba(255,255,255,0.9)' : 'var(--color-text-secondary)',
                       fontSize: '0.875rem',
                     }}>
-                      {modalType === 'clarisa' ? 'CLARISA Match Details' : modalType === 'candidates' ? 'Top Candidate Matches' : 'Web Search Results'}
+                      {modalType === 'clarisa' ? 'CLARISA Match Details' : modalType === 'candidates' ? 'Top Candidate Matches' : modalType === 'accept' ? 'Accept Partner Request' : modalType === 'reject' ? 'Reject Partner Request' : 'Web Search Results'}
                     </p>
                   </div>
                   <button
@@ -1285,7 +2000,7 @@ export default function Home() {
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
-                      color: modalType === 'candidates' || modalType === 'clarisa' ? 'white' : 'var(--cgiar-navy)',
+                      color: modalType === 'candidates' || modalType === 'clarisa' || modalType === 'accept' || modalType === 'reject' ? 'white' : 'var(--cgiar-navy)',
                       fontSize: '1.5rem',
                       lineHeight: 1,
                       padding: '4px',
@@ -1579,6 +2294,282 @@ export default function Home() {
                           </motion.div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Accept Confirmation Modal */}
+                  {modalType === 'accept' && selectedPartner && (
+                    <div style={{
+                      padding: 'var(--space-md)',
+                    }}>
+                      {responseMessage ? (
+                        <div style={{
+                          padding: 'var(--space-md)',
+                          background: responseMessage.type === 'success' ? '#D1FAE5' : '#FEE2E2',
+                          border: `1px solid ${responseMessage.type === 'success' ? '#10B981' : '#EF4444'}`,
+                          borderRadius: 'var(--radius-sm)',
+                          color: responseMessage.type === 'success' ? '#065F46' : '#991B1B',
+                          fontSize: '0.875rem',
+                          marginBottom: 'var(--space-md)',
+                        }}>
+                          {responseMessage.type === 'success' ? '✓' : '⚠️'} {responseMessage.message}
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{
+                            marginBottom: 'var(--space-lg)',
+                            textAlign: 'center',
+                          }}>
+                            <div style={{
+                              width: '48px',
+                              height: '48px',
+                              borderRadius: '50%',
+                              background: 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              margin: '0 auto var(--space-md)',
+                            }}>
+                              <ThumbsUp size={24} style={{ color: '#059669' }} />
+                            </div>
+                            <h3 style={{
+                              fontSize: '1rem',
+                              fontWeight: 600,
+                              color: 'var(--cgiar-navy)',
+                              marginBottom: 'var(--space-xs)',
+                            }}>
+                              Accept Partner Request
+                            </h3>
+                            <p style={{
+                              fontSize: '0.8125rem',
+                              color: 'var(--color-text-secondary)',
+                              lineHeight: 1.5,
+                            }}>
+                              This action will notify the partner and create a record in the CLARISA system.
+                            </p>
+                          </div>
+
+                          <div style={{
+                            display: 'flex',
+                            gap: 'var(--space-sm)',
+                            justifyContent: 'center',
+                          }}>
+                            <button
+                              onClick={() => setModalOpen(false)}
+                              disabled={respondingToRequest}
+                              style={{
+                                padding: '10px 20px',
+                                background: 'white',
+                                color: 'var(--cgiar-navy)',
+                                border: '2px solid var(--cgiar-gray)',
+                                borderRadius: 'var(--radius-md)',
+                                cursor: respondingToRequest ? 'not-allowed' : 'pointer',
+                                fontSize: '0.875rem',
+                                fontWeight: 500,
+                                transition: 'all 0.2s',
+                                opacity: respondingToRequest ? 0.5 : 1,
+                              }}
+                              onMouseOver={(e) => !respondingToRequest && (e.currentTarget.style.borderColor = 'var(--color-text-muted)')}
+                              onMouseOut={(e) => !respondingToRequest && (e.currentTarget.style.borderColor = 'var(--cgiar-gray)')}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => selectedPartner && handleAcceptRequest()}
+                              disabled={respondingToRequest}
+                              style={{
+                                padding: '10px 20px',
+                                background: respondingToRequest ? 'var(--cgiar-gray)' : 'var(--cgiar-green)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: 'var(--radius-md)',
+                                cursor: respondingToRequest ? 'not-allowed' : 'pointer',
+                                fontSize: '0.875rem',
+                                fontWeight: 600,
+                                transition: 'all 0.2s',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                              }}
+                              onMouseOver={(e) => {
+                                if (!respondingToRequest) {
+                                  e.currentTarget.style.background = '#059669';
+                                  e.currentTarget.style.transform = 'translateY(-1px)';
+                                  e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                                }
+                              }}
+                              onMouseOut={(e) => {
+                                if (!respondingToRequest) {
+                                  e.currentTarget.style.background = 'var(--cgiar-green)';
+                                  e.currentTarget.style.transform = 'translateY(0)';
+                                  e.currentTarget.style.boxShadow = 'none';
+                                }
+                              }}
+                            >
+                              {respondingToRequest ? (
+                                <>Processing...</>
+                              ) : (
+                                <>
+                                  <ThumbsUp size={16} />
+                                  Yes, Accept
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Reject Modal with Justification */}
+                  {modalType === 'reject' && selectedPartner && (
+                    <div style={{
+                      padding: 'var(--space-md)',
+                    }}>
+                      {responseMessage ? (
+                        <div style={{
+                          padding: 'var(--space-md)',
+                          background: responseMessage.type === 'success' ? '#D1FAE5' : '#FEE2E2',
+                          border: `1px solid ${responseMessage.type === 'success' ? '#10B981' : '#EF4444'}`,
+                          borderRadius: 'var(--radius-sm)',
+                          color: responseMessage.type === 'success' ? '#065F46' : '#991B1B',
+                          fontSize: '0.875rem',
+                          marginBottom: 'var(--space-md)',
+                        }}>
+                          {responseMessage.type === 'success' ? '✓' : '⚠️'} {responseMessage.message}
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{
+                            marginBottom: 'var(--space-lg)',
+                            padding: 'var(--space-md)',
+                            background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)',
+                            borderRadius: 'var(--radius-md)',
+                            border: '1px solid #FCA5A5',
+                            borderLeft: '4px solid #EF4444',
+                          }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'start',
+                              gap: 'var(--space-sm)',
+                            }}>
+                              <AlertCircle size={20} style={{ color: '#DC2626', flexShrink: 0, marginTop: '2px' }} />
+                              <div>
+                                <p style={{
+                                  fontSize: '0.875rem',
+                                  color: '#991B1B',
+                                  lineHeight: 1.5,
+                                  margin: 0,
+                                  fontWeight: 500,
+                                }}>
+                                  You are about to reject this partner request
+                                </p>
+                                <p style={{
+                                  fontSize: '0.75rem',
+                                  color: '#7F1D1D',
+                                  marginTop: 'var(--space-xs)',
+                                  marginBottom: 0,
+                                }}>
+                                  Please provide a reason below (optional) to help improve future submissions.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ marginBottom: 'var(--space-lg)' }}>
+                            <label style={{
+                              display: 'block',
+                              fontSize: '0.875rem',
+                              fontWeight: 500,
+                              color: 'var(--cgiar-navy)',
+                              marginBottom: 'var(--space-xs)',
+                            }}>
+                              Rejection Reason (Optional)
+                            </label>
+                            <textarea
+                              value={rejectJustification}
+                              onChange={(e) => setRejectJustification(e.target.value)}
+                              placeholder="Provide any details about why this request is being rejected..."
+                              disabled={respondingToRequest}
+                              style={{
+                                width: '100%',
+                                minHeight: '120px',
+                                padding: 'var(--space-sm)',
+                                border: '1px solid var(--cgiar-gray)',
+                                borderRadius: 'var(--radius-sm)',
+                                fontSize: '0.875rem',
+                                fontFamily: 'inherit',
+                                resize: 'vertical',
+                                background: respondingToRequest ? '#F3F4F6' : 'white',
+                              }}
+                            />
+                            <p style={{
+                              fontSize: '0.75rem',
+                              color: 'var(--color-text-muted)',
+                              marginTop: 'var(--space-xs)',
+                              marginBottom: 0,
+                            }}>
+                              {rejectJustification.length} characters
+                            </p>
+                          </div>
+
+                          <div style={{
+                            display: 'flex',
+                            gap: 'var(--space-sm)',
+                            justifyContent: 'flex-end',
+                          }}>
+                            <button
+                              onClick={() => {
+                                setModalOpen(false);
+                                setRejectJustification('');
+                              }}
+                              disabled={respondingToRequest}
+                              style={{
+                                padding: '10px 20px',
+                                background: 'white',
+                                color: 'var(--cgiar-navy)',
+                                border: '1px solid var(--cgiar-gray)',
+                                borderRadius: 'var(--radius-sm)',
+                                cursor: respondingToRequest ? 'not-allowed' : 'pointer',
+                                fontSize: '0.875rem',
+                                fontWeight: 500,
+                                transition: 'all 0.2s',
+                                opacity: respondingToRequest ? 0.5 : 1,
+                              }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => selectedPartner && handleRejectRequest()}
+                              disabled={respondingToRequest}
+                              style={{
+                                padding: '10px 20px',
+                                background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: 'var(--radius-sm)',
+                                cursor: respondingToRequest ? 'not-allowed' : 'pointer',
+                                fontSize: '0.875rem',
+                                fontWeight: 600,
+                                transition: 'all 0.2s',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                opacity: respondingToRequest ? 0.5 : 1,
+                              }}
+                            >
+                              {respondingToRequest ? (
+                                <>Processing...</>
+                              ) : (
+                                <>
+                                  <ThumbsDown size={16} />
+                                  Confirm Reject
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
