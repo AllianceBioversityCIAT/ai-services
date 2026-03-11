@@ -5,12 +5,19 @@ from app.utils.logger.logger_util import get_logger
 
 logger = get_logger()
 
-# Use IAM Role for authentication in Lambda (credentials are optional for local development)
+# Validate Bedrock configuration
+if not BR.get('aws_access_key'):
+    raise ValueError("AWS_ACCESS_KEY_ID_BR environment variable is required. Please configure it in Lambda environment variables.")
+if not BR.get('aws_secret_key'):
+    raise ValueError("AWS_SECRET_ACCESS_KEY_BR environment variable is required. Please configure it in Lambda environment variables.")
+
+# Create Bedrock client using explicit credentials (same pattern as EC2 deployment)
+# Use explicit credentials from environment variables for authentication
 bedrock_runtime = boto3.client(
     service_name='bedrock-runtime',
+    aws_access_key_id=BR['aws_access_key'],
+    aws_secret_access_key=BR['aws_secret_key'],
     region_name=BR.get('region', 'us-east-1')
-    # IAM Role provides credentials automatically in Lambda
-    # For local development, set AWS_ACCESS_KEY_ID_BR and AWS_SECRET_ACCESS_KEY_BR env vars
 )
 
 

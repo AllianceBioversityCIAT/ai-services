@@ -25,16 +25,19 @@ ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.append(str(ROOT))
 
 from app.utils.logger.logger_util import get_logger
-from app.utils.config.config_util import KNOWLEDGE_BASE
+from app.utils.config.config_util import KNOWLEDGE_BASE, BR
 from app.utils.notification.notification_service import NotificationService
 
 logger = get_logger()
 notification_service = NotificationService()
 
 
+# Create Bedrock Agent client using explicit credentials (same pattern as EC2 deployment)
 bedrock_agent = boto3.client(
     service_name='bedrock-agent',
-    region_name='us-east-1'
+    aws_access_key_id=BR['aws_access_key'],
+    aws_secret_access_key=BR['aws_secret_key'],
+    region_name=BR.get('region', 'us-east-1')
 )
 
 
