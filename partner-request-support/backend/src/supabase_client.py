@@ -198,6 +198,235 @@ def search_by_acronym_embedding(query_embedding: List[float],
         return []
 
 
+# ==========================================
+# PARTNER REQUEST CACHE FUNCTIONS
+# ==========================================
+
+CACHE_TABLE = "partner_request_cache_test"
+
+
+def get_cached_result(request_id: int) -> Optional[Dict]:
+    """
+    Gets a cached result for a partner request
+    
+    Args:
+        request_id: Partner request ID from CLARISA API
+        
+    Returns:
+        Dict: Cached partner result or None if not found
+    """
+    try:
+        response = supabase.table(CACHE_TABLE).select("*").eq(
+            'request_id', request_id
+        ).execute()
+        
+        if response.data and len(response.data) > 0:
+            cache_data = response.data[0]
+            # Reconstruct the partner result format
+            partner_result = {
+                'id': str(cache_data['request_id']),
+                'name': cache_data['partner_name'],
+                'acronym': cache_data['acronym'] or '',
+                'website': cache_data['website'] or '',
+                'country': cache_data['country'] or '',
+                'match_found': cache_data['match_found'],
+                'match_quality': cache_data['match_quality'],
+                'clarisa_match': cache_data['clarisa_match'],
+                'top_candidates': cache_data['top_candidates'] or [],
+                'web_search': cache_data['web_search'],
+                'api_data': cache_data['api_data']
+            }
+            logger.info(f"✅ Cache HIT for request_id {request_id}")
+            return partner_result
+        
+        logger.info(f"⚠️  Cache MISS for request_id {request_id}")
+        return None
+    
+    except Exception as e:
+        logger.error(f"❌ Error getting cached result for {request_id}: {e}")
+        return None
+
+
+def get_cached_results(request_ids: List[int]) -> Dict[int, Dict]:
+    """
+    Gets multiple cached results for partner requests
+    
+    Args:
+        request_ids: List of partner request IDs
+        
+    Returns:
+        Dict: Dictionary mapping request_id -> partner_result for found items
+    """
+    if not request_ids:
+        return {}
+    
+    try:
+        response = supabase.table(CACHE_TABLE).select("*").in_(
+            'request_id', request_ids
+        ).execute()
+        
+        cached_results = {}
+        if response.data:
+            for cache_data in response.data:
+                request_id = cache_data['request_id']
+                partner_result = {
+                    'id': str(cache_data['request_id']),
+                    'name': cache_data['partner_name'],
+                    'acronym': cache_data['acronym'] or '',
+                    'website': cache_data['website'] or '',
+                    'country': cache_data['country'] or '',
+                    'match_found': cache_data['match_found'],
+                    'match_quality': cache_data['match_quality'],
+                    'clarisa_match': cache_data['clarisa_match'],
+                    'top_candidates': cache_data['top_candidates'] or [],
+                    'web_search': cache_data['web_search'],
+                    'api_data': cache_data['api_data']
+                }
+                cached_results[request_id] = partner_result
+            
+            logger.info(f"✅ Cache: Found {len(cached_results)}/{len(request_ids)} cached results")
+        else:
+            logger.info(f"⚠️  Cache: No cached results found for {len(request_ids)} requests")
+        
+        return cached_results
+    
+    except Exception as e:
+        logger.error(f"❌ Error getting cached results: {e}")
+        return {}
+
+
+def cache_result(partner_result: Dict) -> bool:
+    """
+    Caches a processed partner request result
+    
+    Args:
+        partner_result: Partner result dictionary from process_partners_to_json
+        
+    Returns:
+        bool: True if cached successfully, False otherwise
+    """
+    try:
+        # Extract request_id from api_data
+        api_data = partner_result.get('api_data', {})
+        request_id = api_data.get('request_id')
+        
+        if not request_id:
+            logger.warning(f"⚠️  Cannot cache result: missing request_id")
+            return False
+        
+        cache_data = {
+            'request_id': request_id,
+            'partner_name': partner_result.get('name', ''),
+            'acronym': partner_result.get('acronym'),
+            'website': partner_result.get('website'),
+            'country': partner_result.get('country'),
+            'match_found': partner_result.get('match_found', False),
+            'match_quality': partner_result.get('match_quality', 'no_match'),
+            'clarisa_match': partner_result.get('clarisa_match'),
+            'top_candidates': partner_result.get('top_candidates', []),
+            'web_search': partner_result.get('web_search'),
+            'api_data': api_data
+        }
+        
+        response = supabase.table(CACHE_TABLE).upsert(
+            cache_data,
+            on_conflict='request_id'
+        ).execute()
+        
+        logger.info(f"✅ Cached result for request_id {request_id}")
+        return True
+    
+    except Exception as e:
+        logger.error(f"❌ Error caching result: {e}")
+        return False
+
+
+def cache_results_batch(partners_results: List[Dict]) -> Dict[str, int]:
+    """
+    Caches multiple partner request results in a batch
+    
+    Args:
+        partners_results: List of partner results from process_partners_to_json
+        
+    Returns:
+        Dict: Statistics {'cached': N, 'failed': M}
+    """
+    stats = {'cached': 0, 'failed': 0, 'skipped': 0}
+    
+    cache_batch = []
+    for partner_result in partners_results:
+        api_data = partner_result.get('api_data', {})
+        request_id = api_data.get('request_id')
+        
+        if not request_id:
+            stats['skipped'] += 1
+            continue
+        
+        cache_data = {
+            'request_id': request_id,
+            'partner_name': partner_result.get('name', ''),
+            'acronym': partner_result.get('acronym'),
+            'website': partner_result.get('website'),
+            'country': partner_result.get('country'),
+            'match_found': partner_result.get('match_found', False),
+            'match_quality': partner_result.get('match_quality', 'no_match'),
+            'clarisa_match': partner_result.get('clarisa_match'),
+            'top_candidates': partner_result.get('top_candidates', []),
+            'web_search': partner_result.get('web_search'),
+            'api_data': api_data
+        }
+        cache_batch.append(cache_data)
+    
+    if not cache_batch:
+        logger.warning(f"⚠️  No valid results to cache")
+        return stats
+    
+    try:
+        response = supabase.table(CACHE_TABLE).upsert(
+            cache_batch,
+            on_conflict='request_id'
+        ).execute()
+        
+        stats['cached'] = len(cache_batch)
+        logger.info(f"✅ Cached {stats['cached']} partner results")
+        
+    except Exception as e:
+        stats['failed'] = len(cache_batch)
+        logger.error(f"❌ Error caching batch: {e}")
+    
+    return stats
+
+
+def get_cache_stats() -> Dict:
+    """
+    Gets statistics about the cache
+    
+    Returns:
+        Dict: Cache statistics
+    """
+    try:
+        # Total cached items
+        total_response = supabase.table(CACHE_TABLE).select(
+            "request_id", count='exact'
+        ).execute()
+        
+        # By match quality
+        quality_response = supabase.table(CACHE_TABLE).select(
+            "match_quality", count='exact'
+        ).execute()
+        
+        stats = {
+            'total_cached': total_response.count if total_response.count else 0,
+            'by_quality': {}
+        }
+        
+        return stats
+    
+    except Exception as e:
+        logger.error(f"❌ Error getting cache stats: {e}")
+        return {'total_cached': 0, 'by_quality': {}}
+
+
 def search_combined(name_embedding: List[float],
                    acronym_embedding: List[float],
                    name_weight: float = 0.7,

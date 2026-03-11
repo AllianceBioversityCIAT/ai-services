@@ -13,6 +13,8 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, File, UploadFile, HTTPException, Body
 from src.mapping_clarisa_comparison import process_partners_to_json
+from src.supabase_client import get_cached_results, cache_results_batch
+from src.supabase_client import get_cached_results, cache_results_batch
 
 
 logger = get_logger()
@@ -186,7 +188,8 @@ async def sync_partner_requests():
 @app.post("/api/process-api-partners")
 async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
     """
-    Process partner requests from the synced API data
+    Process partner requests from the synced API data.
+    Uses cache to avoid re-processing already processed requests.
     
     Args:
         partner_ids: Optional list of specific partner IDs to process.
@@ -196,6 +199,7 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
         JSON with processed results including:
         - partners: List of partners with match info
         - stats: Processing statistics
+        - cache_info: Cache hit/miss statistics
     """
     global synced_partner_requests
     
@@ -213,8 +217,8 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
                 if pr.get('id') in partner_ids
             ]
         else:
-            # For testing, limit to last 3 partners
-            partners_to_process = synced_partner_requests[-3:]
+            # For testing, limit to last 5 partners
+            partners_to_process = synced_partner_requests[-5:]
         
         if not partners_to_process:
             raise HTTPException(
@@ -224,49 +228,140 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
         
         logger.info(f"🚀 Processing {len(partners_to_process)} partner requests from API")
         
-        # Convert API data to DataFrame format expected by process_partners_to_json
-        data_rows = []
+        # STEP 1: Check cache for already processed requests
+        request_ids = [pr.get('id') for pr in partners_to_process]
+        cached_results_dict = get_cached_results(request_ids)
+        
+        # Separate cached vs. new partners
+        cached_partners = []
+        partners_to_compute = []
+        
         for pr in partners_to_process:
-            row = {
-                'id': pr.get('id', ''),
-                'partner_name': pr.get('partnerName', ''),
-                'acronym': pr.get('acronym', ''),
-                'website': pr.get('webPage', ''),
-                'country': pr.get('countryDTO', {}).get('name', ''),
-                'institution_type': pr.get('institutionTypeDTO', {}).get('name', ''),
-                'request_source': pr.get('requestSource', ''),
-                'external_user': pr.get('externalUserName', ''),
-            }
-            data_rows.append(row)
+            pr_id = pr.get('id')
+            if pr_id in cached_results_dict:
+                # Found in cache - use cached result
+                cached_partners.append(cached_results_dict[pr_id])
+            else:
+                # Not in cache - need to process
+                partners_to_compute.append(pr)
         
-        # Create DataFrame
-        df = pd.DataFrame(data_rows)
+        cache_info = {
+            'total_requests': len(partners_to_process),
+            'cache_hits': len(cached_partners),
+            'cache_misses': len(partners_to_compute),
+            'from_cache': len(cached_partners) > 0,
+            'processed_new': len(partners_to_compute) > 0
+        }
         
-        # Reorder columns to match expected format
-        # Column 0: ID, Column 1: partner_name, Column 2: acronym, Column 3: website, Column 5: country
-        df_ordered = pd.DataFrame({
-            'id': df['id'],
-            'partner_name': df['partner_name'],
-            'acronym': df['acronym'],
-            'website': df['website'],
-            'placeholder': '',  # Column 4 placeholder
-            'country': df['country'],
-        })
+        logger.info(f"📦 Cache status: {cache_info['cache_hits']} hits, {cache_info['cache_misses']} misses")
         
-        logger.info(f"📊 Created DataFrame with {len(df_ordered)} rows")
+        # STEP 2: Process only the new partners (cache misses)
+        newly_processed_partners = []
+        processing_stats = {
+            'total': 0,
+            'matched': 0,
+            'no_match': 0,
+            'web_search_attempted': 0,
+            'web_search_success': 0,
+            'errors': 0,
+            'excellent': 0,
+            'good': 0,
+            'fair': 0
+        }
         
-        # Process using existing pipeline
-        results = process_partners_to_json(df_ordered)
-        
-        # Add original API data to results for reference
-        for i, partner_result in enumerate(results['partners']):
-            if i < len(partners_to_process):
-                partner_result['api_data'] = {
-                    'request_id': partners_to_process[i].get('id'),
-                    'request_source': partners_to_process[i].get('requestSource'),
-                    'external_user': partners_to_process[i].get('externalUserName'),
-                    'created_at': partners_to_process[i].get('created_at'),
+        if partners_to_compute:
+            logger.info(f"🔄 Processing {len(partners_to_compute)} new partner requests")
+            
+            # Convert API data to DataFrame format expected by process_partners_to_json
+            data_rows = []
+            for pr in partners_to_compute:
+                row = {
+                    'id': pr.get('id', ''),
+                    'partner_name': pr.get('partnerName', ''),
+                    'acronym': pr.get('acronym', ''),
+                    'website': pr.get('webPage', ''),
+                    'country': pr.get('countryDTO', {}).get('name', ''),
+                    'institution_type': pr.get('institutionTypeDTO', {}).get('name', ''),
+                    'request_source': pr.get('requestSource', ''),
+                    'external_user': pr.get('externalUserName', ''),
                 }
+                data_rows.append(row)
+            
+            # Create DataFrame
+            df = pd.DataFrame(data_rows)
+            
+            # Reorder columns to match expected format
+            df_ordered = pd.DataFrame({
+                'id': df['id'],
+                'partner_name': df['partner_name'],
+                'acronym': df['acronym'],
+                'website': df['website'],
+                'placeholder': '',  # Column 4 placeholder
+                'country': df['country'],
+            })
+            
+            logger.info(f"📊 Created DataFrame with {len(df_ordered)} rows")
+            
+            # Process using existing pipeline
+            processing_results = process_partners_to_json(df_ordered)
+            processing_stats = processing_results['stats']
+            
+            # Add original API data to results for reference
+            for i, partner_result in enumerate(processing_results['partners']):
+                if i < len(partners_to_compute):
+                    partner_result['api_data'] = {
+                        'request_id': partners_to_compute[i].get('id'),
+                        'request_source': partners_to_compute[i].get('requestSource'),
+                        'external_user': partners_to_compute[i].get('externalUserName'),
+                        'created_at': partners_to_compute[i].get('created_at'),
+                    }
+            
+            newly_processed_partners = processing_results['partners']
+            
+            # STEP 3: Cache the newly processed results
+            cache_stats = cache_results_batch(newly_processed_partners)
+            logger.info(f"💾 Cached {cache_stats['cached']} new results")
+        else:
+            logger.info("✨ All requests found in cache - no processing needed")
+        
+        # STEP 4: Combine cached + newly processed results
+        all_partners = cached_partners + newly_processed_partners
+        
+        # Update stats to reflect all results (cached + new)
+        if cached_partners:
+            for partner in cached_partners:
+                processing_stats['total'] += 1
+                if partner.get('match_found'):
+                    processing_stats['matched'] += 1
+                    quality = partner.get('match_quality', 'no_match')
+                    if quality == 'excellent':
+                        processing_stats['excellent'] += 1
+                    elif quality == 'good':
+                        processing_stats['good'] += 1
+                    elif quality == 'fair':
+                        processing_stats['fair'] += 1
+                else:
+                    processing_stats['no_match'] += 1
+                
+                if partner.get('web_search'):
+                    processing_stats['web_search_attempted'] += 1
+                    if partner['web_search'].get('success'):
+                        processing_stats['web_search_success'] += 1
+        
+        # Recalculate percentages
+        if processing_stats['total'] > 0:
+            processing_stats['matched_percentage'] = round(
+                processing_stats['matched'] / processing_stats['total'] * 100, 1
+            )
+            processing_stats['no_match_percentage'] = round(
+                processing_stats['no_match'] / processing_stats['total'] * 100, 1
+            )
+        
+        results = {
+            'partners': all_partners,
+            'stats': processing_stats,
+            'cache_info': cache_info
+        }
         
         logger.info("✅ API partners processing completed successfully")
         
