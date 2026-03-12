@@ -16,5 +16,6 @@ dependencies = [
     "numpy",
     "fastapi",
     "uvicorn",
-    "python-multipart"
+    "python-multipart",
+    "langdetect"
 ]

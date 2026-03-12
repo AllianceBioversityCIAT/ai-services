@@ -17,6 +17,9 @@ pandas>=2.2.0
 # String matching
 rapidfuzz>=3.6.0
 
+# Language detection
+langdetect>=1.0.9
+
 # Progress bars
 tqdm>=4.66.0
 

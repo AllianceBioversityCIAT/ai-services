@@ -4,14 +4,17 @@ Reads an Excel file, searches for each institution in CLARISA using hybrid searc
 (vector embeddings + RapidFuzz) and generates a report with the results
 """
 import os
+import boto3
 import pandas as pd
 from tqdm import tqdm
 from rapidfuzz import fuzz
 from dotenv import load_dotenv
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
+from langdetect import detect, LangDetectException
 
 # Import project modules
+from config.config_util import BR
 from logger.logger_util import get_logger
 from src.utils import clean_text_for_matching
 from src.web_search import search_institution_online
@@ -22,6 +25,13 @@ from src.supabase_client import search_by_name_embedding, search_combined, count
 load_dotenv()
 logger = get_logger()
 
+translate_client = boto3.client(
+    service_name='translate',
+    aws_access_key_id=BR['aws_access_key'],
+    aws_secret_access_key=BR['aws_secret_key'],
+    region_name='us-east-1'
+)
+
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
@@ -29,9 +39,9 @@ THRESHOLD_EMBEDDINGS = 0.2  # Threshold for vector search (lower = more candidat
 THRESHOLD_FINAL = 0.6       # Threshold to consider a valid match (final score)
 NAME_WEIGHT = 0.7           # Weight of name in combined search (0-1)
 ACRONYM_WEIGHT = 0.3        # Weight of acronym in combined search (0-1)
-COSINE_WEIGHT = 0.50        # Weight of cosine similarity in final score
-FUZZ_NAME_WEIGHT = 0.40     # Weight of RapidFuzz name in final score
-FUZZ_ACRONYM_WEIGHT = 0.10  # Weight of RapidFuzz acronym in final score
+COSINE_WEIGHT = 0.60        # Weight of cosine similarity (semantic, multilanguage)
+FUZZ_NAME_WEIGHT = 0.30     # Weight of RapidFuzz name (string exactness)
+FUZZ_ACRONYM_WEIGHT = 0.10  # Weight of RapidFuzz acronym (acronym validation)
 ENABLE_WEB_SEARCH = True    # Enable web search fallback when no match in CLARISA
 
 EXCEL_CELL_CHAR_LIMIT = 32767
@@ -62,6 +72,45 @@ def sanitize_for_excel(text: str) -> str:
     return text
 
 
+def translate_to_english(text: str) -> str:
+    """
+    Translate text to English using AWS Translate for multilanguage support
+    Optimized: detects language locally first to avoid unnecessary API calls
+    
+    Args:
+        text: Text to translate
+        
+    Returns:
+        str: Translated text in English (or original if already English or translation fails)
+    """
+    if not text or not isinstance(text, str) or text.strip() == "":
+        return text
+    
+    try:
+        detected_lang = detect(text)
+
+        if detected_lang == 'en':
+            return text
+        
+        response = translate_client.translate_text(
+            Text=text,
+            SourceLanguageCode='auto',
+            TargetLanguageCode='en'
+        )
+        
+        translated_text = response['TranslatedText']
+        logger.info(f"🌐 Translated ({detected_lang}→en): '{text}' → '{translated_text}'")
+        
+        return translated_text
+        
+    except LangDetectException:
+        logger.debug(f"Language detection failed for '{text}' - using original")
+        return text
+    except Exception as e:
+        logger.warning(f"⚠️  Translation failed for '{text}': {e}. Using original text.")
+        return text
+
+
 # ============================================================================
 # HYBRID SEARCH FUNCTION
 # ============================================================================
@@ -69,10 +118,11 @@ def sanitize_for_excel(text: str) -> str:
 def search_institution_for_excel(partner_name, acronym=None):
     """
     Search for an institution using hybrid search (embeddings + RapidFuzz)
-    Optimized for batch processing from Excel
+    with DUAL-LANGUAGE support: searches with both original and translated text
+    to handle CLARISA's mixed-language database (Spanish and English)
     
     Args:
-        partner_name: Institution name
+        partner_name: Institution name (any language)
         acronym: Optional acronym
         
     Returns:
@@ -84,30 +134,54 @@ def search_institution_for_excel(partner_name, acronym=None):
     partner_name = str(partner_name).strip()
     acronym = str(acronym).strip() if acronym and str(acronym).lower() not in ['nan', 'none', ''] else None
     
-    name_embedding = get_embedding(partner_name)
-    name_embedding_list = embedding_to_list(name_embedding)
-    
-    if acronym:
-        acronym_embedding = get_embedding(acronym)
-        acronym_embedding_list = embedding_to_list(acronym_embedding)
-        
-        candidates = search_combined(
-            name_embedding=name_embedding_list,
-            acronym_embedding=acronym_embedding_list,
-            name_weight=NAME_WEIGHT,
-            acronym_weight=ACRONYM_WEIGHT,
-            threshold=THRESHOLD_EMBEDDINGS,
-            limit=5
-        )
+    partner_name_en = translate_to_english(partner_name)
+
+    search_variants = []
+    if partner_name.lower() != partner_name_en.lower():
+        search_variants = [(partner_name, "original"), (partner_name_en, "translated")]
+        logger.info(f"🔍 Dual search: original + translated")
     else:
-        candidates = search_by_name_embedding(
-            query_embedding=name_embedding_list,
-            threshold=THRESHOLD_EMBEDDINGS,
-            limit=5
-        )
+        search_variants = [(partner_name, "original")]
     
+    all_candidates_dict = {}
+
+    for search_text, variant_type in search_variants:
+        name_embedding = get_embedding(search_text)
+        name_embedding_list = embedding_to_list(name_embedding)
+        
+        if acronym:
+            acronym_embedding = get_embedding(acronym)
+            acronym_embedding_list = embedding_to_list(acronym_embedding)
+            
+            candidates = search_combined(
+                name_embedding=name_embedding_list,
+                acronym_embedding=acronym_embedding_list,
+                name_weight=NAME_WEIGHT,
+                acronym_weight=ACRONYM_WEIGHT,
+                threshold=THRESHOLD_EMBEDDINGS,
+                limit=5
+            )
+        else:
+            candidates = search_by_name_embedding(
+                query_embedding=name_embedding_list,
+                threshold=THRESHOLD_EMBEDDINGS,
+                limit=5
+            )
+        
+        if candidates:
+            for candidate in candidates:
+                clarisa_id = candidate['clarisa_id']
+                existing = all_candidates_dict.get(clarisa_id)
+                current_sim = candidate.get('similarity', candidate.get('combined_similarity', 0))
+                if not existing or current_sim > existing.get('similarity', existing.get('combined_similarity', 0)):
+                    all_candidates_dict[clarisa_id] = candidate
+    
+    candidates = list(all_candidates_dict.values())
     if not candidates:
         return None
+    
+    candidates.sort(key=lambda x: x.get('similarity', x.get('combined_similarity', 0)), reverse=True)
+    candidates = candidates[:5]
     
     processed_candidates = []
     best_match = None
@@ -115,10 +189,19 @@ def search_institution_for_excel(partner_name, acronym=None):
     
     for candidate in candidates:
         cosine_sim = candidate.get('similarity', candidate.get('combined_similarity', 0))
-        
-        normalized_query = clean_text_for_matching(partner_name)
+
         normalized_candidate = clean_text_for_matching(candidate['name'])
-        fuzz_name = fuzz.ratio(normalized_query, normalized_candidate) / 100
+        
+        normalized_query_original = clean_text_for_matching(partner_name)
+        fuzz_original = fuzz.ratio(normalized_query_original, normalized_candidate) / 100
+        
+        fuzz_translated = 0
+        if partner_name.lower() != partner_name_en.lower():
+            normalized_query_translated = clean_text_for_matching(partner_name_en)
+            fuzz_translated = fuzz.ratio(normalized_query_translated, normalized_candidate) / 100
+        
+        fuzz_name = max(fuzz_original, fuzz_translated)
+        used_translation = fuzz_translated > fuzz_original  # Track if translation helped
         
         fuzz_acronym = 0
         if acronym and candidate.get('acronym'):
@@ -142,8 +225,13 @@ def search_institution_for_excel(partner_name, acronym=None):
             'cosine_similarity': cosine_sim,
             'fuzz_name_score': fuzz_name,
             'fuzz_acronym_score': fuzz_acronym,
-            'final_score': combined_score
+            'final_score': combined_score,
+            'used_translation': used_translation  # Indicates if translated version had better fuzzy match
         }
+        
+        # Log when translation significantly improved the match
+        if used_translation and (fuzz_translated - fuzz_original) > 0.2:
+            logger.debug(f"   🌐 Translation improved fuzzy match: {fuzz_original:.2f} → {fuzz_translated:.2f} for '{candidate['name']}'")
         
         processed_candidates.append(candidate_data)
         
@@ -156,7 +244,10 @@ def search_institution_for_excel(partner_name, acronym=None):
     
     return {
         'best_match': best_match if best_score >= THRESHOLD_FINAL else None,
-        'all_candidates': processed_candidates
+        'all_candidates': processed_candidates,
+        'translation_used': partner_name.lower() != partner_name_en.lower(),  # Indicates if query was translated
+        'original_query': partner_name,
+        'translated_query': partner_name_en if partner_name.lower() != partner_name_en.lower() else None
     }
 
 
@@ -223,6 +314,13 @@ def process_partners_to_json(df):
                 best_match = search_result.get('best_match')
                 all_candidates = search_result.get('all_candidates', [])
                 
+                # Add translation info
+                partner_data['translation_info'] = {
+                    'was_translated': search_result.get('translation_used', False),
+                    'original_query': search_result.get('original_query'),
+                    'translated_query': search_result.get('translated_query')
+                }
+                
                 partner_data['top_candidates'] = [
                     {
                         'clarisa_id': cand['clarisa_id'],
@@ -231,6 +329,7 @@ def process_partners_to_json(df):
                         'countries': cand['countries'],
                         'institution_type': cand['institution_type'] or '',
                         'website': cand['website'] or '',
+                        'used_translation': cand.get('used_translation', False),
                         'scores': {
                             'cosine_similarity': round(cand['cosine_similarity'], 4),
                             'fuzz_name_score': round(cand['fuzz_name_score'], 4),
@@ -262,6 +361,7 @@ def process_partners_to_json(df):
                         'countries': best_match['countries'],
                         'institution_type': best_match['institution_type'] or '',
                         'website': best_match['website'] or '',
+                        'used_translation': best_match.get('used_translation', False),
                         'scores': {
                             'cosine_similarity': round(best_match['cosine_similarity'], 4),
                             'fuzz_name_score': round(best_match['fuzz_name_score'], 4),

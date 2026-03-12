@@ -653,8 +653,8 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
                 if pr.get('id') in partner_ids
             ]
         else:
-            # For testing, limit to last 3 partners
-            partners_to_process = synced_partner_requests[-3:]
+            # For testing, limit to last 5 partners
+            partners_to_process = synced_partner_requests[-5:]
         
         if not partners_to_process:
             raise HTTPException(
