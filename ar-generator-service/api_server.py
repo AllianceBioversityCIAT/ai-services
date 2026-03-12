@@ -34,8 +34,8 @@ def is_eventbridge_job(event: Dict[str, Any]) -> bool:
     EventBridge Scheduler sends events with a simple JSON structure like:
     {"job": "update_ar_data"}
     
-    API Gateway events have a different structure with keys like:
-    - "httpMethod", "path", "headers", "body", etc.
+    Function URL and API Gateway events have different structures with keys like:
+    - "requestContext", "headers", "body", "rawPath", "rawQueryString", etc.
     
     Args:
         event: Lambda event dictionary
@@ -43,17 +43,29 @@ def is_eventbridge_job(event: Dict[str, Any]) -> bool:
     Returns:
         True if this looks like an EventBridge job, False otherwise
     """
-    # Check if event is a dict and has the "job" key
+    # Check if event is a dict
     if not isinstance(event, dict):
         return False
     
+    # Function URL and API Gateway events have requestContext
+    # EventBridge Scheduler jobs do NOT have requestContext
+    if "requestContext" in event:
+        return False
+    
+    # Function URL events have these keys
+    function_url_keys = {"rawPath", "rawQueryString", "headers", "requestContext", "body", "isBase64Encoded"}
+    if any(key in event for key in function_url_keys):
+        return False
+    
+    # API Gateway events have these keys
+    api_gateway_keys = {"httpMethod", "path", "headers", "requestContext", "body", "pathParameters", "queryStringParameters"}
+    if any(key in event for key in api_gateway_keys):
+        return False
+    
     # EventBridge Scheduler jobs have a simple structure with "job" key
+    # and NO HTTP-related keys
     if "job" in event and isinstance(event.get("job"), str):
-        # Make sure it doesn't look like an HTTP event
-        # API Gateway events have these keys
-        http_keys = {"httpMethod", "path", "headers", "requestContext", "body", "pathParameters", "queryStringParameters"}
-        if not any(key in event for key in http_keys):
-            return True
+        return True
     
     return False
 
@@ -141,5 +153,32 @@ def handler(event: Dict[str, Any], context: Any) -> Any:
     else:
         # This is an HTTP/Function URL event, use Mangum directly
         # Mangum automatically detects Function URL vs API Gateway format
-        # Return the response directly without any wrapping to ensure proper format
-        return mangum_handler(event, context)
+        try:
+            logger.info(f"🔍 Processing HTTP/Function URL request")
+            logger.debug(f"Event keys: {list(event.keys()) if isinstance(event, dict) else 'Not a dict'}")
+            
+            # Call Mangum handler
+            response = mangum_handler(event, context)
+            
+            # Log response structure for debugging
+            if isinstance(response, dict):
+                logger.info(f"✅ Mangum returned response with keys: {list(response.keys())}")
+                logger.debug(f"Response statusCode: {response.get('statusCode', 'N/A')}")
+                if 'body' in response:
+                    body_preview = str(response['body'])[:200] if response['body'] else 'Empty'
+                    logger.debug(f"Response body preview: {body_preview}...")
+            else:
+                logger.warning(f"⚠️ Mangum returned non-dict response: {type(response)}")
+            
+            return response
+        except Exception as e:
+            logger.error(f"❌ Error in Mangum handler: {str(e)}", exc_info=True)
+            # Return error response in Function URL format
+            return {
+                "statusCode": 500,
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps({
+                    "status": "error",
+                    "message": f"Internal server error: {str(e)}"
+                })
+            }
