@@ -123,21 +123,14 @@ def handler(event: Dict[str, Any], context: Any) -> Any:
     Returns:
         Response appropriate for the event type
     """
-    try:
-        # Check if this is an EventBridge Scheduler job
-        if is_eventbridge_job(event):
-            logger.info("🔍 Detected EventBridge Scheduler job event")
+    # Check if this is an EventBridge Scheduler job
+    if is_eventbridge_job(event):
+        logger.info("🔍 Detected EventBridge Scheduler job event")
+        try:
             # Run async job handler
             return asyncio.run(handle_scheduled_job(event, context))
-        else:
-            # This is an HTTP/API Gateway event, use Mangum
-            logger.debug("🔍 Detected HTTP/API Gateway event, routing to FastAPI")
-            return mangum_handler(event, context)
-            
-    except Exception as e:
-        logger.error(f"❌ Unexpected error in handler: {str(e)}", exc_info=True)
-        # Try to return a proper error response
-        if is_eventbridge_job(event):
+        except Exception as e:
+            logger.error(f"❌ Unexpected error in handler: {str(e)}", exc_info=True)
             return {
                 "statusCode": 500,
                 "body": json.dumps({
@@ -145,6 +138,14 @@ def handler(event: Dict[str, Any], context: Any) -> Any:
                     "message": f"Handler error: {str(e)}"
                 })
             }
-        else:
-            # For HTTP events, let Mangum handle the error
+    else:
+        # This is an HTTP/API Gateway event, use Mangum directly
+        # Don't wrap in try/except to let Mangum handle errors properly
+        try:
+            response = mangum_handler(event, context)
+            logger.info(f"✅ HTTP response generated successfully, returning to API Gateway")
+            return response
+        except Exception as e:
+            logger.error(f"❌ Error in Mangum handler: {str(e)}", exc_info=True)
+            # Re-raise to let Lambda handle it properly
             raise
