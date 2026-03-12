@@ -23,10 +23,12 @@ synced_partner_requests: List[Dict] = []
 CLARISA_API_URL = "https://clarisatest-back.ciat.cgiar.org/api/partner-requests"
 CLARISA_CREATE_URL = "https://clarisatest-back.ciat.cgiar.org/api/partner-requests/create"
 CLARISA_RESPOND_URL = "https://clarisatest-back.ciat.cgiar.org/api/partner-requests/respond"
+CLARISA_COUNTRIES_URL = "https://clarisatest-back.ciat.cgiar.org/api/countries"
+CLARISA_INSTITUTION_TYPES_URL = "https://clarisatest-back.ciat.cgiar.org/api/institution-types"
 
-# Temporary hardcoded values (REQUIRED fields - will be replaced with dynamic lookups)
-TEMP_COUNTRY_ISO = "CO"  # Colombia - REQUIRED for partner request creation
-TEMP_INSTITUTION_TYPE_CODE = 46  # REQUIRED for partner request creation
+# Temporary hardcoded values (REQUIRED fields - default fallbacks)
+TEMP_COUNTRY_ISO = "CO"  # Colombia - Default fallback if country not found
+TEMP_INSTITUTION_TYPE_CODE = 46  # Default fallback if institution type not found
 
 app = FastAPI(
     title="Partner Request Support API",
@@ -168,6 +170,50 @@ async def process_partners(
             except Exception as e:
                 logger.error(f"❌ Error fetching existing requests: {e}")
             
+            # STEP 1.1.5: Fetch countries control list for dynamic country lookup
+            logger.info("🌍 Fetching countries control list...")
+            countries_list = []
+            countries_map = {}  # Map: country_name_lower -> isoAlpha2
+            try:
+                countries_response = requests.get(CLARISA_COUNTRIES_URL, timeout=30)
+                
+                if countries_response.status_code == 200:
+                    countries_list = countries_response.json()
+                    # Build a map: country name (lowercase) -> isoAlpha2
+                    for country in countries_list:
+                        country_name = country.get('name', '').strip().lower()
+                        iso_alpha2 = country.get('isoAlpha2', '')
+                        if country_name and iso_alpha2:
+                            countries_map[country_name] = iso_alpha2
+                    logger.info(f"🌍 Loaded {len(countries_map)} countries for lookup")
+                else:
+                    logger.warning(f"⚠️  Failed to fetch countries list: {countries_response.status_code}")
+                    
+            except Exception as e:
+                logger.error(f"❌ Error fetching countries list: {e}")
+            
+            # STEP 1.1.6: Fetch institution types control list for dynamic institution type lookup
+            logger.info("🏢 Fetching institution types control list...")
+            institution_types_list = []
+            institution_types_map = {}  # Map: institution_type_name_lower -> code
+            try:
+                institution_types_response = requests.get(CLARISA_INSTITUTION_TYPES_URL, timeout=30)
+                
+                if institution_types_response.status_code == 200:
+                    institution_types_list = institution_types_response.json()
+                    # Build a map: institution type name (lowercase) -> code
+                    for inst_type in institution_types_list:
+                        type_name = inst_type.get('name', '').strip().lower()
+                        type_code = inst_type.get('code')
+                        if type_name and type_code is not None:
+                            institution_types_map[type_name] = type_code
+                    logger.info(f"🏢 Loaded {len(institution_types_map)} institution types for lookup")
+                else:
+                    logger.warning(f"⚠️  Failed to fetch institution types list: {institution_types_response.status_code}")
+                    
+            except Exception as e:
+                logger.error(f"❌ Error fetching institution types list: {e}")
+            
             # Track partners to create (only new ones)
             partners_to_create = []  # List of {idx, partner_name, acronym, payload}
             
@@ -179,8 +225,8 @@ async def process_partners(
                 partner_name = row.iloc[1] if len(row) > 1 and pd.notna(row.iloc[1]) else None
                 acronym = row.iloc[2] if len(row) > 2 and pd.notna(row.iloc[2]) else ""
                 website = row.iloc[3] if len(row) > 3 and pd.notna(row.iloc[3]) else ""
-                # institution_type = row.iloc[4] if len(row) > 4 and pd.notna(row.iloc[4]) else ""
-                # country = row.iloc[5] if len(row) > 5 and pd.notna(row.iloc[5]) else ""
+                institution_type = row.iloc[4] if len(row) > 4 and pd.notna(row.iloc[4]) else ""
+                country = row.iloc[5] if len(row) > 5 and pd.notna(row.iloc[5]) else ""
                 category_1 = row.iloc[6] if len(row) > 6 and pd.notna(row.iloc[6]) else ""
                 category_2 = row.iloc[7] if len(row) > 7 and pd.notna(row.iloc[7]) else ""
                 
@@ -212,12 +258,32 @@ async def process_partners(
                         creation_info['failed'] += 1
                 else:
                     # Partner doesn't exist - add to create list
+                    # Lookup country ISO code
+                    country_iso = TEMP_COUNTRY_ISO  # Default fallback
+                    if country and countries_map:
+                        country_lower = str(country).strip().lower()
+                        if country_lower in countries_map:
+                            country_iso = countries_map[country_lower]
+                            logger.info(f"🌍 Found country '{country}' -> {country_iso}")
+                        else:
+                            logger.warning(f"⚠️  Country '{country}' not found in control list, using default: {TEMP_COUNTRY_ISO}")
+                    
+                    # Lookup institution type code
+                    institution_type_code = TEMP_INSTITUTION_TYPE_CODE  # Default fallback
+                    if institution_type and institution_types_map:
+                        institution_type_lower = str(institution_type).strip().lower()
+                        if institution_type_lower in institution_types_map:
+                            institution_type_code = institution_types_map[institution_type_lower]
+                            logger.info(f"🏢 Found institution type '{institution_type}' -> {institution_type_code}")
+                        else:
+                            logger.warning(f"⚠️  Institution type '{institution_type}' not found in control list, using default: {TEMP_INSTITUTION_TYPE_CODE}")
+                    
                     payload = {
                         "name": str(partner_name),
                         "acronym": str(acronym) if acronym else "",
                         "websiteLink": str(website) if website else "",
-                        "hqCountryIso": TEMP_COUNTRY_ISO,  # Hardcoded for now
-                        "institutionTypeCode": TEMP_INSTITUTION_TYPE_CODE,  # Hardcoded for now
+                        "hqCountryIso": country_iso,
+                        "institutionTypeCode": institution_type_code,
                         "category_1": str(category_1) if category_1 else "",
                         "category_2": str(category_2) if category_2 else "",
                         "externalUserMail": user_email,
