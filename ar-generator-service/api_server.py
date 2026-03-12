@@ -113,11 +113,11 @@ async def handle_scheduled_job(event: Dict[str, Any], context: Any) -> Dict[str,
 def handler(event: Dict[str, Any], context: Any) -> Any:
     """
     Hybrid Lambda handler that routes events to either:
-    - HTTP/API Gateway requests → Mangum (FastAPI)
+    - HTTP/Function URL requests → Mangum (FastAPI)
     - EventBridge Scheduler jobs → Direct job execution
     
     Args:
-        event: Lambda event (can be API Gateway or EventBridge)
+        event: Lambda event (can be Function URL or EventBridge)
         context: Lambda context
         
     Returns:
@@ -139,13 +139,7 @@ def handler(event: Dict[str, Any], context: Any) -> Any:
                 })
             }
     else:
-        # This is an HTTP/API Gateway event, use Mangum directly
-        # Don't wrap in try/except to let Mangum handle errors properly
-        try:
-            response = mangum_handler(event, context)
-            logger.info(f"✅ HTTP response generated successfully, returning to API Gateway")
-            return response
-        except Exception as e:
-            logger.error(f"❌ Error in Mangum handler: {str(e)}", exc_info=True)
-            # Re-raise to let Lambda handle it properly
-            raise
+        # This is an HTTP/Function URL event, use Mangum directly
+        # Mangum automatically detects Function URL vs API Gateway format
+        # Return the response directly without any wrapping to ensure proper format
+        return mangum_handler(event, context)
