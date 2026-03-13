@@ -8,7 +8,7 @@ import pandas as pd
 from requests_aws4auth import AWS4Auth
 from db_conn.sql_connection import load_data
 from app.utils.logger.logger_util import get_logger
-from app.utils.config.config_util import BR, OPENSEARCH
+from app.utils.config.config_util import OPENSEARCH
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from app.llm.invoke_llm import invoke_model, get_bedrock_embeddings
 from app.utils.prompts.diss_targets_prompt import generate_target_prompt
@@ -17,14 +17,27 @@ from app.utils.prompts.challenges_prompt import generate_challenges_prompt
 
 logger = get_logger()
 
+
+if not OPENSEARCH.get('host'):
+    raise ValueError("OPENSEARCH_HOST environment variable is required. Please configure it in Lambda environment variables.")
+if not OPENSEARCH.get('index'):
+    raise ValueError("OPENSEARCH_INDEX_NAME environment variable is required. Please configure it in Lambda environment variables.")
+if not OPENSEARCH.get('aws_access_key'):
+    raise ValueError("AWS_ACCESS_KEY_ID_OS environment variable is required. Please configure it in Lambda environment variables.")
+if not OPENSEARCH.get('aws_secret_key'):
+    raise ValueError("AWS_SECRET_ACCESS_KEY_OS environment variable is required. Please configure it in Lambda environment variables.")
+
+
 credentials = boto3.Session(
     aws_access_key_id=OPENSEARCH['aws_access_key'],
     aws_secret_access_key=OPENSEARCH['aws_secret_key'],
-    region_name=BR['region']
+    region_name=OPENSEARCH.get('region', 'us-east-1')
 ).get_credentials()
 
-region = BR['region']
+region = OPENSEARCH.get('region', 'us-east-1')
+
 awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, 'es', session_token=credentials.token)
+
 
 opensearch = OpenSearch(
     hosts=[{'host': OPENSEARCH['host'], 'port': 443}],
@@ -35,6 +48,11 @@ opensearch = OpenSearch(
 )
 
 INDEX_NAME = OPENSEARCH['index']
+
+
+def get_opensearch_client():
+    """Get OpenSearch client (maintained for backward compatibility)."""
+    return opensearch
 
 
 def create_index_if_not_exists(dimension=1024):
@@ -67,7 +85,7 @@ def create_index_if_not_exists(dimension=1024):
             }
             opensearch.indices.create(index=INDEX_NAME, body=index_body)
             return True
-        
+
         logger.info(f"📦 Index {INDEX_NAME} already exists. Skipping creation.")
         return False
 

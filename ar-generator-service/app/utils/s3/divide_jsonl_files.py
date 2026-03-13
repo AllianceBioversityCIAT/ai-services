@@ -26,9 +26,11 @@ def split_jsonl_to_individual_csv_files(jsonl_file_path):
 
                 content_str = ",".join([f'"{k}":"{v}"' for k, v in data.items() if v not in ("", None, [], {}, "Not Provided", "Not provided", "Not linked", "Not defined", "NA", "Not Applicable", "N/A")])
 
+                tmp_dir = "/tmp"
+                csv_files_dir = os.path.join(tmp_dir, "csv_files")
                 file_name = f"{table_type}_record_{line_number}.csv"
-                local_path = os.path.join(os.getcwd(), "csv_files", file_name)
-                os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                local_path = os.path.join(csv_files_dir, file_name)
+                os.makedirs(csv_files_dir, exist_ok=True)
 
                 fieldnames = ["content", "year", "table_type"]
                 row_data = {
@@ -50,8 +52,8 @@ def split_jsonl_to_individual_csv_files(jsonl_file_path):
 
                 # Create metadata file
                 metadata_file_name = f"{file_name}.metadata.json"
-                metadata_local_path = os.path.join(os.getcwd(), "csv_files", metadata_file_name)
-                os.makedirs(os.path.dirname(metadata_local_path), exist_ok=True)
+                metadata_local_path = os.path.join(csv_files_dir, metadata_file_name)
+                os.makedirs(csv_files_dir, exist_ok=True)
 
                 attributes = {
                     "year": year,

@@ -7,9 +7,7 @@ logger = get_logger()
 
 s3_client = boto3.client(
     's3',
-    aws_access_key_id=S3['aws_access_key'],
-    aws_secret_access_key=S3['aws_secret_key'],
-    region_name=S3['aws_region']
+    region_name=S3.get('aws_region', 'us-east-1')
 )
 
 bucket_name = S3['bucket_name']
