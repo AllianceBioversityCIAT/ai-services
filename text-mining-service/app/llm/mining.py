@@ -50,7 +50,6 @@ def invoke_model(prompt, max_tokens=5000):
             "max_tokens": max_tokens,
             "temperature": 0.1,
             "top_k": 250,
-            "top_p": 0.999,
             "stop_sequences": [],
             "messages": [
                 {
