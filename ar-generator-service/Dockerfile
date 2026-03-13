@@ -31,6 +31,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY app ${LAMBDA_TASK_ROOT}/app
 COPY db_conn ${LAMBDA_TASK_ROOT}/db_conn
+COPY web ${LAMBDA_TASK_ROOT}/web
 COPY api_server.py ${LAMBDA_TASK_ROOT}
 
 # Set the CMD to your handler
