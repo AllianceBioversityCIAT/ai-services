@@ -57,7 +57,7 @@ def invoke_model(prompt):
             ]
         }
         response_stream = bedrock_runtime.invoke_model_with_response_stream(
-            modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            modelId="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
             body=json.dumps(request_body),
             contentType="application/json",
             accept="application/json"
