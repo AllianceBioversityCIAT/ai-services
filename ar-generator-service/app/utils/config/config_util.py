@@ -1,18 +1,18 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=False)
 
 BR = {
     "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID_BR"),
     "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY_BR"),
-    "region": os.getenv("AWS_REGION")
+    "region": os.getenv("AWS_REGION", "us-east-1")
 }
 
 S3 = {
     "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID"),
     "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY"),
-    "aws_region": os.getenv("AWS_REGION"),
+    "aws_region": os.getenv("AWS_REGION", "us-east-1"),
     "bucket_name": os.getenv("BUCKET_NAME")
 }
 
@@ -34,7 +34,8 @@ OPENSEARCH = {
     "host": os.getenv("OPENSEARCH_HOST"),
     "index": os.getenv("OPENSEARCH_INDEX_NAME"),
     "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID_OS"),
-    "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY_OS")
+    "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY_OS"),
+    "region": os.getenv("AWS_REGION", "us-east-1")
 }
 
 KNOWLEDGE_BASE = {
