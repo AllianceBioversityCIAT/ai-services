@@ -149,8 +149,9 @@ def load_data(table_name):
         else:
             df["table_type"] = "challenges"
         
-        jsonl_file = f'{table_name}_ar.jsonl'
-        csv_file = f'{table_name}_ar.csv'
+        tmp_dir = "/tmp"
+        jsonl_file = os.path.join(tmp_dir, f'{table_name}_ar.jsonl')
+        csv_file = os.path.join(tmp_dir, f'{table_name}_ar.csv')
         
         try:
             df.to_json(jsonl_file, orient='records', lines=True, force_ascii=False)
@@ -263,17 +264,28 @@ def load_full_data(table_name):
             df = df_grouped.reset_index()
             df["table_type"] = "innovations"
 
-        df.to_json(f'{table_name}.jsonl', orient='records', lines=True, force_ascii=False)
-        df.to_csv(f'{table_name}.csv', index=False)
+        tmp_dir = "/tmp"
+        jsonl_file = os.path.join(tmp_dir, f'{table_name}.jsonl')
+        csv_file = os.path.join(tmp_dir, f'{table_name}.csv')
+        
+        df.to_json(jsonl_file, orient='records', lines=True, force_ascii=False)
+        df.to_csv(csv_file, index=False)
 
         try:
             file_key_jsonl = f"aiccra/chatbot/files/{table_name}.jsonl"
             file_key_csv = f"aiccra/chatbot/files/{table_name}.csv"
-            upload_file_to_s3(file_key_jsonl, f'{table_name}.jsonl')
-            upload_file_to_s3(file_key_csv, f'{table_name}.csv')
+            upload_file_to_s3(file_key_jsonl, jsonl_file)
+            upload_file_to_s3(file_key_csv, csv_file)
             logger.info(f"✅ Files uploaded to S3 successfully")
 
-            split_jsonl_to_individual_csv_files(f'{table_name}.jsonl')
+            split_jsonl_to_individual_csv_files(jsonl_file)
+            
+            if os.path.exists(jsonl_file):
+                os.remove(jsonl_file)
+                logger.info(f"🗑️ Deleted local file: {jsonl_file}")
+            if os.path.exists(csv_file):
+                os.remove(csv_file)
+                logger.info(f"🗑️ Deleted local file: {csv_file}")
             
         except Exception as e:
             logger.error(f"❌ Error uploading data files to S3: {e}")
