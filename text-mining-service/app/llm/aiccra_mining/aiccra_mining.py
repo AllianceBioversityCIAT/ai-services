@@ -73,7 +73,7 @@ def process_document_aiccra(bucket_name, file_key, prompt, user_id: str = None):
                     "prompt_full_length": len(prompt),
                     "chunks_processed": len(chunks),
                     "results_count": len(json_content.get("results", [])),
-                    "model_used": "claude-4-sonnet",
+                    "model_used": "claude-sonnet-4-5",
                     "processing_steps": ["document_read", "text_splitting", "embedding_generation", "vector_search", "llm_processing", "field_mapping"]
                 }
                 

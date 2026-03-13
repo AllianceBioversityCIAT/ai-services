@@ -62,7 +62,7 @@ def invoke_model(prompt, max_tokens=5000):
             ]
         }
         response = bedrock_runtime.invoke_model(
-            modelId="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+            modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
             body=json.dumps(request_body),
             contentType="application/json",
             accept="application/json"
@@ -266,7 +266,7 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR, user_id:
                     "prompt_full_length": len(prompt),
                     "chunks_processed": len(chunks),
                     "results_count": len(json_content.get("results", [])),
-                    "model_used": "claude-4-sonnet",
+                    "model_used": "claude-sonnet-4-5",
                     "processing_steps": ["document_read", "text_splitting", "embedding_generation", "vector_search", "llm_processing", "field_mapping"]
                 }
                 
@@ -380,7 +380,7 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS, use
                     "prompt_full_length": len(prompt),
                     "chunks_processed": len(chunks),
                     "results_count": len(json_content.get("results", [])),
-                    "model_used": "claude-4-sonnet",
+                    "model_used": "claude-sonnet-4-5",
                     "processing_steps": ["document_read", "text_splitting", "embedding_generation", "vector_search", "llm_processing", "field_mapping"]
                 }
                 
