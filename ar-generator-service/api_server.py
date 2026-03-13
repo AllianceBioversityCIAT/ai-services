@@ -15,7 +15,7 @@ from mangum import Mangum
 from app.api.main import app
 from dotenv import load_dotenv
 from app.utils.logger.logger_util import get_logger
-from app.utils.scheduled_jobs import execute_scheduled_job
+from app.utils.jobs.scheduled_jobs import execute_scheduled_job
 
 
 load_dotenv(override=False)

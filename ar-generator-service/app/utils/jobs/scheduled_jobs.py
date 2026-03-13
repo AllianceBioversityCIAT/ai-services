@@ -127,7 +127,7 @@ async def execute_update_chatbot_data() -> Dict[str, Any]:
     """
     try:
         logger.info("=" * 80)
-        logger.info("🚀 Starting chatbot data update job")
+        logger.info("🚀 Starting AICCRA chatbot knowledge base data update")
         logger.info("=" * 80)
         
         tables_to_process = [
@@ -186,7 +186,7 @@ async def execute_update_chatbot_data() -> Dict[str, Any]:
                 "files_generated": files_generated
             }
         else:
-            error_msg = "No tables were successfully processed"
+            error_msg = "No chatbot data tables were successfully processed"
             logger.error(f"❌ {error_msg}")
             
             try:
@@ -293,7 +293,7 @@ async def execute_sync_knowledge_base() -> Dict[str, Any]:
                 app_name="Chatbot Service",
                 color="#36a64f",
                 title="Knowledge Base Synchronization Completed",
-                message=f"Successfully synchronized data for Knowledge Base. Job ID: {ingestion_job_id}",
+                message=f"Successfully synchronized data for Knowledge Base.",
                 priority="Low",
                 time_taken=None
             )
