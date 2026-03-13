@@ -36,8 +36,8 @@ The service leverages Large Language Models (LLMs) and vector search technologie
 - AI-powered narrative generation using AWS Bedrock (Claude 3.7 Sonnet)
 - REST API endpoints with OpenAPI documentation
 - Web-based user interface for non-technical users
-- Background data refresh processes via scheduled cron jobs
-- AWS Lambda deployment capability
+- Background data refresh processes via AWS EventBridge Scheduler
+- Serverless deployment on AWS Lambda
 
 **Out of Scope:**
 - Direct data entry or modification of source AICCRA data
@@ -58,7 +58,7 @@ The AICCRA Annual Report Generator Service is a **microservice** deployed as a R
 #### 2.1 Service Classification
 
 - **Architecture Pattern**: Microservice with REST API interface
-- **Deployment Model**: Containerizable Python application deployable to AWS Lambda (via Mangum handler) or traditional server environments (via Uvicorn)
+- **Deployment Model**: Containerizable Python application deployable to AWS Lambda (via Mangum ASGI handler)
 - **Operational Mode**: Primarily request-response synchronous processing with background job capabilities for data refresh operations
 
 #### 2.2 Core Responsibilities
@@ -67,7 +67,7 @@ The AICCRA Annual Report Generator Service is a **microservice** deployed as a R
 2. **Context Retrieval**: Performs hybrid search operations (vector similarity + keyword filtering) against OpenSearch indexes to retrieve relevant context for report generation
 3. **AI-Powered Generation**: Constructs specialized prompts and invokes AWS Bedrock Claude 3.7 Sonnet to generate narrative content
 4. **Report Assembly**: Combines quantitative summaries, AI-generated narratives, and structured data into formatted markdown reports
-5. **Data Synchronization**: Executes scheduled background jobs to refresh vector indexes and synchronize AWS Bedrock Knowledge Base
+5. **Data Synchronization**: Executes scheduled jobs via AWS EventBridge Scheduler to refresh vector indexes and synchronize AWS Bedrock Knowledge Base
 
 #### 2.3 Technical Approach
 
@@ -94,7 +94,7 @@ The AICCRA Annual Report Generator Service follows a **layered microservice arch
 - **Separation of Concerns**: Clear boundaries between API handling, business logic, AI processing, and data access
 - **External State Management**: Stateless service design with state housed in external databases and vector stores
 - **Lazy Initialization**: Services and configurations loaded on-demand to optimize cold start performance
-- **Asynchronous Background Processing**: Long-running data refresh operations executed via scheduled cron jobs
+- **Asynchronous Background Processing**: Long-running data refresh operations executed via AWS EventBridge Scheduler
 
 **Primary Layers**:
 
@@ -226,22 +226,24 @@ The AICCRA Annual Report Generator Service follows a **layered microservice arch
 
 **Key Files**: [logger_util.py](app/utils/logger/logger_util.py)
 
-##### 3.2.7 Background Job Scheduler (`app/utils/cronjob/`)
+##### 3.2.7 Scheduled Job Executor (`app/utils/jobs/`)
 
 **Responsibilities**:
-- Install and manage cron jobs for weekly data refresh operations
-- Execute data refresh requests to update OpenSearch vector indexes
-- Trigger AWS Bedrock Knowledge Base synchronization after data updates
+- Execute scheduled jobs triggered by AWS EventBridge Scheduler
+- Update AR generator data by running vectorization pipelines
+- Update chatbot knowledge base data sources
+- Synchronize AWS Bedrock Knowledge Base after data updates
 - Send Slack notifications on job completion or failure
 
 **Interactions**:
-- Makes HTTP POST requests to the service's own API endpoints
+- Receives EventBridge Scheduler events through Lambda handler
+- Directly executes data refresh and vectorization operations
 - Interacts with AWS Bedrock Agent service to start ingestion jobs
 - Sends notifications via Slack webhooks
 
-**State**: Stateless (executes as one-off scripts)
+**State**: Stateless (executes within Lambda invocation context)
 
-**Key Files**: [setup_cron.py](app/utils/cronjob/setup_cron.py), [update_ar_data.py](app/utils/cronjob/update_ar_data.py), [sync_knowledge_base.py](app/utils/cronjob/sync_knowledge_base.py)
+**Key Files**: [scheduled_jobs.py](app/utils/jobs/scheduled_jobs.py), [api_server.py](api_server.py) (hybrid Lambda handler)
 
 ##### 3.2.8 S3 Integration (`app/utils/s3/`)
 
@@ -265,7 +267,7 @@ The AICCRA Annual Report Generator Service follows a **layered microservice arch
 - Report job completion status, errors, and operational metrics
 
 **Interactions**:
-- Called by cron jobs after significant operations
+- Called by scheduled jobs after significant operations
 - Posts messages to Slack via webhook URLs
 
 **State**: Stateless
@@ -327,8 +329,8 @@ graph TB
     end
 
     subgraph "Background Jobs"
-        CronRefresh[Data Refresh Cron<br/>Weekly Execution]
-        CronKB[KB Sync Cron<br/>Post-Update]
+        EventBridge[AWS EventBridge<br/>Scheduler]
+        JobExecutor[Scheduled Job Executor<br/>Lambda Invocations]
     end
 
     subgraph "External Systems"
@@ -361,10 +363,10 @@ graph TB
     S3Upload --> S3Bucket
     KBSync --> BedrockKB
 
-    CronRefresh --> Routes
-    CronRefresh --> Notify
-    CronKB --> KBSync
-    CronKB --> Notify
+    EventBridge --> JobExecutor
+    JobExecutor --> Pipeline
+    JobExecutor --> KBSync
+    JobExecutor --> Notify
 
     Notify --> Slack
 
@@ -463,16 +465,17 @@ For quantitative overview tables:
 
 #### 5.4 Background Data Synchronization Flow
 
-Executed via weekly cron job:
+Executed via AWS EventBridge Scheduler:
 
-1. **Cron Trigger**: Scheduled execution every Sunday at 2:00 AM
-2. **Data Refresh Request**: Cron job makes POST request to `/api/generate-annual` with `insert_data=True`
-3. **Long-Running Processing**: Server begins data refresh (may exceed proxy timeout)
-4. **Proxy Timeout Handling**: After 4+ minutes, proxy returns 502 error but server continues processing in background
-5. **S3 Upload Completion**: Server completes data refresh and uploads to S3
-6. **Knowledge Base Sync**: Separate cron job triggers `sync_knowledge_base.py`
-7. **Ingestion Job Start**: Calls AWS Bedrock Agent API to start Knowledge Base ingestion job
-8. **Notification**: Slack notification sent on completion or failure
+1. **EventBridge Trigger**: Scheduled execution every Sunday at 2:00 AM via EventBridge Scheduler rules
+2. **Lambda Invocation**: EventBridge invokes Lambda function with job-specific event payload (e.g., `{"job": "update_ar_data"}`)
+3. **Job Detection**: Hybrid Lambda handler (`api_server.py`) detects EventBridge event and routes to scheduled job executor
+4. **Direct Execution**: Job executor (`scheduled_jobs.py`) directly calls vectorization pipeline functions without HTTP requests
+5. **Long-Running Processing**: Lambda function executes data refresh with extended timeout configuration
+6. **S3 Upload Completion**: Processed data uploaded to S3 for Knowledge Base ingestion
+7. **Knowledge Base Sync**: Separate EventBridge rule triggers `sync_knowledge_base` job
+8. **Ingestion Job Start**: Job executor calls AWS Bedrock Agent API to start Knowledge Base ingestion
+9. **Notification**: Slack notification sent on completion or failure
 
 #### 5.5 Sequence Diagram
 
@@ -530,11 +533,10 @@ sequenceDiagram
 
 #### Frameworks & Libraries
 - **FastAPI**: Modern REST API framework with automatic OpenAPI documentation
-- **Uvicorn**: ASGI server for serving FastAPI applications
+- **Mangum**: AWS Lambda ASGI adapter for serving FastAPI applications in Lambda
 - **Pydantic**: Data validation and settings management using Python type hints
 - **Pandas**: Data manipulation and analysis for structured datasets
 - **NumPy**: Numerical computing for vector operations
-- **Mangum**: AWS Lambda adapter for ASGI applications
 - **python-dotenv**: Environment variable management
 
 #### AI & Machine Learning Providers
@@ -567,8 +569,8 @@ sequenceDiagram
 - **opensearch-py**: Official OpenSearch Python client library
 
 #### Job Scheduling
-- **python-crontab**: Programmatic cron job management for automated data refresh
-- **Cron**: Unix-based job scheduler for periodic task execution
+- **AWS EventBridge Scheduler**: Fully managed serverless scheduler for triggering Lambda functions
+- **asyncio**: Python asynchronous execution library for job orchestration within Lambda
 
 #### API & Documentation
 - **OpenAPI/Swagger**: API specification and interactive documentation
@@ -688,7 +690,7 @@ sequenceDiagram
 
 **Integration Type**: One-way notification webhooks
 
-**Purpose**: Operational alerts for cron job status, errors, and completion notifications
+**Purpose**: Operational alerts for scheduled job status, errors, and completion notifications
 
 **Connection Method**:
 - HTTPS POST requests to webhook URLs
@@ -726,8 +728,8 @@ sequenceDiagram
 **Implementation**:
 - Structured logging using Python's standard logging library
 - Log format includes timestamp, logger name, severity level, file/line number, and message
-- Console handler for real-time monitoring during development and container deployments
-- Rotating file handler with 5MB max size and 5 backup files to prevent disk exhaustion
+- Console handler outputs to CloudWatch Logs in Lambda environment
+- Rotating file handler with 5MB max size and 5 backup files to prevent disk exhaustion in temporary storage
 
 **Log Levels**:
 - **DEBUG**: Detailed diagnostic information (column listings, data transformations)
@@ -735,7 +737,7 @@ sequenceDiagram
 - **WARNING**: Recoverable issues (missing optional configurations)
 - **ERROR**: Failures requiring attention (AWS service errors, database connection failures)
 
-**Log Storage**: `data/logs/app.log` with rotation and `data/logs/annual_report_cron.log` for scheduled jobs
+**Log Storage**: `data/logs/app.log` with rotation and `data/logs/scheduled_jobs.log` for background job execution logs
 
 **Observability**: Logs provide full audit trail of data flow, API requests, AI inference operations, and background job execution
 
@@ -753,9 +755,9 @@ sequenceDiagram
 
 4. **AWS Service Failures**: Bedrock and OpenSearch errors caught, logged with full context, and raised as HTTPException with client-friendly messages
 
-5. **Background Job Tolerance**: Cron jobs distinguish between proxy timeouts (expected for long operations) and real errors; jobs continue running server-side even after proxy timeout
+5. **Background Job Tolerance**: EventBridge-triggered jobs distinguish between Lambda timeouts (expected for long operations) and real errors; jobs handle timeout limits through asynchronous processing patterns and extended timeout configuration
 
-6. **Retry Logic**: Data refresh cron includes retry attempts with exponential backoff for transient network issues
+6. **Retry Logic**: EventBridge Scheduler supports automatic retry with exponential backoff for failed job executions; data refresh operations include additional error handling for transient network issues
 
 **Error Response Format**: Consistent JSON structure with `error`, `details`, and `status` fields
 
@@ -783,9 +785,9 @@ sequenceDiagram
 **Current Design Scalability**:
 
 **Horizontal Scalability**:
-- Service is stateless and can be deployed as multiple instances behind load balancer
+- Service is stateless and scales automatically via AWS Lambda's built-in concurrency management
 - No in-memory session state or caching dependencies
-- Each request independently retrieves required context from external systems
+- Each Lambda invocation independently retrieves required context from external systems
 
 **Vertical Scalability**:
 - Memory footprint scales with data volume processed per request
@@ -799,9 +801,9 @@ sequenceDiagram
 4. **Data Refresh**: Full table reload and re-vectorization on each refresh (not incremental)
 
 **Scalability Limits**:
-- Designed for dozens of concurrent requests, not hundreds
+- Lambda concurrency limits apply (default 1000 concurrent executions per region)
 - Data refresh operations designed for weekly execution, not real-time updates
-- Report generation typically completes in 10-30 seconds without data refresh, 30-40 minutes with refresh
+- Report generation typically completes in 10-30 seconds without data refresh; data refresh operations may require extended Lambda timeout configuration
 
 **Optimization Opportunities**:
 - Implement database connection pooling
@@ -819,14 +821,14 @@ sequenceDiagram
 - S3 upload utilities: Idempotent file uploads
 
 **Stateful Components** (limited):
-- Logger: Maintains file handles and rotation state within process lifecycle
-- Configuration loader: Loads environment variables once at module import time
-- OpenSearch index: Persistent state stored externally, not in application memory
-- Cron scheduler: Maintains cron entries in system crontab (external to application)
+- Logger: Maintains file handles and rotation state within Lambda execution context lifecycle
+- Configuration loader: Loads environment variables once at module import time (cached across warm starts)
+- OpenSearch index: Persistent state stored externally, not in Lambda memory
+- EventBridge Scheduler: Schedule rules managed externally in AWS EventBridge (external to Lambda)
 
 **Session Management**: None - service does not maintain user sessions or authentication state
 
-**Deployment Implications**: Service can be safely stopped, restarted, or scaled without data loss as all state resides in external systems (SQL Server, OpenSearch, S3)
+**Deployment Implications**: Lambda's serverless architecture ensures automatic scaling and fault tolerance; all persistent state resides in external systems (SQL Server, OpenSearch, S3)
 
 ---
 
