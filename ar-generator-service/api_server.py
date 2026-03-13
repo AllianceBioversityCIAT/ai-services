@@ -17,13 +17,11 @@ from dotenv import load_dotenv
 from app.utils.logger.logger_util import get_logger
 from app.utils.scheduled_jobs import execute_scheduled_job
 
-# Load environment variables from .env file if it exists (for local development)
-# In Lambda, environment variables are configured in the function settings
+
 load_dotenv(override=False)
 
 logger = get_logger()
 
-# Create Mangum handler for AWS Lambda HTTP requests
 mangum_handler = Mangum(app, lifespan="off")
 
 
@@ -43,27 +41,20 @@ def is_eventbridge_job(event: Dict[str, Any]) -> bool:
     Returns:
         True if this looks like an EventBridge job, False otherwise
     """
-    # Check if event is a dict
     if not isinstance(event, dict):
         return False
     
-    # Function URL and API Gateway events have requestContext
-    # EventBridge Scheduler jobs do NOT have requestContext
     if "requestContext" in event:
         return False
     
-    # Function URL events have these keys
     function_url_keys = {"rawPath", "rawQueryString", "headers", "requestContext", "body", "isBase64Encoded"}
     if any(key in event for key in function_url_keys):
         return False
     
-    # API Gateway events have these keys
     api_gateway_keys = {"httpMethod", "path", "headers", "requestContext", "body", "pathParameters", "queryStringParameters"}
     if any(key in event for key in api_gateway_keys):
         return False
     
-    # EventBridge Scheduler jobs have a simple structure with "job" key
-    # and NO HTTP-related keys
     if "job" in event and isinstance(event.get("job"), str):
         return True
     
@@ -97,10 +88,8 @@ async def handle_scheduled_job(event: Dict[str, Any], context: Any) -> Dict[str,
         
         logger.info(f"📅 Received scheduled job request: {job_name}")
         
-        # Execute the job
         result = await execute_scheduled_job(job_name)
         
-        # Determine status code based on result
         status_code = 200 if result.get("status") == "success" else 500
         
         logger.info(f"✅ Job '{job_name}' completed with status: {result.get('status')}")
@@ -135,11 +124,9 @@ def handler(event: Dict[str, Any], context: Any) -> Any:
     Returns:
         Response appropriate for the event type
     """
-    # Check if this is an EventBridge Scheduler job
     if is_eventbridge_job(event):
         logger.info("🔍 Detected EventBridge Scheduler job event")
         try:
-            # Run async job handler
             return asyncio.run(handle_scheduled_job(event, context))
         except Exception as e:
             logger.error(f"❌ Unexpected error in handler: {str(e)}", exc_info=True)
@@ -151,16 +138,12 @@ def handler(event: Dict[str, Any], context: Any) -> Any:
                 })
             }
     else:
-        # This is an HTTP/Function URL event, use Mangum directly
-        # Mangum automatically detects Function URL vs API Gateway format
         try:
             logger.info(f"🔍 Processing HTTP/Function URL request")
             logger.debug(f"Event keys: {list(event.keys()) if isinstance(event, dict) else 'Not a dict'}")
             
-            # Call Mangum handler
             response = mangum_handler(event, context)
             
-            # Log response structure for debugging
             if isinstance(response, dict):
                 logger.info(f"✅ Mangum returned response with keys: {list(response.keys())}")
                 logger.debug(f"Response statusCode: {response.get('statusCode', 'N/A')}")
@@ -173,7 +156,6 @@ def handler(event: Dict[str, Any], context: Any) -> Any:
             return response
         except Exception as e:
             logger.error(f"❌ Error in Mangum handler: {str(e)}", exc_info=True)
-            # Return error response in Function URL format
             return {
                 "statusCode": 500,
                 "headers": {"Content-Type": "application/json"},

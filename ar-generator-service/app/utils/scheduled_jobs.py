@@ -11,11 +11,14 @@ Supported jobs:
 - sync_knowledge_base: Synchronizes AWS Bedrock Knowledge Base
 """
 
+import boto3
 import asyncio
 from typing import Dict, Any
+from db_conn.sql_connection import load_full_data
 from app.utils.logger.logger_util import get_logger
-from app.utils.notification.notification_service import NotificationService
+from app.llm.vectorize_os_annual import run_pipeline
 from app.utils.config.config_util import KNOWLEDGE_BASE, BR
+from app.utils.notification.notification_service import NotificationService
 
 logger = get_logger()
 notification_service = NotificationService()
@@ -36,25 +39,18 @@ async def execute_update_ar_data() -> Dict[str, Any]:
         logger.info("🚀 Starting AR data update job")
         logger.info("=" * 80)
         
-        # Import the annual opensearch function
-        from app.llm.vectorize_os_annual import run_pipeline
-        
-        # Execute the pipeline with data insertion
-        # Using the same parameters as the cronjob script
         indicator = "IPI 1.3"
         year = 2025
         insert_data = True
         
         logger.info(f"📊 Running pipeline for indicator: {indicator}, year: {year}, insert_data: {insert_data}")
         
-        # Run the pipeline (this is a synchronous function)
         result = run_pipeline(indicator, year, insert_data=insert_data)
         
         if result is None or (isinstance(result, str) and result.startswith("# Report Generation Error")):
             error_msg = "AR data update pipeline failed"
             logger.error(f"❌ {error_msg}")
             
-            # Send notification
             try:
                 await notification_service.send_slack_notification(
                     emoji="⚠️",
@@ -76,7 +72,6 @@ async def execute_update_ar_data() -> Dict[str, Any]:
         
         logger.info("✅ AR data update completed successfully")
         
-        # Send success notification
         try:
             await notification_service.send_slack_notification(
                 emoji="🔄",
@@ -100,7 +95,6 @@ async def execute_update_ar_data() -> Dict[str, Any]:
         error_msg = f"Unexpected error in AR data update: {str(e)}"
         logger.error(f"❌ {error_msg}", exc_info=True)
         
-        # Send error notification
         try:
             await notification_service.send_slack_notification(
                 emoji="⚠️",
@@ -136,8 +130,6 @@ async def execute_update_chatbot_data() -> Dict[str, Any]:
         logger.info("🚀 Starting chatbot data update job")
         logger.info("=" * 80)
         
-        from db_conn.sql_connection import load_full_data
-        
         tables_to_process = [
             "vw_ai_project_contribution",
             "vw_ai_deliverables",
@@ -167,14 +159,12 @@ async def execute_update_chatbot_data() -> Dict[str, Any]:
                     
             except Exception as table_error:
                 logger.error(f"❌ Error processing table {table_name}: {str(table_error)}", exc_info=True)
-                # Continue with other tables even if one fails
                 continue
         
         if processed_tables:
             logger.info(f"✅ Chatbot data update completed successfully")
             logger.info(f"📊 Processed {len(processed_tables)} tables: {', '.join(processed_tables)}")
             
-            # Send success notification
             try:
                 await notification_service.send_slack_notification(
                     emoji="🔄",
@@ -199,7 +189,6 @@ async def execute_update_chatbot_data() -> Dict[str, Any]:
             error_msg = "No tables were successfully processed"
             logger.error(f"❌ {error_msg}")
             
-            # Send error notification
             try:
                 await notification_service.send_slack_notification(
                     emoji="⚠️",
@@ -223,7 +212,6 @@ async def execute_update_chatbot_data() -> Dict[str, Any]:
         error_msg = f"Unexpected error in chatbot data update: {str(e)}"
         logger.error(f"❌ {error_msg}", exc_info=True)
         
-        # Send error notification
         try:
             await notification_service.send_slack_notification(
                 emoji="⚠️",
@@ -259,9 +247,6 @@ async def execute_sync_knowledge_base() -> Dict[str, Any]:
         logger.info("🚀 Starting Knowledge Base synchronization job")
         logger.info("=" * 80)
         
-        import boto3
-        
-        # Get knowledge base configuration
         kb_id = KNOWLEDGE_BASE.get("knowledge_base_id")
         ds_id = KNOWLEDGE_BASE.get("data_source_id")
         
@@ -277,16 +262,12 @@ async def execute_sync_knowledge_base() -> Dict[str, Any]:
         logger.info(f"📋 Knowledge Base ID: {kb_id}")
         logger.info(f"📋 Data Source ID: {ds_id}")
         
-        # Create Bedrock Agent client
-        # In Lambda, we should use IAM role credentials, but fallback to explicit if needed
         try:
-            # Try using IAM role first (Lambda default)
             bedrock_agent = boto3.client(
                 service_name='bedrock-agent',
                 region_name=BR.get('region', 'us-east-1')
             )
         except Exception:
-            # Fallback to explicit credentials if IAM role doesn't work
             bedrock_agent = boto3.client(
                 service_name='bedrock-agent',
                 aws_access_key_id=BR.get('aws_access_key'),
@@ -305,8 +286,7 @@ async def execute_sync_knowledge_base() -> Dict[str, Any]:
         ingestion_job_id = response['ingestionJob']['ingestionJobId']
         logger.info(f"✅ Synchronization job started: {ingestion_job_id}")
         logger.info(f"ℹ️ AWS Bedrock will continue processing in the background")
-        
-        # Send success notification
+
         try:
             await notification_service.send_slack_notification(
                 emoji="🔄",
@@ -332,8 +312,7 @@ async def execute_sync_knowledge_base() -> Dict[str, Any]:
     except Exception as e:
         error_msg = f"Unexpected error in knowledge base synchronization: {str(e)}"
         logger.error(f"❌ {error_msg}", exc_info=True)
-        
-        # Send error notification
+
         try:
             await notification_service.send_slack_notification(
                 emoji="⚠️",
@@ -354,7 +333,6 @@ async def execute_sync_knowledge_base() -> Dict[str, Any]:
         }
 
 
-# Job mapping dictionary
 JOB_HANDLERS = {
     "update_ar_data": execute_update_ar_data,
     "update_chatbot_data": execute_update_chatbot_data,

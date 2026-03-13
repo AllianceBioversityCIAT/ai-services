@@ -149,7 +149,6 @@ def load_data(table_name):
         else:
             df["table_type"] = "challenges"
         
-        # Use /tmp directory for Lambda compatibility
         tmp_dir = "/tmp"
         jsonl_file = os.path.join(tmp_dir, f'{table_name}_ar.jsonl')
         csv_file = os.path.join(tmp_dir, f'{table_name}_ar.csv')
@@ -265,7 +264,6 @@ def load_full_data(table_name):
             df = df_grouped.reset_index()
             df["table_type"] = "innovations"
 
-        # Use /tmp directory for Lambda compatibility
         tmp_dir = "/tmp"
         jsonl_file = os.path.join(tmp_dir, f'{table_name}.jsonl')
         csv_file = os.path.join(tmp_dir, f'{table_name}.csv')
@@ -282,7 +280,6 @@ def load_full_data(table_name):
 
             split_jsonl_to_individual_csv_files(jsonl_file)
             
-            # Clean up temporary files
             if os.path.exists(jsonl_file):
                 os.remove(jsonl_file)
                 logger.info(f"🗑️ Deleted local file: {jsonl_file}")

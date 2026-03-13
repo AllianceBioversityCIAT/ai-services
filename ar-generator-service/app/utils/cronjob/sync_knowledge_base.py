@@ -32,7 +32,6 @@ logger = get_logger()
 notification_service = NotificationService()
 
 
-# Create Bedrock Agent client using explicit credentials (same pattern as EC2 deployment)
 bedrock_agent = boto3.client(
     service_name='bedrock-agent',
     aws_access_key_id=BR['aws_access_key'],

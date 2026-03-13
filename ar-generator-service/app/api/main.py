@@ -126,23 +126,16 @@ app.add_middleware(
 # Include API routes
 app.include_router(router)
 
-# Note: Static files are not mounted in Lambda deployment
-# Web UI should be served from S3 + CloudFront or separate static hosting
-# For Lambda, we provide a redirect or API-only response
+# Mount static files for the web UI
+app.mount("/static", StaticFiles(directory="web"), name="static")
+
 @app.get("/web", 
          tags=["UI"],
          summary="Web UI Redirect",
-         description="Web UI is not available in Lambda deployment. Use API endpoints directly or deploy UI separately.",
+         description="Redirect to the AICCRA Report Generator Web UI",
 )
 async def serve_ui_alt():
-    return JSONResponse(
-        status_code=200,
-        content={
-            "message": "Web UI is not available in Lambda deployment",
-            "api_docs": "/docs",
-            "note": "Deploy web UI separately using S3 + CloudFront or use API endpoints directly"
-        }
-    )
+    return FileResponse('web/index.html')
 
 
 @app.get(

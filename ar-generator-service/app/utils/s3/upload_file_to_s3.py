@@ -5,12 +5,9 @@ from app.utils.logger.logger_util import get_logger
 
 logger = get_logger()
 
-# Use IAM Role for authentication in Lambda (credentials are optional for local development)
 s3_client = boto3.client(
     's3',
     region_name=S3.get('aws_region', 'us-east-1')
-    # IAM Role provides credentials automatically in Lambda
-    # For local development, set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars
 )
 
 bucket_name = S3['bucket_name']

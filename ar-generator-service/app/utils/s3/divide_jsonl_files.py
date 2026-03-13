@@ -26,7 +26,6 @@ def split_jsonl_to_individual_csv_files(jsonl_file_path):
 
                 content_str = ",".join([f'"{k}":"{v}"' for k, v in data.items() if v not in ("", None, [], {}, "Not Provided", "Not provided", "Not linked", "Not defined", "NA", "Not Applicable", "N/A")])
 
-                # Use /tmp directory for Lambda compatibility
                 tmp_dir = "/tmp"
                 csv_files_dir = os.path.join(tmp_dir, "csv_files")
                 file_name = f"{table_type}_record_{line_number}.csv"

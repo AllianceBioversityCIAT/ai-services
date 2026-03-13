@@ -1,19 +1,15 @@
 import os
 from dotenv import load_dotenv
 
-# Load .env file if it exists (for local development)
-# In Lambda, variables come from environment variables configured in the function
 load_dotenv(override=False)
 
 BR = {
-    "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID_BR"),  # Optional: IAM Role used in Lambda
-    "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY_BR"),  # Optional: IAM Role used in Lambda
+    "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID_BR"),
+    "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY_BR"),
     "region": os.getenv("AWS_REGION", "us-east-1")
 }
 
 S3 = {
-    "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID"),  # Optional: IAM Role used in Lambda
-    "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY"),  # Optional: IAM Role used in Lambda
     "aws_region": os.getenv("AWS_REGION", "us-east-1"),
     "bucket_name": os.getenv("BUCKET_NAME")
 }

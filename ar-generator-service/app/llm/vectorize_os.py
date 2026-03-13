@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from requests_aws4auth import AWS4Auth
 from app.utils.logger.logger_util import get_logger
-from app.utils.config.config_util import BR, OPENSEARCH
+from app.utils.config.config_util import OPENSEARCH
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from db_conn.sql_connection import load_data, load_full_data
 from app.utils.prompts.report_prompt import generate_report_prompt
@@ -15,7 +15,7 @@ from app.llm.invoke_llm import invoke_model, get_bedrock_embeddings
 
 logger = get_logger()
 
-# Validate OpenSearch configuration
+
 if not OPENSEARCH.get('host'):
     raise ValueError("OPENSEARCH_HOST environment variable is required. Please configure it in Lambda environment variables.")
 if not OPENSEARCH.get('index'):
@@ -25,24 +25,18 @@ if not OPENSEARCH.get('aws_access_key'):
 if not OPENSEARCH.get('aws_secret_key'):
     raise ValueError("AWS_SECRET_ACCESS_KEY_OS environment variable is required. Please configure it in Lambda environment variables.")
 
-# Create OpenSearch client using explicit credentials (same pattern as EC2 deployment)
-# Use boto3.Session with explicit credentials to get credentials object for AWS4Auth
+
 credentials = boto3.Session(
     aws_access_key_id=OPENSEARCH['aws_access_key'],
     aws_secret_access_key=OPENSEARCH['aws_secret_key'],
     region_name=OPENSEARCH.get('region', 'us-east-1')
 ).get_credentials()
 
-# Create AWS4Auth for SigV4 signing
-awsauth = AWS4Auth(
-    credentials.access_key,
-    credentials.secret_key,
-    OPENSEARCH.get('region', 'us-east-1'),
-    'es',
-    session_token=credentials.token
-)
+region = OPENSEARCH.get('region', 'us-east-1')
 
-# Create OpenSearch client
+awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, 'es', session_token=credentials.token)
+
+
 opensearch = OpenSearch(
     hosts=[{'host': OPENSEARCH['host'], 'port': 443}],
     http_auth=awsauth,
@@ -57,10 +51,6 @@ INDEX_NAME = OPENSEARCH['index']
 def get_opensearch_client():
     """Get OpenSearch client (maintained for backward compatibility)."""
     return opensearch
-
-
-# Removed @property decorator as it doesn't work at module level
-# Use get_opensearch_client() function instead
 
 
 def create_index_if_not_exists(dimension=1024):
@@ -93,9 +83,9 @@ def create_index_if_not_exists(dimension=1024):
             }
             opensearch.indices.create(index=INDEX_NAME, body=index_body)
             return True
-        else:
-            logger.info(f"📦 Index {INDEX_NAME} already exists. Skipping creation.")
-            return False
+        
+        logger.info(f"📦 Index {INDEX_NAME} already exists. Skipping creation.")
+        return False
 
     except Exception as e:
         logger.error(f"❌ Error creating index: {e}")
