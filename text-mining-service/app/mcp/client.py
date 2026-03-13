@@ -89,7 +89,7 @@ app = FastAPI(
     Key Features:
     - 📄 Multi-format document support (PDF, DOCX, Excel, PowerPoint, TXT)
     - 🔍 Semantic content extraction with vector embeddings
-    - 🤖 AI-powered analysis using AWS Bedrock (Claude 3 Sonnet)
+    - 🤖 AI-powered analysis using AWS Bedrock (Claude 4.5 Sonnet)
     - 🔐 Authentication integration
     - 📊 Excel row-level processing for structured data
     - 🚀 Real-time processing with MCP protocol
@@ -471,7 +471,7 @@ async def update_record_status(data: RecordStatusUpdate):
           1. Document validation and upload (if file provided)
           2. Authentication verification  
           3. Document chunking and vectorization
-          4. AI analysis using Claude 3 Sonnet
+          4. AI analysis using Claude 4.5 Sonnet
           5. Structured data extraction
           
           Supported File Types:
@@ -804,7 +804,7 @@ async def bulk_upload_capdev_endpoint(
           Processing Flow:
           1. Document validation and upload (if file provided)
           2. Document chunking and vectorization
-          3. AI analysis using Claude 4 Sonnet with custom or default prompt
+          3. AI analysis using Claude 4.5 Sonnet with custom or default prompt
           4. Structured data extraction
           
           Supported File Types:
