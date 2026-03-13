@@ -193,6 +193,7 @@ faiss/
 *.csv
 *.jsonl
 *.xlsx
+*.ts
 
 # Data logs
 data/logs/

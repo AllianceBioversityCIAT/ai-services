@@ -1,7 +1,7 @@
 import time
 import json
 import boto3
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
 from app.llm.map_fields import map_fields_with_opensearch
@@ -10,7 +10,7 @@ from app.utils.prompt.prompt_prms import DEFAULT_PROMPT_PRMS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.utils.interactions.interaction_client import interaction_client
 from app.utils.config.config_util import AWS, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, MAPPING_URL
-from app.schemas.mining_schemas import MiningResponse, ErrorResponse, InnovationDevelopmentResult, PolicyChangeResult, CapacityDevelopmentResult
+from app.schemas.mining_schemas import MiningResponse, InnovationDevelopmentResult, PolicyChangeResult, CapacityDevelopmentResult
 from app.llm.vectorize import (get_embedding,
                                check_reference_exists,
                                store_reference_embeddings,
@@ -123,12 +123,16 @@ def initialize_reference_data(bucket_name, file_key_regions, file_key_countries)
         raise
 
 
-def format_mining_response(raw_response: str) -> Dict[str, Any]:
+def format_mining_response(raw_response: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
     """
     Format the mining response to ensure consistent structure with indicator-specific fields
+    Accepts either raw JSON string or already parsed dict (after field mapping)
     """
     try:
-        if is_valid_json(raw_response):
+        # If already a dict, use it directly (post field mapping)
+        if isinstance(raw_response, dict):
+            parsed_response = raw_response
+        elif is_valid_json(raw_response):
             parsed_response = json.loads(raw_response)
         else:
             logger.warning(f"Invalid JSON received from LLM: {raw_response[:200]}...")
@@ -167,6 +171,18 @@ def format_mining_response(raw_response: str) -> Dict[str, Any]:
                 logger.error(f"Error processing result with indicator '{indicator}': {str(e)}")
                 continue
         
+        total_count = len(results)
+        valid_count = len(typed_results)
+        failed_count = total_count - valid_count
+        
+        if failed_count > 0:
+            logger.warning(f"⚠️ {failed_count} of {total_count} results failed validation and will NOT be sent to STAR")
+        
+        if valid_count > 0:
+            logger.info(f"✅ {valid_count} of {total_count} results validated successfully")
+        elif total_count > 0:
+            logger.error(f"❌ All {total_count} results failed validation - returning empty results")
+        
         mining_response = MiningResponse(
             results=typed_results
         )
@@ -174,12 +190,13 @@ def format_mining_response(raw_response: str) -> Dict[str, Any]:
         return mining_response.model_dump(exclude_none=True)
         
     except Exception as e:
-        logger.error(f"Error formatting mining response: {str(e)}")
+        logger.error(f"❌ Critical error formatting mining response: {str(e)}")
         
-        error_response = ErrorResponse(
-            error=f"Error formatting response: {str(e)}"
-        )
-        return error_response.model_dump(exclude_none=True)
+        return {
+            "results": [],
+            "status": "error",
+            "error": f"Critical formatting error: {str(e)}"
+        }
 
 
 def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR, user_id: str = None):
@@ -231,9 +248,7 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR, user_id:
         end_time = time.time()
         elapsed_time = end_time - start_time
 
-        # formatted_response = format_mining_response(
-        #     raw_response=response_text
-        # )
+        formatted_response = format_mining_response(json_content)
 
         interaction_id = None
         if user_id:
@@ -242,7 +257,7 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR, user_id:
                 if isinstance(document_content, dict) and document_content.get("type") == "excel":
                     user_input += f" (Excel file with {len(document_content.get('chunks', []))} rows)"
                 
-                ai_output = json.dumps(json_content, indent=2, ensure_ascii=False)
+                ai_output = json.dumps(formatted_response, indent=2, ensure_ascii=False)
                 
                 tracking_context = {
                     "bucket_name": bucket_name,
@@ -276,15 +291,13 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR, user_id:
             except Exception as tracking_error:
                 logger.error(f"❌ Error tracking interaction: {str(tracking_error)}")
 
-        # logger.info(f"✅ Successfully generated response:\n{json.dumps(formatted_response, indent=2)}")
-        logger.info(f"✅ Successfully generated response:\n{json.dumps(json_content, indent=2, ensure_ascii=False)}")
+        logger.info(f"✅ Successfully generated response:\n{json.dumps(formatted_response, indent=2, ensure_ascii=False)}")
         logger.info(f"⏱️ Response time: {elapsed_time:.2f} seconds")
 
         result = {
             "content": response_text,
             "time_taken": f"{elapsed_time:.2f}",
-            "json_content": json_content
-            # "json_content": formatted_response
+            "json_content": formatted_response
         }
         
         if interaction_id:
@@ -348,6 +361,9 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS, use
         end_time = time.time()
         elapsed_time = end_time - start_time
 
+        # Validate and format response with Pydantic schemas (after field mapping)
+        formatted_response = format_mining_response(json_content)
+
         interaction_id = None
         if user_id:
             try:
@@ -355,7 +371,7 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS, use
                 if isinstance(document_content, dict) and document_content.get("type") == "excel":
                     user_input += f" (Excel file with {len(document_content.get('chunks', []))} rows)"
                 
-                ai_output = json.dumps(json_content, indent=2, ensure_ascii=False)
+                ai_output = json.dumps(formatted_response, indent=2, ensure_ascii=False)
                 
                 tracking_context = {
                     "bucket_name": bucket_name,
@@ -389,13 +405,13 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS, use
             except Exception as tracking_error:
                 logger.error(f"❌ Error tracking interaction: {str(tracking_error)}")
         
-        logger.info(f"✅ Successfully generated PRMS response:\n{json.dumps(json_content, indent=2, ensure_ascii=False)}")
+        logger.info(f"✅ Successfully generated PRMS response:\n{json.dumps(formatted_response, indent=2, ensure_ascii=False)}")
         logger.info(f"⏱️ PRMS Response time: {elapsed_time:.2f} seconds")
 
         result = {
             "content": response_text,
             "time_taken": f"{elapsed_time:.2f}",
-            "json_content": json_content,
+            "json_content": formatted_response,
             "project": "PRMS"
         }
 
