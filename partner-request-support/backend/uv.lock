@@ -180,6 +180,7 @@ dependencies = [
     { name = "boto3" },
     { name = "fastapi" },
     { name = "langdetect" },
+    { name = "mangum" },
     { name = "numpy" },
     { name = "openai" },
     { name = "openpyxl" },
@@ -198,6 +199,7 @@ requires-dist = [
     { name = "boto3" },
     { name = "fastapi" },
     { name = "langdetect" },
+    { name = "mangum" },
     { name = "numpy" },
     { name = "openai" },
     { name = "openpyxl" },
@@ -490,6 +492,18 @@ dependencies = [
     { name = "six" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0e/72/a3add0e4eec4eb9e2569554f7c70f4a3c27712f40e3284d483e88094cc0e/langdetect-1.0.9.tar.gz", hash = "sha256:cbc1fef89f8d062739774bd51eda3da3274006b3661d199c2655f6b3f6d605a0", size = 981474 }
+
+[[package]]
+name = "mangum"
+version = "0.21.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/89/cb/d9f4d685a0b8eceac10991e15ac471d9568e4e42c2489ae9bf072828c1c2/mangum-0.21.0.tar.gz", hash = "sha256:e31ed72d67f9958fa4379f65df77729906dec6dfa00afa6ed4e06c77833000de", size = 89130 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b7/50/e3c694b8e122551e4557450219283771334dee2ed5734a8398c8b8018c50/mangum-0.21.0-py3-none-any.whl", hash = "sha256:309e48f5c629542516c5106ecf079f4ec08809ed50df882238d98fe1392820c7", size = 17146 },
+]
 
 [[package]]
 name = "markdown-it-py"
