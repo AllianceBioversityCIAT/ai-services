@@ -860,6 +860,24 @@ export default function Home() {
             </div>
           </motion.div>
 
+          {/* Testing Environment Tag */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            style={{
+              background: '#DC2626',
+              color: 'white',
+              padding: '8px 20px',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              boxShadow: '0 2px 8px rgba(220, 38, 38, 0.25)',
+              letterSpacing: '0.5px',
+            }}
+          >
+            Testing Environment
+          </motion.div>
+
           {/* User info and logout */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -1154,6 +1172,17 @@ export default function Home() {
                       </>
                     )}
                   </button>
+
+                  {/* Recommendation Text */}
+                  <p style={{
+                    marginTop: 'var(--space-xs)',
+                    fontSize: '0.75rem',
+                    color: 'var(--color-text-muted)',
+                    textAlign: 'center',
+                    fontStyle: 'italic',
+                  }}>
+                    <strong>Recommendation:</strong> Upload a maximum of 10 partners in a single file for optimal processing.
+                  </p>
 
                   {/* Info Box */}
                   <div style={{
