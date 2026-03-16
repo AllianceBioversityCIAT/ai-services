@@ -7,6 +7,7 @@ import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
+import { SyncAlert } from './components/SyncAlert';
 
 interface ClarisaMatch {
   clarisa_id: string;
@@ -48,6 +49,17 @@ interface Partner {
   };
 }
 
+interface SyncInfo {
+  sync_performed: boolean;
+  institutions_before: number;
+  institutions_after: number;
+  new_institutions: number;
+  modified_institutions: number;
+  unchanged_institutions: number;
+  total_processed: number;
+  sync_message: string;
+}
+
 interface ProcessingResults {
   partners: Partner[];
   stats: {
@@ -62,6 +74,14 @@ interface ProcessingResults {
     fair: number;
     matched_percentage: number;
     no_match_percentage: number;
+  };
+  sync_info?: SyncInfo;
+  cache_info?: {
+    total_requests: number;
+    cache_hits: number;
+    cache_misses: number;
+    from_cache: boolean;
+    processed_new: boolean;
   };
 }
 
@@ -220,6 +240,7 @@ export default function Home() {
   const handleProcessApiPartners = async () => {
     setProcessing(true);
     setError(null);
+    setMessage('Synchronizing CLARISA database...');
 
     try {
       const response = await axios.post<ProcessingResults>(
@@ -233,8 +254,10 @@ export default function Home() {
       );
 
       setResults(response.data);
+      setMessage('');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error processing API partners. Please try again.');
+      setMessage('');
     } finally {
       setProcessing(false);
     }
@@ -261,6 +284,7 @@ export default function Home() {
 
     setProcessing(true);
     setError(null);
+    setMessage('Synchronizing CLARISA database...');
 
     const formData = new FormData();
     formData.append('file', file);
@@ -281,8 +305,10 @@ export default function Home() {
       );
 
       setResults(response.data);
+      setMessage('');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error processing file. Please try again.');
+      setMessage('');
     } finally {
       setProcessing(false);
     }
@@ -1119,7 +1145,7 @@ export default function Home() {
                     {processing ? (
                       <>
                         <div className="spinner" />
-                        Processing...
+                        {message || 'Processing...'}
                       </>
                     ) : (
                       <>
@@ -1277,7 +1303,7 @@ export default function Home() {
                     {processing ? (
                       <>
                         <div className="spinner" />
-                        Processing...
+                        {message || 'Processing...'}
                       </>
                     ) : (
                       <>
@@ -1348,6 +1374,11 @@ export default function Home() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
           >
+            {/* Sync Info Alert */}
+            {results.sync_info && (
+              <SyncAlert syncInfo={results.sync_info} className="mb-4" />
+            )}
+
             {/* Statistics Grid */}
             <div style={{
               display: 'grid',

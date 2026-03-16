@@ -136,6 +136,107 @@ def count_institutions() -> int:
         return 0
 
 
+def get_all_institutions_from_db() -> List[Dict]:
+    """
+    Gets all institutions from the database
+    
+    Returns:
+        List[Dict]: List of all institutions with their data (excluding embeddings)
+    """
+    try:
+        # Fetch all records with pagination to avoid Supabase's 1000 record limit
+        all_data = []
+        page_size = 1000
+        offset = 0
+        
+        while True:
+            response = supabase.table(TABLE_NAME).select(
+                "clarisa_id, name, acronym, website, countries, institution_type, created_at, updated_at"
+            ).range(offset, offset + page_size - 1).execute()
+            
+            if response.data:
+                all_data.extend(response.data)
+                
+                # If we got less than page_size, we're done
+                if len(response.data) < page_size:
+                    break
+                    
+                offset += page_size
+            else:
+                break
+        
+        return all_data
+    
+    except Exception as e:
+        logger.error(f"❌ Error getting all institutions: {e}")
+        return []
+
+
+def get_all_clarisa_ids_from_db() -> set:
+    """
+    Gets all clarisa_ids from the database
+    
+    Returns:
+        set: Set of clarisa_ids existing in the database
+    """
+    try:
+        # Fetch all IDs with pagination to avoid Supabase's 1000 record limit
+        all_ids = set()
+        page_size = 1000
+        offset = 0
+        
+        while True:
+            response = supabase.table(TABLE_NAME).select(
+                "clarisa_id"
+            ).range(offset, offset + page_size - 1).execute()
+            
+            if response.data:
+                for item in response.data:
+                    all_ids.add(item['clarisa_id'])
+                
+                # If we got less than page_size, we're done
+                if len(response.data) < page_size:
+                    break
+                    
+                offset += page_size
+            else:
+                break
+        
+        return all_ids
+    
+    except Exception as e:
+        logger.error(f"❌ Error getting clarisa_ids: {e}")
+        return set()
+
+
+def delete_institutions_by_ids(clarisa_ids: List[int]) -> int:
+    """
+    Deletes institutions by their clarisa_ids
+    
+    Args:
+        clarisa_ids: List of clarisa_ids to delete
+        
+    Returns:
+        int: Number of institutions deleted
+    """
+    if not clarisa_ids:
+        return 0
+    
+    try:
+        response = supabase.table(TABLE_NAME).delete().in_(
+            'clarisa_id', clarisa_ids
+        ).execute()
+        
+        deleted_count = len(response.data) if response.data else 0
+        logger.info(f"✅ Deleted {deleted_count} institutions from database")
+        
+        return deleted_count
+    
+    except Exception as e:
+        logger.error(f"❌ Error deleting institutions: {e}")
+        return 0
+
+
 def search_by_name_embedding(query_embedding: List[float], 
                              threshold: float = 0.5, 
                              limit: int = 5) -> List[Dict]:
@@ -203,96 +304,6 @@ def search_by_acronym_embedding(query_embedding: List[float],
 # ==========================================
 
 CACHE_TABLE = "partner_request_cache_test"
-
-
-def get_cached_result(request_id: int) -> Optional[Dict]:
-    """
-    Gets a cached result for a partner request
-    
-    Args:
-        request_id: Partner request ID from CLARISA API
-        
-    Returns:
-        Dict: Cached partner result or None if not found
-    """
-    try:
-        response = supabase.table(CACHE_TABLE).select("*").eq(
-            'request_id', request_id
-        ).execute()
-        
-        if response.data and len(response.data) > 0:
-            cache_data = response.data[0]
-            # Reconstruct the partner result format
-            partner_result = {
-                'id': str(cache_data['request_id']),
-                'name': cache_data['partner_name'],
-                'acronym': cache_data['acronym'] or '',
-                'website': cache_data['website'] or '',
-                'country': cache_data['country'] or '',
-                'match_found': cache_data['match_found'],
-                'match_quality': cache_data['match_quality'],
-                'clarisa_match': cache_data['clarisa_match'],
-                'top_candidates': cache_data['top_candidates'] or [],
-                'web_search': cache_data['web_search'],
-                'api_data': cache_data['api_data']
-            }
-            logger.info(f"✅ Cache HIT for request_id {request_id}")
-            return partner_result
-        
-        logger.info(f"⚠️  Cache MISS for request_id {request_id}")
-        return None
-    
-    except Exception as e:
-        logger.error(f"❌ Error getting cached result for {request_id}: {e}")
-        return None
-
-
-def get_cached_results(request_ids: List[int]) -> Dict[int, Dict]:
-    """
-    Gets multiple cached results for partner requests by ID
-    
-    Args:
-        request_ids: List of partner request IDs
-        
-    Returns:
-        Dict: Dictionary mapping request_id -> partner_result for found items
-    """
-    if not request_ids:
-        return {}
-    
-    try:
-        response = supabase.table(CACHE_TABLE).select("*").in_(
-            'request_id', request_ids
-        ).execute()
-        
-        cached_results = {}
-        if response.data:
-            for cache_data in response.data:
-                request_id = cache_data['request_id']
-                partner_result = {
-                    'id': str(cache_data['request_id']),
-                    'name': cache_data['partner_name'],
-                    'acronym': cache_data['acronym'] or '',
-                    'website': cache_data['website'] or '',
-                    'country': cache_data['country'] or '',
-                    'match_found': cache_data['match_found'],
-                    'match_quality': cache_data['match_quality'],
-                    'clarisa_match': cache_data['clarisa_match'],
-                    'top_candidates': cache_data['top_candidates'] or [],
-                    'web_search': cache_data['web_search'],
-                    'api_data': cache_data['api_data']
-                }
-                cached_results[request_id] = partner_result
-            
-            logger.info(f"✅ Cache: Found {len(cached_results)}/{len(request_ids)} cached results")
-        else:
-            logger.info(f"⚠️  Cache: No cached results found for {len(request_ids)} requests")
-        
-        return cached_results
-    
-    except Exception as e:
-        logger.error(f"❌ Error getting cached results: {e}")
-        return {}
 
 
 def get_cached_results_by_name(partner_names: List[str]) -> Dict[str, Dict]:
