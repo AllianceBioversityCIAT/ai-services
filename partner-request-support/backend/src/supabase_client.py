@@ -465,6 +465,37 @@ def cache_results_batch(partners_results: List[Dict]) -> Dict[str, int]:
     return stats
 
 
+def clear_all_cache() -> int:
+    """
+    Clears all cache entries. Used when CLARISA database is updated
+    to ensure all matches are reprocessed with fresh data.
+    
+    Returns:
+        int: Number of cache entries deleted
+    """
+    try:
+        count_response = supabase.table(CACHE_TABLE).select(
+            "request_id", count='exact'
+        ).execute()
+        
+        count = count_response.count if count_response.count else 0
+        
+        if count == 0:
+            logger.info("📭 Cache is already empty")
+            return 0
+        
+        delete_response = supabase.table(CACHE_TABLE).delete().neq(
+            'request_id', -1
+        ).execute()
+        
+        logger.info(f"🗑️  Cleared {count} cache entries")
+        return count
+        
+    except Exception as e:
+        logger.error(f"❌ Error clearing cache: {e}")
+        return 0
+
+
 def get_cache_stats() -> Dict:
     """
     Gets statistics about the cache

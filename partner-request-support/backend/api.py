@@ -111,7 +111,7 @@ async def process_partners(
         # STEP 0: Sync CLARISA institutions database before processing
         logger.info("🔄 Synchronizing CLARISA institutions database...")
         institutions_before = count_institutions()
-        sync_stats = sync_clarisa_institutions(batch_size=50, delete_obsolete=False)
+        sync_stats = sync_clarisa_institutions(batch_size=50, delete_obsolete=True)
         institutions_after = count_institutions()
         
         sync_info = {
@@ -122,6 +122,7 @@ async def process_partners(
             'modified_institutions': sync_stats['modified'],
             'unchanged_institutions': sync_stats['unchanged'],
             'total_processed': sync_stats['new'] + sync_stats['modified'],
+            'cache_cleared': sync_stats.get('cache_cleared', 0),
             'sync_message': None
         }
         
@@ -133,7 +134,13 @@ async def process_partners(
             if sync_stats['modified'] > 0:
                 msg_parts.append(f"{sync_stats['modified']} modified institution(s)")
             
-            sync_info['sync_message'] = f"Found {' and '.join(msg_parts)}. Database has been updated."
+            base_msg = f"Found {' and '.join(msg_parts)}. Database has been updated."
+            
+            # Add cache invalidation info if cache was cleared
+            if sync_stats.get('cache_cleared', 0) > 0:
+                base_msg += f" Cache cleared ({sync_stats['cache_cleared']} entries) to ensure fresh matches."
+            
+            sync_info['sync_message'] = base_msg
             logger.info(f"✅ {sync_info['sync_message']}")
         else:
             sync_info['sync_message'] = "Database synchronized. No changes found in CLARISA."
@@ -655,7 +662,7 @@ async def sync_partner_requests():
 
 
 @app.post("/api/sync-clarisa-institutions")
-async def sync_clarisa_institutions_endpoint(delete_obsolete: bool = Body(False)):
+async def sync_clarisa_institutions_endpoint(delete_obsolete: bool = Body(True)):
     """
     Manually trigger synchronization of CLARISA institutions database
     
@@ -663,7 +670,7 @@ async def sync_clarisa_institutions_endpoint(delete_obsolete: bool = Body(False)
     It compares the current database with CLARISA and only processes new or modified institutions.
     
     Args:
-        delete_obsolete: Whether to delete institutions that no longer exist in CLARISA (default: False)
+        delete_obsolete: Whether to delete institutions that no longer exist in CLARISA (default: True)
     
     Returns:
         JSON with sync statistics including:
@@ -702,6 +709,10 @@ async def sync_clarisa_institutions_endpoint(delete_obsolete: bool = Body(False)
             else:
                 message_parts.append(f"{sync_stats['obsolete']} obsolete institution(s) found")
         
+        # Add cache info if cleared
+        if sync_stats.get('cache_cleared', 0) > 0:
+            message_parts.append(f"{sync_stats['cache_cleared']} cache entries cleared")
+        
         if message_parts:
             message = "Sync completed: " + ", ".join(message_parts) + "."
         else:
@@ -716,6 +727,7 @@ async def sync_clarisa_institutions_endpoint(delete_obsolete: bool = Body(False)
             'unchanged_institutions': sync_stats['unchanged'],
             'obsolete_institutions': sync_stats['obsolete'],
             'deleted_institutions': sync_stats.get('deleted', 0),
+            'cache_cleared': sync_stats.get('cache_cleared', 0),
             'total_processed': sync_stats['new'] + sync_stats['modified'],
             'message': message
         }
@@ -760,7 +772,7 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
         # STEP 0: Sync CLARISA institutions database before processing
         logger.info("🔄 Synchronizing CLARISA institutions database...")
         institutions_before = count_institutions()
-        sync_stats = sync_clarisa_institutions(batch_size=50, delete_obsolete=False)
+        sync_stats = sync_clarisa_institutions(batch_size=50, delete_obsolete=True)
         institutions_after = count_institutions()
         
         sync_info = {
@@ -771,6 +783,7 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
             'modified_institutions': sync_stats['modified'],
             'unchanged_institutions': sync_stats['unchanged'],
             'total_processed': sync_stats['new'] + sync_stats['modified'],
+            'cache_cleared': sync_stats.get('cache_cleared', 0),
             'sync_message': None
         }
         
@@ -782,7 +795,13 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
             if sync_stats['modified'] > 0:
                 msg_parts.append(f"{sync_stats['modified']} modified institution(s)")
             
-            sync_info['sync_message'] = f"Found {' and '.join(msg_parts)}. Database has been updated."
+            base_msg = f"Found {' and '.join(msg_parts)}. Database has been updated."
+            
+            # Add cache invalidation info if cache was cleared
+            if sync_stats.get('cache_cleared', 0) > 0:
+                base_msg += f" Cache cleared ({sync_stats['cache_cleared']} entries) to ensure fresh matches."
+            
+            sync_info['sync_message'] = base_msg
             logger.info(f"✅ {sync_info['sync_message']}")
         else:
             sync_info['sync_message'] = "Database synchronized. No changes found in CLARISA."

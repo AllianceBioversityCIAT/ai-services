@@ -15,7 +15,8 @@ from src.supabase_client import (
     count_institutions,
     get_all_institutions_from_db,
     get_all_clarisa_ids_from_db,
-    delete_institutions_by_ids
+    delete_institutions_by_ids,
+    clear_all_cache
 )
 
 logger = get_logger()
@@ -232,6 +233,15 @@ def sync_clarisa_institutions(batch_size: int = 50, delete_obsolete: bool = Fals
     elif obsolete_ids:
         logger.info(f"⚠️  NOTE: {len(obsolete_ids)} obsolete institutions found but not deleted (use --delete-obsolete to remove)")
     
+    # Step 7: Invalidate cache if database changed
+    cache_cleared = 0
+    if len(new_ids) > 0 or len(modified_ids) > 0:
+        logger.info("🗑️  STEP 7: CLARISA database changed - Invalidating cache...")
+        cache_cleared = clear_all_cache()
+        logger.info(f"✅ Cache invalidated to ensure fresh matches with updated data")
+    else:
+        logger.info("✅ No changes detected - Cache remains valid")
+    
     # Final summary
     logger.info("=" * 50)
     logger.info("📊 SYNC SUMMARY")
@@ -251,7 +261,8 @@ def sync_clarisa_institutions(batch_size: int = 50, delete_obsolete: bool = Fals
         'obsolete': len(obsolete_ids),
         'unchanged': unchanged_count,
         'deleted': deleted_count,
-        'failed': failed_count if total_to_process > 0 else 0
+        'failed': failed_count if total_to_process > 0 else 0,
+        'cache_cleared': cache_cleared
     }
 
 
