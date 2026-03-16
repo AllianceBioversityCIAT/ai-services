@@ -117,6 +117,7 @@ interface AuthResponse {
 }
 
 export default function Home() {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   const [file, setFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
   const [results, setResults] = useState<ProcessingResults | null>(null);
@@ -227,7 +228,7 @@ export default function Home() {
     setSyncError(null);
     
     try {
-      const response = await axios.get('http://localhost:8000/api/sync-partner-requests');
+      const response = await axios.get(`${API_URL}/api/sync-partner-requests`);
       setApiPartners(response.data.pending_requests || []);
     } catch (err: any) {
       setSyncError(err.response?.data?.detail || 'Error syncing partner requests');
@@ -244,7 +245,7 @@ export default function Home() {
 
     try {
       const response = await axios.post<ProcessingResults>(
-        'http://localhost:8000/api/process-api-partners',
+        `${API_URL}/api/process-api-partners`,
         null,  // Will process first 5 by default
         {
           headers: {
@@ -274,7 +275,7 @@ export default function Home() {
   const handleDownloadTemplate = async () => {
     try {
       const response = await axios.get(
-        'http://localhost:8000/api/download-template',
+        `${API_URL}/api/download-template`,
         {
           responseType: 'blob',
         }
@@ -324,7 +325,7 @@ export default function Home() {
 
     try {
       const response = await axios.post<ProcessingResults>(
-        'http://localhost:8000/api/process-partners',
+        `${API_URL}/api/process-partners`,
         formData,
         {
           headers: {
@@ -359,7 +360,7 @@ export default function Home() {
 
     try {
       const response = await axios.post(
-        'http://localhost:8000/api/respond-partner-request',
+        `${API_URL}/api/respond-partner-request`,
         {
           request_id: selectedPartner.api_data.request_id,
           user_id: authUser.id,
@@ -424,7 +425,7 @@ export default function Home() {
 
     try {
       const response = await axios.post(
-        'http://localhost:8000/api/respond-partner-request',
+        `${API_URL}/api/respond-partner-request`,
         {
           request_id: selectedPartner.api_data.request_id,
           user_id: authUser.id,
