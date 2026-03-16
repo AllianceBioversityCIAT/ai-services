@@ -271,6 +271,35 @@ export default function Home() {
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await axios.get(
+        'http://localhost:8000/api/download-template',
+        {
+          responseType: 'blob',
+        }
+      );
+
+      // Create a blob from the response
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+
+      // Create a download link and trigger download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'PartnerRequestTemplate_v1.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error('Error downloading template:', err);
+      setError('Failed to download template. Please try again.');
+    }
+  };
+
   const handleUpload = async () => {
     if (!file) {
       setError('Please select a file first');
@@ -1200,11 +1229,13 @@ export default function Home() {
                     }}>
                       Required Excel Format
                     </h4>
+                    
                     <ul style={{
                       paddingLeft: 'var(--space-md)',
                       color: 'var(--color-text-secondary)',
                       fontSize: '0.75rem',
                       lineHeight: 1.6,
+                      marginBottom: 'var(--space-sm)',
                     }}>
                       <li><strong>Column 0:</strong> ID <span style={{color: '#DC2626', fontWeight: 600}}>(required)</span></li>
                       <li><strong>Column 1:</strong> Partner Name <span style={{color: '#DC2626', fontWeight: 600}}>(required)</span></li>
@@ -1215,6 +1246,38 @@ export default function Home() {
                       <li><strong>Column 6:</strong> Category 1 (optional)</li>
                       <li><strong>Column 7:</strong> Category 2 (optional)</li>
                     </ul>
+
+                    {/* Download Template Button */}
+                    <button
+                      onClick={handleDownloadTemplate}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        background: 'var(--cgiar-blue)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#1e5a8e';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'var(--cgiar-blue)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      <FileSpreadsheet size={14} />
+                      Download Excel Template
+                    </button>
                   </div>
                 </motion.div>
               )}

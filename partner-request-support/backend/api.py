@@ -3,18 +3,22 @@ FastAPI server for Partner Request Support
 Handles Excel file upload and processing
 """
 import os
+import io
+import boto3
 import uvicorn
 import tempfile
 import requests
 import pandas as pd
 from typing import List, Dict, Optional
+from botocore.exceptions import ClientError
 from logger.logger_util import get_logger
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, File, UploadFile, HTTPException, Body, Form
 from src.mapping_clarisa_comparison import process_partners_to_json
 from src.supabase_client import get_cached_results_by_name, cache_results_batch, count_institutions
 from src.populate_clarisa_db import sync_clarisa_institutions
+from config.config_util import BR
 
 
 logger = get_logger()
@@ -1094,6 +1098,70 @@ async def respond_partner_request(
         raise HTTPException(
             status_code=500,
             detail=f"Error processing response: {str(e)}"
+        )
+
+
+@app.get("/api/download-template")
+async def download_template():
+    """
+    Download the Excel template from S3.
+    Uses the same AWS credentials as Bedrock.
+    
+    Returns:
+        StreamingResponse with the Excel file
+    """
+    try:
+        bucket_name = os.getenv("S3_TEMPLATE_BUCKET", "cgiar-partner-templates")
+        template_key = os.getenv("S3_TEMPLATE_KEY", "PartnerRequestTemplate_v1.xlsx")
+
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=BR['aws_access_key'],
+            aws_secret_access_key=BR['aws_secret_key'],
+            region_name='us-east-1'
+        )
+        
+        logger.info(f"📥 Downloading template from S3: {bucket_name}/{template_key}")
+        
+        file_obj = io.BytesIO()
+        s3_client.download_fileobj(bucket_name, template_key, file_obj)
+        file_obj.seek(0)
+        
+        logger.info("✅ Template downloaded successfully")
+        
+        return StreamingResponse(
+            file_obj,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename=PartnerRequestTemplate_v1.xlsx"
+            }
+        )
+        
+    except ClientError as e:
+        error_code = e.response['Error']['Code']
+        if error_code == 'NoSuchBucket':
+            logger.error(f"❌ S3 bucket not found: {bucket_name}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Template bucket not found. Please contact administrator."
+            )
+        elif error_code == 'NoSuchKey' or error_code == '404':
+            logger.error(f"❌ Template file not found in S3: {template_key}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Template file not found. Please contact administrator."
+            )
+        else:
+            logger.error(f"❌ AWS error downloading template: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error downloading template: {str(e)}"
+            )
+    except Exception as e:
+        logger.error(f"❌ Error downloading template from S3: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error downloading template: {str(e)}"
         )
 
 
