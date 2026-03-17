@@ -14,7 +14,6 @@ from src.supabase_client import (
     insert_institutions_batch, 
     count_institutions,
     get_all_institutions_from_db,
-    get_all_clarisa_ids_from_db,
     delete_institutions_by_ids,
     clear_all_cache
 )
@@ -60,19 +59,16 @@ def calculate_institution_hash(institution: Dict) -> str:
     Returns:
         str: MD5 hash of the institution's relevant data
     """
-    # Only hash the fields that would require re-embedding if changed
     relevant_data = {
         'name': institution.get('name', ''),
         'acronym': institution.get('acronym', ''),
         'website': institution.get('website', ''),
-        'countries': sorted(institution.get('countries', [])),  # Sort for consistency
+        'countries': sorted(institution.get('countries', [])),
         'institution_type': institution.get('institution_type', '')
     }
     
-    # Create a stable JSON representation
     data_str = json.dumps(relevant_data, sort_keys=True)
     
-    # Return MD5 hash
     return hashlib.md5(data_str.encode('utf-8')).hexdigest()
 
 
@@ -136,7 +132,6 @@ def sync_clarisa_institutions(batch_size: int = 50, delete_obsolete: bool = Fals
     """
     logger.info("🔄 Starting INCREMENTAL SYNC of CLARISA institutions")
     
-    # Step 1: Fetch current institutions from CLARISA
     logger.info("📋 STEP 1: Fetching institutions from CLARISA...")
     clarisa_institutions = get_all_parsed_institutions()
     
@@ -146,19 +141,16 @@ def sync_clarisa_institutions(batch_size: int = 50, delete_obsolete: bool = Fals
     
     logger.info(f"✅ {len(clarisa_institutions)} institutions fetched from CLARISA")
     
-    # Step 2: Fetch existing institutions from database
     logger.info("💾 STEP 2: Fetching existing institutions from database...")
     db_institutions = get_all_institutions_from_db()
     logger.info(f"✅ {len(db_institutions)} institutions in database")
     
-    # Create lookup dictionaries
     clarisa_dict = {inst['clarisa_id']: inst for inst in clarisa_institutions}
     db_dict = {inst['clarisa_id']: inst for inst in db_institutions}
     
     clarisa_ids = set(clarisa_dict.keys())
     db_ids = set(db_dict.keys())
     
-    # Step 3: Identify what needs to be processed
     logger.info("🔍 STEP 3: Analyzing differences...")
     
     new_ids = clarisa_ids - db_ids
@@ -169,7 +161,6 @@ def sync_clarisa_institutions(batch_size: int = 50, delete_obsolete: bool = Fals
     logger.info(f"   📊 Potentially modified: {len(potentially_modified_ids)}")
     logger.info(f"   📊 Obsolete institutions: {len(obsolete_ids)}")
     
-    # Identify truly modified institutions by comparing hashes
     modified_ids = set()
     unchanged_count = 0
     
@@ -187,7 +178,6 @@ def sync_clarisa_institutions(batch_size: int = 50, delete_obsolete: bool = Fals
         logger.info(f"   ✅ Actually modified: {len(modified_ids)}")
         logger.info(f"   ✅ Unchanged: {unchanged_count}")
     
-    # Step 4: Process new and modified institutions
     institutions_to_process = []
     
     for inst_id in new_ids:
@@ -217,7 +207,6 @@ def sync_clarisa_institutions(batch_size: int = 50, delete_obsolete: bool = Fals
         
         logger.info(f"✅ Embeddings generated for {len(institutions_with_embeddings)} institutions")
         
-        # Step 5: Insert/Update in database
         logger.info("💾 STEP 5: Upserting institutions into Supabase...")
         insert_stats = insert_institutions_batch(institutions_with_embeddings, batch_size=batch_size)
         logger.info(f"✅ Upserted {insert_stats['success']} institutions")
@@ -225,7 +214,6 @@ def sync_clarisa_institutions(batch_size: int = 50, delete_obsolete: bool = Fals
         if insert_stats['failed'] > 0:
             logger.warning(f"⚠️  Failed to upsert {insert_stats['failed']} institutions")
     
-    # Step 6: Handle obsolete institutions
     deleted_count = 0
     if obsolete_ids and delete_obsolete:
         logger.info(f"🗑️  STEP 6: Deleting {len(obsolete_ids)} obsolete institutions...")
@@ -233,7 +221,6 @@ def sync_clarisa_institutions(batch_size: int = 50, delete_obsolete: bool = Fals
     elif obsolete_ids:
         logger.info(f"⚠️  NOTE: {len(obsolete_ids)} obsolete institutions found but not deleted (use --delete-obsolete to remove)")
     
-    # Step 7: Invalidate cache if database changed
     cache_cleared = 0
     if len(new_ids) > 0 or len(modified_ids) > 0:
         logger.info("🗑️  STEP 7: CLARISA database changed - Invalidating cache...")
@@ -242,7 +229,6 @@ def sync_clarisa_institutions(batch_size: int = 50, delete_obsolete: bool = Fals
     else:
         logger.info("✅ No changes detected - Cache remains valid")
     
-    # Final summary
     logger.info("=" * 50)
     logger.info("📊 SYNC SUMMARY")
     logger.info("=" * 50)
@@ -316,7 +302,6 @@ Examples:
     logger.info(f"📊 Current institutions in the database: {current_count}")
     
     if args.mode == 'populate':
-        # Full population mode
         logger.info("📋 Mode: FULL POPULATION")
         
         if current_count > 0 and not args.force:
@@ -328,7 +313,6 @@ Examples:
         populate_clarisa_institutions(batch_size=args.batch_size)
     
     elif args.mode == 'sync':
-        # Incremental sync mode
         logger.info("🔄 Mode: INCREMENTAL SYNC")
         
         if current_count == 0:
