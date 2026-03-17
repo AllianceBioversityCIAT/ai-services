@@ -47,7 +47,7 @@ with tab1:
     if st.button("Generate Annual Report", type="primary", key="generate_tab1"):
         with st.spinner("Generating annual report..."):
             try:
-                url = "https://ia.prms.cgiar.org/api/generate-annual"
+                url = "https://qg53uhgrn7bpofn5eawcuvl62y0akymf.lambda-url.us-east-1.on.aws/api/generate-annual"
                 payload = {
                     "indicator": selected_indicator,
                     "year": selected_year,
@@ -91,7 +91,7 @@ with tab2:
     if st.button("Generate Tables", type="primary", key="generate_tab4"):
         with st.spinner("Generating summary tables..."):
             try:
-                url = "https://ia.prms.cgiar.org/api/generate-annual-tables"
+                url = "https://qg53uhgrn7bpofn5eawcuvl62y0akymf.lambda-url.us-east-1.on.aws/api/generate-annual-tables"
                 payload = {
                     "indicator": selected_indicator,
                     "year": selected_year_tables,

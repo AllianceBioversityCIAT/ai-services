@@ -31,7 +31,7 @@ logger = get_logger()
 notification_service = NotificationService()
 
 
-ENDPOINT_URL = "https://ia.prms.cgiar.org/api/generate-annual"
+ENDPOINT_URL = "https://qg53uhgrn7bpofn5eawcuvl62y0akymf.lambda-url.us-east-1.on.aws/api/generate-annual"
 REQUEST_PAYLOAD = {
     "indicator": "IPI 1.3",
     "year": 2025,

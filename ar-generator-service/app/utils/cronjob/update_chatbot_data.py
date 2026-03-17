@@ -31,7 +31,7 @@ logger = get_logger()
 notification_service = NotificationService()
 
 
-ENDPOINT_URL = "https://ia.prms.cgiar.org/api/update-chatbot-data"
+ENDPOINT_URL = "https://qg53uhgrn7bpofn5eawcuvl62y0akymf.lambda-url.us-east-1.on.aws/api/update-chatbot-data"
 TIMEOUT_SECONDS = 360  # 6 minutes - longer than proxy timeout to receive the 502 response
 MAX_RETRIES = 2  # Reduced retries since we only need to confirm request acceptance
 RETRY_DELAY = 30  # Delay between retries
