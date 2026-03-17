@@ -74,7 +74,7 @@ export const Header = ({ authUser, onLogout }: HeaderProps) => {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           style={{
-            background: '#DC2626',
+            background: '#81c003',
             color: 'white',
             padding: '8px 20px',
             borderRadius: 'var(--radius-md)',
