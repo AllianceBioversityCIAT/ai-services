@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { AuthResponse, LoginCredentials } from '../types/auth.types';
 
-const AUTH_API_URL = 'https://clarisatest-back.ciat.cgiar.org/auth';
+const AUTH_API_URL = 'https://api.clarisa.cgiar.org/auth';
 
 export const authService = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {

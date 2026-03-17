@@ -469,7 +469,7 @@ export const UploadSection = ({
                 {syncing
                   ? 'Fetching partner requests from CLARISA API...'
                   : apiPartners.length > 0
-                  ? 'Ready to process last 5 partner requests (testing mode)'
+                  ? 'Ready to process all partner requests'
                   : 'Click Refresh to sync with CLARISA API'}
               </p>
             </div>
@@ -540,51 +540,6 @@ export const UploadSection = ({
                 </>
               )}
             </button>
-
-            {/* Info Box */}
-            <div
-              style={{
-                marginTop: 'var(--space-md)',
-                padding: 'var(--space-md)',
-                background: '#FFF4E6',
-                borderRadius: 'var(--radius-md)',
-                borderLeft: '3px solid var(--cgiar-yellow)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'start', gap: 'var(--space-xs)' }}>
-                <Info
-                  size={16}
-                  style={{
-                    color: 'var(--cgiar-yellow)',
-                    marginTop: '2px',
-                    flexShrink: 0,
-                  }}
-                />
-                <div>
-                  <h4
-                    style={{
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      color: 'var(--cgiar-navy)',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    Testing Mode
-                  </h4>
-                  <p
-                    style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--color-text-secondary)',
-                      lineHeight: 1.5,
-                      margin: 0,
-                    }}
-                  >
-                    Currently processing last 5 partner requests for testing. Full processing
-                    will be available in production mode.
-                  </p>
-                </div>
-              </div>
-            </div>
           </motion.div>
         )}
 

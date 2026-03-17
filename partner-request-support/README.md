@@ -328,7 +328,6 @@ The frontend follows modern React best practices with a **modular, scalable arch
 - Sync pending partner requests from CLARISA API
 - Auto-refresh capability
 - Displays request count and metadata
-- Processing limit indicator (first 3 in test mode)
 
 #### **Results Dashboard**
 
@@ -506,12 +505,12 @@ CREATE INDEX idx_name_embedding ON clarisa_institutions_v2
 
 **Typical Row Count:** ~3,000-5,000 institutions
 
-### **Table: `partner_request_cache_test`**
+### **Table: `partner_request_cache_prod`**
 
 Caches processing results to avoid redundant searches.
 
 ```sql
-CREATE TABLE partner_request_cache_test (
+CREATE TABLE partner_request_cache_prod (
     request_id BIGINT PRIMARY KEY,
     partner_name TEXT NOT NULL,
     match_found BOOLEAN,
@@ -847,7 +846,7 @@ Ensure backend has CORS enabled in `api.py` for your frontend URL
 ### **Cache not invalidating**
 Manually clear cache:
 ```sql
-DELETE FROM partner_request_cache_test;
+DELETE FROM partner_request_cache_prod;
 ```
 
 ---

@@ -69,7 +69,7 @@ export const Header = ({ authUser, onLogout }: HeaderProps) => {
           </div>
         </motion.div>
 
-        {/* Testing Environment Tag */}
+        {/* Production Environment Tag */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -84,7 +84,7 @@ export const Header = ({ authUser, onLogout }: HeaderProps) => {
             letterSpacing: '0.5px',
           }}
         >
-          Testing Environment
+          Production Environment
         </motion.div>
 
         {/* User info and logout */}

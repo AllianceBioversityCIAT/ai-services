@@ -718,7 +718,7 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
     
     Args:
         partner_ids: Optional list of specific partner IDs to process.
-                    If None, processes all synced partners (limited to 5 for testing)
+                    If None, processes all synced partners
     
     Returns:
         JSON with processed results including:
@@ -776,7 +776,7 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
                 if pr.get('id') in partner_ids
             ]
         else:
-            partners_to_process = synced_partner_requests[-5:]
+            partners_to_process = synced_partner_requests
         
         if not partners_to_process:
             raise HTTPException(

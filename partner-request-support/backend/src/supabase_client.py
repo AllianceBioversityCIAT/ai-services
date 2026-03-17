@@ -186,7 +186,7 @@ def search_by_name_embedding(query_embedding: List[float],
 # PARTNER REQUEST CACHE FUNCTIONS
 # ==========================================
 
-CACHE_TABLE = "partner_request_cache_test"
+CACHE_TABLE = "partner_request_cache_prod"
 
 
 def get_cached_results_by_name(partner_names: List[str]) -> Dict[str, Dict]:
