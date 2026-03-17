@@ -469,7 +469,7 @@ export const UploadSection = ({
                 {syncing
                   ? 'Fetching partner requests from CLARISA API...'
                   : apiPartners.length > 0
-                  ? 'Ready to process first 3 partner requests (testing mode)'
+                  ? 'Ready to process last 5 partner requests (testing mode)'
                   : 'Click Refresh to sync with CLARISA API'}
               </p>
             </div>
@@ -579,7 +579,7 @@ export const UploadSection = ({
                       margin: 0,
                     }}
                   >
-                    Currently processing first 3 partner requests for testing. Full processing
+                    Currently processing last 5 partner requests for testing. Full processing
                     will be available in production mode.
                   </p>
                 </div>
