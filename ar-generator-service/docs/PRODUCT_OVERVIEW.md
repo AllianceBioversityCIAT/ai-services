@@ -40,9 +40,9 @@ The module is designed for both technical and non-technical users, offering both
 ## 4. Access & Availability
 
 **Production Environment:**
-- **Web Interface**: [https://ia.prms.cgiar.org/web/](https://ia.prms.cgiar.org/web/)
-- **API Endpoint**: `https://ia.prms.cgiar.org/api/`
-- **Interactive API Documentation**: [https://ia.prms.cgiar.org/docs](https://ia.prms.cgiar.org/docs) (Swagger UI for testing endpoints)
+- **Web Interface**: [https://qg53uhgrn7bpofn5eawcuvl62y0akymf.lambda-url.us-east-1.on.aws/web/](https://qg53uhgrn7bpofn5eawcuvl62y0akymf.lambda-url.us-east-1.on.aws/web/)
+- **API Endpoint**: `https://qg53uhgrn7bpofn5eawcuvl62y0akymf.lambda-url.us-east-1.on.aws/api/`
+- **Interactive API Documentation**: [https://qg53uhgrn7bpofn5eawcuvl62y0akymf.lambda-url.us-east-1.on.aws/docs](https://qg53uhgrn7bpofn5eawcuvl62y0akymf.lambda-url.us-east-1.on.aws/docs) (Swagger UI for testing endpoints)
 - **MARLO Platform Integration**: Accessible through MARLO's AICCRA AI Module at [https://aiccratest.ciat.cgiar.org/ai/AICCRA/ai.do?edit=true&phaseID=428](https://aiccratest.ciat.cgiar.org/ai/AICCRA/ai.do?edit=true&phaseID=428)
 
 **Development Environment:**

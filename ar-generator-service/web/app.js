@@ -1,5 +1,5 @@
 // AICCRA Report Generator Web App
-const API_BASE_URL = 'https://ia.prms.cgiar.org';
+const API_BASE_URL = 'https://qg53uhgrn7bpofn5eawcuvl62y0akymf.lambda-url.us-east-1.on.aws';
 
 // Tracking configuration
 const AI_FEEDBACK_URL = 'https://i8s5i8c21i.execute-api.us-east-1.amazonaws.com';
