@@ -12,7 +12,7 @@ The service supports multiple projects:
 
 - ✅ Document ingestion from S3
 - 🔍 Semantic chunking + vector embedding with LanceDB
-- 🤖 Answer generation using LLM (Claude 3 Sonnet via Bedrock)
+- 🤖 Answer generation using LLM (Claude 4.5 Sonnet via Bedrock)
 - 🔒 Auth via CLARISA credentials
 - 📦 Sync processing via MCP
 - 📤 Slack notifications on success/failure
@@ -346,7 +346,7 @@ MCP is a protocol that enables seamless integration between the service and LLM 
 
 1. **Handle document processing requests**: The MCP server exposes both `process_document` (for STAR) and `process_document_prms` (for PRMS) tools that receive parameters like bucket name, document key, and authentication credentials.
 2. **Authenticate users**: All requests are authenticated through the CLARISA service before processing.
-3. **Process documents with LLMs**: Once authenticated, documents are retrieved from S3, processed using LLMs (Claude 3 Sonnet via Bedrock), and the results are returned.
+3. **Process documents with LLMs**: Once authenticated, documents are retrieved from S3, processed using LLMs (Claude 4.5 Sonnet via Bedrock), and the results are returned.
 4. **Notify stakeholders**: The service sends notifications via Slack upon successful processing or failures, with project-specific messaging.
 
 ### MCP Architecture

@@ -1,3 +1,4 @@
+import re
 import time
 import json
 import boto3
@@ -49,9 +50,6 @@ def invoke_model(prompt, max_tokens=5000):
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": max_tokens,
             "temperature": 0.1,
-            "top_k": 250,
-            "top_p": 0.999,
-            "stop_sequences": [],
             "messages": [
                 {
                     "role": "user",
@@ -62,7 +60,7 @@ def invoke_model(prompt, max_tokens=5000):
             ]
         }
         response = bedrock_runtime.invoke_model(
-            modelId="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+            modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
             body=json.dumps(request_body),
             contentType="application/json",
             accept="application/json"
@@ -72,6 +70,18 @@ def invoke_model(prompt, max_tokens=5000):
     except Exception as e:
         logger.error(f"❌ Error invoking the model: {str(e)}")
         raise
+
+
+def extract_json_from_markdown(text):
+    """Extract JSON from markdown code blocks if present"""
+    
+    json_pattern = r'```(?:json)?\s*\n?(.*?)\n?```'
+    match = re.search(json_pattern, text, re.DOTALL)
+    
+    if match:
+        return match.group(1).strip()
+    
+    return text.strip()
 
 
 def is_valid_json(text):
@@ -164,7 +174,7 @@ def format_mining_response(raw_response: Union[str, Dict[str, Any]]) -> Dict[str
                     typed_results.append(innovation_result)
                     
                 else:
-                    logger.warning(f"Unknown indicator type: {indicator}")
+                    logger.warning(f"❌ Unknown indicator type: {indicator}")
                     continue
                     
             except Exception as e:
@@ -228,8 +238,10 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR, user_id:
         """
 
         response_text = invoke_model(query)
+        
+        extracted_json = extract_json_from_markdown(response_text)
 
-        json_content = json.loads(response_text) if is_valid_json(response_text) else {"text": response_text}
+        json_content = json.loads(extracted_json) if is_valid_json(extracted_json) else {"text": response_text}
         
         if isinstance(json_content, dict) and "results" in json_content:
             mapped_results = []
@@ -341,8 +353,10 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS, use
         """
 
         response_text = invoke_model(query)
+        
+        extracted_json = extract_json_from_markdown(response_text)
 
-        json_content = json.loads(response_text) if is_valid_json(response_text) else {"text": response_text}
+        json_content = json.loads(extracted_json) if is_valid_json(extracted_json) else {"text": response_text}
         
         if isinstance(json_content, dict) and "results" in json_content:
             mapped_results = []
