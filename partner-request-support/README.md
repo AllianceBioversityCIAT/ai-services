@@ -155,15 +155,26 @@ The CGIAR Partner Request Support System is an enterprise-grade platform designe
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         Frontend (Next.js)                      │
+│                    Frontend (Next.js 16 + React 19)             │
+│                                                                 │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  page.tsx (Main Orchestrator)                              │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                              ↓                                  │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-│  │ Login Screen │  │ Upload Mode  │  │Results Table │           │
+│  │  Components  │  │ Custom Hooks │  │   Services   │           │
+│  │  (11 total)  │  │  (6 total)   │  │   (2 total)  │           │
 │  └──────────────┘  └──────────────┘  └──────────────┘           │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-│  │ Modals       │  │ Statistics   │  │Accept/Reject │           │
-│  └──────────────┘  └──────────────┘  └──────────────┘           │
+│         ↓                  ↓                  ↓                 │
+│  LoginPage         useAuth          authService                 │
+│  Header            usePartnerProc.  partnerService              │
+│  UploadSection     useFileUpload                                │
+│  StatsCards        useApiSync                                   │
+│  PartnerTable      useModal                                     │
+│  QualityBadge      useWebSearch                                 │
+│  ...                                                            │
 └────────────────────────────┬────────────────────────────────────┘
-                             │ HTTP/REST
+                             │ HTTP/REST (Axios)
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Backend API (FastAPI)                      │
@@ -173,7 +184,7 @@ The CGIAR Partner Request Support System is an enterprise-grade platform designe
 │  │  /api/manual-web-search /api/respond-partner-request     │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │   Hybrid    │  │     Web     │  │   CLARISA   │              │
+│  │   Hybrid    │  │     Web     │  │   CLARISA   │              │ 
 │  │   Search    │  │   Search    │  │     API     │              │
 │  │   Engine    │  │   Module    │  │  Integration│              │
 │  └─────────────┘  └─────────────┘  └─────────────┘              │
@@ -251,28 +262,77 @@ npm run dev
 
 ## 🎨 Frontend Application
 
-### **Authentication**
+### **Architecture & Design Patterns**
+
+The frontend follows modern React best practices with a **modular, scalable architecture**:
+
+#### **Component-Based Structure**
+- **11 Specialized Components**: Each component handles a single responsibility
+  - `LoginPage` - Authentication interface
+  - `Header` - Application header with branding and user info
+  - `AIDisclaimer` - AI usage disclaimer banner
+  - `UploadSection` - Dual-mode upload interface (Excel/API)
+  - `StatsCards` - Animated statistics dashboard
+  - `ResultsSection` - Complete results orchestrator
+  - `PartnerTable` - Results table container
+  - `PartnerRow` - Individual partner row with actions
+  - `QualityBadge` - Color-coded match quality indicator
+  - `SyncAlert` - Database sync notifications
+  - `ModalDialog` - Reusable modal component
+
+#### **Custom Hooks Pattern**
+- **6 Custom Hooks** for separation of concerns and reusability:
+  - `useAuth` - Authentication state and login/logout logic
+  - `usePartnerProcessing` - Partner processing orchestration
+  - `useApiSync` - API partner request synchronization
+  - `useFileUpload` - File upload state management
+  - `useModal` - Modal state and control
+  - `useWebSearch` - Manual web search execution
+
+#### **Service Layer**
+- **Centralized API Communication**:
+  - `authService` - CLARISA authentication API
+  - `partnerService` - Partner processing endpoints
+- Clean separation between UI logic and API calls
+- Consistent error handling and response formatting
+
+#### **Type System**
+- **Full TypeScript Coverage**:
+  - `partner.types` - Partner and match-related interfaces
+  - `api.types` - API request/response schemas
+  - `auth.types` - Authentication types
+- Type-safe props and state management
+- IntelliSense support throughout
+
+#### **Utility Helpers**
+- `qualityHelpers` - Match quality classification and badge rendering
+- `fileHelpers` - File validation and processing helpers
+
+### **Key Features**
+
+#### **Authentication**
 - Split-screen login interface with CGIAR branding
 - Email/password authentication via CLARISA API
-- Password visibility toggle and error handling
+- Password visibility toggle and comprehensive error handling
+- Automatic session management
 
-### **Processing Modes**
+#### **Processing Modes**
 
-#### **Excel Upload Mode**
+**Excel Upload Mode:**
 - Drag-and-drop file upload (`.xlsx`, `.xls`)
 - Template download from S3
 - Real-time file validation
 - Option to create partner requests in CLARISA first
 
-#### **API Request Mode**
+**API Request Mode:**
 - Sync pending partner requests from CLARISA API
 - Auto-refresh capability
 - Displays request count and metadata
 - Processing limit indicator (first 3 in test mode)
 
-### **Results Dashboard**
+#### **Results Dashboard**
 
-**Statistics Cards** (animated):
+**Statistics Cards** (animated with Framer Motion):
 - Total Partners Processed
 - Successfully Matched
 - Excellent Matches (≥85% confidence)
@@ -283,6 +343,7 @@ npm run dev
 - Match Quality badge (color-coded)
 - Actions: CLARISA Match, Top Candidates, Web Search
 - Accept/Reject buttons (for API requests)
+- Search/filter capabilities
 
 **Match Quality Indicators**:
 - 🟢 **Excellent** (≥85%): High confidence, verified match
@@ -290,14 +351,14 @@ npm run dev
 - 🟠 **Fair** (60-69%): Moderate match, needs validation
 - ⚪ **No Match** (<60%): No suitable match found
 
-### **Modal Interactions**
+#### **Modal Interactions**
 
 - **CLARISA Match Modal**: Complete institution details with score breakdown
 - **Top Candidates Modal**: Ranked list of top 5 potential matches
 - **Web Search Modal**: AI-generated institutional research in markdown
 - **Accept/Reject Modals**: Confirmation dialogs with optional justification
 
-### **Design System**
+#### **Design System**
 
 **Color Palette:**
 - `#7AB800` - CGIAR Green (Primary)
@@ -307,6 +368,14 @@ npm run dev
 - `#F5F7FA` - Light Gray (Background)
 
 **Typography:** Poppins font family (Google Fonts)
+
+### **State Management**
+
+- **React Hooks-Based**: No external state management library needed
+- **Custom Hooks** encapsulate complex state logic
+- **Service Layer** handles API state
+- **Local Component State** for UI-specific concerns
+- **Prop Drilling Minimization** through composition
 
 ---
 
@@ -567,20 +636,62 @@ report = search_institution_info(
 partner-request-support/
 ├── frontend/
 │   ├── app/
-│   │   ├── page.tsx              # Main application
+│   │   ├── page.tsx              # Main application (orchestrator)
 │   │   ├── layout.tsx            # Root layout
 │   │   ├── globals.css           # Global styles
-│   │   └── components/
-│   │       └── SyncAlert.tsx     # Sync notification
+│   │   │
+│   │   ├── components/           # UI Components
+│   │   │   ├── LoginPage.tsx
+│   │   │   ├── Header.tsx
+│   │   │   ├── AIDisclaimer.tsx
+│   │   │   ├── UploadSection.tsx
+│   │   │   ├── StatsCards.tsx
+│   │   │   ├── ResultsSection.tsx
+│   │   │   ├── PartnerTable.tsx
+│   │   │   ├── PartnerRow.tsx
+│   │   │   ├── QualityBadge.tsx
+│   │   │   ├── SyncAlert.tsx
+│   │   │   ├── ModalDialog.tsx
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── hooks/                # Custom Hooks
+│   │   │   ├── useAuth.ts
+│   │   │   ├── usePartnerProcessing.ts
+│   │   │   ├── useApiSync.ts
+│   │   │   ├── useFileUpload.ts
+│   │   │   ├── useModal.ts
+│   │   │   ├── useWebSearch.ts
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── services/             # API Services
+│   │   │   ├── authService.ts
+│   │   │   ├── partnerService.ts
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── types/                # TypeScript Types
+│   │   │   ├── partner.types.ts
+│   │   │   ├── api.types.ts
+│   │   │   ├── auth.types.ts
+│   │   │   └── index.ts
+│   │   │
+│   │   └── utils/                # Utility Helpers
+│   │       ├── qualityHelpers.tsx
+│   │       └── fileHelpers.ts
+│   │
+│   ├── public/
 │   ├── package.json
 │   ├── tsconfig.json
-│   └── next.config.ts
+│   ├── next.config.ts
+│   ├── tailwind.config.ts
+│   └── postcss.config.mjs
 │
 ├── backend/
 │   ├── api.py                    # FastAPI entry point
 │   ├── main.py                   # CLI script
 │   ├── requirements.txt
+│   │
 │   ├── src/
+│   │   ├── __init__.py
 │   │   ├── mapping_clarisa_comparison.py  # Hybrid search engine
 │   │   ├── clarisa_api.py                 # CLARISA API client
 │   │   ├── embeddings.py                  # Embedding generation
@@ -588,12 +699,50 @@ partner-request-support/
 │   │   ├── utils.py                       # Utilities
 │   │   ├── web_search.py                  # Web search module
 │   │   └── populate_clarisa_db.py         # DB population
+│   │
 │   ├── config/
+│   │   └── config_util.py
+│   │
 │   ├── docs/
+│   │   ├── CGIAR_INSTITUTION_RULES.md
+│   │   ├── HOW THE SEARCH WORKS.md
+│   │   └── QUICKSTART.md
+│   │
 │   ├── sql/
+│   │   ├── create_clarisa_vector_table.sql
+│   │   └── create_partner_cache_table.sql
+│   │
 │   ├── test/
+│   │   ├── search_example.py
+│   │   └── web_search_test.py
+│   │
 │   └── logger/
+│       └── logger_util.py
+│
+├── .env
+├── .gitignore
+├── README.md
+└── skills-lock.json
 ```
+
+### **Frontend Architecture Principles**
+
+**Component Organization:**
+- **Single Responsibility**: Each component handles one specific UI concern
+- **Composition Over Inheritance**: Complex UIs built from simple, reusable components
+- **Props Interface**: TypeScript interfaces for all component props
+
+**Custom Hooks Benefits:**
+- **Logic Reusability**: Share stateful logic across components
+- **Separation of Concerns**: UI components focus on rendering, hooks handle logic
+- **Testability**: Hooks can be tested independently
+- **Code Organization**: Complex state management extracted from components
+
+**Service Layer Pattern:**
+- **Centralized API Logic**: All HTTP requests in dedicated service files
+- **Error Handling**: Consistent error formatting across the app
+- **Type Safety**: Typed request/response with TypeScript
+- **Easier Mocking**: Services can be easily mocked for testing
 
 ### **Development Commands**
 
@@ -602,10 +751,67 @@ partner-request-support/
 cd backend
 uvicorn api:app --reload --host 0.0.0.0 --port 8000
 
-# Frontend
+# Frontend with development mode
 cd frontend
 npm run dev
+
+# Frontend with Turbopack (faster)
+npm run dev --turbo
 ```
+
+### **Adding New Features**
+
+#### **Frontend: New Component**
+```bash
+# 1. Create component file
+touch frontend/app/components/NewComponent.tsx
+
+# 2. Add to index.ts for centralized exports
+echo "export * from './NewComponent';" >> frontend/app/components/index.ts
+
+# 3. Import in page.tsx or other components
+# import { NewComponent } from './components';
+```
+
+#### **Frontend: New Custom Hook**
+```bash
+# 1. Create hook file
+touch frontend/app/hooks/useNewFeature.ts
+
+# 2. Add to index.ts
+echo "export * from './useNewFeature';" >> frontend/app/hooks/index.ts
+
+# 3. Use in components
+# import { useNewFeature } from './hooks';
+```
+
+#### **Frontend: New Service Method**
+```typescript
+// In frontend/app/services/partnerService.ts
+async newMethod(params: Params): Promise<Response> {
+  const response = await axios.post(`${getApiUrl()}/api/new-endpoint`, params);
+  return response.data;
+}
+```
+
+#### **Backend: New API Endpoint**
+```python
+# 1. Add route in api.py
+@app.post("/api/new-endpoint")
+async def new_endpoint(data: RequestModel):
+    # Implementation
+    return {"result": "..."}
+
+# 2. Implement business logic in src/ modules
+# 3. OpenAPI docs update automatically
+# 4. Add corresponding method in frontend partnerService.ts
+```
+
+#### **Database Changes**
+1. Write migration SQL script in `backend/sql/`
+2. Test in Supabase SQL editor
+3. Document schema changes in README
+4. Update cache invalidation logic if needed
 
 ---
 
