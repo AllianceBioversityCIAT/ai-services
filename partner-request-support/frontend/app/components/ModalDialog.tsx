@@ -21,6 +21,40 @@ interface ModalProps {
   isResponding?: boolean;
 }
 
+// Rejection message templates
+const REJECTION_TEMPLATES = [
+  {
+    id: 'already_exists',
+    label: 'Already exists',
+    template: '"[InstitutionRequested]" already exists in CLARISA as "[CLARISAInstitution]"'
+  },
+  {
+    id: 'already_exists_ppa',
+    label: 'Already exists as PPA',
+    template: '"[InstitutionRequested]" is available in CLARISA as Managing/PPA Partner. Please contact your PMU or "[ManagementLiaisonRole]" in order to add it to the list of project partners'
+  },
+  {
+    id: 'not_legal',
+    label: 'Not legal entity',
+    template: 'This is a program/project, not an institution. We suggest to use "[CLARISAInstitution]" instead.'
+  },
+  {
+    id: 'sub_department',
+    label: 'Sub-department',
+    template: 'The "[InstitutionRequested]" is a part of the "[CLARISAInstitution]". Therefore, we kindly suggest you to include "[InstitutionRequested]" as sub-department of "[CLARISAInstitution]".'
+  },
+  {
+    id: 'person_not_institution',
+    label: 'Person - Not institution',
+    template: '"[PersonRequested]" is a person, not an institution. We suggest you to include this person under the institution that hired him.'
+  },
+  {
+    id: 'country_office',
+    label: 'Country - Office',
+    template: 'The "[InstitutionRequested]" is a part of the "[CLARISAInstitution]" in "[CountryInstitution]". Therefore, we kindly suggest you to include the "[Country]" country office for "[CLARISAInstitution]".'
+  }
+];
+
 const DataField = ({ label, value, fullWidth }: { label: string; value: string; fullWidth?: boolean }) => (
   <div style={{ gridColumn: fullWidth ? '1 / -1' : 'auto' }}>
     <p style={{
@@ -652,6 +686,56 @@ export const Modal = ({
                               </p>
                             </div>
                           </div>
+                        </div>
+
+                        <div style={{ marginBottom: 'var(--space-md)' }}>
+                          <label style={{
+                            display: 'block',
+                            fontSize: '0.875rem',
+                            fontWeight: 500,
+                            color: 'var(--cgiar-navy)',
+                            marginBottom: 'var(--space-xs)',
+                          }}>
+                            Quick Templates
+                          </label>
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value && onReject) {
+                                const template = REJECTION_TEMPLATES.find(t => t.id === e.target.value);
+                                if (template) {
+                                  onReject(template.template);
+                                }
+                              }
+                            }}
+                            disabled={isResponding}
+                            style={{
+                              width: '100%',
+                              padding: '10px var(--space-sm)',
+                              border: '1px solid var(--cgiar-gray)',
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: '0.875rem',
+                              fontFamily: 'inherit',
+                              background: isResponding ? '#F3F4F6' : 'white',
+                              cursor: isResponding ? 'not-allowed' : 'pointer',
+                              color: 'var(--cgiar-navy)',
+                            }}
+                            value=""
+                          >
+                            <option value="">Select a template...</option>
+                            {REJECTION_TEMPLATES.map(template => (
+                              <option key={template.id} value={template.id}>
+                                {template.label}
+                              </option>
+                            ))}
+                          </select>
+                          <p style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--color-text-muted)',
+                            marginTop: 'var(--space-xs)',
+                            marginBottom: 0,
+                          }}>
+                            Select a template to auto-fill the message. You can customize placeholders like [InstitutionRequested], [CLARISAInstitution], etc.
+                          </p>
                         </div>
 
                         <div style={{ marginBottom: 'var(--space-lg)' }}>
