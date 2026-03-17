@@ -135,6 +135,7 @@ export default function Home() {
   const [responseMessage, setResponseMessage] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [runningWebSearch, setRunningWebSearch] = useState<{ [partnerId: string]: boolean }>({});
   
   // Authentication states
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -473,6 +474,62 @@ export default function Home() {
       setResponseMessage({ type: 'error', message: errorMsg });
     } finally {
       setRespondingToRequest(false);
+    }
+  };
+
+  const handleManualWebSearch = async (partner: Partner) => {
+    const partnerId = partner.id;
+    
+    setRunningWebSearch(prev => ({ ...prev, [partnerId]: true }));
+    
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/manual-web-search`,
+        {
+          partner_name: partner.name,
+          country: partner.country || null,
+          website: partner.website || null
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      // Update the partner in results with the web search data
+      if (results) {
+        const updatedPartners = results.partners.map(p => 
+          p.id === partnerId
+            ? { ...p, web_search: response.data }
+            : p
+        );
+        
+        setResults({
+          ...results,
+          partners: updatedPartners,
+          stats: {
+            ...results.stats,
+            web_search_attempted: results.stats.web_search_attempted + 1,
+            web_search_success: response.data.success 
+              ? results.stats.web_search_success + 1 
+              : results.stats.web_search_success
+          }
+        });
+
+        // If successful, open the modal automatically
+        if (response.data.success) {
+          const updatedPartner = { ...partner, web_search: response.data };
+          setSelectedPartner(updatedPartner);
+          setModalType('websearch');
+          setModalOpen(true);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error running manual web search:', err);
+      setError(err.response?.data?.detail || 'Error running web search. Please try again.');
+    } finally {
+      setRunningWebSearch(prev => ({ ...prev, [partnerId]: false }));
     }
   };
 
@@ -1974,6 +2031,46 @@ export default function Home() {
                               >
                                 <Globe size={14} />
                                 View
+                              </button>
+                            ) : (partner.match_quality === 'fair' || partner.match_quality === 'good') ? (
+                              <button
+                                onClick={() => handleManualWebSearch(partner)}
+                                disabled={runningWebSearch[partner.id]}
+                                style={{
+                                  padding: '6px 12px',
+                                  background: runningWebSearch[partner.id] 
+                                    ? 'var(--cgiar-gray)' 
+                                    : 'rgba(252, 211, 77, 0.3)',
+                                  color: runningWebSearch[partner.id] 
+                                    ? 'white' 
+                                    : 'var(--cgiar-navy)',
+                                  borderRadius: 'var(--radius-sm)',
+                                  border: runningWebSearch[partner.id] 
+                                    ? 'none' 
+                                    : '1px solid rgba(252, 211, 77, 0.6)',
+                                  cursor: runningWebSearch[partner.id] ? 'not-allowed' : 'pointer',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 500,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'all 0.2s',
+                                  opacity: runningWebSearch[partner.id] ? 0.7 : 1,
+                                }}
+                                onMouseOver={(e) => !runningWebSearch[partner.id] && (e.currentTarget.style.background = 'rgba(252, 211, 77, 0.5)')}
+                                onMouseOut={(e) => !runningWebSearch[partner.id] && (e.currentTarget.style.background = 'rgba(252, 211, 77, 0.3)')}
+                              >
+                                {runningWebSearch[partner.id] ? (
+                                  <>
+                                    <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                                    Searching...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Globe size={14} />
+                                    Run
+                                  </>
+                                )}
                               </button>
                             ) : (
                               <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>—</span>

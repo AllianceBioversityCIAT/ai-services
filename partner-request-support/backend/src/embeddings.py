@@ -61,25 +61,6 @@ def get_embedding(text: str, normalize: bool = False) -> np.ndarray:
         return np.zeros(EMBEDDING_DIMENSION, dtype=np.float32)
 
 
-def get_embeddings_batch(texts: List[str]) -> List[np.ndarray]:
-    """
-    Generates embeddings for multiple texts
-    
-    Args:
-        texts: List of texts
-        
-    Returns:
-        List[np.ndarray]: List of embedding vectors
-    """
-    embeddings = []
-    
-    for text in texts:
-        embedding = get_embedding(text)
-        embeddings.append(embedding)
-    
-    return embeddings
-
-
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     """
     Calculates cosine similarity between two vectors
@@ -111,19 +92,3 @@ def embedding_to_list(embedding: np.ndarray) -> List[float]:
         List[float]: List of floats
     """
     return embedding.tolist()
-
-
-def list_to_embedding(embedding_list: Union[List[float], str]) -> np.ndarray:
-    """
-    Converts a list or JSON string to a numpy vector
-    
-    Args:
-        embedding_list: List of floats or JSON string
-        
-    Returns:
-        np.ndarray: Embedding vector
-    """
-    if isinstance(embedding_list, str):
-        embedding_list = json.loads(embedding_list)
-    
-    return np.array(embedding_list, dtype=np.float32)

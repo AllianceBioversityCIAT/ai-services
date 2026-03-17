@@ -9,31 +9,30 @@ import uvicorn
 import tempfile
 import requests
 import pandas as pd
-from typing import List, Dict, Optional
-from botocore.exceptions import ClientError
-from logger.logger_util import get_logger
-from fastapi.responses import JSONResponse, StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, File, UploadFile, HTTPException, Body, Form
-from src.mapping_clarisa_comparison import process_partners_to_json
-from src.supabase_client import get_cached_results_by_name, cache_results_batch, count_institutions
-from src.populate_clarisa_db import sync_clarisa_institutions
+from dotenv import load_dotenv
 from config.config_util import BR
+from typing import List, Dict, Optional
+from logger.logger_util import get_logger
+from botocore.exceptions import ClientError
+from fastapi.middleware.cors import CORSMiddleware
+from src.web_search import search_institution_online
+from src.populate_clarisa_db import sync_clarisa_institutions
+from fastapi.responses import JSONResponse, StreamingResponse
+from src.mapping_clarisa_comparison import process_partners_to_json
+from fastapi import FastAPI, File, UploadFile, HTTPException, Body, Form
+from src.supabase_client import get_cached_results_by_name, cache_results_batch, count_institutions
 
 
 logger = get_logger()
+load_dotenv()
 
-# Global variables
 synced_partner_requests: List[Dict] = []
-CLARISA_API_URL = "https://clarisatest-back.ciat.cgiar.org/api/partner-requests"
-CLARISA_CREATE_URL = "https://clarisatest-back.ciat.cgiar.org/api/partner-requests/create"
-CLARISA_RESPOND_URL = "https://clarisatest-back.ciat.cgiar.org/api/partner-requests/respond"
-CLARISA_COUNTRIES_URL = "https://clarisatest-back.ciat.cgiar.org/api/countries"
-CLARISA_INSTITUTION_TYPES_URL = "https://clarisatest-back.ciat.cgiar.org/api/institution-types"
+CLARISA_API_URL = os.getenv("CLARISA_PARTNER_REQUESTS_URL")
+CLARISA_CREATE_URL = os.getenv("CLARISA_CREATE_URL")
+CLARISA_RESPOND_URL = os.getenv("CLARISA_RESPOND_URL")
+CLARISA_COUNTRIES_URL = os.getenv("CLARISA_COUNTRIES_URL")
+CLARISA_INSTITUTION_TYPES_URL = os.getenv("CLARISA_INSTITUTION_TYPES_URL")
 
-# Temporary hardcoded values (REQUIRED fields - default fallbacks)
-TEMP_COUNTRY_ISO = "CO"  # Colombia - Default fallback if country not found
-TEMP_INSTITUTION_TYPE_CODE = 46  # Default fallback if institution type not found
 
 app = FastAPI(
     title="Partner Request Support API",
@@ -83,13 +82,14 @@ async def process_partners(
         - Column 1: partner_name (REQUIRED)
         - Column 2: acronym (optional)
         - Column 3: website (optional)
-        - Column 4: institution_type (REQUIRED - currently hardcoded, will be dynamic)
-        - Column 5: country (REQUIRED - currently hardcoded, will be dynamic)
+        - Column 4: institution_type (REQUIRED - must match CLARISA control list)
+        - Column 5: country (REQUIRED - must match CLARISA control list)
         - Column 6: category_1 (optional)
         - Column 7: category_2 (optional)
     
-    Note: Country and Institution Type are currently hardcoded (CO, code 46)
-          but will be replaced with dynamic lookups from control lists
+    Note: Country and Institution Type are validated against CLARISA control lists.
+          If a value is not found in the control list or is missing, the partner request
+          will NOT be created and will be marked as failed.
     
     Args:
         file: Excel file to process
@@ -112,7 +112,6 @@ async def process_partners(
     
     temp_file = None
     try:
-        # STEP 0: Sync CLARISA institutions database before processing
         logger.info("🔄 Synchronizing CLARISA institutions database...")
         institutions_before = count_institutions()
         sync_stats = sync_clarisa_institutions(batch_size=50, delete_obsolete=True)
@@ -130,7 +129,6 @@ async def process_partners(
             'sync_message': None
         }
         
-        # Generate user-friendly message
         if sync_stats['new'] > 0 or sync_stats['modified'] > 0:
             msg_parts = []
             if sync_stats['new'] > 0:
@@ -140,7 +138,6 @@ async def process_partners(
             
             base_msg = f"Found {' and '.join(msg_parts)}. Database has been updated."
             
-            # Add cache invalidation info if cache was cleared
             if sync_stats.get('cache_cleared', 0) > 0:
                 base_msg += f" Cache cleared ({sync_stats['cache_cleared']} entries) to ensure fresh matches."
             
@@ -189,12 +186,10 @@ async def process_partners(
             'new_ids': []
         }
         
-        # STEP 1: Create partner requests in CLARISA (if enabled)
         if create_requests:
             logger.info("🔨 Processing partner requests creation in CLARISA API...")
             creation_info['created'] = True
             
-            # STEP 1.1: Fetch existing pending partner requests to avoid duplicates
             logger.info("🔍 Fetching existing pending partner requests...")
             existing_requests = []
             try:
@@ -213,16 +208,14 @@ async def process_partners(
             except Exception as e:
                 logger.error(f"❌ Error fetching existing requests: {e}")
             
-            # STEP 1.1.5: Fetch countries control list for dynamic country lookup
             logger.info("🌍 Fetching countries control list...")
             countries_list = []
-            countries_map = {}  # Map: country_name_lower -> isoAlpha2
+            countries_map = {}
             try:
                 countries_response = requests.get(CLARISA_COUNTRIES_URL, timeout=30)
                 
                 if countries_response.status_code == 200:
                     countries_list = countries_response.json()
-                    # Build a map: country name (lowercase) -> isoAlpha2
                     for country in countries_list:
                         country_name = country.get('name', '').strip().lower()
                         iso_alpha2 = country.get('isoAlpha2', '')
@@ -235,16 +228,14 @@ async def process_partners(
             except Exception as e:
                 logger.error(f"❌ Error fetching countries list: {e}")
             
-            # STEP 1.1.6: Fetch institution types control list for dynamic institution type lookup
             logger.info("🏢 Fetching institution types control list...")
             institution_types_list = []
-            institution_types_map = {}  # Map: institution_type_name_lower -> code
+            institution_types_map = {} 
             try:
                 institution_types_response = requests.get(CLARISA_INSTITUTION_TYPES_URL, timeout=30)
                 
                 if institution_types_response.status_code == 200:
                     institution_types_list = institution_types_response.json()
-                    # Build a map: institution type name (lowercase) -> code
                     for inst_type in institution_types_list:
                         type_name = inst_type.get('name', '').strip().lower()
                         type_code = inst_type.get('code')
@@ -257,14 +248,11 @@ async def process_partners(
             except Exception as e:
                 logger.error(f"❌ Error fetching institution types list: {e}")
             
-            # Track partners to create (only new ones)
-            partners_to_create = []  # List of {idx, partner_name, acronym, payload}
+            partners_to_create = []  
             
-            # STEP 1.2: Check each partner in Excel
             for idx, row in df.iterrows():
                 creation_info['total_attempts'] += 1
                 
-                # Extract data from Excel
                 partner_name = row.iloc[1] if len(row) > 1 and pd.notna(row.iloc[1]) else None
                 acronym = row.iloc[2] if len(row) > 2 and pd.notna(row.iloc[2]) else ""
                 website = row.iloc[3] if len(row) > 3 and pd.notna(row.iloc[3]) else ""
@@ -278,7 +266,6 @@ async def process_partners(
                     creation_info['failed'] += 1
                     continue
                 
-                # Check if partner already exists in CLARISA
                 partner_name_lower = str(partner_name).strip().lower()
                 existing_match = None
                 
@@ -289,7 +276,6 @@ async def process_partners(
                         break
                 
                 if existing_match:
-                    # Partner already exists - use existing ID
                     existing_id = existing_match.get('id')
                     if existing_id:
                         df.at[idx, df.columns[0]] = existing_id
@@ -300,26 +286,32 @@ async def process_partners(
                         logger.warning(f"⚠️  Existing match has no ID for: {partner_name}")
                         creation_info['failed'] += 1
                 else:
-                    # Partner doesn't exist - add to create list
-                    # Lookup country ISO code
-                    country_iso = TEMP_COUNTRY_ISO  # Default fallback
+                    country_iso = None
                     if country and countries_map:
                         country_lower = str(country).strip().lower()
                         if country_lower in countries_map:
                             country_iso = countries_map[country_lower]
                             logger.info(f"🌍 Found country '{country}' -> {country_iso}")
                         else:
-                            logger.warning(f"⚠️  Country '{country}' not found in control list, using default: {TEMP_COUNTRY_ISO}")
+                            logger.warning(f"⚠️  Country '{country}' not found in control list. Skipping partner request creation.")
+                    else:
+                        logger.warning(f"⚠️  No country provided for '{partner_name}'. Skipping partner request creation.")
                     
-                    # Lookup institution type code
-                    institution_type_code = TEMP_INSTITUTION_TYPE_CODE  # Default fallback
+                    institution_type_code = None
                     if institution_type and institution_types_map:
                         institution_type_lower = str(institution_type).strip().lower()
                         if institution_type_lower in institution_types_map:
                             institution_type_code = institution_types_map[institution_type_lower]
                             logger.info(f"🏢 Found institution type '{institution_type}' -> {institution_type_code}")
                         else:
-                            logger.warning(f"⚠️  Institution type '{institution_type}' not found in control list, using default: {TEMP_INSTITUTION_TYPE_CODE}")
+                            logger.warning(f"⚠️  Institution type '{institution_type}' not found in control list. Skipping partner request creation.")
+                    else:
+                        logger.warning(f"⚠️  No institution type provided for '{partner_name}'. Skipping partner request creation.")
+                    
+                    if not country_iso or institution_type_code is None:
+                        logger.error(f"❌ Cannot create partner request for '{partner_name}': missing required country or institution type")
+                        creation_info['failed'] += 1
+                        continue
                     
                     payload = {
                         "name": str(partner_name),
@@ -342,7 +334,6 @@ async def process_partners(
                         'payload': payload
                     })
             
-            # STEP 1.3: Create new partner requests in CLARISA
             if partners_to_create:
                 logger.info(f"🔨 Creating {len(partners_to_create)} new partner requests...")
                 
@@ -369,7 +360,6 @@ async def process_partners(
                         logger.error(f"❌ Error creating request for {partner_info['name']}: {e}")
                         creation_info['failed'] += 1
             
-            # STEP 1.4: Fetch IDs for newly created partners
             newly_created_requests = []
             
             if creation_info['created_new'] > 0:
@@ -385,23 +375,19 @@ async def process_partners(
                         all_requests = fetch_response.json()
                         logger.info(f"📥 Fetched {len(all_requests)} total partner requests")
                         
-                        # Match newly created partners with fetched requests by name
                         for partner_info in partners_to_create:
                             partner_name_lower = partner_info['name'].strip().lower()
                             
-                            # Find matching request
                             matching_requests = [
                                 req for req in all_requests 
                                 if req.get('partnerName', '').strip().lower() == partner_name_lower
                             ]
                             
                             if matching_requests:
-                                # Get the most recent one
                                 matched_request = matching_requests[-1]
                                 request_id = matched_request.get('id')
                                 
                                 if request_id:
-                                    # Store ID in DataFrame
                                     df.at[partner_info['idx'], df.columns[0]] = request_id
                                     creation_info['new_ids'].append(request_id)
                                     newly_created_requests.append(matched_request)
@@ -413,7 +399,6 @@ async def process_partners(
                         
                         logger.info(f"✅ Retrieved {len(creation_info['new_ids'])} IDs for newly created requests")
                         
-                        # Add newly created requests to synced_partner_requests
                         if newly_created_requests:
                             synced_partner_requests.extend(newly_created_requests)
                             logger.info(f"📋 Added {len(newly_created_requests)} new requests to synced list")
@@ -423,12 +408,10 @@ async def process_partners(
                 except Exception as e:
                     logger.error(f"❌ Error fetching partner requests: {e}")
             
-            # Add existing requests to synced list if not already there
             if creation_info['existing_ids']:
                 existing_to_add = []
                 for req in existing_requests:
                     if req.get('id') in creation_info['existing_ids']:
-                        # Check if already in synced list
                         if not any(s.get('id') == req.get('id') for s in synced_partner_requests):
                             existing_to_add.append(req)
                 
@@ -436,10 +419,8 @@ async def process_partners(
                     synced_partner_requests.extend(existing_to_add)
                     logger.info(f"📋 Added {len(existing_to_add)} existing requests to synced list")
             
-            # Log final summary
             logger.info(f"📊 Summary: {creation_info['found_existing']} existing found, {creation_info['created_new']} newly created, {creation_info['failed']} failed")
         
-        # STEP 2: Check cache by PARTNER NAME (not ID)
         partner_names = []
         for idx, row in df.iterrows():
             partner_name = row.iloc[1] if len(row) > 1 and pd.notna(row.iloc[1]) else None
@@ -463,7 +444,6 @@ async def process_partners(
             cache_info['from_cache'] = len(cached_results_by_name) > 0
             logger.info(f"📦 Cache status: {cache_info['cache_hits']} hits, {cache_info['cache_misses']} misses")
         
-        # STEP 3: Process only new partners (not in cache)
         cached_partners = []
         newly_processed_partners = []
         processing_stats = {
@@ -478,9 +458,8 @@ async def process_partners(
             'fair': 0
         }
         
-        # Filter DataFrame to only include rows not in cache (by name)
         if cached_results_by_name:
-            cached_names_lower = set(cached_results_by_name.keys())  # Already lowercase
+            cached_names_lower = set(cached_results_by_name.keys())
             rows_to_process = []
             
             for idx, row in df.iterrows():
@@ -488,10 +467,8 @@ async def process_partners(
                 if partner_name:
                     name_lower = str(partner_name).strip().lower()
                     if name_lower in cached_names_lower:
-                        # Found in cache - prepare cached result with current request_id
                         cached_result = cached_results_by_name[name_lower].copy()
                         
-                        # Update with current request_id from DataFrame
                         current_request_id = row.iloc[0] if len(row) > 0 and pd.notna(row.iloc[0]) else None
                         if current_request_id:
                             try:
@@ -503,10 +480,8 @@ async def process_partners(
                         
                         cached_partners.append(cached_result)
                     else:
-                        # Not in cache - needs processing
                         rows_to_process.append(idx)
                 else:
-                    # No name - skip
                     rows_to_process.append(idx)
             
             if rows_to_process:
@@ -519,14 +494,12 @@ async def process_partners(
             df_to_process = df
             cache_info['processed_new'] = True
         
-        # Process new partners
         if not df_to_process.empty:
             logger.info(f"🚀 Processing {len(df_to_process)} new partners...")
             processing_results = process_partners_to_json(df_to_process)
             processing_stats = processing_results['stats']
             newly_processed_partners = processing_results['partners']
             
-            # Add api_data with request_id for caching
             for i, partner_result in enumerate(newly_processed_partners):
                 row_idx = df_to_process.index[i]
                 request_id = df_to_process.loc[row_idx].iloc[0] if pd.notna(df_to_process.loc[row_idx].iloc[0]) else None
@@ -542,17 +515,14 @@ async def process_partners(
                     except (ValueError, TypeError):
                         pass
             
-            # Cache newly processed results
             if newly_processed_partners:
                 cache_stats = cache_results_batch(newly_processed_partners)
                 logger.info(f"💾 Cached {cache_stats['cached']} new results")
         else:
             logger.info("✨ All partners found in cache - no processing needed")
         
-        # STEP 4: Combine cached + newly processed results
         all_partners = cached_partners + newly_processed_partners
         
-        # Update stats to reflect all results (cached + new)
         if cached_partners:
             for partner in cached_partners:
                 processing_stats['total'] += 1
@@ -573,7 +543,6 @@ async def process_partners(
                     if partner['web_search'].get('success'):
                         processing_stats['web_search_success'] += 1
         
-        # Recalculate percentages
         if processing_stats['total'] > 0:
             processing_stats['matched_percentage'] = round(
                 processing_stats['matched'] / processing_stats['total'] * 100, 1
@@ -582,7 +551,6 @@ async def process_partners(
                 processing_stats['no_match'] / processing_stats['total'] * 100, 1
             )
         
-        # Add creation, cache, and sync info to results
         results = {
             'partners': all_partners,
             'stats': processing_stats,
@@ -627,19 +595,16 @@ async def sync_partner_requests():
     try:
         logger.info(f"🔄 Fetching partner requests from {CLARISA_API_URL}")
         
-        # Fetch data from external API
         response = requests.get(CLARISA_API_URL, timeout=30)
         response.raise_for_status()
         
         partner_requests = response.json()
         
-        # Filter only pending requests
         pending_requests = [
             pr for pr in partner_requests 
             if pr.get('requestStatus') == 'Pending'
         ]
         
-        # Store in global variable
         synced_partner_requests = pending_requests
         
         logger.info(f"✅ Synced {len(pending_requests)} pending partner requests")
@@ -693,13 +658,11 @@ async def sync_clarisa_institutions_endpoint(delete_obsolete: bool = Body(True))
         institutions_before = count_institutions()
         logger.info(f"📊 Institutions before sync: {institutions_before}")
         
-        # Perform sync
         sync_stats = sync_clarisa_institutions(batch_size=50, delete_obsolete=delete_obsolete)
         
         institutions_after = count_institutions()
         logger.info(f"📊 Institutions after sync: {institutions_after}")
         
-        # Build response message
         message_parts = []
         if sync_stats['new'] > 0:
             message_parts.append(f"{sync_stats['new']} new institution(s) added")
@@ -713,7 +676,6 @@ async def sync_clarisa_institutions_endpoint(delete_obsolete: bool = Body(True))
             else:
                 message_parts.append(f"{sync_stats['obsolete']} obsolete institution(s) found")
         
-        # Add cache info if cleared
         if sync_stats.get('cache_cleared', 0) > 0:
             message_parts.append(f"{sync_stats['cache_cleared']} cache entries cleared")
         
@@ -773,7 +735,6 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
         )
     
     try:
-        # STEP 0: Sync CLARISA institutions database before processing
         logger.info("🔄 Synchronizing CLARISA institutions database...")
         institutions_before = count_institutions()
         sync_stats = sync_clarisa_institutions(batch_size=50, delete_obsolete=True)
@@ -791,7 +752,6 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
             'sync_message': None
         }
         
-        # Generate user-friendly message
         if sync_stats['new'] > 0 or sync_stats['modified'] > 0:
             msg_parts = []
             if sync_stats['new'] > 0:
@@ -801,7 +761,6 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
             
             base_msg = f"Found {' and '.join(msg_parts)}. Database has been updated."
             
-            # Add cache invalidation info if cache was cleared
             if sync_stats.get('cache_cleared', 0) > 0:
                 base_msg += f" Cache cleared ({sync_stats['cache_cleared']} entries) to ensure fresh matches."
             
@@ -811,14 +770,12 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
             sync_info['sync_message'] = "Database synchronized. No changes found in CLARISA."
             logger.info("✅ Database synchronized - no changes")
         
-        # Filter partners if specific IDs provided
         if partner_ids:
             partners_to_process = [
                 pr for pr in synced_partner_requests 
                 if pr.get('id') in partner_ids
             ]
         else:
-            # For testing, limit to last 5 partners
             partners_to_process = synced_partner_requests[-5:]
         
         if not partners_to_process:
@@ -829,11 +786,9 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
         
         logger.info(f"🚀 Processing {len(partners_to_process)} partner requests from API")
         
-        # STEP 1: Check cache by PARTNER NAME (not ID)
         partner_names = [pr.get('partnerName') for pr in partners_to_process if pr.get('partnerName')]
         cached_results_by_name = get_cached_results_by_name(partner_names)
         
-        # Separate cached vs. new partners
         cached_partners = []
         partners_to_compute = []
         
@@ -841,10 +796,8 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
             partner_name = pr.get('partnerName', '').strip().lower()
             
             if partner_name in cached_results_by_name:
-                # Found in cache by name - use cached result but update with current request_id
                 cached_result = cached_results_by_name[partner_name].copy()
                 
-                # Update with current request_id
                 current_id = pr.get('id')
                 if current_id:
                     cached_result['id'] = str(current_id)
@@ -853,7 +806,6 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
                 
                 cached_partners.append(cached_result)
             else:
-                # Not in cache - need to process
                 partners_to_compute.append(pr)
         
         cache_info = {
@@ -866,7 +818,6 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
         
         logger.info(f"📦 Cache status: {cache_info['cache_hits']} hits, {cache_info['cache_misses']} misses")
         
-        # STEP 2: Process only the new partners (cache misses)
         newly_processed_partners = []
         processing_stats = {
             'total': 0,
@@ -883,7 +834,6 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
         if partners_to_compute:
             logger.info(f"🔄 Processing {len(partners_to_compute)} new partner requests")
             
-            # Convert API data to DataFrame format expected by process_partners_to_json
             data_rows = []
             for pr in partners_to_compute:
                 row = {
@@ -898,10 +848,8 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
                 }
                 data_rows.append(row)
             
-            # Create DataFrame
             df = pd.DataFrame(data_rows)
             
-            # Reorder columns to match expected format
             df_ordered = pd.DataFrame({
                 'id': df['id'],
                 'partner_name': df['partner_name'],
@@ -913,11 +861,9 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
             
             logger.info(f"📊 Created DataFrame with {len(df_ordered)} rows")
             
-            # Process using existing pipeline
             processing_results = process_partners_to_json(df_ordered)
             processing_stats = processing_results['stats']
             
-            # Add original API data to results for reference
             for i, partner_result in enumerate(processing_results['partners']):
                 if i < len(partners_to_compute):
                     partner_result['api_data'] = {
@@ -929,16 +875,13 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
             
             newly_processed_partners = processing_results['partners']
             
-            # STEP 3: Cache the newly processed results
             cache_stats = cache_results_batch(newly_processed_partners)
             logger.info(f"💾 Cached {cache_stats['cached']} new results")
         else:
             logger.info("✨ All requests found in cache - no processing needed")
         
-        # STEP 4: Combine cached + newly processed results
         all_partners = cached_partners + newly_processed_partners
         
-        # Update stats to reflect all results (cached + new)
         if cached_partners:
             for partner in cached_partners:
                 processing_stats['total'] += 1
@@ -959,7 +902,6 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
                     if partner['web_search'].get('success'):
                         processing_stats['web_search_success'] += 1
         
-        # Recalculate percentages
         if processing_stats['total'] > 0:
             processing_stats['matched_percentage'] = round(
                 processing_stats['matched'] / processing_stats['total'] * 100, 1
@@ -1013,7 +955,6 @@ async def respond_partner_request(
     global synced_partner_requests
     
     try:
-        # Find the partner request in synced data
         partner_request = None
         for pr in synced_partner_requests:
             if pr.get('id') == request_id:
@@ -1026,7 +967,6 @@ async def respond_partner_request(
                 detail=f"Partner request {request_id} not found. Please sync first."
             )
         
-        # Build the payload for CLARISA API
         payload = {
             "requestId": request_id,
             "userId": user_id,
@@ -1037,11 +977,9 @@ async def respond_partner_request(
             "externalUserComments": partner_request.get('externalUserComments', '')
         }
         
-        # Add reject justification if rejecting
         if not accept:
             payload["rejectJustification"] = reject_justification or "No justification provided"
         
-        # Prepare headers with authentication
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {auth_token}"
@@ -1050,7 +988,6 @@ async def respond_partner_request(
         action = "accept" if accept else "reject"
         logger.info(f"📤 Sending {action} request for partner {request_id} to CLARISA API")
         
-        # Send request to CLARISA API
         response = requests.post(
             CLARISA_RESPOND_URL,
             json=payload,
@@ -1062,7 +999,6 @@ async def respond_partner_request(
         
         logger.info(f"✅ Successfully {action}ed partner request {request_id}")
         
-        # Remove from synced_partner_requests after successful response
         synced_partner_requests = [
             pr for pr in synced_partner_requests 
             if pr.get('id') != request_id
@@ -1098,6 +1034,50 @@ async def respond_partner_request(
         raise HTTPException(
             status_code=500,
             detail=f"Error processing response: {str(e)}"
+        )
+
+
+@app.post("/api/manual-web-search")
+async def manual_web_search(
+    partner_name: str = Body(...),
+    country: Optional[str] = Body(None),
+    website: Optional[str] = Body(None)
+):
+    """
+    Manually trigger a web search for a partner institution.
+    Used when match_quality is 'fair' or 'good' and user wants additional information.
+    
+    Args:
+        partner_name: Name of the partner institution
+        country: Country of the institution (optional)
+        website: Website of the institution (optional)
+        
+    Returns:
+        JSON with web search results
+    """
+    try:
+        logger.info(f"🔍 Manual web search triggered for: {partner_name}")
+        
+        web_result = search_institution_online(partner_name, country, website)
+        
+        if web_result['success']:
+            logger.info(f"✅ Manual web search successful for: {partner_name}")
+            return {
+                "success": True,
+                "result": web_result.get('formatted_result', '')
+            }
+        else:
+            logger.warning(f"⚠️ Manual web search failed for: {partner_name}")
+            return {
+                "success": False,
+                "error": web_result.get('error', 'Unknown error')
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ Error in manual web search: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error performing web search: {str(e)}"
         )
 
 
