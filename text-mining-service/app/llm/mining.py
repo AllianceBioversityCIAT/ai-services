@@ -43,7 +43,7 @@ def split_text(text):
     return text_splitter.split_text(text)
 
 
-def invoke_model(prompt, max_tokens=5000):
+def invoke_model(prompt, max_tokens=15000):
     try:
         logger.info("🚀 Invoking the model...")
         request_body = {
@@ -59,13 +59,31 @@ def invoke_model(prompt, max_tokens=5000):
                 }
             ]
         }
+        
         response = bedrock_runtime.invoke_model(
             modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
             body=json.dumps(request_body),
             contentType="application/json",
             accept="application/json"
         )
-        return json.loads(response['body'].read())['content'][0]['text']
+        
+        response_body = json.loads(response['body'].read())
+        
+        stop_reason = response_body.get('stop_reason', 'unknown')
+        usage = response_body.get('usage', {})
+        input_tokens = usage.get('input_tokens', 0)
+        output_tokens = usage.get('output_tokens', 0)
+        
+        logger.info(f"✅ Model invoked successfully - Stop reason: {stop_reason}")
+        logger.info(f"📊 Token usage - Input: {input_tokens}, Output: {output_tokens}")
+        
+        response_text = response_body['content'][0]['text']
+        logger.info(f"📄 Model response (first 500 chars): {response_text[:500]}...")
+        
+        if stop_reason != 'end_turn':
+            logger.warning(f"⚠️ Model stopped with reason: {stop_reason} (may indicate truncation or max_tokens reached)")
+        
+        return response_text
 
     except Exception as e:
         logger.error(f"❌ Error invoking the model: {str(e)}")
@@ -91,6 +109,99 @@ def is_valid_json(text):
         return True
     except json.JSONDecodeError:
         return False
+
+
+def _clean_organization_fields(mining_result):
+    """
+    Clean organization fields based on mapping success:
+    - If name + id + similarity > 70 (mapped successfully) → keep ONLY name, id, similarity_score
+    - If name + id but similarity <= 70, and has type → keep ONLY type, sub_type, other_type
+    - If name but no id, and has type → keep ONLY type, sub_type, other_type
+    - If only type (no name) → keep ONLY type, sub_type, other_type
+    - Otherwise → remove organization
+    """
+    if "organizations_detailed" not in mining_result:
+        return
+    
+    organizations = mining_result.get("organizations_detailed", [])
+    cleaned_organizations = []
+    
+    SIMILARITY_THRESHOLD = 70.0
+    
+    for org in organizations:
+        has_name = org.get("institution_name") is not None and org.get("institution_name").strip() != ""
+        has_id = org.get("institution_id") is not None and org.get("institution_id") != ""
+        has_type = org.get("type") is not None and org.get("type").strip() != ""
+        similarity = org.get("similarity_score", 0)
+        
+        # Case 1: Has name AND id AND similarity > threshold
+        if has_name and has_id and similarity > SIMILARITY_THRESHOLD:
+            cleaned_org = {
+                "institution_name": org["institution_name"],
+                "institution_id": org["institution_id"],
+                "similarity_score": similarity
+            }
+            cleaned_organizations.append(cleaned_org)
+            logger.info(f"✅ Organization mapped: '{org['institution_name']}' → ID: {org['institution_id']} (score: {similarity})")
+        
+        # Case 2: Has name AND id BUT similarity <= threshold, fallback to type if available
+        elif has_name and has_id and similarity <= SIMILARITY_THRESHOLD and has_type:
+            cleaned_org = {
+                "type": org["type"]
+            }
+            if org.get("sub_type"):
+                cleaned_org["sub_type"] = org["sub_type"]
+            if org.get("other_type"):
+                cleaned_org["other_type"] = org["other_type"]
+            cleaned_organizations.append(cleaned_org)
+            logger.warning(f"⚠️ Organization '{org['institution_name']}' mapped with low similarity ({similarity}), using type classification: {org['type']}")
+        
+        # Case 3: Has name AND id BUT similarity <= threshold, NO type available → discard
+        elif has_name and has_id and similarity <= SIMILARITY_THRESHOLD and not has_type:
+            logger.warning(f"❌ Organization '{org['institution_name']}' mapped with low similarity ({similarity}) and no type classification - discarding")
+            continue
+        
+        # Case 4: Has name but NOT mapped, but has type classification
+        elif has_name and not has_id and has_type:
+            cleaned_org = {
+                "type": org["type"]
+            }
+            if org.get("sub_type"):
+                cleaned_org["sub_type"] = org["sub_type"]
+            if org.get("other_type"):
+                cleaned_org["other_type"] = org["other_type"]
+            cleaned_organizations.append(cleaned_org)
+            logger.info(f"ℹ️ Organization '{org['institution_name']}' not mapped, using type classification: {org['type']}")
+        
+        # Case 5: Has name but NOT mapped and NO type → discard
+        elif has_name and not has_id and not has_type:
+            logger.warning(f"❌ Organization '{org['institution_name']}' not mapped and no type provided - discarding")
+            continue
+        
+        # Case 6: No name but has type → keep type classification only
+        elif not has_name and has_type:
+            cleaned_org = {
+                "type": org["type"]
+            }
+            if org.get("sub_type"):
+                cleaned_org["sub_type"] = org["sub_type"]
+            if org.get("other_type"):
+                cleaned_org["other_type"] = org["other_type"]
+            cleaned_organizations.append(cleaned_org)
+            logger.info(f"ℹ️ Organization (no name) with type: {org['type']}")
+        
+        # Case 7: Neither name nor type → discard
+        else:
+            logger.warning(f"❌ Organization with neither name nor type - discarding")
+            continue
+    
+    if cleaned_organizations:
+        mining_result["organizations_detailed"] = cleaned_organizations
+        logger.info(f"🧹 Cleaned organizations: {len(organizations)} → {len(cleaned_organizations)}")
+    else:
+        # Remove the field completely if no valid organizations remain
+        mining_result.pop("organizations_detailed", None)
+        logger.info(f"🧹 All organizations removed - no valid data")
 
 
 def initialize_reference_data(bucket_name, file_key_regions, file_key_countries):
@@ -248,6 +359,7 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR, user_id:
             for result in json_content["results"]:
                 try:
                     mapped_result = map_fields_with_opensearch(result, MAPPING_URL)
+                    _clean_organization_fields(mapped_result)
                     mapped_results.append(mapped_result)
                     logger.info(f"🔗 Fields mapped for result with indicator: {result.get('indicator', 'Unknown')}")
                 except Exception as map_error:
@@ -363,6 +475,7 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS, use
             for result in json_content["results"]:
                 try:
                     mapped_result = map_fields_with_opensearch(result, MAPPING_URL)
+                    _clean_organization_fields(mapped_result)
                     mapped_results.append(mapped_result)
                     logger.info(f"🔗 Fields mapped for result with indicator: {result.get('indicator', 'Unknown')}")
                 except Exception as map_error:
@@ -375,7 +488,6 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS, use
         end_time = time.time()
         elapsed_time = end_time - start_time
 
-        # Validate and format response with Pydantic schemas (after field mapping)
         formatted_response = format_mining_response(json_content)
 
         interaction_id = None

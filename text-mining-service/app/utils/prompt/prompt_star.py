@@ -234,7 +234,7 @@ Actors involved in the innovation:
     • Include the names, types, genres and ages of all individuals mentioned in the document that are potential or actual users or beneficiaries of the innovation.
     • Return a list of objects. Each object must include:
         • name: Full name of the actor, or do not include this field if only the role or type is known.
-        • type: Must be one or more of the following predefined values:
+        • type: Must be ONE of the following predefined values (select the most appropriate single value):
             • "Farmers / (agro)pastoralist / herders / fishers"
             • "Researchers"
             • "Extension agents"
@@ -256,6 +256,69 @@ Actors involved in the innovation:
     • If the document does not provide any information about gender or age, do not return the gender_age field in the output JSON.
     • Do NOT create multiple entries for the same actor with different gender/age combinations.
     • If the document does not provide enough information, you may include partial entries (e.g., name and type only).
+    • If anticipated_users is "This is yet to be determined", do not include this field in the output JSON.
+
+Organizations involved in the innovation (detailed):
+    • organizations_detailed
+    • This field is used ONLY if the anticipated_users is "Users have been determined".
+    • Return a list of organization objects. IMPORTANT: For each organization, try to extract BOTH the name AND the type ONLY when possible.
+    • Each object should include:
+        • institution_name: Full name of the organization that is potential or actual user or beneficiary of the innovation. Try to extract the name if mentioned in the document. If no specific name is found or you cannot infer it, omit this field.
+        • type: Try to determine and extract the organization type. Must be one of the following predefined values:
+            • "NGO"
+            • "Research organizations and universities"
+            • "Organization (other than financial or research)"
+            • "Government"
+            • "Financial institution"
+            • "Private company (other than financial)"
+            • "Public-Private Partnership"
+            • "Foundation"
+            • "Other"
+        • sub_type: 
+            • This field is used ONLY if the organization_type is "NGO" or "Research organizations and universities" or "Organization (other than financial or research)" or "Government" or "Financial Institution".
+            • If the organization_type is "Private company (other than financial)", "Public-Private Partnership", "Foundation", or "Other", this field should not be included in the output JSON.
+            • If you do not know the sub-type, do not include the sub_type field in the output JSON.
+            • If the organization_type is "NGO", it must be one of the following predefined values:
+                • NGO International
+                • NGO International (General)
+                • NGO International (Farmers)
+                • NGO Regional
+                • NGO Regional (General)
+                • NGO Regional (Farmers)
+                • NGO National
+                • NGO National (General)
+                • NGO National (Farmers)
+                • NGO Local
+                • NGO Local (General)
+                • NGO Local (Farmers)
+            • If the organization_type is "Research organizations and universities", it must be one of the following predefined values:
+                • Research organizations and universities International
+                • Research organizations and universities International (General)
+                • Research organizations and universities International (Universities)
+                • Research organizations and universities International (CGIAR)
+                • Research organizations and universities Regional
+                • Research organizations and universities Regional (NA)
+                • Research organizations and universities Regional (Universities)
+                • Research organizations and universities National
+                • Research organizations and universities National (NARS)
+                • Research organizations and universities National (Universities)
+                • Research organizations and universities Local
+                • Research organizations and universities Local (NA)
+                • Research organizations and universities Local (Universities)
+            • If the organization_type is "Organization (other than financial or research)", it must be one of the following predefined values:
+                • Organization (other than financial or research) International
+                • Organization (other than financial or research) Regional
+            • If the organization_type is "Government", it must be one of the following predefined values:
+                • Government (National)
+                • Government (Subnational)
+            • If the organization_type is "Financial institution", it must be one of the following predefined values:
+                • Financial Institution
+                • Financial Institution International
+                • Financial Institution Regional
+                • Financial Institution National
+                • Financial Institution Local
+        • other_type: Include ONLY if type is "Other"; otherwise do not include this field. This field should contain information about the type of organization involved in the innovation that does not fit into the predefined values.
+    • Do not include individuals in this field; individuals should be captured under innovation_actors_detailed.
     • If anticipated_users is "This is yet to be determined", do not include this field in the output JSON.
 
 ⸻
@@ -332,92 +395,16 @@ Follow this exact structure:
                     "other_actor_type": "<value (only if type is 'Other')>",
                     "gender_age": ["<value 1>", "<value 2>", ...]
                 }
+            ] (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development'),
+            "organizations_detailed": [
+                {
+                    "institution_name": "<organization name>",
+                    "type": "<value or 'Other'>",
+                    "sub_type": "<value (only if matches the organization_type requirements)>",
+                    "other_type": "<value (only if type is 'Other')>"
+                }
             ] (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')
         }
     ]
 }
 """
-
-
-# Organization(s) involved in the innovation:
-#     • organizations
-#     • This field is used ONLY if the anticipated_users is "Users have been determined".
-#     • Include the names of all organizations mentioned in the document that are potential or actual users or beneficiaries of the innovation. These names were extracted from the anticipated_users field.
-#     • Do not include individuals, this field is only for organizations.
-#     • This field supports the classification of the organization_type, which is the only actor-related information displayed in the application interface.
-#     • If anticipated_users is "This is yet to be determined", do not include this field in the output JSON.
-
-# Organization types:
-#     • organization_type
-#     • This field is used ONLY if the anticipated_users is "Users have been determined".
-#     • This field is used to classify the type(s) of organization(s) identified in the organizations field.
-#     • Must be one or more of the following predefined values:
-#         • "NGO"
-#         • "Research organizations and universities"
-#         • "Organization (other than financial or research)"
-#         • "Government"
-#         • "Financial institution"
-#         • "Private company (other than financial)"
-#         • "Public-Private Partnership"
-#         • "Foundation"
-#         • "Other"
-#     • If anticipated_users is "This is yet to be determined", do not include this field in the output JSON.
-
-# Organization sub-types:
-#     • organization_sub_type
-#     • This field is used ONLY if the organization_type is "NGO" or "Research organizations and universities" or "Organization (other than financial or research)" or "Government" or "Financial Institution".
-#     • If the organization_type is "Private company (other than financial)", "Public-Private Partnership", "Foundation", or "Other", this field should not be included in the output JSON.
-#     • If you have multiple organization types, you must include the organization_sub_type for each one.
-#     • If you do not know the sub-type, return "Not collected".
-#     • If the organization_type is "NGO", it must be one of the following predefined values:
-#         • NGO International
-#         • NGO International (General)
-#         • NGO International (Farmers)
-#         • NGO Regional
-#         • NGO Regional (General)
-#         • NGO Regional (Farmers)
-#         • NGO National
-#         • NGO National (General)
-#         • NGO National (Farmers)
-#         • NGO Local
-#         • NGO Local (General)
-#         • NGO Local (Farmers)
-#     • If the organization_type is "Research organizations and universities", it must be one of the following predefined values:
-#         • Research organizations and universities International
-#         • Research organizations and universities International (General)
-#         • Research organizations and universities International (Universities)
-#         • Research organizations and universities International (CGIAR)
-#         • Research organizations and universities Regional
-#         • Research organizations and universities Regional (NA)
-#         • Research organizations and universities Regional (Universities)
-#         • Research organizations and universities National
-#         • Research organizations and universities National (NARS)
-#         • Research organizations and universities National (Universities)
-#         • Research organizations and universities Local
-#         • Research organizations and universities Local (NA)
-#         • Research organizations and universities Local (Universities)
-#     • If the organization_type is "Organization (other than financial or research)", it must be one of the following predefined values:
-#         • Organization (other than financial or research) International
-#         • Organization (other than financial or research) Regional
-#     • If the organization_type is "Government", it must be one of the following predefined values:
-#         • Government (National)
-#         • Government (Subnational)
-#     • If the organization_type is "Financial institution", it must be one of the following predefined values:
-#         • Financial Institution
-#         • Financial Institution International
-#         • Financial Institution Regional
-#         • Financial Institution National
-#         • Financial Institution Local
-
-# Other organization types:
-#     • other_organization_type
-#     • This field is used ONLY if the organization_type is "Other".
-#     • If the organization_type is not "Other", this field should not be included in the output JSON.
-#     • This field should contain information about the type of organization involved in the innovation that does not fit into the predefined values.
-
-
-
-# "organizations": "<[array of organization names] or null (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
-# "organization_type": "<[array of organization types] or null (only if anticipated_users is 'Users have been determined' and indicator is 'Innovation Development')>",
-# "organization_sub_type": "<value or 'Not collected' (only if indicator is 'Innovation Development')>",
-# "other_organization_type": "<value or 'Not collected' (only if organization_type is 'Other' and indicator is 'Innovation Development')>"
