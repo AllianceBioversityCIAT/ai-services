@@ -19,11 +19,12 @@ Parameters:
     Default: INFO
     AllowedValues: [DEBUG, INFO, WARNING, ERROR]
 
+# Do not set Runtime/Handler/Layers in Globals when using PackageType: Image (container).
+# The runtime comes from the Docker image (Dockerfile uses python3.13 base).
 Globals:
   Function:
     Timeout: 120
     MemorySize: 1024
-    Runtime: python3.13
     Tags:
       Project: PRMS
       Functionality: partner-request
