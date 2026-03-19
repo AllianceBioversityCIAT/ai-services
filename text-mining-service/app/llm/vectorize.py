@@ -7,12 +7,9 @@ from pathlib import Path
 from datetime import datetime
 from app.utils.config.config_util import AWS
 from app.utils.logger.logger_util import get_logger
-import os
 
 
 logger = get_logger()
-
-is_prod = os.getenv('IS_PROD', 'false').lower() == 'true'
 
 DB_PATH = "/tmp/miningdb"
 Path(DB_PATH).mkdir(parents=True, exist_ok=True)

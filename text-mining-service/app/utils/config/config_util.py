@@ -21,3 +21,5 @@ AUTH_TOKEN_STAR = os.getenv("AUTH_TOKEN_STAR", None)
 
 CLIENT_ID = os.getenv("CLIENT_ID", None)
 CLIENT_SECRET = os.getenv("CLIENT_SECRET", None)
+
+IS_PROD = os.getenv("IS_PROD", "false").lower() == "true"

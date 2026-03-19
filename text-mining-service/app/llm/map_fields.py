@@ -2,6 +2,7 @@ import time
 import requests
 import threading
 from app.utils.logger.logger_util import get_logger
+from app.utils.config.config_util import IS_PROD
 
 logger = get_logger()
 
@@ -75,9 +76,10 @@ def map_fields_with_opensearch(mining_result, mapping_service_url, max_retries=1
         try:
             logger.info(f"🔗 Attempting mapping (attempt {attempt + 1}/{max_retries}) for {len(entries_to_map)} new entries")
 
+            environment = "prod" if IS_PROD else "test"
             response = requests.post(
                 f"{mapping_service_url}/map/fields",
-                json={"entries": entries_to_map},
+                json={"entries": entries_to_map, "environment": environment},
                 timeout=600
             )
             response.raise_for_status()
