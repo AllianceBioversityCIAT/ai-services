@@ -7,6 +7,7 @@ class MappingEntry(BaseModel):
 
 class MappingRequest(BaseModel):
     entries: List[MappingEntry]
+    environment: Literal["test", "prod"] = "prod"
 
 class MappingResult(BaseModel):
     original_value: str
