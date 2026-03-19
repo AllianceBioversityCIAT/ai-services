@@ -1,6 +1,6 @@
 # Partner Request Support - Backend API (SAM)
-# Lambda (FastAPI + Mangum) + API Gateway HTTP API. Tags: Project=PRMS, Functionality=partner-request
-AWSTemplateFormatVersion: '2010-09-09'
+# Lambda (FastAPI + Mangum) + API Gateway HTTP API. Tags: Project=PRMS, Functionality=partner-request.
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: Partner Request Support API - Lambda + API Gateway (PRMS / partner-request)
 
