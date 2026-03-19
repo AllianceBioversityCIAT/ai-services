@@ -1,0 +1,98 @@
+# Partner Request Support - Backend API (SAM)
+# Lambda (FastAPI + Mangum) + API Gateway HTTP API. Tags: Project=PRMS, Functionality=partner-request
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Partner Request Support API - Lambda + API Gateway (PRMS / partner-request)
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+    Description: Environment (dev | prod)
+  CorsAllowOrigin:
+    Type: String
+    Default: "*"
+    Description: CORS allowed origins (comma-separated)
+  LogLevel:
+    Type: String
+    Default: INFO
+    AllowedValues: [DEBUG, INFO, WARNING, ERROR]
+
+Globals:
+  Function:
+    Timeout: 120
+    MemorySize: 1024
+    Runtime: python3.13
+    Tags:
+      Project: PRMS
+      Functionality: partner-request
+
+Resources:
+  PartnerRequestHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Name: !Sub "partner-request-support-api-${Environment}"
+      Description: HTTP API for Partner Request Support (PRMS)
+      CorsConfiguration:
+        AllowOrigins: !Split [",", !Ref CorsAllowOrigin]
+        AllowMethods: GET, POST, PUT, OPTIONS
+        AllowHeaders: "*"
+        AllowCredentials: true
+      Tags:
+        Project: PRMS
+        Functionality: partner-request
+        Environment: !Ref Environment
+
+  PartnerRequestApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ./
+      DockerTag: !Sub "${Environment}-${AWS::StackName}"
+    Properties:
+      PackageType: Image
+      FunctionName: !Sub "partner-request-support-api-${Environment}"
+      Description: Partner Request Support REST API (FastAPI + Mangum)
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          LOG_LEVEL: !Ref LogLevel
+          CORS_ORIGINS: !Ref CorsAllowOrigin
+      Events:
+        ApiRoot:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PartnerRequestHttpApi
+            Path: /
+            Method: ANY
+        ApiProxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PartnerRequestHttpApi
+            Path: /{proxy+}
+            Method: ANY
+      Tags:
+        Project: PRMS
+        Functionality: partner-request
+        Environment: !Ref Environment
+
+  PartnerRequestApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PartnerRequestApiFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PartnerRequestHttpApi}/*"
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway HTTP API endpoint URL
+    Value: !Sub "https://${PartnerRequestHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+    Export:
+      Name: !Sub "PartnerRequestApiEndpoint-${Environment}"
+  ApiFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt PartnerRequestApiFunction.Arn
+    Export:
+      Name: !Sub "PartnerRequestApiFunctionArn-${Environment}"

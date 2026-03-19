@@ -27,12 +27,21 @@ logger = get_logger()
 load_dotenv()
 
 synced_partner_requests: List[Dict] = []
-CLARISA_API_URL = os.getenv("CLARISA_PARTNER_REQUESTS_URL")
-CLARISA_CREATE_URL = os.getenv("CLARISA_CREATE_URL")
-CLARISA_RESPOND_URL = os.getenv("CLARISA_RESPOND_URL")
-CLARISA_COUNTRIES_URL = os.getenv("CLARISA_COUNTRIES_URL")
-CLARISA_INSTITUTION_TYPES_URL = os.getenv("CLARISA_INSTITUTION_TYPES_URL")
 
+# CLARISA Partner Request API: use base URL (no trailing slash) or individual URLs per env (dev/prod).
+_CLARISA_BASE = (os.getenv("CLARISA_PARTNER_REQUEST_BASE_URL") or "").rstrip("/")
+if _CLARISA_BASE and not os.getenv("CLARISA_PARTNER_REQUESTS_URL"):
+    CLARISA_API_URL = f"{_CLARISA_BASE}/api/partner-requests"
+    CLARISA_CREATE_URL = f"{_CLARISA_BASE}/api/partner-requests/create"
+    CLARISA_RESPOND_URL = f"{_CLARISA_BASE}/api/partner-requests/respond"
+    CLARISA_COUNTRIES_URL = f"{_CLARISA_BASE}/api/countries"
+    CLARISA_INSTITUTION_TYPES_URL = f"{_CLARISA_BASE}/api/institution-types"
+else:
+    CLARISA_API_URL = os.getenv("CLARISA_PARTNER_REQUESTS_URL") or ""
+    CLARISA_CREATE_URL = os.getenv("CLARISA_CREATE_URL") or ""
+    CLARISA_RESPOND_URL = os.getenv("CLARISA_RESPOND_URL") or ""
+    CLARISA_COUNTRIES_URL = os.getenv("CLARISA_COUNTRIES_URL") or ""
+    CLARISA_INSTITUTION_TYPES_URL = os.getenv("CLARISA_INSTITUTION_TYPES_URL") or ""
 
 app = FastAPI(
     title="Partner Request Support API",
@@ -40,9 +49,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# CORS: set CORS_ORIGINS (comma-separated) in env for prod (e.g. https://partner-request.example.com).
+_cors_origins = (os.getenv("CORS_ORIGINS") or "http://localhost:3000,http://localhost:3001").strip().split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=[o.strip() for o in _cors_origins if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
