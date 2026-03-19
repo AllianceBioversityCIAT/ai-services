@@ -106,17 +106,16 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+# Sin CloudFormation Export: el nombre de export es único por cuenta/región; otro stack que
+# ya exporte PartnerRequestFrontendBucket-dev hace fallar el create y deja ROLLBACK_COMPLETE.
+# Jenkins/CLI usan describe-stacks por OutputKey, no Fn::ImportValue.
 Outputs:
   FrontendBucketName:
     Description: S3 bucket for static assets
     Value: !Ref FrontendBucket
-    Export:
-      Name: !Sub "PartnerRequestFrontendBucket-${Environment}"
   CloudFrontDistributionId:
     Description: CloudFront distribution ID
     Value: !Ref CloudFrontDistribution
-    Export:
-      Name: !Sub "PartnerRequestFrontendDistributionId-${Environment}"
   CloudFrontDomainName:
     Description: CloudFront domain
     Value: !GetAtt CloudFrontDistribution.DomainName
@@ -125,5 +124,4 @@ Outputs:
     Value: !Sub
       - "https://${DomainName}"
       - DomainName: !GetAtt CloudFrontDistribution.DomainName
-    Export:
-      Name: !Sub "PartnerRequestFrontendURL-${Environment}"
+
