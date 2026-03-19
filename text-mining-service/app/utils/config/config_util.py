@@ -19,3 +19,5 @@ MAPPING_URL = os.getenv("MAPPING_URL")
 
 CLIENT_ID = os.getenv("CLIENT_ID", None)
 CLIENT_SECRET = os.getenv("CLIENT_SECRET", None)
+
+IS_PROD = os.getenv("IS_PROD", "false").lower() == "true"
