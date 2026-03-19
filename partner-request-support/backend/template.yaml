@@ -53,7 +53,8 @@ Resources:
       DockerTag: !Sub "${Environment}-${AWS::StackName}"
     Properties:
       PackageType: Image
-      FunctionName: !Sub "partner-request-support-api-${Environment}"
+      # No explicit FunctionName: avoids EarlyValidation ResourceExistenceCheck when the name
+      # already exists (e.g. orphaned Lambda from a failed stack). Physical name = logical ID + random suffix.
       Description: Partner Request Support REST API (FastAPI + Mangum)
       Environment:
         Variables:
@@ -87,6 +88,11 @@ Resources:
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PartnerRequestHttpApi}/*"
 
 Outputs:
+  ApiFunctionName:
+    Description: Lambda function physical name (use for CLI/Jenkins after deploy)
+    Value: !Ref PartnerRequestApiFunction
+    Export:
+      Name: !Sub "PartnerRequestApiFunctionName-${Environment}"
   ApiEndpoint:
     Description: API Gateway HTTP API endpoint URL
     Value: !Sub "https://${PartnerRequestHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
