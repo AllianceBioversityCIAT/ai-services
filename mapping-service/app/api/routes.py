@@ -6,5 +6,5 @@ router = APIRouter()
 
 @router.post("/fields", response_model=MappingResponse)
 async def map_fields(request: MappingRequest):
-    results = map_entries_to_ids(request.entries)
+    results = map_entries_to_ids(request.entries, request.environment)
     return {"results": results}

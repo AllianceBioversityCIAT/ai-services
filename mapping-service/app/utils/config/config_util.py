@@ -13,7 +13,8 @@ STAR = {
 
 CLARISA = {
     "opensearch_url": os.getenv("CLARISA_OPENSEARCH_URL"),
-    "opensearch_index": os.getenv("CLARISA_OPENSEARCH_BASE_INDEX"),
+    "opensearch_prod_index": os.getenv("CLARISA_OPENSEARCH_PROD_INDEX"),
+    "opensearch_test_index": os.getenv("CLARISA_OPENSEARCH_TEST_INDEX"),
     "opensearch_username": os.getenv("CLARISA_OPENSEARCH_USERNAME"),
     "opensearch_password": os.getenv("CLARISA_OPENSEARCH_PASSWORD"),
 }
