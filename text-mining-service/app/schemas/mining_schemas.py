@@ -248,12 +248,117 @@ class InnovationActorModel(BaseModel):
         return filtered if filtered else None
 
 
-# class OrganizationModel(BaseModel):
-#     """Organization involved in innovation"""
-    # name: str = Field(..., description="Organization name")
-    # type: str = Field(..., description="Organization type(s)")
-    # sub_type: Optional[str] = Field(None, description="Organization subtype")
-    # other_type: Optional[str] = Field(None, description="Other organization type if type is 'Other'")
+class OrganizationModel(BaseModel):
+    """Organization involved in innovation"""
+    model_config = ConfigDict(exclude_none=True)
+    
+    institution_name: Optional[str] = Field(None, description="Organization name")
+    institution_id: Optional[str] = Field(None, description="Organization ID from mapping service")
+    similarity_score: Optional[float] = Field(None, description="Similarity score from mapping")
+    type: Optional[str] = Field(None, description="Organization type")
+    sub_type: Optional[str] = Field(None, description="Organization subtype")
+    other_type: Optional[str] = Field(None, description="Other organization type if type is 'Other'")
+
+    @field_validator('type')
+    @classmethod
+    def validate_type(cls, v):
+        """Validate organization type values"""
+        valid_types = [
+            "NGO",
+            "Research organizations and universities",
+            "Organization (other than financial or research)",
+            "Government",
+            "Financial institution",
+            "Private company (other than financial)",
+            "Public-Private Partnership",
+            "Foundation",
+            "Other"
+        ]
+        if v and v not in valid_types:
+            return "Other"
+        return v
+    
+    @model_validator(mode='after')
+    def validate_conditional_fields(self):
+        """Validate sub_type and other_type based on organization type"""
+        org_type = self.type
+        sub_type = self.sub_type
+        other_type = self.other_type
+        
+        if other_type:
+            if not org_type or org_type != "Other":
+                self.other_type = None
+        
+        if not sub_type:
+            return self
+        
+        if not org_type:
+            self.sub_type = None
+            return self
+        
+        valid_subtypes_map = {
+            "NGO": [
+                "NGO International",
+                "NGO International (General)",
+                "NGO International (Farmers)",
+                "NGO Regional",
+                "NGO Regional (General)",
+                "NGO Regional (Farmers)",
+                "NGO National",
+                "NGO National (General)",
+                "NGO National (Farmers)",
+                "NGO Local",
+                "NGO Local (General)",
+                "NGO Local (Farmers)"
+            ],
+            "Research organizations and universities": [
+                "Research organizations and universities International",
+                "Research organizations and universities International (General)",
+                "Research organizations and universities International (Universities)",
+                "Research organizations and universities International (CGIAR)",
+                "Research organizations and universities Regional",
+                "Research organizations and universities Regional (NA)",
+                "Research organizations and universities Regional (Universities)",
+                "Research organizations and universities National",
+                "Research organizations and universities National (NARS)",
+                "Research organizations and universities National (Universities)",
+                "Research organizations and universities Local",
+                "Research organizations and universities Local (NA)",
+                "Research organizations and universities Local (Universities)"
+            ],
+            "Organization (other than financial or research)": [
+                "Organization (other than financial or research) International",
+                "Organization (other than financial or research) Regional"
+            ],
+            "Government": [
+                "Government (National)",
+                "Government (Subnational)"
+            ],
+            "Financial institution": [
+                "Financial Institution",
+                "Financial Institution International",
+                "Financial Institution Regional",
+                "Financial Institution National",
+                "Financial Institution Local"
+            ]
+        }
+        
+        no_subtype_types = [
+            "Private company (other than financial)",
+            "Public-Private Partnership",
+            "Foundation",
+            "Other"
+        ]
+        
+        if org_type in no_subtype_types:
+            self.sub_type = None
+            return self
+        
+        if org_type in valid_subtypes_map:
+            if sub_type not in valid_subtypes_map[org_type]:
+                self.sub_type = None
+        
+        return self
 
 
 class InnovationDevelopmentResult(BaseResultModel):
@@ -266,12 +371,7 @@ class InnovationDevelopmentResult(BaseResultModel):
     anticipated_users: Optional[str] = Field(None, description="Anticipated users")
     
     innovation_actors_detailed: Optional[List[InnovationActorModel]] = Field(None, description="Innovation actors")
-    # organizations_detailed: Optional[List[OrganizationModel]] = Field(None, description="Organizations")
-
-    # organizations: Optional[List[str]] = Field(None, description="List of organization names")
-    # organization_type: Optional[List[str]] = Field(None, description="List of organization types")
-    # organization_sub_type: Optional[str] = Field(None, description="Organization subtype")
-    # other_organization_type: Optional[str] = Field(None, description="Other organization type if type is 'Other'")
+    organizations_detailed: Optional[List[OrganizationModel]] = Field(None, description="Innovation organizations")
 
     @field_validator('innovation_nature')
     @classmethod
@@ -321,108 +421,6 @@ class InnovationDevelopmentResult(BaseResultModel):
         if v and v not in valid_values:
             return "This is yet to be determined"
         return v
-    
-    # @field_validator('organizations', 'organization_type', mode='before')
-    # @classmethod
-    # def ensure_lists(cls, v):
-    #     """Ensure organization fields are lists"""
-    #     if v is None:
-    #         return None
-    #     if isinstance(v, str):
-    #         return [v]
-    #     if isinstance(v, list):
-    #         return [str(item) for item in v if item]
-    #     return []
-    
-    # @model_validator(mode='after')
-    # def validate_organization_sub_type(self):
-    #     """Validate organization_sub_type and other_organization_type based on organization_type"""
-    #     org_types = self.organization_type
-    #     org_sub_type = self.organization_sub_type
-    #     other_org_type = self.other_organization_type
-        
-    #     # Validate other_organization_type - only allowed if "Other" is in organization_type
-    #     if other_org_type:
-    #         if not org_types or "Other" not in org_types:
-    #             self.other_organization_type = None
-        
-    #     # If no organization_sub_type provided, that's fine (it's optional)
-    #     if not org_sub_type:
-    #         return self
-        
-    #     # If no organization_type, but org_sub_type exists, remove org_sub_type
-    #     if not org_types or len(org_types) == 0:
-    #         self.organization_sub_type = None
-    #         return self
-        
-    #     # Define valid subtypes for each organization type
-    #     valid_subtypes_map = {
-    #         "NGO": [
-    #             "NGO International", "NGO International (General)", "NGO International (Farmers)",
-    #             "NGO Regional", "NGO Regional (General)", "NGO Regional (Farmers)",
-    #             "NGO National", "NGO National (General)", "NGO National (Farmers)",
-    #             "NGO Local", "NGO Local (General)", "NGO Local (Farmers)"
-    #         ],
-    #         "Research organizations and universities": [
-    #             "Research organizations and universities International",
-    #             "Research organizations and universities International (General)",
-    #             "Research organizations and universities International (Universities)",
-    #             "Research organizations and universities International (CGIAR)",
-    #             "Research organizations and universities Regional",
-    #             "Research organizations and universities Regional (NA)",
-    #             "Research organizations and universities Regional (Universities)",
-    #             "Research organizations and universities National",
-    #             "Research organizations and universities National (NARS)",
-    #             "Research organizations and universities National (Universities)",
-    #             "Research organizations and universities Local",
-    #             "Research organizations and universities Local (NA)",
-    #             "Research organizations and universities Local (Universities)"
-    #         ],
-    #         "Organization (other than financial or research)": [
-    #             "Organization (other than financial or research) International",
-    #             "Organization (other than financial or research) Regional"
-    #         ],
-    #         "Government": [
-    #             "Government (National)",
-    #             "Government (Subnational)"
-    #         ],
-    #         "Financial institution": [
-    #             "Financial Institution",
-    #             "Financial Institution International",
-    #             "Financial Institution Regional",
-    #             "Financial Institution National",
-    #             "Financial Institution Local"
-    #         ]
-    #     }
-        
-    #     # Types that don't use organization_sub_type
-    #     no_subtype_types = [
-    #         "Private company (other than financial)",
-    #         "Public-Private Partnership",
-    #         "Foundation",
-    #         "Other"
-    #     ]
-        
-    #     # Check if any org_type is in the no_subtype list
-    #     if any(ot in no_subtype_types for ot in org_types):
-    #         # If all types are no-subtype types, remove org_sub_type
-    #         if all(ot in no_subtype_types for ot in org_types):
-    #             self.organization_sub_type = None
-    #             return self
-        
-    #     # Validate that org_sub_type matches at least one org_type
-    #     is_valid = False
-    #     for org_type in org_types:
-    #         if org_type in valid_subtypes_map:
-    #             if org_sub_type in valid_subtypes_map[org_type]:
-    #                 is_valid = True
-    #                 break
-        
-    #     # If invalid, set to None (will be excluded from JSON)
-    #     if not is_valid:
-    #         self.organization_sub_type = None
-        
-    #     return self
 
 
 ResultModel = Union[CapacityDevelopmentResult, PolicyChangeResult, InnovationDevelopmentResult]
