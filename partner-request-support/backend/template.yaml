@@ -33,8 +33,8 @@ Resources:
   PartnerRequestHttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
-      Name: !Sub "partner-request-support-api-${Environment}"
-      Description: HTTP API for Partner Request Support (PRMS)
+      # Omit Name: avoids collisions with an existing HTTP API of the same display name in the account.
+      Description: !Sub "Partner Request Support HTTP API (${Environment})"
       CorsConfiguration:
         AllowOrigins: !Split [",", !Ref CorsAllowOrigin]
         AllowMethods: GET, POST, PUT, OPTIONS
@@ -87,19 +87,16 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PartnerRequestHttpApi}/*"
 
+# Outputs without CloudFormation Export: export names must be unique per region/account.
+# A failed stack (e.g. partner-request-support-api-null) can hold exports like *-dev and block new stacks.
+# Jenkins/CLI use describe-stacks by OutputKey; use Fn::ImportValue only if you add a uniquely named Export.
 Outputs:
   ApiFunctionName:
     Description: Lambda function physical name (use for CLI/Jenkins after deploy)
     Value: !Ref PartnerRequestApiFunction
-    Export:
-      Name: !Sub "PartnerRequestApiFunctionName-${Environment}"
   ApiEndpoint:
     Description: API Gateway HTTP API endpoint URL
     Value: !Sub "https://${PartnerRequestHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
-    Export:
-      Name: !Sub "PartnerRequestApiEndpoint-${Environment}"
   ApiFunctionArn:
     Description: Lambda function ARN
     Value: !GetAtt PartnerRequestApiFunction.Arn
-    Export:
-      Name: !Sub "PartnerRequestApiFunctionArn-${Environment}"
