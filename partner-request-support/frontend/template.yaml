@@ -70,15 +70,14 @@ Resources:
             DomainName: !GetAtt FrontendBucket.DomainName
             S3OriginConfig:
               OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+        # Sin CachePolicyId, CloudFormation/API exige ForwardedValues (modo legacy).
+        # Política administrada "CachingOptimized" (IDs fijos globales CloudFront).
+        # Ver: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html
         DefaultCacheBehavior:
           TargetOriginId: S3Origin
           ViewerProtocolPolicy: redirect-to-https
           AllowedMethods: [GET, HEAD, OPTIONS]
-          CachedMethods: [GET, HEAD, OPTIONS]
-          Compress: true
-          DefaultTTL: 86400
-          MaxTTL: 31536000
-          MinTTL: 0
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
         CustomErrorResponses:
           - ErrorCode: 403
             ResponseCode: 200
