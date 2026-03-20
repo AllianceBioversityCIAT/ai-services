@@ -256,7 +256,17 @@ npm run dev
 # Frontend runs on http://localhost:3000
 ```
 
-**Access the application at http://localhost:3000**
+### **Environment URLs**
+
+**Backend API:**
+- 🔧 **Development**: http://localhost:8000
+- 🧪 **Test**: https://hw4qszwcz55trf2n4xg7ujef7y0tgtya.lambda-url.us-east-1.on.aws
+- 🚀 **Production**: https://eff4b5tkftulww4nllaebunmri0cdwrf.lambda-url.us-east-1.on.aws
+
+**Frontend Application:**
+- 🔧 **Development**: http://localhost:3000
+- 🧪 **Test**: https://d27ujrreorxaxf.cloudfront.net
+- 🚀 **Production**: https://d27ujrreorxaxf.cloudfront.net
 
 ---
 
@@ -420,8 +430,18 @@ Download Excel template from S3
 Health check endpoint
 
 ### **API Documentation**
+
+**Development (localhost):**
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
+
+**Test Environment:**
+- **Swagger UI**: https://hw4qszwcz55trf2n4xg7ujef7y0tgtya.lambda-url.us-east-1.on.aws/docs
+- **ReDoc**: https://hw4qszwcz55trf2n4xg7ujef7y0tgtya.lambda-url.us-east-1.on.aws/redoc
+
+**Production Environment:**
+- **Swagger UI**: https://eff4b5tkftulww4nllaebunmri0cdwrf.lambda-url.us-east-1.on.aws/docs
+- **ReDoc**: https://eff4b5tkftulww4nllaebunmri0cdwrf.lambda-url.us-east-1.on.aws/redoc
 
 ---
 
@@ -566,6 +586,10 @@ OPENAI_API_KEY=sk-proj-...
 # S3 (Template Storage)
 S3_TEMPLATE_BUCKET=cgiar-partner-templates
 S3_TEMPLATE_KEY=partner_request_template.xlsx
+
+# CORS (Frontend URLs)
+# Development, Test, and Production frontend URLs (comma-separated)
+CORS_ORIGINS=http://localhost:3000,https://d27ujrreorxaxf.cloudfront.net
 ```
 
 ### **Frontend Configuration**
@@ -574,6 +598,16 @@ Create `.env.local` in `frontend/`:
 
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+**Test:**
+```bash
+NEXT_PUBLIC_API_URL=https://hw4qszwcz55trf2n4xg7ujef7y0tgtya.lambda-url.us-east-1.on.aws
+```
+
+**Production:**
+```bash
+NEXT_PUBLIC_API_URL=https://eff4b5tkftulww4nllaebunmri0cdwrf.lambda-url.us-east-1.on.aws
 ```
 
 ---
@@ -585,6 +619,10 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 ```python
 import requests
 
+# Choose your environment:
+# Dev: "http://localhost:8000"
+# Test: "https://hw4qszwcz55trf2n4xg7ujef7y0tgtya.lambda-url.us-east-1.on.aws"
+# Prod: "https://eff4b5tkftulww4nllaebunmri0cdwrf.lambda-url.us-east-1.on.aws"
 url = "http://localhost:8000/api/process-partners"
 with open("partners.xlsx", "rb") as f:
     files = {"file": f}
@@ -842,7 +880,12 @@ CREATE INDEX idx_name_embedding ON clarisa_institutions_v2
 - Check AWS service quotas
 
 ### **CORS errors**
-Ensure backend has CORS enabled in `api.py` for your frontend URL
+Ensure backend has CORS enabled in `api.py` for your frontend URLs:
+- Development: `http://localhost:3000`
+- Test: `https://d27ujrreorxaxf.cloudfront.net`
+- Production: `https://d27ujrreorxaxf.cloudfront.net`
+
+Check the `CORS_ORIGINS` environment variable in your `.env` file.
 
 ### **Cache not invalidating**
 Manually clear cache:
