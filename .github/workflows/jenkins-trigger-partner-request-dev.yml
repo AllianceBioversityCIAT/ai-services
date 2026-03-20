@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - "dev-partner-request-support"
-  pull_request:
-    branches:
-      - "dev-partner-request-support"
   workflow_dispatch:
 
 jobs:
