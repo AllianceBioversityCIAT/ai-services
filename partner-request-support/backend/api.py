@@ -28,25 +28,95 @@ load_dotenv()
 
 synced_partner_requests: List[Dict] = []
 
-# CLARISA Partner Request API: use base URL (no trailing slash) or individual URLs per env (dev/prod).
-_CLARISA_BASE = (os.getenv("CLARISA_PARTNER_REQUEST_BASE_URL") or "").rstrip("/")
-if _CLARISA_BASE and not os.getenv("CLARISA_PARTNER_REQUESTS_URL"):
-    CLARISA_API_URL = f"{_CLARISA_BASE}/api/partner-requests"
-    CLARISA_CREATE_URL = f"{_CLARISA_BASE}/api/partner-requests/create"
-    CLARISA_RESPOND_URL = f"{_CLARISA_BASE}/api/partner-requests/respond"
-    CLARISA_COUNTRIES_URL = f"{_CLARISA_BASE}/api/countries"
-    CLARISA_INSTITUTION_TYPES_URL = f"{_CLARISA_BASE}/api/institution-types"
-else:
-    CLARISA_API_URL = os.getenv("CLARISA_PARTNER_REQUESTS_URL") or ""
-    CLARISA_CREATE_URL = os.getenv("CLARISA_CREATE_URL") or ""
-    CLARISA_RESPOND_URL = os.getenv("CLARISA_RESPOND_URL") or ""
-    CLARISA_COUNTRIES_URL = os.getenv("CLARISA_COUNTRIES_URL") or ""
-    CLARISA_INSTITUTION_TYPES_URL = os.getenv("CLARISA_INSTITUTION_TYPES_URL") or ""
+CLARISA_API_URL = os.getenv("CLARISA_PARTNER_REQUESTS_URL") or ""
+CLARISA_CREATE_URL = os.getenv("CLARISA_CREATE_URL") or ""
+CLARISA_RESPOND_URL = os.getenv("CLARISA_RESPOND_URL") or ""
+CLARISA_COUNTRIES_URL = os.getenv("CLARISA_COUNTRIES_URL") or ""
+CLARISA_INSTITUTION_TYPES_URL = os.getenv("CLARISA_INSTITUTION_TYPES_URL") or ""
 
 app = FastAPI(
     title="Partner Request Support API",
-    description="API for processing partner requests and matching with CLARISA database",
-    version="1.0.0"
+    description="""
+    Partner Request Support API
+    
+    Overview:
+    
+    This API provides intelligent matching and processing of partner institution requests
+    against the CLARISA (Common List of Agricultural Research Institutions and Services) database.
+    
+    Key Features:
+    
+    - 🤖 AI-Powered Matching: Uses semantic embeddings and similarity search for accurate institution matching
+    - 📊 Excel Processing: Upload and process batch partner requests from Excel files
+    - 🔄 Auto-Synchronization: Keeps local database synchronized with CLARISA
+    - 💾 Smart Caching: Reduces processing time with intelligent result caching
+    - 🌐 Web Search Integration: Validates matches with AI-powered web research
+    - 📈 Quality Scoring: Provides match quality ratings (excellent, good, fair, no match)
+    
+    Typical Workflow:
+    
+    Option 1: Excel File Processing
+    1. Download the template using `/api/download-template`
+    2. Fill in partner institution details
+    3. Upload and process via `/api/process-partners`
+    4. Review matches and quality scores
+    5. Perform manual web searches if needed
+    
+    Option 2: API Partner Requests
+    1. Sync pending requests from CLARISA: `/api/sync-partner-requests`
+    2. Process synced requests: `/api/process-api-partners`
+    3. Review matches and respond: `/api/respond-partner-request`
+    
+    Authentication:
+    
+    Most endpoints require a CLARISA authentication token passed in the request body or headers.
+    
+    Match Quality Interpretation:
+    
+    - Excellent (>0.85): High confidence - typically safe to accept
+    - Good (0.75-0.85): Probable match - review recommended
+    - Fair (0.65-0.75): Possible match - verification required
+    - No Match (<0.65): No suitable candidate found
+    """,
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    servers=[
+        {
+            "url": "http://localhost:8000",
+            "description": "🔧 Development (Local)"
+        },
+        {
+            "url": "https://hw4qszwcz55trf2n4xg7ujef7y0tgtya.lambda-url.us-east-1.on.aws",
+            "description": "🧪 Testing"
+        },
+        {
+            "url": "https://eff4b5tkftulww4nllaebunmri0cdwrf.lambda-url.us-east-1.on.aws",
+            "description": "🚀 Production"
+        }
+    ],
+    openapi_tags=[
+        {
+            "name": "Health",
+            "description": "Health check and status endpoints"
+        },
+        {
+            "name": "Partner Processing",
+            "description": "Core endpoints for processing and matching partner institutions"
+        },
+        {
+            "name": "Synchronization",
+            "description": "Database and API synchronization operations"
+        },
+        {
+            "name": "Web Search",
+            "description": "Manual web search for institution verification"
+        },
+        {
+            "name": "Templates",
+            "description": "Download Excel templates and resources"
+        }
+    ]
 )
 
 _cors_origins = (os.getenv("CORS_ORIGINS") or "https://d27ujrreorxaxf.cloudfront.net,http://localhost:3000,http://localhost:3001").strip().split(",")
@@ -60,9 +130,27 @@ app.add_middleware(
 )
 
 
-@app.get("/")
+@app.get("/", tags=["Health"])
 async def root():
-    """Root endpoint - API info"""
+    """
+    # API Information Endpoint
+    
+    Returns basic information about the Partner Request Support API.
+    
+    ## Response
+    - **name**: API name
+    - **version**: Current API version
+    - **status**: Current operational status
+    
+    ## Example Response
+    ```json
+    {
+        "name": "Partner Request Support API",
+        "version": "1.0.0",
+        "status": "online"
+    }
+    ```
+    """
     return {
         "name": "Partner Request Support API",
         "version": "1.0.0",
@@ -70,13 +158,31 @@ async def root():
     }
 
 
-@app.get("/health")
+@app.get("/health", tags=["Health"])
 async def health():
-    """Health check endpoint"""
+    """
+    # Health Check Endpoint
+    
+    Verifies that the API service is running and healthy.
+    Used for monitoring and load balancer health checks.
+    
+    ## Response
+    Returns a simple status indicator.
+    
+    ## Example Response
+    ```json
+    {
+        "status": "healthy"
+    }
+    ```
+    
+    ## HTTP Status Codes
+    - **200**: Service is healthy and operational
+    """
     return {"status": "healthy"}
 
 
-@app.post("/api/process-partners")
+@app.post("/api/process-partners", tags=["Partner Processing"])
 async def process_partners(
     file: UploadFile = File(...),
     user_email: str = Form(...),
@@ -85,35 +191,100 @@ async def process_partners(
     create_requests: bool = Form(default=True)
 ):
     """
-    Process an Excel file with partner requests.
-    First creates the partner requests in CLARISA, then processes them.
+    # Process Partner Requests from Excel File
     
-    Expected Excel format:
-        - Column 0: ID (optional)
-        - Column 1: partner_name (REQUIRED)
-        - Column 2: acronym (optional)
-        - Column 3: website (optional)
-        - Column 4: institution_type (REQUIRED - must match CLARISA control list)
-        - Column 5: country (REQUIRED - must match CLARISA control list)
-        - Column 6: category_1 (optional)
-        - Column 7: category_2 (optional)
+    Processes an Excel file containing partner institution requests. The endpoint:
+    1. Synchronizes the CLARISA institutions database
+    2. Optionally creates partner requests in CLARISA
+    3. Matches partners against the CLARISA database using AI-powered semantic search
+    4. Performs web searches for additional validation when needed
+    5. Caches results for performance optimization
     
-    Note: Country and Institution Type are validated against CLARISA control lists.
-          If a value is not found in the control list or is missing, the partner request
-          will NOT be created and will be marked as failed.
+    ## Excel File Format Requirements
     
-    Args:
-        file: Excel file to process
-        user_email: Email of the user creating the requests
-        user_name: Name of the user creating the requests
-        auth_token: Authentication token for CLARISA API
-        create_requests: Whether to create partner requests in CLARISA first
+    The uploaded file must be in `.xlsx` or `.xls` format with the following columns:
     
-    Returns:
-        JSON with processed results including:
-        - partners: List of partners with match info
-        - stats: Processing statistics
-        - creation_info: Info about request creation (if create_requests=True)
+    | Column | Name | Required | Description |
+    |--------|------|----------|-------------|
+    | 0 | ID | Optional | Partner request identifier |
+    | 1 | partner_name | **REQUIRED** | Full name of the partner institution |
+    | 2 | acronym | Optional | Institution acronym or short name |
+    | 3 | website | Optional | Official website URL |
+    | 4 | institution_type | **REQUIRED** | Must match CLARISA control list |
+    | 5 | country | **REQUIRED** | Must match CLARISA control list |
+    | 6 | category_1 | Optional | Custom category field |
+    | 7 | category_2 | Optional | Custom category field |
+    
+    ## Parameters
+    
+    - **file**: Excel file (multipart/form-data)
+    - **user_email**: Email address of the requesting user
+    - **user_name**: Full name of the requesting user
+    - **auth_token**: Bearer token for CLARISA API authentication
+    - **create_requests**: Whether to create partner requests in CLARISA before processing (default: true)
+    
+    ## Response Structure
+    
+    ```json
+    {
+        "partners": [
+            {
+                "id": "123",
+                "partner_name": "Example University",
+                "match_found": true,
+                "match_quality": "excellent",
+                "best_match": {...},
+                "web_search": {...}
+            }
+        ],
+        "stats": {
+            "total": 10,
+            "matched": 8,
+            "no_match": 2,
+            "excellent": 5,
+            "good": 2,
+            "fair": 1,
+            "matched_percentage": 80.0
+        },
+        "creation_info": {
+            "created": true,
+            "found_existing": 3,
+            "created_new": 7,
+            "failed": 0
+        },
+        "cache_info": {
+            "cache_hits": 2,
+            "cache_misses": 8,
+            "from_cache": true
+        },
+        "sync_info": {
+            "sync_performed": true,
+            "new_institutions": 5,
+            "modified_institutions": 2,
+            "sync_message": "Database updated successfully"
+        }
+    }
+    ```
+    
+    ## Match Quality Levels
+    
+    - **excellent**: High confidence match (similarity > 0.85)
+    - **good**: Probable match requiring review (0.75 - 0.85)
+    - **fair**: Possible match requiring verification (0.65 - 0.75)
+    - **no_match**: No suitable match found (< 0.65)
+    
+    ## HTTP Status Codes
+    
+    - **200**: Successfully processed the file
+    - **400**: Invalid file format or missing required data
+    - **500**: Internal server error during processing
+    
+    ## Notes
+    
+    - Country and Institution Type values are validated against CLARISA control lists
+    - Invalid or missing required values will cause request creation to fail
+    - Results are automatically cached by partner name for faster subsequent processing
+    - Database synchronization happens automatically before processing
     """
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(
@@ -591,15 +762,54 @@ async def process_partners(
                 logger.warning(f"⚠️  Could not delete temporary file: {e}")
 
 
-@app.get("/api/sync-partner-requests")
+@app.get("/api/sync-partner-requests", tags=["Synchronization"])
 async def sync_partner_requests():
     """
-    Synchronize partner requests from external CLARISA API
+    # Synchronize Partner Requests from CLARISA
     
-    Returns:
-        JSON with:
-        - count: Number of partner requests found
-        - pending_requests: List of pending partner requests
+    Fetches all pending partner requests from the external CLARISA API and stores them
+    in memory for processing. This endpoint should be called before using the
+    `/api/process-api-partners` endpoint.
+    
+    ## Response Structure
+    
+    ```json
+    {
+        "success": true,
+        "count": 25,
+        "total_requests": 100,
+        "pending_requests": [
+            {
+                "id": 123,
+                "partnerName": "Example University",
+                "acronym": "EU",
+                "webPage": "https://example.edu",
+                "requestStatus": "Pending",
+                "countryDTO": {"name": "United States"},
+                "institutionTypeDTO": {"name": "University"}
+            }
+        ]
+    }
+    ```
+    
+    ## Response Fields
+    
+    - **success**: Boolean indicating operation success
+    - **count**: Number of pending partner requests
+    - **total_requests**: Total number of all requests (any status)
+    - **pending_requests**: Array of pending partner request objects
+    
+    ## HTTP Status Codes
+    
+    - **200**: Successfully synchronized partner requests
+    - **502**: Error connecting to CLARISA API
+    - **500**: Internal server error
+    
+    ## Notes
+    
+    - Only requests with status "Pending" are returned
+    - Results are stored in server memory for subsequent processing
+    - This is a read-only operation that doesn't modify any data
     """
     global synced_partner_requests
     
@@ -641,27 +851,76 @@ async def sync_partner_requests():
         )
 
 
-@app.post("/api/sync-clarisa-institutions")
+@app.post("/api/sync-clarisa-institutions", tags=["Synchronization"])
 async def sync_clarisa_institutions_endpoint(delete_obsolete: bool = Body(True)):
     """
-    Manually trigger synchronization of CLARISA institutions database
+    # Synchronize CLARISA Institutions Database
     
-    This endpoint allows forcing a sync of the institutions database with CLARISA API.
-    It compares the current database with CLARISA and only processes new or modified institutions.
+    Manually triggers a complete synchronization of the local institutions database with
+    the CLARISA API. This operation:
+    - Fetches all institutions from CLARISA
+    - Compares with local database to identify changes
+    - Adds new institutions with AI-generated embeddings
+    - Updates modified institutions
+    - Optionally removes obsolete institutions
+    - Clears cache when changes are detected
     
-    Args:
-        delete_obsolete: Whether to delete institutions that no longer exist in CLARISA (default: True)
+    ## Request Body
     
-    Returns:
-        JSON with sync statistics including:
-        - institutions_before: Count before sync
-        - institutions_after: Count after sync
-        - new_institutions: Number of new institutions added
-        - modified_institutions: Number of institutions updated
-        - unchanged_institutions: Number of institutions that didn't change
-        - obsolete_institutions: Number of obsolete institutions found
-        - total_processed: Total institutions that required embedding generation
-        - message: User-friendly message about the sync result
+    ```json
+    {
+        "delete_obsolete": true
+    }
+    ```
+    
+    ## Parameters
+    
+    - **delete_obsolete**: Whether to delete institutions that no longer exist in CLARISA (default: true)
+    
+    ## Response Structure
+    
+    ```json
+    {
+        "success": true,
+        "institutions_before": 1500,
+        "institutions_after": 1520,
+        "new_institutions": 25,
+        "modified_institutions": 10,
+        "unchanged_institutions": 1465,
+        "obsolete_institutions": 5,
+        "deleted_institutions": 5,
+        "cache_cleared": 15,
+        "total_processed": 35,
+        "message": "Sync completed: 25 new institution(s) added, 10 institution(s) updated, 5 obsolete institution(s) deleted."
+    }
+    ```
+    
+    ## Response Fields
+    
+    - **success**: Operation completion status
+    - **institutions_before**: Database count before synchronization
+    - **institutions_after**: Database count after synchronization
+    - **new_institutions**: Number of newly added institutions
+    - **modified_institutions**: Number of updated institutions
+    - **unchanged_institutions**: Number of institutions without changes
+    - **obsolete_institutions**: Number of obsolete institutions detected
+    - **deleted_institutions**: Number of institutions removed (if delete_obsolete=true)
+    - **cache_cleared**: Number of cache entries cleared
+    - **total_processed**: Total institutions requiring embedding generation
+    - **message**: Human-readable summary of the sync operation
+    
+    ## HTTP Status Codes
+    
+    - **200**: Synchronization completed successfully
+    - **500**: Error during synchronization process
+    
+    ## Notes
+    
+    - This operation automatically happens during `/api/process-partners` but can be triggered manually
+    - Embeddings are generated only for new or modified institutions
+    - Cache is automatically cleared when institutions are added or modified
+    - The operation is idempotent and safe to call multiple times
+    - Processing time depends on the number of new/modified institutions
     """
     try:
         logger.info("🔄 Manual CLARISA institutions sync triggered")
@@ -721,21 +980,107 @@ async def sync_clarisa_institutions_endpoint(delete_obsolete: bool = Body(True))
         )
 
 
-@app.post("/api/process-api-partners")
+@app.post("/api/process-api-partners", tags=["Partner Processing"])
 async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
     """
-    Process partner requests from the synced API data.
-    Uses cache to avoid re-processing already processed requests.
+    # Process Partner Requests from Synced API Data
     
     Args:
         partner_ids: Optional list of specific partner IDs to process.
                     If None, processes all synced partners
     
-    Returns:
-        JSON with processed results including:
-        - partners: List of partners with match info
-        - stats: Processing statistics
-        - cache_info: Cache hit/miss statistics
+    ## Prerequisites
+    
+    Call `/api/sync-partner-requests` first to load partner requests into memory.
+    
+    ## Request Body
+    
+    ```json
+    {
+        "partner_ids": [123, 456, 789]
+    }
+    ```
+    
+    ## Parameters
+    
+    - **partner_ids**: Optional array of specific partner request IDs to process
+      - If provided: processes only the specified IDs
+      - If null/omitted: processes last 5 synced partners (for testing)
+    
+    ## Response Structure
+    
+    ```json
+    {
+        "partners": [
+            {
+                "id": "123",
+                "partner_name": "Example Research Institute",
+                "match_found": true,
+                "match_quality": "excellent",
+                "similarity_score": 0.92,
+                "best_match": {
+                    "id": 456,
+                    "name": "Example Research Institute",
+                    "acronym": "ERI",
+                    "websiteLink": "https://eri.org"
+                },
+                "api_data": {
+                    "request_id": 123,
+                    "request_source": "External",
+                    "external_user": "John Doe"
+                },
+                "web_search": {
+                    "success": true,
+                    "formatted_result": "..."
+                }
+            }
+        ],
+        "stats": {
+            "total": 5,
+            "matched": 4,
+            "no_match": 1,
+            "excellent": 3,
+            "good": 1,
+            "fair": 0,
+            "web_search_attempted": 1,
+            "web_search_success": 1,
+            "matched_percentage": 80.0
+        },
+        "cache_info": {
+            "total_requests": 5,
+            "cache_hits": 2,
+            "cache_misses": 3,
+            "from_cache": true,
+            "processed_new": true
+        },
+        "sync_info": {
+            "sync_performed": true,
+            "institutions_after": 1520,
+            "new_institutions": 0,
+            "sync_message": "Database synchronized. No changes found."
+        }
+    }
+    ```
+    
+    ## HTTP Status Codes
+    
+    - **200**: Successfully processed partner requests
+    - **400**: No partner requests in memory (sync required)
+    - **404**: Specified partner IDs not found
+    - **500**: Internal server error
+    
+    ## Performance Features
+    
+    - **Smart Caching**: Previously processed partners are retrieved from cache
+    - **Batch Processing**: Efficient handling of multiple requests
+    - **Auto-Sync**: Automatically synchronizes institutions database before processing
+    
+    ## Notes
+    
+    - Processes only pending partner requests
+    - Results include API metadata (request_id, source, user)
+    - Cache is based on partner name (case-insensitive)
+    - Newly processed results are automatically cached
     """
     global synced_partner_requests
     
@@ -942,7 +1287,7 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
         )
 
 
-@app.post("/api/respond-partner-request")
+@app.post("/api/respond-partner-request", tags=["Partner Processing"])
 async def respond_partner_request(
     request_id: int = Body(...),
     user_id: int = Body(...),
@@ -951,17 +1296,79 @@ async def respond_partner_request(
     reject_justification: Optional[str] = Body(None)
 ):
     """
-    Accept or reject a partner request
+    # Accept or Reject a Partner Request
     
-    Args:
-        request_id: ID of the partner request to respond to
-        user_id: ID of the authenticated user
-        accept: True to accept, False to reject
-        auth_token: Bearer token for authentication
-        reject_justification: Optional text when rejecting
+    Submits a decision (accept/reject) for a partner request to the CLARISA API.
+    Upon successful submission, the request is removed from the local synced list.
     
-    Returns:
-        JSON with success status and message
+    ## Request Body
+    
+    ```json
+    {
+        "request_id": 123,
+        "user_id": 456,
+        "accept": true,
+        "auth_token": "Bearer eyJ...",
+        "reject_justification": "Does not meet criteria"
+    }
+    ```
+    
+    ## Parameters
+    
+    - **request_id**: ID of the partner request to respond to (required)
+    - **user_id**: ID of the authenticated CLARISA user making the decision (required)
+    - **accept**: Boolean decision - true to accept, false to reject (required)
+    - **auth_token**: Bearer authentication token for CLARISA API (required)
+    - **reject_justification**: Explanation text required when rejecting (optional for accept, recommended for reject)
+    
+    ## Response Structure
+    
+    ### Success Response
+    ```json
+    {
+        "success": true,
+        "action": "accept",
+        "request_id": 123,
+        "message": "Partner request successfully accepted"
+    }
+    ```
+    
+    ### Error Response
+    ```json
+    {
+        "detail": "Error message describing what went wrong"
+    }
+    ```
+    
+    ## Response Fields
+    
+    - **success**: Boolean indicating operation success
+    - **action**: The action performed ("accept" or "reject")
+    - **request_id**: ID of the processed request
+    - **message**: Human-readable confirmation message
+    
+    ## HTTP Status Codes
+    
+    - **200**: Request successfully accepted or rejected
+    - **404**: Partner request not found in synced list
+    - **401/403**: Authentication or authorization error
+    - **502**: Network error connecting to CLARISA API
+    - **500**: Internal server error
+    
+    ## Workflow
+    
+    1. Validates request exists in local synced list
+    2. Constructs payload with request data and user information
+    3. Sends decision to CLARISA API
+    4. Removes request from local synced list on success
+    
+    ## Notes
+    
+    - Request must be previously synced via `/api/sync-partner-requests`
+    - Rejection requires justification text (auto-filled if not provided)
+    - Successful responses remove the request from the local cache
+    - This operation is final and cannot be undone
+    - Authentication token must have appropriate CLARISA permissions
     """
     global synced_partner_requests
     
@@ -1048,23 +1455,84 @@ async def respond_partner_request(
         )
 
 
-@app.post("/api/manual-web-search")
+@app.post("/api/manual-web-search", tags=["Web Search"])
 async def manual_web_search(
     partner_name: str = Body(...),
     country: Optional[str] = Body(None),
     website: Optional[str] = Body(None)
 ):
     """
-    Manually trigger a web search for a partner institution.
-    Used when match_quality is 'fair' or 'good' and user wants additional information.
+    # Manual Web Search for Partner Institution
     
-    Args:
-        partner_name: Name of the partner institution
-        country: Country of the institution (optional)
-        website: Website of the institution (optional)
-        
-    Returns:
-        JSON with web search results
+    Performs an AI-powered web search to gather additional information about a partner
+    institution. Particularly useful when match quality is 'fair' or 'good' and manual
+    verification is needed.
+    
+    ## Use Cases
+    
+    - Verify questionable matches before accepting
+    - Gather additional context for decision-making
+    - Validate institution details when database match is uncertain
+    - Research institutions with incomplete information
+    
+    ## Request Body
+    
+    ```json
+    {
+        "partner_name": "MIT",
+        "country": "United States",
+        "website": "https://mit.edu"
+    }
+    ```
+    
+    ## Parameters
+    
+    - **partner_name**: Full or partial name of the institution (required)
+    - **country**: Country where the institution is located (optional, improves accuracy)
+    - **website**: Official website URL (optional, helps verify identity)
+    
+    ## Response Structure
+    
+    ### Success Response
+    ```json
+    {
+        "success": true,
+        "result": "Massachusetts Institute of Technology (MIT) is a private research university located in Cambridge, Massachusetts, United States. Founded in 1861, it is known for..."
+    }
+    ```
+    
+    ### Failure Response
+    ```json
+    {
+        "success": false,
+        "error": "No relevant information found"
+    }
+    ```
+    
+    ## Response Fields
+    
+    - **success**: Boolean indicating if search succeeded
+    - **result**: Formatted text with institution information (on success)
+    - **error**: Error message explaining failure (on failure)
+    
+    ## HTTP Status Codes
+    
+    - **200**: Search completed (check 'success' field for outcome)
+    - **500**: Internal server error during search
+    
+    ## Search Features
+    
+    - **AI-Powered**: Uses Bedrock AI to analyze and summarize web results
+    - **Multi-Source**: Searches across multiple web sources
+    - **Contextual**: Considers country and website for better relevance
+    - **Formatted Output**: Returns clean, readable summaries
+    
+    ## Notes
+    
+    - Search results are not cached
+    - Response time varies (typically 3-10 seconds)
+    - Quality depends on available online information
+    - Results are AI-generated summaries, not raw search results
     """
     try:
         logger.info(f"🔍 Manual web search triggered for: {partner_name}")
@@ -1092,14 +1560,56 @@ async def manual_web_search(
         )
 
 
-@app.get("/api/download-template")
+@app.get("/api/download-template", tags=["Templates"])
 async def download_template():
     """
-    Download the Excel template from S3.
-    Uses the same AWS credentials as Bedrock.
+    # Download Excel Template
     
-    Returns:
-        StreamingResponse with the Excel file
+    Downloads the official Excel template file for partner request submissions from AWS S3.
+    This template includes the correct column structure, headers, and formatting required
+    for the `/api/process-partners` endpoint.
+    
+    ## Response
+    
+    Returns an Excel file (.xlsx) as a downloadable attachment.
+    
+    **Filename**: `PartnerRequestTemplate_v1.xlsx`
+    
+    ## Template Structure
+    
+    The template includes the following columns:
+    
+    | Column | Header | Description |
+    |--------|--------|-------------|
+    | A | ID | Optional request identifier |
+    | B | Partner Name* | Institution name (required) |
+    | C | Acronym | Short name or abbreviation |
+    | D | Website | Official website URL |
+    | E | Institution Type* | Must match CLARISA list (required) |
+    | F | Country* | Must match CLARISA list (required) |
+    | G | Category 1 | Custom category field |
+    | H | Category 2 | Custom category field |
+    
+    *Required fields
+    
+    ## HTTP Status Codes
+    
+    - **200**: Template file successfully downloaded
+    - **404**: Template bucket or file not found in S3
+    - **500**: Error accessing S3 or downloading file
+    
+    ## Configuration
+    
+    Template location is configured via environment variables:
+    - `S3_TEMPLATE_BUCKET`: S3 bucket name (default: "cgiar-partner-templates")
+    - `S3_TEMPLATE_KEY`: File key/path (default: "PartnerRequestTemplate_v1.xlsx")
+    
+    ## Notes
+    
+    - Uses the same AWS credentials as Bedrock AI service
+    - File is streamed directly from S3 (not stored locally)
+    - Template includes data validation for required fields
+    - Always use the latest template version for best compatibility
     """
     try:
         bucket_name = os.getenv("S3_TEMPLATE_BUCKET", "cgiar-partner-templates")
