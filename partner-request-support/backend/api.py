@@ -985,9 +985,9 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
     """
     # Process Partner Requests from Synced API Data
     
-    Args:
-        partner_ids: Optional list of specific partner IDs to process.
-                    If None, processes all synced partners
+    Processes partner requests that were previously synchronized from the CLARISA API
+    using the `/api/sync-partner-requests` endpoint. This endpoint performs intelligent
+    matching against the CLARISA institutions database with caching support.
     
     ## Prerequisites
     
