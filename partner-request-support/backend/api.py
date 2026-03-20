@@ -49,8 +49,8 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS: set CORS_ORIGINS (comma-separated) in env for prod (e.g. https://partner-request.example.com).
-_cors_origins = (os.getenv("CORS_ORIGINS") or "http://localhost:3000,http://localhost:3001").strip().split(",")
+_cors_origins = (os.getenv("CORS_ORIGINS") or "https://d27ujrreorxaxf.cloudfront.net,http://localhost:3000,http://localhost:3001").strip().split(",")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in _cors_origins if o.strip()],
