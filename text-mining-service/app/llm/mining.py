@@ -2,6 +2,7 @@ import re
 import time
 import json
 import boto3
+from botocore.config import Config
 from typing import Dict, Any, Union
 from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
@@ -23,11 +24,18 @@ from app.llm.vectorize import (get_embedding,
 
 logger = get_logger()
 
+bedrock_config = Config(
+    connect_timeout=60,
+    read_timeout=300,
+    retries={'max_attempts': 3, 'mode': 'adaptive'}
+)
+
 bedrock_runtime = boto3.client(
     service_name='bedrock-runtime',
     aws_access_key_id=AWS['aws_access_key'],
     aws_secret_access_key=AWS['aws_secret_key'],
-    region_name='us-east-1'
+    region_name='us-east-1',
+    config=bedrock_config
 )
 
 
