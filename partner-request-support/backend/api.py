@@ -119,7 +119,7 @@ app = FastAPI(
     ]
 )
 
-_cors_origins = (os.getenv("CORS_ORIGINS") or "https://d27ujrreorxaxf.cloudfront.net,http://localhost:3000,http://localhost:3001").strip().split(",")
+_cors_origins = (os.getenv("CORS_ORIGINS") or "https://d2xsau6p4hnevy.cloudfront.net,http://localhost:3000,http://localhost:3001").strip().split(",")
 
 app.add_middleware(
     CORSMiddleware,
