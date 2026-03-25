@@ -167,13 +167,13 @@ async def get_auth_token():
 @app.get("/ui", tags=["AICCRA Project"])
 async def serve_ui_alt():
     """Alternative endpoint for the UI"""
-    return FileResponse('interface/index.html')
+    return FileResponse('interface/aiccra_mining/index.html')
 
 
 @app.get("/bulk-upload", tags=["STAR Project"])
 async def serve_bulk_upload():
     """Serve the bulk upload interface"""
-    return FileResponse('interface/bulk_upload.html')
+    return FileResponse('interface/bulk_upload/bulk_upload.html')
 
 
 @app.get("/aiccra/prompt", tags=["AICCRA Project"])
