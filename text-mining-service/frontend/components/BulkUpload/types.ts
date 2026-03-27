@@ -121,7 +121,7 @@ export type TabType = 'pending' | 'submitted';
 export interface ColumnDef {
   key: string;
   label: string;
-  type: 'checkbox' | 'text' | 'number' | 'textarea' | 'select' | 'status' | 'link';
+  type: 'checkbox' | 'text' | 'number' | 'textarea' | 'select' | 'status' | 'link' | 'chips';
   readonly?: boolean;
   required?: boolean;
   options?: string[];

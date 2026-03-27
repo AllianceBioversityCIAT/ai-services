@@ -138,6 +138,25 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     );
   }
 
+  if (col.type === 'chips') {
+    const raw = getNestedValue(result, col.key);
+    const items: string[] = Array.isArray(raw)
+      ? raw.map(String)
+      : typeof raw === 'string' && raw.trim().startsWith('[')
+        ? (() => { try { return JSON.parse(raw) as string[]; } catch { return [raw]; } })()
+        : raw ? [String(raw)] : [];
+    return (
+      <td>
+        <div className="bulk-chips">
+          {items.map((item, i) => (
+            <span key={i} className="bulk-chip">{item}</span>
+          ))}
+          {items.length === 0 && <span className="bulk-chips-empty">—</span>}
+        </div>
+      </td>
+    );
+  }
+
   // text / readonly
   const value = getNestedValue(result, col.key) ?? '';
   if (col.readonly) {
