@@ -8,6 +8,9 @@ import { getNestedValue, setNestedValue, getUniqueValues } from '../utils/tableH
 import { usePagination } from '../hooks/usePagination';
 import { FilterPanel } from './FilterPanel';
 import { useState } from 'react';
+import type { RawInstitution } from '../types';
+import { PartnersCell } from './PartnersCell';
+import { SdgCell } from './SdgCell';
 
 // Hoisted static SVGs (rendering-hoist-jsx)
 const StarSubmitSvg = (
@@ -33,7 +36,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     if (textareaRef.current) {
       const el = textareaRef.current;
       el.style.height = 'auto';
-      el.style.height = Math.max(el.scrollHeight, 80) + 'px';
+      el.style.height = Math.max(el.scrollHeight, 60) + 'px';
     }
   }, []);
 
@@ -65,7 +68,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
       if (e.target.tagName === 'TEXTAREA') {
         const el = e.target as HTMLTextAreaElement;
         el.style.height = 'auto';
-        el.style.height = Math.max(el.scrollHeight, 80) + 'px';
+        el.style.height = Math.max(el.scrollHeight, 60) + 'px';
       }
 
       onEdit(globalIdx, col.key, value);
@@ -157,6 +160,38 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     );
   }
 
+  if (col.type === 'partners') {
+    const raw = getNestedValue(result, col.key);
+    const partners: RawInstitution[] = Array.isArray(raw) ? (raw as RawInstitution[]) : [];
+    return (
+      <td>
+        <PartnersCell
+          partners={partners}
+          globalIdx={globalIdx}
+          onEdit={onEdit as (globalIdx: number, field: string, value: RawInstitution[]) => void}
+        />
+      </td>
+    );
+  }
+
+  if (col.type === 'sdg') {
+    const raw = getNestedValue(result, col.key);
+    const values: string[] = Array.isArray(raw)
+      ? (raw as string[])
+      : typeof raw === 'string' && raw.trim().startsWith('[')
+        ? (() => { try { return JSON.parse(raw) as string[]; } catch { return raw ? [raw] : []; } })()
+        : raw ? [String(raw)] : [];
+    return (
+      <td>
+        <SdgCell
+          values={values}
+          globalIdx={globalIdx}
+          onEdit={onEdit as (globalIdx: number, field: string, value: string[]) => void}
+        />
+      </td>
+    );
+  }
+
   // text / readonly
   const value = getNestedValue(result, col.key) ?? '';
   if (col.readonly) {
@@ -195,6 +230,7 @@ interface ResultsTableProps {
   onTabChange: (tab: TabType) => void;
   onSubmitToStar: () => void;
   onClearSelections: () => void;
+  onViewUnmapped: () => void;
   starSubmissionResponse: unknown;
 }
 
@@ -213,6 +249,7 @@ export function ResultsTable({
   onTabChange,
   onSubmitToStar,
   onClearSelections,
+  onViewUnmapped,
   starSubmissionResponse,
 }: ResultsTableProps) {
   const pagination = usePagination(10);
@@ -274,7 +311,6 @@ export function ResultsTable({
   const closeFilter = useCallback(() => setOpenFilter(null), []);
 
   const pageAllSelected = paginatedResults.every((_, i) => selectedIndices.has(globalIndexMap(i)));
-  const tabLabel = currentTab === 'pending' ? 'Pending/Failed' : 'Submitted';
 
   return (
     <div className="bulk-step">
@@ -296,35 +332,44 @@ export function ResultsTable({
         </button>
       </div>
 
-      {/* Controls row */}
-      <div className="bulk-results-controls">
-        <div className="bulk-results-info">
-          <span>{filteredResults.length} {tabLabel} records</span>
+      {/* Controls row — only shown on pending tab */}
+      {currentTab === 'pending' && (
+        <div className="bulk-results-controls">
+          <button
+            className="bulk-unmapped-nav-btn"
+            type="button"
+            disabled={selectedIndices.size === 0}
+            onClick={onClearSelections}
+          >
+            🔄 Clear Selections
+          </button>
+          <button
+            className="bulk-star-submit-btn"
+            type="button"
+            disabled={selectedIndices.size === 0}
+            onClick={onSubmitToStar}
+          >
+            {StarSubmitSvg}
+            Submit to STAR
+          </button>
         </div>
-        <button
-          className="bulk-star-submit-btn"
-          type="button"
-          disabled={selectedIndices.size === 0}
-          onClick={onSubmitToStar}
-        >
-          {StarSubmitSvg}
-          Submit to STAR
-        </button>
-      </div>
+      )}
 
       {/* Table */}
       <div className="bulk-table-container">
         <table id="bulkResultsTable" className="bulk-results-table">
           <thead>
             <tr>
-              <th>
-                <input
-                  type="checkbox"
-                  title="Select/Deselect All"
-                  checked={pageAllSelected && paginatedResults.length > 0}
-                  onChange={(e) => handleSelectAll(e.target.checked)}
-                />
-              </th>
+              {currentTab === 'pending' && (
+                <th>
+                  <input
+                    type="checkbox"
+                    title="Select/Deselect All"
+                    checked={pageAllSelected && paginatedResults.length > 0}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                  />
+                </th>
+              )}
               {RESULTS_TABLE_COLUMNS.slice(1).map((col) => {
                 if (col.readonly || col.type === 'status' || col.type === 'link') {
                   return <th key={col.key}>{col.label}</th>;
@@ -354,14 +399,16 @@ export function ResultsTable({
               const rid = String(result.id);
               return (
                 <tr key={rid || localIdx}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      className="row-select"
-                      checked={selectedIndices.has(globalIdx)}
-                      onChange={(e) => handleRowCheck(globalIdx, e.target.checked)}
-                    />
-                  </td>
+                  {currentTab === 'pending' && (
+                    <td>
+                      <input
+                        type="checkbox"
+                        className="row-select"
+                        checked={selectedIndices.has(globalIdx)}
+                        onChange={(e) => handleRowCheck(globalIdx, e.target.checked)}
+                      />
+                    </td>
+                  )}
                   {RESULTS_TABLE_COLUMNS.slice(1).map((col) => (
                     <TableCell
                       key={col.key}
@@ -410,16 +457,20 @@ export function ResultsTable({
         </div>
       )}
 
-      {/* STAR Submission Results */}
-      {starSubmissionResponse !== null && (
-        <div className="bulk-star-results">
-          <h3>✅ STAR Submission Results</h3>
-          <details className="bulk-collapsible" open>
-            <summary>📋 STAR Submission Details</summary>
-            <pre className="bulk-json-output">{JSON.stringify(starSubmissionResponse, null, 2)}</pre>
-          </details>
-          <button className="bulk-btn bulk-btn-secondary" type="button" onClick={onClearSelections}>
-            🔄 Clear Selections
+      {/* STAR Submission Results — logged to console only */}
+      {starSubmissionResponse !== null && currentTab === 'pending' && (() => {
+        console.log('STAR Submission Results:', starSubmissionResponse);
+        return null;
+      })()}
+
+      {/* Next step — navigates to unmapped institutions */}
+      {currentTab === 'pending' && (
+        <div className="bulk-next-step-container">
+          <button className="bulk-next-step-btn" type="button" onClick={onViewUnmapped}>
+            Next step
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+              <path d="M8 1l7 7-7 7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
         </div>
       )}

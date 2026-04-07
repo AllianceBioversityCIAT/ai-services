@@ -103,7 +103,7 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
   { key: 'description', label: 'Description', type: 'textarea' },
   { key: 'year', label: 'Year', type: 'text' },
   { key: 'contract_code', label: 'Contract Code', type: 'text' },
-  { key: 'sdg_targets', label: 'SDG Targets', type: 'textarea' },
+  { key: 'sdg_targets', label: 'SDG Targets', type: 'sdg' },
   {
     key: 'training_category',
     label: 'Training Category',
@@ -160,7 +160,7 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
   { key: 'training_supervisor.name', label: 'Training Supervisor', type: 'text' },
   { key: 'trainee_affiliation.institution_name', label: 'Trainee Affiliation', type: 'text' },
   { key: 'language.name', label: 'Language', type: 'text' },
-  { key: 'partners', label: 'Partners', type: 'textarea' },
+  { key: 'partners', label: 'Partners', type: 'partners' },
   { key: 'trainees', label: 'Trainees', type: 'select', options: ['Yes', 'No'] },
   { key: 'trainees_description', label: 'Trainees Organizations', type: 'textarea' },
   { key: 'countries', label: 'Countries', type: 'textarea' },

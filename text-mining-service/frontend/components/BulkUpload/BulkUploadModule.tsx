@@ -11,6 +11,7 @@ import { setNestedValue } from './utils/tableHelpers';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { ErrorMessage } from './components/ErrorMessage';
 import { UploadHeader, UnmappedHeader, ResultsHeader } from './components/Headers';
+import { StepIndicator } from './components/StepIndicator';
 import { Step1Upload } from './components/Step1Upload';
 import { UnmappedTable } from './components/UnmappedTable';
 import { ResultsTable } from './components/ResultsTable';
@@ -71,13 +72,14 @@ export default function BulkUploadModule() {
         setCurrentFileName(fileName);
         filters.clearAllFilters();
         setSelectedIndices(new Set());
-        setStep('unmapped');
+        setStep('results');
       });
     },
     [api, filters],
   );
 
   const handleNextStep = useCallback(() => setStep('results'), []);
+  const handleViewUnmapped = useCallback(() => setStep('unmapped'), []);
 
   const handleDownloadUnmappedReport = useCallback(() => {
     if (unmappedInstitutions.length === 0) return;
@@ -131,6 +133,9 @@ export default function BulkUploadModule() {
         />
       )}
 
+      {/* Step indicator — outside white card, in header background */}
+      <StepIndicator currentStep={step} />
+
       {/* White card container */}
       <div className="bulk-upload-container">
         {api.isLoading && <LoadingOverlay text={api.loadingText} />}
@@ -151,7 +156,8 @@ export default function BulkUploadModule() {
           <UnmappedTable
             institutions={unmappedInstitutions}
             onDownloadReport={handleDownloadUnmappedReport}
-            onNextStep={handleNextStep}
+            onBackToResults={handleNextStep}
+            onFinishProcess={handleNewUpload}
           />
         )}
 
@@ -171,6 +177,7 @@ export default function BulkUploadModule() {
             onTabChange={(tab) => { filters.setTab(tab); setSelectedIndices(new Set()); }}
             onSubmitToStar={handleSubmitToStar}
             onClearSelections={handleClearSelections}
+            onViewUnmapped={handleViewUnmapped}
             starSubmissionResponse={api.starSubmissionResponse}
           />
         )}

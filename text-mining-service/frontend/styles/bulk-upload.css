@@ -28,7 +28,7 @@
     --bulk-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     
     /* Fuentes STAR */
-    font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     color: var(--bulk-gray-800);
     line-height: 1.6;
     font-size: 15px;
@@ -833,9 +833,9 @@
     background: transparent;
     border: none;
     border-bottom: 3px solid transparent;
-    color: var(--bulk-gray-600);
+    color: #8D929A;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 700;
     cursor: pointer;
     transition: all 0.2s ease;
     position: relative;
@@ -850,7 +850,7 @@
 .bulk-upload-container .bulk-tab-btn.active {
     color: var(--bulk-primary);
     border-bottom-color: var(--bulk-primary);
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .bulk-upload-container .bulk-results-controls {
@@ -892,6 +892,29 @@
     cursor: not-allowed;
 }
 
+.bulk-upload-container .bulk-unmapped-nav-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: transparent;
+    border: 1px solid var(--bulk-primary);
+    border-radius: 6px;
+    color: var(--bulk-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.bulk-upload-container .bulk-unmapped-nav-btn:hover {
+    background: var(--bulk-gray-50);
+}
+
+.bulk-upload-container .bulk-star-results {
+    margin-top: 1.5rem;
+}
+
 .bulk-upload-container .bulk-table-container {
     overflow-x: auto;
     border: none;
@@ -913,14 +936,14 @@
     text-align: left;
     font-weight: 600;
     font-size: 13px;
-    color: var(--bulk-gray-700);
+    color: var(--bulk-primary);
     border-bottom: 1px solid var(--bulk-gray-300);
 }
 
 .bulk-upload-container .bulk-results-table td {
-    padding: 1rem;
+    padding: 0.5rem 0.75rem;
     font-size: 14px;
-    color: var(--bulk-gray-800);
+    color: #4B5563;
     border-bottom: 1px solid var(--bulk-gray-200);
     vertical-align: top;
 }
@@ -934,32 +957,8 @@
 /* Cells containing textareas need to wrap */
 .bulk-upload-container .bulk-results-table td:has(textarea) {
     white-space: normal;
-    width: 250px;
-    min-width: 250px;
-}
-
-/* Indicator column - wider to show full text */
-.bulk-upload-container .bulk-results-table th:nth-child(5),
-.bulk-upload-container .bulk-results-table td:nth-child(5) {
-    width: 300px;
-    min-width: 300px;
-    white-space: normal;
-}
-
-/* Title column - extra wide to show full text */
-.bulk-upload-container .bulk-results-table th:nth-child(6),
-.bulk-upload-container .bulk-results-table td:nth-child(6) {
-    width: 400px;
-    min-width: 400px;
-    white-space: normal;
-}
-
-/* Description column - extra wide */
-.bulk-upload-container .bulk-results-table th:nth-child(7),
-.bulk-upload-container .bulk-results-table td:nth-child(7) {
-    width: 450px;
-    min-width: 450px;
-    white-space: normal;
+    min-width: 220px;
+    max-width: 320px;
 }
 
 .bulk-upload-container .bulk-results-table tbody tr {
@@ -986,13 +985,11 @@
     background: transparent;
     font-size: 14px;
     font-family: inherit;
-    color: var(--bulk-gray-800);
+    color: #4B5563;
     border-radius: 4px;
     transition: all 0.2s ease;
     outline: none;
     box-sizing: border-box;
-    word-wrap: break-word;
-    white-space: normal;
 }
 
 /* Hover state - subtle hint of editability */
@@ -1022,23 +1019,34 @@
     border-color: transparent;
 }
 
-/* Textarea specific - auto-expand to show all content */
+/* Textarea specific — auto-expands via JS, no scroll, no cap */
 .bulk-upload-container .bulk-results-table textarea {
-    min-height: 80px;
+    min-height: 60px;
     resize: none;
     line-height: 1.5;
     overflow: hidden;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
-/* Textareas in Indicator and Title columns - smaller min-height */
-.bulk-upload-container .bulk-results-table td:nth-child(5) textarea,
-.bulk-upload-container .bulk-results-table td:nth-child(6) textarea {
-    min-height: 60px;
+/* Text inputs — minimum width so content isn't crushed */
+.bulk-upload-container .bulk-results-table input[type="text"] {
+    min-width: 130px;
+}
+
+/* Number inputs - compact with tabular numerals */
+.bulk-upload-container .bulk-results-table input[type="number"] {
+    min-width: 55px;
+    max-width: 85px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
 }
 
 /* Select dropdown - cleaner appearance */
 .bulk-upload-container .bulk-results-table select {
     cursor: pointer;
+    min-width: 130px;
+    white-space: nowrap;
     padding-right: 2rem;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23374151' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
@@ -1115,6 +1123,202 @@
     font-size: 14px;
 }
 
+/* SDG Cell */
+.bulk-upload-container .sdg-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 160px;
+}
+
+.bulk-upload-container .sdg-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.bulk-upload-container .sdg-popover {
+    width: 180px;
+    min-width: 160px;
+}
+
+/* Partner Chips */
+.bulk-upload-container .partners-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 200px;
+}
+
+.bulk-upload-container .partners-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.bulk-upload-container .partner-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 50px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    line-height: 1.4;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bulk-upload-container .partner-chip-mapped {
+    background: #D1FAE5;
+    color: #065F46;
+    border: 1px solid #6EE7B7;
+}
+
+.bulk-upload-container .partner-chip-low {
+    background: #FEF3C7;
+    color: #92400E;
+    border: 1px solid #FCD34D;
+}
+
+.bulk-upload-container .partner-chip-unmapped {
+    background: #F3F4F6;
+    color: #374151;
+    border: 1px solid #D1D5DB;
+}
+
+.bulk-upload-container .partner-chip-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+    opacity: 0.6;
+    color: inherit;
+    flex-shrink: 0;
+}
+
+.bulk-upload-container .partner-chip-remove:hover {
+    opacity: 1;
+}
+
+.bulk-upload-container .partner-add-container {
+    position: relative;
+}
+
+.bulk-upload-container .partner-add-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #EFF6FF;
+    color: #1D4ED8;
+    border: 1px solid #BFDBFE;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    font-weight: 400;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.bulk-upload-container .partner-add-btn:hover {
+    background: #DBEAFE;
+    border-color: #93C5FD;
+}
+
+.bulk-upload-container .partners-search-popover {
+    position: absolute;
+    top: 26px;
+    left: 0;
+    z-index: 200;
+    background: #fff;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    padding: 8px;
+    width: 360px;
+    min-width: 260px;
+}
+
+.bulk-upload-container .partners-search-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 10px;
+    border: 1px solid #D1D5DB;
+    border-radius: 6px;
+    font-size: 13px;
+    outline: none;
+    color: #111827;
+}
+
+.bulk-upload-container .partners-search-input:focus {
+    border-color: #3B82F6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.bulk-upload-container .partners-search-loading,
+.bulk-upload-container .partners-search-empty {
+    padding: 8px 4px;
+    font-size: 12px;
+    color: var(--bulk-gray-400);
+    text-align: center;
+}
+
+.bulk-upload-container .partners-search-results {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.bulk-upload-container .partners-search-result {
+    display: flex;
+    align-items: baseline;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    gap: 0;
+    font-size: 13px;
+    color: #111827;
+    overflow: hidden;
+}
+
+.bulk-upload-container .partners-search-result:hover {
+    background: #F3F4F6;
+}
+
+.bulk-upload-container .partners-result-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bulk-upload-container .partners-result-acronym {
+    font-weight: 700;
+    flex-shrink: 0;
+    color: #111827;
+}
+
+.bulk-upload-container .partners-result-sep {
+    flex-shrink: 0;
+    color: #6B7280;
+}
+
+.bulk-upload-container .partners-result-country {
+    flex-shrink: 0;
+    color: #6B7280;
+    white-space: nowrap;
+}
+
 /* Unmapped Institutions Section */
 .bulk-upload-container .bulk-unmapped-container {
     margin-top: 0;
@@ -1153,6 +1357,85 @@
 .bulk-upload-container .bulk-download-unmapped-btn:hover {
     background: var(--bulk-primary);
     color: var(--bulk-white);
+}
+
+/* Step Indicator — lives outside white card in header background */
+.bulk-upload-wrapper .bulk-step-indicator {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    margin: 1.5rem auto 1.5rem;
+    width: fit-content;
+    gap: 0;
+}
+
+.bulk-upload-wrapper .bulk-step-item {
+    display: flex;
+    align-items: flex-start;
+}
+
+.bulk-upload-wrapper .bulk-step-line {
+    width: 150px;
+    height: 2px;
+    flex-shrink: 0;
+    margin-top: 17px; /* half of 36px circle = center of circle */
+}
+
+.bulk-upload-wrapper .bulk-step-line-done {
+    background: #7CB580;
+}
+
+.bulk-upload-wrapper .bulk-step-line-upcoming {
+    background: #D1D5DB;
+}
+
+.bulk-upload-wrapper .bulk-step-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.bulk-upload-wrapper .bulk-step-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 600;
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+
+.bulk-upload-wrapper .bulk-step-circle-active {
+    background: transparent;
+    border: 2px solid #1689CA;
+    color: #1689CA;
+}
+
+.bulk-upload-wrapper .bulk-step-circle-done {
+    background: #7CB580;
+    border: 2px solid #7CB580;
+    color: #fff;
+}
+
+.bulk-upload-wrapper .bulk-step-circle-upcoming {
+    background: transparent;
+    border: 2px solid #B9B9B9;
+    color: #B9B9B9;
+}
+
+.bulk-upload-wrapper .bulk-step-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #A3A9AF;
+    white-space: nowrap;
+}
+
+.bulk-upload-wrapper .bulk-step-label-active {
+    color: #1689CA;
 }
 
 .bulk-upload-container .bulk-next-step-container {
