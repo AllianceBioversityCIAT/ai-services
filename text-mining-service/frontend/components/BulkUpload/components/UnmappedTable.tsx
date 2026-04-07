@@ -21,10 +21,11 @@ const NextArrowSvg = (
 interface UnmappedTableProps {
   institutions: UnmappedInstitution[];
   onDownloadReport: () => void;
-  onNextStep: () => void;
+  onBackToResults: () => void;
+  onFinishProcess: () => void;
 }
 
-export function UnmappedTable({ institutions, onDownloadReport, onNextStep }: UnmappedTableProps) {
+export function UnmappedTable({ institutions, onDownloadReport, onBackToResults, onFinishProcess }: UnmappedTableProps) {
   const pagination = usePagination(5);
   const { setTotalItems } = pagination;
 
@@ -144,10 +145,13 @@ export function UnmappedTable({ institutions, onDownloadReport, onNextStep }: Un
           </div>
         </div>
 
-        {/* Next Step */}
-        <div className="bulk-next-step-container">
-          <button className="bulk-next-step-btn" type="button" onClick={onNextStep}>
-            Next step
+        {/* Action buttons */}
+        <div className="bulk-next-step-container" style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+          <button className="bulk-unmapped-nav-btn" type="button" onClick={onBackToResults}>
+            ← Back to Results
+          </button>
+          <button className="bulk-next-step-btn" type="button" onClick={onFinishProcess}>
+            Finish Process
             {NextArrowSvg}
           </button>
         </div>
