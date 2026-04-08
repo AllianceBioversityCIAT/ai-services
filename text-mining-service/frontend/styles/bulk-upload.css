@@ -1036,6 +1036,7 @@
 /* Table Editable Fields - Clean, subtle design */
 .bulk-upload-container .bulk-results-table input[type="text"],
 .bulk-upload-container .bulk-results-table input[type="number"],
+.bulk-upload-container .bulk-results-table input[type="date"],
 .bulk-upload-container .bulk-results-table select,
 .bulk-upload-container .bulk-results-table textarea {
     width: 100%;
@@ -1054,6 +1055,7 @@
 /* Hover state - subtle hint of editability */
 .bulk-upload-container .bulk-results-table input[type="text"]:hover:not(:read-only),
 .bulk-upload-container .bulk-results-table input[type="number"]:hover,
+.bulk-upload-container .bulk-results-table input[type="date"]:hover,
 .bulk-upload-container .bulk-results-table select:hover,
 .bulk-upload-container .bulk-results-table textarea:hover {
     background: var(--bulk-gray-50);
@@ -1063,6 +1065,7 @@
 /* Focus state - clear editing indication */
 .bulk-upload-container .bulk-results-table input[type="text"]:focus,
 .bulk-upload-container .bulk-results-table input[type="number"]:focus,
+.bulk-upload-container .bulk-results-table input[type="date"]:focus,
 .bulk-upload-container .bulk-results-table select:focus,
 .bulk-upload-container .bulk-results-table textarea:focus {
     background: var(--bulk-white);
@@ -1091,6 +1094,11 @@
 /* Text inputs — minimum width so content isn't crushed */
 .bulk-upload-container .bulk-results-table input[type="text"] {
     min-width: 130px;
+}
+
+/* Date inputs */
+.bulk-upload-container .bulk-results-table input[type="date"] {
+    min-width: 140px;
 }
 
 /* Number inputs - compact with tabular numerals */

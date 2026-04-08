@@ -117,8 +117,8 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
     options: ['Individual training', 'Group training'],
   },
   { key: 'training_purpose', label: 'Training Purpose', type: 'training_purpose' },
-  { key: 'start_date', label: 'Start Date', type: 'text' },
-  { key: 'end_date', label: 'End Date', type: 'text' },
+  { key: 'start_date', label: 'Start Date', type: 'date' },
+  { key: 'end_date', label: 'End Date', type: 'date' },
   {
     key: 'delivery_modality',
     label: 'Delivery Modality',
