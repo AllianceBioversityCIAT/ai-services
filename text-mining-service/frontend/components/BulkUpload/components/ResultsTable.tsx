@@ -79,6 +79,10 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     [col.key, globalIdx, onEdit],
   );
 
+  const isDisabled = col.enabledWhen
+    ? !col.enabledWhen.values.some((v) => String(getNestedValue(result, col.enabledWhen!.field)) === String(v))
+    : false;
+
   if (col.type === 'status') {
     const status = recordStatus?.status ?? 'pending';
     const statusClass = status === 'complete' ? 'status-complete' : status === 'failed' ? 'status-failed' : 'status-pending';
@@ -139,6 +143,8 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
           data-field={col.key}
           defaultValue={String(value ?? '')}
           onChange={handleChange}
+          disabled={isDisabled}
+          className={isDisabled ? 'cell-conditional-disabled' : undefined}
         />
       </td>
     );
@@ -323,6 +329,8 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
         data-index={globalIdx}
         data-field={col.key}
         onChange={handleChange}
+        disabled={isDisabled}
+        className={isDisabled ? 'cell-conditional-disabled' : undefined}
       />
     </td>
   );

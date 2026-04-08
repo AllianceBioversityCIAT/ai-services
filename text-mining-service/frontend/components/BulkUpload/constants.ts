@@ -179,7 +179,7 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
       'Others',
     ],
   },
-  { key: 'asset_ip_owner_description', label: 'Asset IP Owner Description', type: 'text' },
+  { key: 'asset_ip_owner_description', label: 'Asset IP Owner Description', type: 'text', enabledWhen: { field: 'asset_ip_owner_id', values: [4, 'Others'] } },
   {
     key: 'publicity_restriction',
     label: 'Publicity Restriction',
@@ -190,6 +190,7 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
     key: 'publicity_restriction_description',
     label: 'Publicity Restriction Description',
     type: 'textarea',
+    enabledWhen: { field: 'publicity_restriction', values: ['Yes'] },
   },
   {
     key: 'potential_asset',
@@ -197,7 +198,7 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
     type: 'select',
     options: ['Yes', 'No'],
   },
-  { key: 'potential_asset_description', label: 'Potential Asset Description', type: 'textarea' },
+  { key: 'potential_asset_description', label: 'Potential Asset Description', type: 'textarea', enabledWhen: { field: 'potential_asset', values: ['Yes'] } },
   {
     key: 'requires_further_development',
     label: 'Requires Further Development',
@@ -208,5 +209,6 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
     key: 'requires_further_development_description',
     label: 'Further Development Description',
     type: 'textarea',
+    enabledWhen: { field: 'requires_further_development', values: ['Yes'] },
   },
 ];
