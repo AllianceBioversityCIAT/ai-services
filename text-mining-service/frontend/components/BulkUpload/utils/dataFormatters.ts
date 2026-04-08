@@ -323,6 +323,11 @@ export function formatResultForSTAR(result: BulkUploadResult): Record<string, un
     }
   });
 
+  // Step 17.5: strip "Other: " prefix from training_purpose before sending
+  if (typeof formatted.training_purpose === 'string' && formatted.training_purpose.startsWith('Other: ')) {
+    formatted.training_purpose = formatted.training_purpose.slice(7);
+  }
+
   // Step 18: optional numeric fields
   NUMERIC_FIELDS.forEach((field) => {
     if (formatted[field] === null || formatted[field] === undefined) {
