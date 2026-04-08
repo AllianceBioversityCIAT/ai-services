@@ -183,6 +183,7 @@ export default function BulkUploadModule() {
             onClearSelections={handleClearSelections}
             onViewUnmapped={handleViewUnmapped}
             starSubmissionResponse={api.starSubmissionResponse}
+            authToken={api.authToken}
           />
         )}
       </div>

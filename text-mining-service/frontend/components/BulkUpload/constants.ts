@@ -128,7 +128,7 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
   { key: 'trainee_affiliation', label: 'Trainee Affiliation', type: 'affiliation', enabledWhen: { field: 'training_type', values: ['Individual training'] } },
   { key: 'trainee_nationality', label: 'Trainee Nationality', type: 'nationality', enabledWhen: { field: 'training_type', values: ['Individual training'] } },
   { key: 'training_supervisor.name', label: 'Training Supervisor', type: 'text' },
-  { key: 'language.name', label: 'Language', type: 'text' },
+  { key: 'language', label: 'Language', type: 'language' },
   { key: 'start_date', label: 'Start Date', type: 'date' },
   { key: 'end_date', label: 'End Date', type: 'date' },
   { key: 'delivery_modality', label: 'Delivery Modality', type: 'select', options: ['in-person', 'virtual', 'hybrid'] },

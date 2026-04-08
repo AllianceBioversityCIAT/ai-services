@@ -16,6 +16,7 @@ import { RegionsCell } from './RegionsCell';
 import { CountriesCell } from './CountriesCell';
 import { TraineeAffiliationCell } from './TraineeAffiliationCell';
 import { TraineeNationalityCell } from './TraineeNationalityCell';
+import { LanguageCell } from './LanguageCell';
 
 // Hoisted static SVGs (rendering-hoist-jsx)
 const StarSubmitSvg = (
@@ -31,9 +32,10 @@ interface TableCellProps {
   globalIdx: number;
   recordStatus: RecordStatus | undefined;
   onEdit: (globalIdx: number, field: string, value: unknown) => void;
+  authToken: string | null;
 }
 
-const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus, onEdit }: TableCellProps) {
+const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus, onEdit, authToken }: TableCellProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea on mount
@@ -168,6 +170,15 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     return (
       <td>
         <TraineeNationalityCell value={raw} globalIdx={globalIdx} onEdit={onEdit} disabled={isDisabled} />
+      </td>
+    );
+  }
+
+  if (col.type === 'language') {
+    const raw = getNestedValue(result, col.key) as { name: string; code: string } | null | undefined;
+    return (
+      <td>
+        <LanguageCell value={raw} globalIdx={globalIdx} authToken={authToken} onEdit={onEdit} disabled={isDisabled} />
       </td>
     );
   }
@@ -378,6 +389,7 @@ interface ResultsTableProps {
   onClearSelections: () => void;
   onViewUnmapped: () => void;
   starSubmissionResponse: unknown;
+  authToken: string | null;
 }
 
 export function ResultsTable({
@@ -397,6 +409,7 @@ export function ResultsTable({
   onClearSelections,
   onViewUnmapped,
   starSubmissionResponse,
+  authToken,
 }: ResultsTableProps) {
   const pagination = usePagination(10);
   const { setTotalItems } = pagination;
@@ -567,6 +580,7 @@ export function ResultsTable({
                       globalIdx={globalIdx}
                       recordStatus={recordStatuses[rid]}
                       onEdit={onEdit}
+                      authToken={authToken}
                     />
                   ))}
                 </tr>
