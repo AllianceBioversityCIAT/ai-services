@@ -121,7 +121,7 @@ export type TabType = 'pending' | 'submitted';
 export interface ColumnDef {
   key: string;
   label: string;
-  type: 'checkbox' | 'text' | 'number' | 'textarea' | 'select' | 'status' | 'link' | 'chips' | 'partners' | 'sdg' | 'evidence_desc' | 'evidence_link' | 'training_purpose' | 'date' | 'countries' | 'regions';
+  type: 'checkbox' | 'text' | 'number' | 'textarea' | 'select' | 'status' | 'link' | 'chips' | 'partners' | 'sdg' | 'evidence_desc' | 'evidence_link' | 'training_purpose' | 'date' | 'countries' | 'regions' | 'affiliation' | 'nationality';
   readonly?: boolean;
   required?: boolean;
   options?: string[];

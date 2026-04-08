@@ -12,6 +12,7 @@ interface TrainingPurposeCellProps {
   value: string | undefined;
   globalIdx: number;
   onEdit: (globalIdx: number, field: string, value: string) => void;
+  disabled?: boolean;
 }
 
 function parseValue(raw: string | undefined): { option: string; otherText: string } {
@@ -23,7 +24,7 @@ function parseValue(raw: string | undefined): { option: string; otherText: strin
   return { option: 'Other', otherText: raw };
 }
 
-export function TrainingPurposeCell({ value, globalIdx, onEdit }: TrainingPurposeCellProps) {
+export function TrainingPurposeCell({ value, globalIdx, onEdit, disabled }: TrainingPurposeCellProps) {
   const parsed = parseValue(value);
   const [option, setOption] = useState(parsed.option);
   const [otherText, setOtherText] = useState(parsed.otherText);
@@ -36,7 +37,6 @@ export function TrainingPurposeCell({ value, globalIdx, onEdit }: TrainingPurpos
         setOtherText('');
         onEdit(globalIdx, 'training_purpose', selected);
       } else {
-        // Keep current otherText; only emit if there's already text
         if (otherText) onEdit(globalIdx, 'training_purpose', `Other: ${otherText}`);
       }
     },
@@ -53,8 +53,8 @@ export function TrainingPurposeCell({ value, globalIdx, onEdit }: TrainingPurpos
   );
 
   return (
-    <div className="bulk-training-purpose-cell">
-      <select value={option} onChange={handleOptionChange}>
+    <div className={`bulk-training-purpose-cell${disabled ? ' cell-conditional-disabled' : ''}`}>
+      <select value={option} onChange={handleOptionChange} disabled={disabled}>
         <option value="">Select...</option>
         {FIXED_OPTIONS.map((opt) => (
           <option key={opt} value={opt}>{opt}</option>
@@ -68,6 +68,7 @@ export function TrainingPurposeCell({ value, globalIdx, onEdit }: TrainingPurpos
           placeholder="Describe purpose..."
           value={otherText}
           onChange={handleOtherChange}
+          disabled={disabled}
         />
       )}
     </div>

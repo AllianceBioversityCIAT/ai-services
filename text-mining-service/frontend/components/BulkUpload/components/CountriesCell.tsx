@@ -111,8 +111,8 @@ export function CountriesCell({ values, geoscopeLevel, globalIdx, onEdit }: Coun
         <div key={country.code} className="geo-country-block">
           {/* Country chip */}
           <div className="geo-country-header">
-            <span className="bulk-chip geo-chip">
-              {getName(country.code)}
+            <span className="bulk-chip geo-chip" title={getName(country.code)}>
+              <span className="bulk-chip-label">{getName(country.code)}</span>
               <button
                 className="partner-chip-remove"
                 aria-label={`Remove ${country.code}`}

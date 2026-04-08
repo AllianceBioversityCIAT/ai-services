@@ -14,6 +14,8 @@ import { SdgCell } from './SdgCell';
 import { TrainingPurposeCell } from './TrainingPurposeCell';
 import { RegionsCell } from './RegionsCell';
 import { CountriesCell } from './CountriesCell';
+import { TraineeAffiliationCell } from './TraineeAffiliationCell';
+import { TraineeNationalityCell } from './TraineeNationalityCell';
 
 // Hoisted static SVGs (rendering-hoist-jsx)
 const StarSubmitSvg = (
@@ -105,7 +107,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     const strValue = value ? String(value) : '';
     return (
       <td>
-        <select data-index={globalIdx} data-field={col.key} value={strValue} onChange={handleChange}>
+        <select data-index={globalIdx} data-field={col.key} value={strValue} onChange={handleChange} disabled={isDisabled} className={isDisabled ? 'cell-conditional-disabled' : undefined}>
           <option value="">Select...</option>
           {(col.options ?? []).map((opt) => (
             <option key={opt} value={opt}>{opt}</option>
@@ -126,6 +128,8 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
           data-index={globalIdx}
           data-field={col.key}
           onChange={handleChange}
+          disabled={isDisabled}
+          className={isDisabled ? 'cell-conditional-disabled' : undefined}
         />
       </td>
     );
@@ -146,6 +150,24 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
           disabled={isDisabled}
           className={isDisabled ? 'cell-conditional-disabled' : undefined}
         />
+      </td>
+    );
+  }
+
+  if (col.type === 'affiliation') {
+    const raw = getNestedValue(result, col.key) as RawInstitution | null | undefined;
+    return (
+      <td>
+        <TraineeAffiliationCell value={raw} globalIdx={globalIdx} onEdit={onEdit} disabled={isDisabled} />
+      </td>
+    );
+  }
+
+  if (col.type === 'nationality') {
+    const raw = getNestedValue(result, col.key) as { code: string } | null | undefined;
+    return (
+      <td>
+        <TraineeNationalityCell value={raw} globalIdx={globalIdx} onEdit={onEdit} disabled={isDisabled} />
       </td>
     );
   }
@@ -177,6 +199,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
         <PartnersCell
           partners={partners}
           globalIdx={globalIdx}
+          field={col.key}
           onEdit={onEdit as (globalIdx: number, field: string, value: RawInstitution[]) => void}
         />
       </td>
@@ -191,6 +214,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
           value={raw !== undefined && raw !== null ? String(raw) : undefined}
           globalIdx={globalIdx}
           onEdit={onEdit as (globalIdx: number, field: string, value: string) => void}
+          disabled={isDisabled}
         />
       </td>
     );
