@@ -952,6 +952,15 @@
     font-style: italic;
 }
 
+/* Conditionally disabled inputs/textareas */
+.bulk-upload-container .cell-conditional-disabled {
+    background-color: #F3F4F6 !important;
+    color: #9CA3AF !important;
+    cursor: not-allowed !important;
+    border-color: #E5E7EB !important;
+    resize: none;
+}
+
 .bulk-upload-container .geo-cell {
     display: flex;
     flex-direction: column;
