@@ -11,6 +11,7 @@ import { useState } from 'react';
 import type { RawInstitution } from '../types';
 import { PartnersCell } from './PartnersCell';
 import { SdgCell } from './SdgCell';
+import { TrainingPurposeCell } from './TrainingPurposeCell';
 
 // Hoisted static SVGs (rendering-hoist-jsx)
 const StarSubmitSvg = (
@@ -56,7 +57,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
 
       if (
         e.target.tagName === 'TEXTAREA' &&
-        ['keywords', 'partners', 'countries', 'regions', 'evidences', 'sdg_targets', 'trainees_description'].includes(col.key)
+        ['keywords', 'partners', 'countries', 'regions', 'sdg_targets', 'trainees_description'].includes(col.key)
       ) {
         try { value = JSON.parse(value as string); } catch { /* keep as string */ }
       }
@@ -170,6 +171,54 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
           globalIdx={globalIdx}
           onEdit={onEdit as (globalIdx: number, field: string, value: RawInstitution[]) => void}
         />
+      </td>
+    );
+  }
+
+  if (col.type === 'training_purpose') {
+    const raw = getNestedValue(result, col.key);
+    return (
+      <td>
+        <TrainingPurposeCell
+          value={raw !== undefined && raw !== null ? String(raw) : undefined}
+          globalIdx={globalIdx}
+          onEdit={onEdit as (globalIdx: number, field: string, value: string) => void}
+        />
+      </td>
+    );
+  }
+
+  if (col.type === 'evidence_desc' || col.type === 'evidence_link') {
+    const raw = getNestedValue(result, col.key);
+    const evidences: { evidence_description: string; evidence_link: string }[] = Array.isArray(raw)
+      ? (raw as { evidence_description: string; evidence_link: string }[])
+      : typeof raw === 'string' && raw.trim().startsWith('[')
+        ? (() => { try { return JSON.parse(raw); } catch { return []; } })()
+        : [];
+    const items = col.type === 'evidence_desc'
+      ? evidences.map((e) => e.evidence_description).filter(Boolean)
+      : evidences.map((e) => e.evidence_link).filter(Boolean);
+    if (items.length === 0) return <td><span className="bulk-evidence-empty">—</span></td>;
+    if (items.length === 1) {
+      return (
+        <td>
+          {col.type === 'evidence_link'
+            ? <a href={items[0]} target="_blank" rel="noreferrer" className="bulk-evidence-link">{items[0]}</a>
+            : <span className="bulk-evidence-text">{items[0]}</span>}
+        </td>
+      );
+    }
+    return (
+      <td>
+        <ul className="bulk-evidence-list">
+          {items.map((item, i) => (
+            <li key={i}>
+              {col.type === 'evidence_link'
+                ? <a href={item} target="_blank" rel="noreferrer" className="bulk-evidence-link">{item}</a>
+                : <span className="bulk-evidence-text">{item}</span>}
+            </li>
+          ))}
+        </ul>
       </td>
     );
   }
@@ -372,11 +421,11 @@ export function ResultsTable({
               )}
               {RESULTS_TABLE_COLUMNS.slice(1).map((col) => {
                 if (col.readonly || col.type === 'status' || col.type === 'link') {
-                  return <th key={col.key}>{col.label}</th>;
+                  return <th key={col.key + col.type}>{col.label}</th>;
                 }
                 const hasFilter = activeFilters[col.key]?.length > 0;
                 return (
-                  <th key={col.key}>
+                  <th key={col.key + col.type}>
                     <div className="th-content">
                       <span>{col.label}</span>
                       <span
@@ -411,7 +460,7 @@ export function ResultsTable({
                   )}
                   {RESULTS_TABLE_COLUMNS.slice(1).map((col) => (
                     <TableCell
-                      key={col.key}
+                      key={col.key + col.type}
                       col={col}
                       result={result}
                       globalIdx={globalIdx}

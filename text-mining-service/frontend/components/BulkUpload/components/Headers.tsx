@@ -6,7 +6,7 @@ import { FileHeader } from './FileHeader';
 const PageHeader = (
   <>
     <div className="bulk-content-header">
-      <h1 className="bulk-page-title">Bulk upload – Text mining service</h1>
+      <h1 className="bulk-page-title">Bulk upload</h1>
       <p className="bulk-page-subtitle">
         Upload multiple Capacity Development entries within a specific bilateral.
       </p>

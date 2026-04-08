@@ -48,15 +48,15 @@ export function FileDropzone({ selectedFile, onFileSelect, onFileRemove }: FileD
   }, []);
 
   const handleDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
-    (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--bulk-gray-300)';
-    (e.currentTarget as HTMLDivElement).style.background = 'var(--bulk-gray-50)';
+    (e.currentTarget as HTMLDivElement).style.borderColor = '#BFDBFE';
+    (e.currentTarget as HTMLDivElement).style.background = 'var(--bulk-bg-light)';
   }, []);
 
   const handleDrop = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
       e.preventDefault();
-      (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--bulk-gray-300)';
-      (e.currentTarget as HTMLDivElement).style.background = 'var(--bulk-gray-50)';
+      (e.currentTarget as HTMLDivElement).style.borderColor = '#BFDBFE';
+      (e.currentTarget as HTMLDivElement).style.background = 'var(--bulk-bg-light)';
       const file = e.dataTransfer.files?.[0];
       if (file) {
         // Sync the native input so form state is consistent
@@ -97,25 +97,26 @@ export function FileDropzone({ selectedFile, onFileSelect, onFileRemove }: FileD
           hidden
           onChange={handleFileChange}
         />
-        <label htmlFor="bulkFileInput" className="bulk-dropzone-label">
-          <div className="bulk-dropzone-icon">{DropzonePlus}</div>
-          <p className="bulk-dropzone-text">Drag and drop your file here or click to upload</p>
-          <p className="bulk-dropzone-subtext">Accepted file formats: xlsx, xls</p>
-        </label>
-      </div>
 
-      {selectedFile !== null && (
-        <div className="bulk-file-preview-card">
-          <div className="bulk-file-preview-icon">{FileIconLarge}</div>
-          <div className="bulk-file-preview-info">
+        {selectedFile !== null ? (
+          /* File selected — show preview card inside the dropzone */
+          <div className="bulk-file-preview-card">
+            <div className="bulk-file-preview-icon">{FileIconLarge}</div>
             <div className="bulk-file-preview-name">{selectedFile.name}</div>
             <div className="bulk-file-preview-size">{formatFileSize(selectedFile.size)}</div>
+            <button className="bulk-file-remove-btn" type="button" onClick={handleRemove} aria-label="Remove file">
+              {RemoveIconSvg}
+            </button>
           </div>
-          <button className="bulk-file-remove-btn" type="button" onClick={handleRemove} aria-label="Remove file">
-            {RemoveIconSvg}
-          </button>
-        </div>
-      )}
+        ) : (
+          /* No file — show drag/drop prompt */
+          <label htmlFor="bulkFileInput" className="bulk-dropzone-label">
+            <div className="bulk-dropzone-icon">{DropzonePlus}</div>
+            <p className="bulk-dropzone-text">Drag and drop your file here or click to upload</p>
+            <p className="bulk-dropzone-subtext">Accepted file formats: xlsx, xls</p>
+          </label>
+        )}
+      </div>
     </div>
   );
 }

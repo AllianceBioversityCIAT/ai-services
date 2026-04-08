@@ -116,7 +116,7 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
     type: 'select',
     options: ['Individual training', 'Group training'],
   },
-  { key: 'training_purpose', label: 'Training Purpose', type: 'text' },
+  { key: 'training_purpose', label: 'Training Purpose', type: 'training_purpose' },
   { key: 'start_date', label: 'Start Date', type: 'text' },
   { key: 'end_date', label: 'End Date', type: 'text' },
   {
@@ -165,7 +165,8 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
   { key: 'trainees_description', label: 'Trainees Organizations', type: 'textarea' },
   { key: 'countries', label: 'Countries', type: 'textarea' },
   { key: 'regions', label: 'Regions', type: 'textarea' },
-  { key: 'evidences', label: 'Evidences', type: 'textarea' },
+  { key: 'evidences', label: 'Evidence Description', type: 'evidence_desc' },
+  { key: 'evidences', label: 'Evidence Link', type: 'evidence_link' },
   { key: 'trainee_nationality.code', label: 'Trainee Nationality Code', type: 'text' },
   {
     key: 'asset_ip_owner_id',
