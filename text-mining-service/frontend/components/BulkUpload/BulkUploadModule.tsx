@@ -104,11 +104,15 @@ export default function BulkUploadModule() {
 
   const handleSubmitToStar = useCallback(() => {
     if (!api.authToken || !currentFileName) return;
-    const selected = Array.from(selectedIndices).map((idx) => editedData[idx]);
+    const selected = Array.from(selectedIndices)
+      .map((idx) => editedData[idx])
+      .filter((result) => recordStatuses[String(result.id)]?.status !== 'complete');
+    if (selected.length === 0) return;
     api.submitToSTAR(selected, currentFileName, api.authToken, handleStatusUpdate, () => {
+      setSelectedIndices(new Set());
       setEditedData((prev) => [...prev]);
     });
-  }, [api, currentFileName, selectedIndices, editedData, handleStatusUpdate]);
+  }, [api, currentFileName, selectedIndices, editedData, handleStatusUpdate, recordStatuses]);
 
   const handleClearSelections = useCallback(() => {
     setSelectedIndices(new Set());

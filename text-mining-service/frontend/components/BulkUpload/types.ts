@@ -121,8 +121,9 @@ export type TabType = 'pending' | 'submitted';
 export interface ColumnDef {
   key: string;
   label: string;
-  type: 'checkbox' | 'text' | 'number' | 'textarea' | 'select' | 'status' | 'link' | 'chips' | 'partners' | 'sdg' | 'evidence_desc' | 'evidence_link' | 'training_purpose' | 'date';
+  type: 'checkbox' | 'text' | 'number' | 'textarea' | 'select' | 'status' | 'link' | 'chips' | 'partners' | 'sdg' | 'evidence_desc' | 'evidence_link' | 'training_purpose' | 'date' | 'countries' | 'regions';
   readonly?: boolean;
   required?: boolean;
   options?: string[];
+  tooltip?: string;
 }

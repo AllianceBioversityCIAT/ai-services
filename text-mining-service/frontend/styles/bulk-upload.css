@@ -945,6 +945,102 @@
     color: #B9B9B9;
 }
 
+/* Geo cells (Regions & Countries) */
+.bulk-upload-container .geo-readonly {
+    font-size: 13px;
+    color: #9CA3AF;
+    font-style: italic;
+}
+
+.bulk-upload-container .geo-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 160px;
+}
+
+.bulk-upload-container .geo-chip {
+    background: #EFF6FF;
+    color: #183F6F;
+    border: 1px solid #BFDBFE;
+}
+
+.bulk-upload-container .geo-country-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.bulk-upload-container .geo-country-header {
+    display: flex;
+    align-items: center;
+}
+
+.bulk-upload-container .geo-areas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding-left: 8px;
+    border-left: 2px solid #BFDBFE;
+    margin-left: 4px;
+}
+
+.bulk-upload-container .geo-area-chip {
+    background: #F0FDF4;
+    color: #166534;
+    border: 1px solid #BBF7D0;
+    font-size: 12px;
+}
+
+.bulk-upload-container .geo-area-invalid {
+    background: #FFF7ED;
+    color: #92400E;
+    border-color: #FCD34D;
+}
+
+.bulk-upload-container .geo-area-input-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.bulk-upload-container .geo-area-input {
+    width: 90px;
+    padding: 2px 6px;
+    border: 1px solid #D1D5DB;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #4B5563;
+    font-family: inherit;
+}
+
+.bulk-upload-container .geo-area-input:focus {
+    outline: none;
+    border-color: #1689CA;
+    box-shadow: 0 0 0 2px rgba(22,137,202,0.15);
+}
+
+.bulk-upload-container .geo-area-add-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid #D1D5DB;
+    background: #fff;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    color: #6B7280;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.bulk-upload-container .geo-area-add-btn:hover {
+    border-color: #1689CA;
+    color: #1689CA;
+}
+
 /* Training Purpose cell */
 .bulk-upload-container .bulk-training-purpose-cell {
     display: flex;
@@ -997,6 +1093,42 @@
     font-size: 13px;
     color: var(--bulk-primary);
     border-bottom: 1px solid var(--bulk-gray-300);
+}
+
+.bulk-upload-container .col-tooltip-icon {
+    cursor: help;
+    opacity: 0.7;
+    font-size: 12px;
+    position: relative;
+}
+
+.bulk-upload-container .col-tooltip-icon:hover {
+    opacity: 1;
+}
+
+.bulk-upload-container .col-tooltip-icon::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1F2937;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 400;
+    padding: 5px 9px;
+    border-radius: 6px;
+    white-space: normal;
+    width: 220px;
+    line-height: 1.4;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 100;
+}
+
+.bulk-upload-container .col-tooltip-icon:hover::after {
+    opacity: 1;
 }
 
 .bulk-upload-container .bulk-results-table td {
@@ -1173,7 +1305,9 @@
 }
 
 .bulk-upload-container .bulk-chip {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     padding: 3px 10px;
     background: #EFF6FF;
     color: #1D4ED8;
@@ -1349,11 +1483,12 @@
 
 .bulk-upload-container .partners-search-result {
     display: flex;
-    align-items: baseline;
+    flex-direction: column;
+    align-items: flex-start;
     padding: 6px 8px;
     border-radius: 6px;
     cursor: pointer;
-    gap: 0;
+    gap: 1px;
     font-size: 13px;
     color: #111827;
     overflow: hidden;
@@ -1366,6 +1501,12 @@
 .bulk-upload-container .partners-result-name {
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bulk-upload-container .partners-result-meta {
+    font-size: 11px;
+    color: #9CA3AF;
     white-space: nowrap;
 }
 
