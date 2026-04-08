@@ -8,10 +8,12 @@ import { getNestedValue, setNestedValue, getUniqueValues } from '../utils/tableH
 import { usePagination } from '../hooks/usePagination';
 import { FilterPanel } from './FilterPanel';
 import { useState } from 'react';
-import type { RawInstitution } from '../types';
+import type { RawInstitution, RawCountry } from '../types';
 import { PartnersCell } from './PartnersCell';
 import { SdgCell } from './SdgCell';
 import { TrainingPurposeCell } from './TrainingPurposeCell';
+import { RegionsCell } from './RegionsCell';
+import { CountriesCell } from './CountriesCell';
 
 // Hoisted static SVGs (rendering-hoist-jsx)
 const StarSubmitSvg = (
@@ -183,6 +185,53 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
           value={raw !== undefined && raw !== null ? String(raw) : undefined}
           globalIdx={globalIdx}
           onEdit={onEdit as (globalIdx: number, field: string, value: string) => void}
+        />
+      </td>
+    );
+  }
+
+  if (col.type === 'regions') {
+    const raw = getNestedValue(result, col.key);
+    const regionCodes: number[] = Array.isArray(raw)
+      ? (raw as unknown[]).map(r => typeof r === 'object' && r !== null && 'id' in r ? Number((r as {id:unknown}).id) : Number(r)).filter(n => !isNaN(n))
+      : typeof raw === 'string' && raw.trim().startsWith('[')
+        ? (() => { try { return (JSON.parse(raw) as unknown[]).map(Number).filter(n => !isNaN(n)); } catch { return []; } })()
+        : [];
+    const geoscopeLevel = String(getNestedValue(result, 'geoscope_level') ?? '');
+    const isRegional = geoscopeLevel === 'Regional' || geoscopeLevel === 'Global';
+    if (!isRegional) {
+      return <td><span className="geo-readonly">{regionCodes.length ? regionCodes.join(', ') : '—'}</span></td>;
+    }
+    return (
+      <td>
+        <RegionsCell
+          values={regionCodes}
+          globalIdx={globalIdx}
+          onEdit={onEdit as (globalIdx: number, field: string, value: number[]) => void}
+        />
+      </td>
+    );
+  }
+
+  if (col.type === 'countries') {
+    const raw = getNestedValue(result, col.key);
+    const countriesVal: RawCountry[] = Array.isArray(raw)
+      ? (raw as RawCountry[])
+      : typeof raw === 'string' && raw.trim().startsWith('[')
+        ? (() => { try { return JSON.parse(raw) as RawCountry[]; } catch { return []; } })()
+        : [];
+    const geoscopeLevel = String(getNestedValue(result, 'geoscope_level') ?? '');
+    const isGeoEditable = geoscopeLevel === 'National' || geoscopeLevel === 'Sub-national' || geoscopeLevel === 'Global';
+    if (!isGeoEditable) {
+      return <td><span className="geo-readonly">{countriesVal.length ? countriesVal.map(c => c.code).join(', ') : '—'}</span></td>;
+    }
+    return (
+      <td>
+        <CountriesCell
+          values={countriesVal}
+          geoscopeLevel={geoscopeLevel}
+          globalIdx={globalIdx}
+          onEdit={onEdit as (globalIdx: number, field: string, value: RawCountry[]) => void}
         />
       </td>
     );
@@ -443,7 +492,11 @@ export function ResultsTable({
                 return (
                   <th key={col.key + col.type}>
                     <div className="th-content">
-                      <span>{col.label}</span>
+                      <span>
+                        {col.tooltip
+                          ? <>{col.label.replace(' ⓘ', '')} <span className="col-tooltip-icon" data-tooltip={col.tooltip}>ⓘ</span></>
+                          : col.label}
+                      </span>
                       <span
                         className={`filter-icon${hasFilter ? ' filter-active' : ''}`}
                         title="Filter"
