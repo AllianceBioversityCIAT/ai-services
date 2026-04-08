@@ -38,6 +38,7 @@ interface PartnersCellProps {
   partners: RawInstitution[];
   globalIdx: number;
   onEdit: (globalIdx: number, field: string, value: RawInstitution[]) => void;
+  field?: string;
 }
 
 function chipClass(p: RawInstitution): string {
@@ -50,7 +51,7 @@ function isRemovable(_p: RawInstitution): boolean {
   return true;
 }
 
-export function PartnersCell({ partners, globalIdx, onEdit }: PartnersCellProps) {
+export function PartnersCell({ partners, globalIdx, onEdit, field = 'partners' }: PartnersCellProps) {
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
   const [allInstitutions, setAllInstitutions] = useState<ClarisaInstitution[]>(cachedInstitutions ?? []);
@@ -95,8 +96,8 @@ export function PartnersCell({ partners, globalIdx, onEdit }: PartnersCellProps)
   }, [query, allInstitutions]);
 
   const handleRemove = useCallback((idx: number) => {
-    onEdit(globalIdx, 'partners', partners.filter((_, i) => i !== idx));
-  }, [partners, globalIdx, onEdit]);
+    onEdit(globalIdx, field, partners.filter((_, i) => i !== idx));
+  }, [partners, globalIdx, onEdit, field]);
 
   const handleAdd = useCallback((inst: ClarisaInstitution) => {
     const already = partners.some(p => p.institution_id === String(inst.code));
@@ -106,19 +107,19 @@ export function PartnersCell({ partners, globalIdx, onEdit }: PartnersCellProps)
         institution_id: String(inst.code),
         similarity_score: 100,
       };
-      onEdit(globalIdx, 'partners', [...partners, newPartner]);
+      onEdit(globalIdx, field, [...partners, newPartner]);
     }
     setShowSearch(false);
     setQuery('');
-  }, [partners, globalIdx, onEdit]);
+  }, [partners, globalIdx, onEdit, field]);
 
   return (
     <div className="partners-cell">
       <div className="partners-chips">
         {partners.length === 0 && <span className="bulk-chips-empty">—</span>}
         {partners.map((p, i) => (
-          <span key={i} className={chipClass(p)} title={`Score: ${p.similarity_score}`}>
-            {p.institution_name}
+          <span key={i} className={chipClass(p)} title={p.institution_name}>
+            <span className="partner-chip-label">{p.institution_name}</span>
             {isRemovable(p) && (
               <button
                 className="partner-chip-remove"

@@ -85,8 +85,8 @@ export function RegionsCell({ values, globalIdx, onEdit }: RegionsCellProps) {
       <div className="bulk-chips">
         {values.length === 0 && <span className="bulk-chips-empty">—</span>}
         {values.map(code => (
-          <span key={code} className="bulk-chip geo-chip">
-            {getLabel(code)}
+          <span key={code} className="bulk-chip geo-chip" title={getLabel(code)}>
+            <span className="bulk-chip-label">{getLabel(code)}</span>
             <button
               className="partner-chip-remove"
               aria-label={`Remove region ${code}`}
