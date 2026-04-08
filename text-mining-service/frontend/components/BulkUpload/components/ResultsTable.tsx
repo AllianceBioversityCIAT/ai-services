@@ -241,6 +241,22 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     );
   }
 
+  if (col.type === 'date') {
+    const raw = getNestedValue(result, col.key);
+    const dateVal = raw ? String(raw) : '';
+    return (
+      <td>
+        <input
+          type="date"
+          defaultValue={dateVal}
+          data-index={globalIdx}
+          data-field={col.key}
+          onChange={handleChange}
+        />
+      </td>
+    );
+  }
+
   // text / readonly
   const value = getNestedValue(result, col.key) ?? '';
   if (col.readonly) {
