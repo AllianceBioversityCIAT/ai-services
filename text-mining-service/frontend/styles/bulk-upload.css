@@ -1026,6 +1026,26 @@
 .bulk-upload-container .affiliation-dot-low      { background-color: #F59E0B; }
 .bulk-upload-container .affiliation-dot-unmapped { background-color: #9CA3AF; }
 
+/* Staff search result rows */
+.bulk-upload-container .staff-search-result {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+}
+
+.bulk-upload-container .staff-result-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1F2937;
+    line-height: 1.3;
+}
+
+.bulk-upload-container .staff-result-email {
+    font-size: 11px;
+    color: #9CA3AF;
+    line-height: 1.3;
+}
+
 .bulk-upload-container .geo-cell {
     display: flex;
     flex-direction: column;
