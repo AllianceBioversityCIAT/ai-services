@@ -19,6 +19,8 @@ import { TraineeNationalityCell } from './TraineeNationalityCell';
 import { LanguageCell } from './LanguageCell';
 import { StaffCell } from './StaffCell';
 import type { RawStaff } from './StaffCell';
+import { EvidenceCell } from './EvidenceCell';
+import type { Evidence } from './EvidenceCell';
 
 // Hoisted static SVGs (rendering-hoist-jsx)
 const StarSubmitSvg = (
@@ -292,35 +294,20 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
 
   if (col.type === 'evidence_desc' || col.type === 'evidence_link') {
     const raw = getNestedValue(result, col.key);
-    const evidences: { evidence_description: string; evidence_link: string }[] = Array.isArray(raw)
-      ? (raw as { evidence_description: string; evidence_link: string }[])
+    const evidences: Evidence[] = Array.isArray(raw)
+      ? (raw as Evidence[])
       : typeof raw === 'string' && raw.trim().startsWith('[')
-        ? (() => { try { return JSON.parse(raw); } catch { return []; } })()
+        ? (() => { try { return JSON.parse(raw) as Evidence[]; } catch { return []; } })()
         : [];
-    const items = col.type === 'evidence_desc'
-      ? evidences.map((e) => e.evidence_description).filter(Boolean)
-      : evidences.map((e) => e.evidence_link).filter(Boolean);
-    if (items.length === 0) return <td><span className="bulk-evidence-empty">—</span></td>;
-    if (items.length === 1) {
-      return (
-        <td>
-          {col.type === 'evidence_link'
-            ? <a href={items[0]} target="_blank" rel="noreferrer" className="bulk-evidence-link">{items[0]}</a>
-            : <span className="bulk-evidence-text">{items[0]}</span>}
-        </td>
-      );
-    }
+    const field = col.type === 'evidence_desc' ? 'evidence_description' : 'evidence_link';
     return (
       <td>
-        <ul className="bulk-evidence-list">
-          {items.map((item, i) => (
-            <li key={i}>
-              {col.type === 'evidence_link'
-                ? <a href={item} target="_blank" rel="noreferrer" className="bulk-evidence-link">{item}</a>
-                : <span className="bulk-evidence-text">{item}</span>}
-            </li>
-          ))}
-        </ul>
+        <EvidenceCell
+          evidences={evidences}
+          field={field}
+          globalIdx={globalIdx}
+          onEdit={onEdit as (globalIdx: number, field: string, value: Evidence[]) => void}
+        />
       </td>
     );
   }

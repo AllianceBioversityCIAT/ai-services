@@ -909,31 +909,45 @@
 }
 
 /* Evidence columns */
-.bulk-upload-container .bulk-evidence-list {
-    margin: 0;
-    padding-left: 1.1rem;
-    list-style: disc;
+.bulk-upload-container .evidence-items {
     display: flex;
     flex-direction: column;
+    gap: 3px;
+    flex: 1;
+    min-width: 0;
+}
+
+.bulk-upload-container .evidence-item {
+    display: flex;
+    align-items: baseline;
     gap: 4px;
 }
 
-.bulk-upload-container .bulk-evidence-list li {
-    font-size: 13px;
-    color: #4B5563;
-    line-height: 1.4;
+.bulk-upload-container .evidence-num {
+    font-size: 11px;
+    color: #9CA3AF;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
 }
 
 .bulk-upload-container .bulk-evidence-text {
     font-size: 13px;
     color: #4B5563;
     line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 220px;
 }
 
 .bulk-upload-container .bulk-evidence-link {
     font-size: 13px;
     color: #1689CA;
-    word-break: break-all;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 220px;
+    display: block;
     line-height: 1.4;
 }
 
@@ -943,6 +957,79 @@
 
 .bulk-upload-container .bulk-evidence-empty {
     color: #B9B9B9;
+}
+
+/* Evidence edit popover */
+.bulk-upload-container .evidence-edit-popover {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 200;
+    background: #fff;
+    border: 1px solid #D1D5DB;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    padding: 10px;
+    min-width: 340px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bulk-upload-container .evidence-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.bulk-upload-container .evidence-edit-input {
+    flex: 1;
+    font-size: 13px;
+    border: 1px solid #D1D5DB;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #1F2937;
+    outline: none;
+    min-width: 0;
+}
+
+.bulk-upload-container .evidence-edit-input:focus {
+    border-color: #93C5FD;
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.15);
+}
+
+.bulk-upload-container .evidence-edit-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2px;
+}
+
+.bulk-upload-container .evidence-add-btn {
+    background: none;
+    border: 1px dashed #93C5FD;
+    border-radius: 4px;
+    color: #2563EB;
+    font-size: 12px;
+    padding: 3px 10px;
+    cursor: pointer;
+}
+
+.bulk-upload-container .evidence-add-btn:hover {
+    background: #EFF6FF;
+}
+
+.bulk-upload-container .evidence-save-btn {
+    background: #2563EB;
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 12px;
+    padding: 3px 12px;
+    cursor: pointer;
+}
+
+.bulk-upload-container .evidence-save-btn:hover {
+    background: #1D4ED8;
 }
 
 /* Geo cells (Regions & Countries) */
