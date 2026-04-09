@@ -17,6 +17,8 @@ import { CountriesCell } from './CountriesCell';
 import { TraineeAffiliationCell } from './TraineeAffiliationCell';
 import { TraineeNationalityCell } from './TraineeNationalityCell';
 import { LanguageCell } from './LanguageCell';
+import { StaffCell } from './StaffCell';
+import type { RawStaff } from './StaffCell';
 
 // Hoisted static SVGs (rendering-hoist-jsx)
 const StarSubmitSvg = (
@@ -179,6 +181,15 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     return (
       <td>
         <LanguageCell value={raw} globalIdx={globalIdx} authToken={authToken} onEdit={onEdit} disabled={isDisabled} />
+      </td>
+    );
+  }
+
+  if (col.type === 'staff') {
+    const raw = getNestedValue(result, col.key) as RawStaff | null | undefined;
+    return (
+      <td>
+        <StaffCell value={raw} globalIdx={globalIdx} field={col.key} authToken={authToken} onEdit={onEdit} disabled={isDisabled} />
       </td>
     );
   }

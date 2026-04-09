@@ -21,6 +21,10 @@ async function fetchCountries(): Promise<ClarisaCountry[]> {
       .then(data => {
         cachedCountries = data;
         return data;
+      })
+      .catch(err => {
+        fetchPromise = null; // allow retry on next open
+        throw err;
       });
   }
   return fetchPromise;
