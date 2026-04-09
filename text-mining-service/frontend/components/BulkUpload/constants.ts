@@ -145,7 +145,7 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
       'This is yet to be determined',
     ],
   },
-  { key: 'countries', label: 'Countries ⓘ', type: 'countries', tooltip: 'Sub-national area codes use ISO 3166-2 format' },
+  { key: 'countries', label: 'Countries', type: 'countries' },
   { key: 'regions', label: 'Regions', type: 'regions' },
   { key: 'evidences', label: 'Evidence Link', type: 'evidence_link' },
   { key: 'evidences', label: 'Evidence Description', type: 'evidence_desc' },

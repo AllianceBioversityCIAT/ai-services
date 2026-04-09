@@ -283,6 +283,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
           values={countriesVal}
           geoscopeLevel={geoscopeLevel}
           globalIdx={globalIdx}
+          authToken={authToken}
           onEdit={onEdit as (globalIdx: number, field: string, value: RawCountry[]) => void}
         />
       </td>
