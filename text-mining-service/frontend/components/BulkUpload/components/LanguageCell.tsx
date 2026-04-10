@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { STAR_BASE_URL } from '../constants';
 
-const LANGUAGES_URL = 'https://main-allianceindicatorstest.ciat.cgiar.org/api/tools/clarisa/languages';
+const LANGUAGES_URL = `${STAR_BASE_URL}/tools/clarisa/languages`;
 
 interface StarLanguage {
   id: number;

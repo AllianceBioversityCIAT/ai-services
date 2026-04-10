@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { RawCountry } from '../types';
+import { STAR_BASE_URL, CLARISA_BASE_URL } from '../constants';
 
-const CLARISA_COUNTRIES_URL = 'https://clarisatest-back.ciat.cgiar.org/api/countries';
+const CLARISA_COUNTRIES_URL = `${CLARISA_BASE_URL}/countries`;
 const SUBNATIONAL_URL = (iso: string) =>
-  `https://main-allianceindicatorstest.ciat.cgiar.org/api/tools/clarisa/sub-nationals/country/${iso}`;
+  `${STAR_BASE_URL}/tools/clarisa/sub-nationals/country/${iso}`;
 
 interface ClarisaCountry {
   isoAlpha2: string;

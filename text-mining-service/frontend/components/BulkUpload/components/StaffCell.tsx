@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { STAR_BASE_URL } from '../constants';
 
-const STAFF_URL = 'https://main-allianceindicatorstest.ciat.cgiar.org/api/agresso/staff';
+const STAFF_URL = `${STAR_BASE_URL}/agresso/staff`;
 
 interface StaffPerson {
   carnet: string;
