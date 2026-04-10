@@ -19,12 +19,8 @@ OPENSEARCH_INDEX = STAR["opensearch_index"]
 CL_OPENSEARCH_URL = CLARISA["opensearch_url"]
 CL_OPENSEARCH_USERNAME = CLARISA["opensearch_username"]
 CL_OPENSEARCH_PASSWORD = CLARISA["opensearch_password"]
-CL_OPENSEARCH_INDEX = CLARISA["opensearch_index"]
-
-INDEX_MAPPING = {
-    "institution": CL_OPENSEARCH_INDEX,
-    "staff": OPENSEARCH_INDEX
-}
+CL_OPENSEARCH_PROD_INDEX = CLARISA["opensearch_prod_index"]
+CL_OPENSEARCH_TEST_INDEX = CLARISA["opensearch_test_index"]
 
 
 def call_llm_validation(original_value: str, candidates: List[Dict], entry_type: str) -> Optional[Dict]:
@@ -138,13 +134,17 @@ def call_llm_validation(original_value: str, candidates: List[Dict], entry_type:
         return None
 
 
-def map_entries_to_ids(entries: List[MappingEntry]) -> List[MappingResult]:
+def map_entries_to_ids(entries: List[MappingEntry], environment: str = "prod") -> List[MappingResult]:
     results = []
 
     for entry in entries:
         try:
-            index = INDEX_MAPPING.get(entry.type)
-            if not index:
+            # Determine index based on type and environment
+            if entry.type == "staff":
+                index = OPENSEARCH_INDEX
+            elif entry.type == "institution":
+                index = CL_OPENSEARCH_TEST_INDEX if environment == "test" else CL_OPENSEARCH_PROD_INDEX
+            else:
                 raise ValueError(f"Unsupported type '{entry.type}'")
 
             if entry.type == "staff":
