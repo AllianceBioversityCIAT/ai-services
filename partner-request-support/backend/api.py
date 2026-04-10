@@ -1343,27 +1343,39 @@ async def respond_partner_request(
     
     ## Notes
     
-    - Request must be previously synced via `/api/sync-partner-requests`
+    - Partner request metadata is fetched live from CLARISA at the time of the call
     - Rejection requires justification text (auto-filled if not provided)
-    - Successful responses remove the request from the local cache
     - This operation is final and cannot be undone
     - Authentication token must have appropriate CLARISA permissions
     """
-    global synced_partner_requests
-    
     try:
-        partner_request = None
-        for pr in synced_partner_requests:
-            if pr.get('id') == request_id:
-                partner_request = pr
-                break
-        
+        logger.info(f"🔍 Fetching partner request {request_id} from CLARISA API...")
+        try:
+            fetch_response = requests.get(
+                CLARISA_API_URL,
+                headers={"Authorization": f"Bearer {auth_token}"},
+                timeout=30
+            )
+            fetch_response.raise_for_status()
+            all_requests = fetch_response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ Failed to fetch partner requests from CLARISA: {e}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Error fetching partner request from CLARISA API: {str(e)}"
+            )
+
+        partner_request = next(
+            (pr for pr in all_requests if pr.get('id') == request_id),
+            None
+        )
+
         if not partner_request:
             raise HTTPException(
                 status_code=404,
-                detail=f"Partner request {request_id} not found. Please sync first."
+                detail=f"Partner request {request_id} not found in CLARISA."
             )
-        
+
         payload = {
             "requestId": request_id,
             "userId": user_id,
@@ -1395,12 +1407,7 @@ async def respond_partner_request(
         response.raise_for_status()
         
         logger.info(f"✅ Successfully {action}ed partner request {request_id}")
-        
-        synced_partner_requests = [
-            pr for pr in synced_partner_requests 
-            if pr.get('id') != request_id
-        ]
-        
+
         return {
             "success": True,
             "action": action,
