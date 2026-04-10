@@ -9,3 +9,4 @@ export * from './PartnerTable';
 export * from './PartnerRow';
 export * from './ResultsSection';
 export * from './ModalDialog';
+export * from './ExcelPreviewModal';
