@@ -5,7 +5,7 @@ import { FileSpreadsheet, CheckCircle2, Database, Globe } from 'lucide-react';
 import { ProcessingStats } from '../types';
 
 interface StatsCardsProps {
-  stats: ProcessingStats;
+  stats: ProcessingStats | undefined | null;
 }
 
 interface StatCardProps {
@@ -97,6 +97,7 @@ const StatCard = ({ title, value, percentage, subtitle, color, icon }: StatCardP
 };
 
 export const StatsCards = ({ stats }: StatsCardsProps) => {
+  if (!stats) return null;
   return (
     <div
       style={{

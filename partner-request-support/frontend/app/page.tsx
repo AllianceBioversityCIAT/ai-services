@@ -30,6 +30,7 @@ export default function Home() {
     processExcelFile,
     processApiPartners,
     clearResults,
+    clearError,
     setResults,
   } = usePartnerProcessing();
 
