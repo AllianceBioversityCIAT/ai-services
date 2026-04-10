@@ -4,12 +4,13 @@ import certifi
 import logging
 import aiohttp
 from typing import Dict, Any, Optional
+from app.utils.config.config_util import IS_PROD
 
 
 class NotificationService:
     def __init__(self):
         """Initialize notification service"""
-        self.is_prod = os.getenv('IS_PROD', 'false').lower() == 'true'
+        self.is_prod = IS_PROD
         self.logger = logging.getLogger(__name__)
         self.slack_webhook = os.getenv('SLACK_WEBHOOK_URL')
 

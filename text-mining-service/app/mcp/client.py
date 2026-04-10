@@ -89,7 +89,7 @@ app = FastAPI(
     Key Features:
     - 📄 Multi-format document support (PDF, DOCX, Excel, PowerPoint, TXT)
     - 🔍 Semantic content extraction with vector embeddings
-    - 🤖 AI-powered analysis using AWS Bedrock (Claude 3 Sonnet)
+    - 🤖 AI-powered analysis using AWS Bedrock (Claude 4.5 Sonnet)
     - 🔐 Authentication integration
     - 📊 Excel row-level processing for structured data
     - 🚀 Real-time processing with MCP protocol
@@ -167,13 +167,13 @@ async def get_auth_token():
 @app.get("/ui", tags=["AICCRA Project"])
 async def serve_ui_alt():
     """Alternative endpoint for the UI"""
-    return FileResponse('interface/index.html')
+    return FileResponse('interface/aiccra_mining/index.html')
 
 
 @app.get("/bulk-upload", tags=["STAR Project"])
 async def serve_bulk_upload():
     """Serve the bulk upload interface"""
-    return FileResponse('interface/bulk_upload.html')
+    return FileResponse('interface/bulk_upload/bulk_upload.html')
 
 
 @app.get("/aiccra/prompt", tags=["AICCRA Project"])
@@ -471,7 +471,7 @@ async def update_record_status(data: RecordStatusUpdate):
           1. Document validation and upload (if file provided)
           2. Authentication verification  
           3. Document chunking and vectorization
-          4. AI analysis using Claude 3 Sonnet
+          4. AI analysis using Claude 4.5 Sonnet
           5. Structured data extraction
           
           Supported File Types:
@@ -804,7 +804,7 @@ async def bulk_upload_capdev_endpoint(
           Processing Flow:
           1. Document validation and upload (if file provided)
           2. Document chunking and vectorization
-          3. AI analysis using Claude 4 Sonnet with custom or default prompt
+          3. AI analysis using Claude 4.5 Sonnet with custom or default prompt
           4. Structured data extraction
           
           Supported File Types:

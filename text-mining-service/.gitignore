@@ -193,9 +193,13 @@ faiss/
 *.csv
 *.jsonl
 *.xlsx
-*.ts
 
 # Data logs
 data/logs/
+
+# Interface files
 interface_1/
 interface_2/
+interface/bulk_upload/bulk_upload_embedded.html
+interface/bulk_upload/bulk_upload_embedded.js
+interface/bulk_upload/star_mock.html

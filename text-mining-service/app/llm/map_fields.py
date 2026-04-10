@@ -2,6 +2,7 @@ import time
 import requests
 import threading
 from app.utils.logger.logger_util import get_logger
+from app.utils.config.config_util import IS_PROD
 
 logger = get_logger()
 
@@ -44,6 +45,11 @@ def map_fields_with_opensearch(mining_result, mapping_service_url, max_retries=1
         if trainee_name := trainee.get("institution_name"):
             entries.append({"value": trainee_name, "type": "institution"})
 
+    # Map organizations for Innovation Development
+    for org in mining_result.get("organizations_detailed", []):
+        if org_name := org.get("institution_name"):
+            entries.append({"value": org_name, "type": "institution"})
+
     if not entries:
         return mining_result
 
@@ -75,9 +81,10 @@ def map_fields_with_opensearch(mining_result, mapping_service_url, max_retries=1
         try:
             logger.info(f"🔗 Attempting mapping (attempt {attempt + 1}/{max_retries}) for {len(entries_to_map)} new entries")
 
+            environment = "prod" if IS_PROD else "test"
             response = requests.post(
                 f"{mapping_service_url}/map/fields",
-                json={"entries": entries_to_map},
+                json={"entries": entries_to_map, "environment": environment},
                 timeout=600
             )
             response.raise_for_status()
@@ -163,6 +170,15 @@ def _apply_mapped_results(mining_result, mapped_dict):
                 trainee["institution_id"] = m.get("mapped_id")
                 trainee["similarity_score"] = m.get("score", 0)
 
+    # Apply mapping to organizations
+    for org in mining_result.get("organizations_detailed", []):
+        if org_name := org.get("institution_name"):
+            key = (org_name, "institution")
+            if key in mapped_dict:
+                m = mapped_dict[key]
+                org["institution_id"] = m.get("mapped_id")
+                org["similarity_score"] = m.get("score", 0)
+
 
 def _apply_default_values(mining_result):
     if "main_contact_person" in mining_result and mining_result["main_contact_person"].get("name"):
@@ -196,3 +212,11 @@ def _apply_default_values(mining_result):
                 trainee["institution_id"] = None
             if "similarity_score" not in trainee:
                 trainee["similarity_score"] = 0
+
+    # Apply default values to organizations if mapping failed
+    for org in mining_result.get("organizations_detailed", []):
+        if org.get("institution_name"):
+            if "institution_id" not in org:
+                org["institution_id"] = None
+            if "similarity_score" not in org:
+                org["similarity_score"] = 0

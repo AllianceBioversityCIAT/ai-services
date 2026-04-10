@@ -4,8 +4,6 @@ import logging
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
-is_prod = os.getenv('IS_PROD', 'false').lower() == 'true'
-
 logs_dir = Path("/tmp/logs")
 # logs_dir = Path(__file__).parent.parent.parent.parent / "data" / "logs"
 

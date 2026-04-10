@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, MAPPING_URL
 from app.utils.prompt.bulk_upload_capdev_prompt import PROMPT_BULK_UPLOAD_CAPDEV
 from app.llm.vectorize import get_embedding, store_temp_embeddings, get_relevant_chunk
-from app.llm.mining import initialize_reference_data, split_text, invoke_model, is_valid_json
+from app.llm.mining import initialize_reference_data, split_text, invoke_model, is_valid_json, extract_json_from_markdown
 from app.llm.map_fields import map_fields_with_opensearch, clear_mapping_cache, get_cache_stats
 
 logger = get_logger()
@@ -53,8 +53,12 @@ def process_single_batch(batch_chunks, prompt, batch_number, all_reference_data,
         
         logger.info(f"✅ [Thread-{batch_number}] Batch {batch_number} processed successfully")
         
-        if is_valid_json(response_text):
-            parsed_result = json.loads(response_text)
+        extracted_json = extract_json_from_markdown(response_text)
+        if extracted_json != response_text:
+            logger.info(f"🔍 [Thread-{batch_number}] JSON extracted from markdown code blocks")
+        
+        if is_valid_json(extracted_json):
+            parsed_result = json.loads(extracted_json)
             
             if isinstance(parsed_result, dict) and "results" in parsed_result:
                 for i, result in enumerate(parsed_result["results"]):
@@ -111,35 +115,7 @@ def process_single_batch(batch_chunks, prompt, batch_number, all_reference_data,
             return parsed_result
         
         else:
-            logger.warning(f"⚠️ [Thread-{batch_number}] Batch {batch_number} response is not valid JSON")
-            cleaned_response = response_text.strip()
-            if cleaned_response.startswith('```json'):
-                cleaned_response = cleaned_response.replace('```json', '').replace('```', '').strip()
-            
-            if is_valid_json(cleaned_response):
-                parsed_result = json.loads(cleaned_response)
-                if isinstance(parsed_result, dict) and "results" in parsed_result:
-                    logger.info(f"📊 [Thread-{batch_number}] Found {len(parsed_result['results'])} results in cleaned batch {batch_number}")
-                    
-                    for i, result in enumerate(parsed_result["results"]):
-                        if isinstance(result, dict):
-                            result_title = result.get("title", f"Cleaned Result {i+1}")
-                            logger.info(f"🔍 [Thread-{batch_number}] Processing cleaned result {i+1}: '{result_title}'")
-                            
-                            result["batch_number"] = batch_number
-
-                            if mapping_service_url:
-                                try:
-                                    logger.info(f"🔗 [Thread-{batch_number}] Starting field mapping for cleaned '{result_title}'...")
-                                    result = map_fields_with_opensearch(result, mapping_service_url)
-                                    logger.info(f"✅ [Thread-{batch_number}] Field mapping completed for cleaned '{result_title}'")
-                                except Exception as map_error:
-                                    logger.error(f"❌ [Thread-{batch_number}] Field mapping FAILED for cleaned '{result_title}': {str(map_error)}")
-                            else:
-                                logger.warning(f"⚠️ Field mapping disabled (no mapping_service_url provided)")
-
-                return parsed_result
-            
+            logger.error(f"❌ [Thread-{batch_number}] Failed to parse JSON even after markdown extraction")
             return {"results": [{"text": response_text, "batch": batch_number, "parsing_error": True}]}
             
     except Exception as e:
@@ -306,7 +282,8 @@ def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAP
             Do the following:\n{prompt}
             """
 
-            response_text = invoke_model(query, max_tokens=4000)
+            response_text = invoke_model(query, max_tokens=15000)
+            extracted_json = extract_json_from_markdown(response_text)
 
             end_time = time.time()
             elapsed_time = end_time - start_time
@@ -316,7 +293,7 @@ def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAP
             return {
                 "content": response_text,
                 "time_taken": f"{elapsed_time:.2f}",
-                "json_content": json.loads(response_text) if is_valid_json(response_text) else {"text": response_text}
+                "json_content": json.loads(extracted_json) if is_valid_json(extracted_json) else {"text": response_text}
             }
 
     except Exception as e:
