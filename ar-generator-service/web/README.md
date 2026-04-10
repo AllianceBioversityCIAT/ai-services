@@ -7,7 +7,7 @@ This web interface provides an easy and intuitive way to generate AICCRA reports
 Once the FastAPI server is running, you can access the web interface at:
 
 - **Local development**: `http://localhost:8000/web/`
-- **Production**: `https://ia.prms.cgiar.org/web/`
+- **Production**: `https://qg53uhgrn7bpofn5eawcuvl62y0akymf.lambda-url.us-east-1.on.aws/web/`
 
 ## ✨ Features
 
