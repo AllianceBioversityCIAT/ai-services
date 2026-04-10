@@ -17,5 +17,6 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "python-multipart",
-    "langdetect"
+    "langdetect",
+    "mangum"
 ]

@@ -1,0 +1,102 @@
+# Partner Request Support - Backend API (SAM)
+# Lambda (FastAPI + Mangum) + API Gateway HTTP API. Tags: Project=PRMS, Functionality=partner-request.
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Partner Request Support API - Lambda + API Gateway (PRMS / partner-request)
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+    Description: Environment (dev | prod)
+  CorsAllowOrigin:
+    Type: String
+    Default: "*"
+    Description: CORS allowed origins (comma-separated)
+  LogLevel:
+    Type: String
+    Default: INFO
+    AllowedValues: [DEBUG, INFO, WARNING, ERROR]
+
+# Do not set Runtime/Handler/Layers in Globals when using PackageType: Image (container).
+# The runtime comes from the Docker image (Dockerfile uses python3.13 base).
+Globals:
+  Function:
+    Timeout: 120
+    MemorySize: 1024
+    Tags:
+      Project: PRMS
+      Functionality: partner-request
+
+Resources:
+  PartnerRequestHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      # Omit Name: avoids collisions with an existing HTTP API of the same display name in the account.
+      Description: !Sub "Partner Request Support HTTP API (${Environment})"
+      CorsConfiguration:
+        AllowOrigins: !Split [",", !Ref CorsAllowOrigin]
+        AllowMethods: GET, POST, PUT, OPTIONS
+        AllowHeaders: "*"
+        AllowCredentials: true
+      Tags:
+        Project: PRMS
+        Functionality: partner-request
+        Environment: !Ref Environment
+
+  PartnerRequestApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ./
+      DockerTag: !Sub "${Environment}-${AWS::StackName}"
+    Properties:
+      PackageType: Image
+      # No explicit FunctionName: avoids EarlyValidation ResourceExistenceCheck when the name
+      # already exists (e.g. orphaned Lambda from a failed stack). Physical name = logical ID + random suffix.
+      Description: Partner Request Support REST API (FastAPI + Mangum)
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          LOG_LEVEL: !Ref LogLevel
+          CORS_ORIGINS: !Ref CorsAllowOrigin
+      Events:
+        ApiRoot:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PartnerRequestHttpApi
+            Path: /
+            Method: ANY
+        ApiProxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PartnerRequestHttpApi
+            Path: /{proxy+}
+            Method: ANY
+      Tags:
+        Project: PRMS
+        Functionality: partner-request
+        Environment: !Ref Environment
+
+  PartnerRequestApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PartnerRequestApiFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PartnerRequestHttpApi}/*"
+
+# Outputs without CloudFormation Export: export names must be unique per region/account.
+# A failed stack (e.g. partner-request-support-api-null) can hold exports like *-dev and block new stacks.
+# Jenkins/CLI use describe-stacks by OutputKey; use Fn::ImportValue only if you add a uniquely named Export.
+Outputs:
+  ApiFunctionName:
+    Description: Lambda function physical name (use for CLI/Jenkins after deploy)
+    Value: !Ref PartnerRequestApiFunction
+  ApiEndpoint:
+    Description: API Gateway HTTP API endpoint URL
+    Value: !Sub "https://${PartnerRequestHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  ApiFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt PartnerRequestApiFunction.Arn

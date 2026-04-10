@@ -1,0 +1,126 @@
+# Partner Request Support - Frontend (S3 + CloudFront). Tags: Project=PRMS, Functionality=partner-request
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Partner Request Support Frontend - S3 + CloudFront (PRMS / partner-request)
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+    Description: Environment (dev | prod)
+  DomainName:
+    Type: String
+    Default: ""
+    Description: Optional custom domain for CloudFront. Leave empty for *.cloudfront.net.
+  CertificateArn:
+    Type: String
+    Default: ""
+    Description: Optional ACM certificate ARN (us-east-1). Leave empty if no custom domain.
+
+Conditions:
+  UseCustomDomain: !Not [!Equals [!Ref DomainName, ""]]
+
+Resources:
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "partner-request-support-frontend-${Environment}-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: PRMS
+        - Key: Functionality
+          Value: partner-request
+        - Key: Environment
+          Value: !Ref Environment
+
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub "OAI partner-request-support frontend ${Environment}"
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowCloudFrontOAI
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOriginAccessIdentity}"
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "Partner Request Support Frontend - ${Environment}"
+        DefaultRootObject: index.html
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt FrontendBucket.DomainName
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+        # Sin CachePolicyId, CloudFormation/API exige ForwardedValues (modo legacy).
+        # Política administrada "CachingOptimized" (IDs fijos globales CloudFront).
+        # Ver: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 300
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 300
+        ViewerCertificate: !If
+          - UseCustomDomain
+          - AcmCertificateArn: !Ref CertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - CloudFrontDefaultCertificate: true
+        Aliases: !If
+          - UseCustomDomain
+          - !Ref DomainName
+          - !Ref AWS::NoValue
+      Tags:
+        - Key: Project
+          Value: PRMS
+        - Key: Functionality
+          Value: partner-request
+        - Key: Environment
+          Value: !Ref Environment
+
+# Sin CloudFormation Export: el nombre de export es único por cuenta/región; otro stack que
+# ya exporte PartnerRequestFrontendBucket-dev hace fallar el create y deja ROLLBACK_COMPLETE.
+# Jenkins/CLI usan describe-stacks por OutputKey, no Fn::ImportValue.
+Outputs:
+  FrontendBucketName:
+    Description: S3 bucket for static assets
+    Value: !Ref FrontendBucket
+  CloudFrontDistributionId:
+    Description: CloudFront distribution ID
+    Value: !Ref CloudFrontDistribution
+  CloudFrontDomainName:
+    Description: CloudFront domain
+    Value: !GetAtt CloudFrontDistribution.DomainName
+  FrontendURL:
+    Description: Frontend URL (https)
+    Value: !Sub
+      - "https://${DomainName}"
+      - DomainName: !GetAtt CloudFrontDistribution.DomainName
+

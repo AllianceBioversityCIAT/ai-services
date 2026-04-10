@@ -100,7 +100,6 @@ Be thorough - include everything that might be relevant.
         if website and str(website).strip():
             domain = _extract_domain(str(website).strip())
             if domain:
-                # Valid domain - use focused search
                 tools = [{
                     "type": "web_search",
                     "filters": {
@@ -110,7 +109,6 @@ Be thorough - include everything that might be relevant.
                 search_type = "focused"
                 logger.info(f"   Using focused search on domain: {domain}")
             else:
-                # Invalid domain - fall back to open search
                 logger.info(f"   Invalid website domain '{website}' - using open search")
                 search_type = "open"
         
@@ -138,7 +136,6 @@ Be thorough - include everything that might be relevant.
     except Exception as e:
         error_message = str(e)
         
-        # Make error messages more user-friendly
         if "Invalid domain" in error_message or "invalid_request_error" in error_message:
             user_message = f"Could not perform web search: The website URL provided appears to be invalid. Performing general web search instead."
             logger.warning(f"⚠️  Invalid domain for '{name}': {website}")
@@ -312,19 +309,15 @@ def _extract_domain(website: str) -> str:
         return ""
     
     try:
-        # Clean the URL
         domain = re.sub(r'^https?://', '', website)
         domain = re.sub(r'^www\.', '', domain)
         domain = domain.split('/')[0]
         domain = domain.split(':')[0]
         
-        # Validate domain format
-        # Must have at least one dot and valid characters
         if '.' not in domain:
             logger.warning(f"⚠️  Invalid domain format (no TLD): {website}")
             return ""
         
-        # Check for valid domain characters (alphanumeric, dots, hyphens)
         if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$', domain):
             logger.warning(f"⚠️  Invalid domain format (invalid characters): {website}")
             return ""

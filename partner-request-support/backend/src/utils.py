@@ -5,25 +5,6 @@ import re
 import unicodedata
 
 
-def clean_text_basic(text):
-    """
-    Basic cleaning for embeddings (keeps accents, uppercase)
-    Only normalizes spaces and trims
-    
-    Args:
-        text: Text to clean
-        
-    Returns:
-        str: Text with basic cleaning
-    """
-    if not isinstance(text, str):
-        return ""
-    
-    text = re.sub(r"\s+", " ", text).strip()
-    
-    return text
-
-
 def clean_text_for_matching(text):
     """
     Full normalization for string matching (RapidFuzz)
@@ -49,13 +30,6 @@ def clean_text_for_matching(text):
     text = re.sub(r"\s+", " ", text).strip()
 
     return text
-
-
-def clean_text(text):
-    """
-    Alias for clean_text_for_matching (compatibility)
-    """
-    return clean_text_for_matching(text)
 
 
 def safe_str(value):

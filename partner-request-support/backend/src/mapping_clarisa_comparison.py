@@ -201,7 +201,7 @@ def search_institution_for_excel(partner_name, acronym=None):
             fuzz_translated = fuzz.ratio(normalized_query_translated, normalized_candidate) / 100
         
         fuzz_name = max(fuzz_original, fuzz_translated)
-        used_translation = fuzz_translated > fuzz_original  # Track if translation helped
+        used_translation = fuzz_translated > fuzz_original
         
         fuzz_acronym = 0
         if acronym and candidate.get('acronym'):
@@ -226,10 +226,9 @@ def search_institution_for_excel(partner_name, acronym=None):
             'fuzz_name_score': fuzz_name,
             'fuzz_acronym_score': fuzz_acronym,
             'final_score': combined_score,
-            'used_translation': used_translation  # Indicates if translated version had better fuzzy match
+            'used_translation': used_translation
         }
         
-        # Log when translation significantly improved the match
         if used_translation and (fuzz_translated - fuzz_original) > 0.2:
             logger.debug(f"   🌐 Translation improved fuzzy match: {fuzz_original:.2f} → {fuzz_translated:.2f} for '{candidate['name']}'")
         
@@ -239,7 +238,6 @@ def search_institution_for_excel(partner_name, acronym=None):
             best_score = combined_score
             best_match = candidate_data
     
-    # Sort candidates by final score (descending)
     processed_candidates.sort(key=lambda x: x['final_score'], reverse=True)
     
     return {
@@ -314,7 +312,6 @@ def process_partners_to_json(df):
                 best_match = search_result.get('best_match')
                 all_candidates = search_result.get('all_candidates', [])
                 
-                # Add translation info
                 partner_data['translation_info'] = {
                     'was_translated': search_result.get('translation_used', False),
                     'original_query': search_result.get('original_query'),
@@ -486,8 +483,8 @@ def run_pipeline(excel_path):
         'fuzz_name_score': [],
         'fuzz_acronym_score': [],
         'final_score': [],
-        'match_quality': [],  # 'excellent', 'good', 'fair', 'no_match'
-        'web_search_result': []  # Formatted web search result (single column)
+        'match_quality': [],
+        'web_search_result': []
     }
     
     stats = {
@@ -630,7 +627,6 @@ def run_pipeline(excel_path):
         logger.info(f"   🌐 Web search:         {stats['web_search_success']}/{stats['web_search_attempted']} successful")
     logger.info(f"   ⚠️  Errors:             {stats['errors']:,}")
     
-    # Breakdown by quality
     if stats['matched'] > 0:
         excellent = sum(1 for q in results['match_quality'] if q == 'excellent')
         good = sum(1 for q in results['match_quality'] if q == 'good')
@@ -641,7 +637,6 @@ def run_pipeline(excel_path):
         logger.info(f"   Good (≥0.70):      {good:,} ({good/stats['matched']*100:.1f}%)")
         logger.info(f"   Fair (≥0.50):      {fair:,} ({fair/stats['matched']*100:.1f}%)")
     
-    # Average scores
     if stats['matched'] > 0:
         matched_scores = [s for s, q in zip(results['final_score'], results['match_quality']) if q != 'no_match' and q != 'error']
         avg_score = sum(matched_scores) / len(matched_scores) if matched_scores else 0

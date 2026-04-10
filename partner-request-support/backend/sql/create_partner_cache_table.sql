@@ -1,7 +1,7 @@
 -- Table for caching processed partner request results
 -- This prevents re-processing the same partner requests multiple times
 
-CREATE TABLE IF NOT EXISTS partner_request_cache_test (
+CREATE TABLE IF NOT EXISTS partner_request_cache_prod (
     request_id BIGINT PRIMARY KEY,
     partner_name TEXT NOT NULL,
     acronym TEXT,
@@ -18,9 +18,9 @@ CREATE TABLE IF NOT EXISTS partner_request_cache_test (
 );
 
 -- Index for faster lookups
-CREATE INDEX IF NOT EXISTS idx_partner_cache_request_id ON partner_request_cache_test(request_id);
-CREATE INDEX IF NOT EXISTS idx_partner_cache_processed_at ON partner_request_cache_test(processed_at);
-CREATE INDEX IF NOT EXISTS idx_partner_cache_match_quality ON partner_request_cache_test(match_quality);
+CREATE INDEX IF NOT EXISTS idx_partner_cache_request_id ON partner_request_cache_prod(request_id);
+CREATE INDEX IF NOT EXISTS idx_partner_cache_processed_at ON partner_request_cache_prod(processed_at);
+CREATE INDEX IF NOT EXISTS idx_partner_cache_match_quality ON partner_request_cache_prod(match_quality);
 
 -- Trigger to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_partner_cache_updated_at()
@@ -32,14 +32,14 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trigger_update_partner_cache_updated_at
-    BEFORE UPDATE ON partner_request_cache_test
+    BEFORE UPDATE ON partner_request_cache_prod
     FOR EACH ROW
     EXECUTE FUNCTION update_partner_cache_updated_at();
 
 -- Add comments for documentation
-COMMENT ON TABLE partner_request_cache_test IS 'Cache table for processed partner requests to avoid re-processing';
-COMMENT ON COLUMN partner_request_cache_test.request_id IS 'Partner request ID from CLARISA API';
-COMMENT ON COLUMN partner_request_cache_test.clarisa_match IS 'Best match from CLARISA with all scores';
-COMMENT ON COLUMN partner_request_cache_test.top_candidates IS 'Top 5 candidate matches with scores';
-COMMENT ON COLUMN partner_request_cache_test.web_search IS 'Web search results if performed';
-COMMENT ON COLUMN partner_request_cache_test.api_data IS 'Original API data for reference';
+COMMENT ON TABLE partner_request_cache_prod IS 'Cache table for processed partner requests to avoid re-processing';
+COMMENT ON COLUMN partner_request_cache_prod.request_id IS 'Partner request ID from CLARISA API';
+COMMENT ON COLUMN partner_request_cache_prod.clarisa_match IS 'Best match from CLARISA with all scores';
+COMMENT ON COLUMN partner_request_cache_prod.top_candidates IS 'Top 5 candidate matches with scores';
+COMMENT ON COLUMN partner_request_cache_prod.web_search IS 'Web search results if performed';
+COMMENT ON COLUMN partner_request_cache_prod.api_data IS 'Original API data for reference';
