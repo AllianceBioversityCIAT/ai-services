@@ -21,13 +21,8 @@ export const partnerService = {
     const response = await axios.post<ProcessingResults>(
       `${getApiUrl()}/api/process-partners`,
       formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
+      { headers: { 'Content-Type': 'multipart/form-data' } }
     );
-
     return response.data;
   },
 
