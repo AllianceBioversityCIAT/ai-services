@@ -1,11 +1,13 @@
 import type { ColumnDef } from './types';
 
-export const API_BASE_URL = 'http://localhost:8000';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_MINING_API_BASE_URL;
 export const S3_BUCKET = 'ai-services-ibd';
 export const FOLDER_PATH = 'star/text-mining/files/test/bulk_upload/';
-export const ENVIRONMENT_URL = 'https://management-allianceindicatorstest.ciat.cgiar.org/api/';
-export const STAR_API_URL =
-  'https://main-allianceindicatorstest.ciat.cgiar.org/api/results/ai/formalize/bulk';
+export const STAR_BASE_URL = process.env.NEXT_PUBLIC_STAR_API_BASE_URL;
+export const MANAGEMENT_BASE_URL = process.env.NEXT_PUBLIC_MANAGEMENT_API_BASE_URL;
+export const CLARISA_BASE_URL = process.env.NEXT_PUBLIC_CLARISA_API_BASE_URL;
+export const ENVIRONMENT_URL = `${MANAGEMENT_BASE_URL}/`;
+export const STAR_API_URL = `${STAR_BASE_URL}/results/ai/formalize/bulk`;
 
 // Hoisted: module-level maps (js-index-maps, js-cache-function-results)
 export const ASSET_IP_OWNER_NAME_TO_ID: Record<string, number> = {

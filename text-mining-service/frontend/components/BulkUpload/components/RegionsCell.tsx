@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { CLARISA_BASE_URL } from '../constants';
 
-const CLARISA_REGIONS_URL = 'https://clarisatest-back.ciat.cgiar.org/api/regions/un-regions';
+const CLARISA_REGIONS_URL = `${CLARISA_BASE_URL}/regions/un-regions`;
 
 interface ClarisaRegion {
   um49Code: number;

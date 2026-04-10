@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { CLARISA_BASE_URL } from '../constants';
 
-const CLARISA_COUNTRIES_URL = 'https://clarisatest-back.ciat.cgiar.org/api/countries';
+const CLARISA_COUNTRIES_URL = `${CLARISA_BASE_URL}/countries`;
 
 interface ClarisaCountry {
   isoAlpha2: string;

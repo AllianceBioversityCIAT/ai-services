@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { RawInstitution } from '../types';
+import { CLARISA_BASE_URL } from '../constants';
 
-const CLARISA_INSTITUTIONS_URL = 'https://clarisatest-back.ciat.cgiar.org/api/institutions';
+const CLARISA_INSTITUTIONS_URL = `${CLARISA_BASE_URL}/institutions`;
 
 interface ClarisaCountryOffice {
   name: string;
