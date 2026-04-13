@@ -193,6 +193,7 @@ faiss/
 *.csv
 *.jsonl
 *.json
+test_output.md
 
 # Chat and data logs
 chat_logs/
