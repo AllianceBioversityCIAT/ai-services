@@ -1,5 +1,6 @@
 // AICCRA Report Generator Web App
 const API_BASE_URL = 'https://qg53uhgrn7bpofn5eawcuvl62y0akymf.lambda-url.us-east-1.on.aws';
+// const API_BASE_URL = 'http://localhost:8000';
 
 // Tracking configuration
 const AI_FEEDBACK_URL = 'https://i8s5i8c21i.execute-api.us-east-1.amazonaws.com';
@@ -83,10 +84,70 @@ function formatMarkdown(text) {
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
 }
 
+function markdownToHtml(text) {
+    if (!text) return '';
+
+    const lines = text.split('\n');
+    const htmlLines = [];
+    let inList = false;
+
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+
+        line = line
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+
+        if (/^### (.+)/.test(line)) {
+            if (inList) { htmlLines.push('</ul>'); inList = false; }
+            htmlLines.push(`<h3>${line.replace(/^### /, '')}</h3>`);
+        } else if (/^## (.+)/.test(line)) {
+            if (inList) { htmlLines.push('</ul>'); inList = false; }
+            htmlLines.push(`<h2>${line.replace(/^## /, '')}</h2>`);
+        } else if (/^# (.+)/.test(line)) {
+            if (inList) { htmlLines.push('</ul>'); inList = false; }
+            htmlLines.push(`<h1>${line.replace(/^# /, '')}</h1>`);
+        } else if (/^- (.+)/.test(line)) {
+            if (!inList) { htmlLines.push('<ul>'); inList = true; }
+            htmlLines.push(`<li>${line.replace(/^- /, '')}</li>`);
+        } else if (line.trim() === '') {
+            if (inList) { htmlLines.push('</ul>'); inList = false; }
+            htmlLines.push('');
+        } else {
+            if (inList) { htmlLines.push('</ul>'); inList = false; }
+            htmlLines.push(`<p>${line}</p>`);
+        }
+    }
+
+    if (inList) htmlLines.push('</ul>');
+    return htmlLines.join('\n');
+}
+
 function downloadAsDocx(content, filename) {
-    // Simple DOCX download using blob
-    // Note: This is a simplified version. For full DOCX support, you'd need a library like docx.js
-    const blob = new Blob([content], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const htmlBody = markdownToHtml(content);
+
+    const fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.6; }
+        h1 { font-size: 18pt; color: #0478A3; margin-top: 1em; }
+        h2 { font-size: 15pt; color: #0478A3; margin-top: 1em; }
+        h3 { font-size: 13pt; color: #0478A3; margin-top: 0.8em; }
+        p  { margin: 0.4em 0; text-align: justify; }
+        ul { margin: 0.4em 0 0.4em 1.5em; }
+        li { margin: 0.2em 0; text-align: justify; }
+        a  { color: #0478A3; }
+    </style>
+</head>
+<body>
+${htmlBody}
+</body>
+</html>`;
+
+    const blob = window.htmlDocx.asBlob(fullHtml);
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -439,14 +500,14 @@ async function generateChallengesReport() {
 function downloadReport() {
     if (window.lastReport) {
         const reportTypeName = window.lastReport.type === 'annual' ? 'annual_report' : 'midyear_report';
-        const filename = `${reportTypeName}_${window.lastReport.indicator}_${window.lastReport.year}.txt`;
+        const filename = `${reportTypeName}_${window.lastReport.indicator}_${window.lastReport.year}.docx`;
         downloadAsDocx(window.lastReport.content, filename);
     }
 }
 
 function downloadChallengesReport() {
     if (window.lastChallengesReport) {
-        const filename = `challenges_lessons_learned_${window.lastChallengesReport.year}.txt`;
+        const filename = `challenges_lessons_learned_${window.lastChallengesReport.year}.docx`;
         downloadAsDocx(window.lastChallengesReport.content, filename);
     }
 }
