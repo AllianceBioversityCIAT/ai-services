@@ -28,11 +28,11 @@ const ProcessArrowSvg = (
 // Hoisted static guidelines list (rendering-hoist-jsx)
 const GuidelinesList = (
   <ul className="bulk-requirements-list">
-    <li><strong>Format</strong> → EXCEL FILE (.XLSX OR .XLS)</li>
-    <li><strong>File name</strong> → USE A DISTINCTIVE NAME (E.G., YOUR NAME OR DATE) TO EASILY IDENTIFY IT.</li>
-    <li><strong>ID column</strong> → MUST INCLUDE INCREMENTAL NUMBERS (1, 2, 3, ...N).</li>
-    <li><strong>Project code</strong> → INCLUDE THE PROJECT CODE, NOT ONLY THE PROJECT NAME.</li>
-    <li><strong>Column names</strong> → USE NAMES IDENTICAL OR VERY SIMILAR TO THE TEMPLATE TO ENSURE ACCURATE AI MAPPING.</li>
+    <li className="bulk-note-tip"><strong>💡 Tip</strong> → Upload all records in a single Excel file to avoid running the process multiple times.</li>
+    <li><strong>File name</strong> → Use a distinctive name (e.g., your name or date) to easily identify it.</li>
+    <li><strong>Column names</strong> → Follow the template to ensure accurate AI mapping. Remember to add an <strong>ID column</strong> with incremental numbers.</li>
+    <li><strong>Recommendation</strong> → Upload files with a maximum of <strong>100 rows</strong> to ensure optimal performance and avoid processing issues.</li>
+    <li className="bulk-note-warning"><strong>⚠️ Warning</strong> → Do not reuse the same file name for different datasets, as this may affect tracking and processing.</li>
   </ul>
 );
 
@@ -153,7 +153,7 @@ export function Step1Upload({
               {downloadOpen && (
                 <div className="bulk-download-options">
                   <button className="bulk-download-option" type="button" onClick={() => handleDownload('es')}>
-                    🇪🇸 Español
+                    🇪🇸 Spanish
                   </button>
                   <button className="bulk-download-option" type="button" onClick={() => handleDownload('en')}>
                     🇬🇧 English

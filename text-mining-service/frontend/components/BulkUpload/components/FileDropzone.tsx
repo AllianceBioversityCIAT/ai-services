@@ -1,8 +1,13 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
 import { formatFileSize } from '../utils/csvUtils';
+
+function isValidExcelFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return name.endsWith('.xlsx') || name.endsWith('.xls');
+}
 
 // Hoisted static SVGs (rendering-hoist-jsx)
 const DropzonePlus = (
@@ -32,13 +37,24 @@ interface FileDropzoneProps {
 
 export function FileDropzone({ selectedFile, onFileSelect, onFileRemove }: FileDropzoneProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showInvalidModal, setShowInvalidModal] = useState(false);
+
+  const rejectFile = useCallback((inputEl: HTMLInputElement | null) => {
+    if (inputEl) inputEl.value = '';
+    setShowInvalidModal(true);
+  }, []);
 
   const handleFileChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (file) onFileSelect(file);
+      if (!file) return;
+      if (!isValidExcelFile(file)) {
+        rejectFile(e.target);
+        return;
+      }
+      onFileSelect(file);
     },
-    [onFileSelect],
+    [onFileSelect, rejectFile],
   );
 
   const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
@@ -58,17 +74,20 @@ export function FileDropzone({ selectedFile, onFileSelect, onFileRemove }: FileD
       (e.currentTarget as HTMLDivElement).style.borderColor = '#BFDBFE';
       (e.currentTarget as HTMLDivElement).style.background = 'var(--bulk-bg-light)';
       const file = e.dataTransfer.files?.[0];
-      if (file) {
-        // Sync the native input so form state is consistent
-        if (fileInputRef.current) {
-          const dt = new DataTransfer();
-          dt.items.add(file);
-          fileInputRef.current.files = dt.files;
-        }
-        onFileSelect(file);
+      if (!file) return;
+      if (!isValidExcelFile(file)) {
+        rejectFile(fileInputRef.current);
+        return;
       }
+      // Sync the native input so form state is consistent
+      if (fileInputRef.current) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInputRef.current.files = dt.files;
+      }
+      onFileSelect(file);
     },
-    [onFileSelect],
+    [onFileSelect, rejectFile],
   );
 
   const handleRemove = useCallback(
@@ -83,6 +102,26 @@ export function FileDropzone({ selectedFile, onFileSelect, onFileRemove }: FileD
 
   return (
     <div>
+      {showInvalidModal && (
+        <div className="bulk-invalid-file-overlay" role="dialog" aria-modal="true" aria-labelledby="bulk-invalid-file-title">
+          <div className="bulk-invalid-file-modal">
+            <div className="bulk-invalid-file-icon">❌</div>
+            <h3 id="bulk-invalid-file-title" className="bulk-invalid-file-title">Invalid file type</h3>
+            <p className="bulk-invalid-file-desc">
+              Only <strong>.xlsx</strong> and <strong>.xls</strong> files are accepted.<br />
+              Please select a valid Excel file.
+            </p>
+            <button
+              className="bulk-invalid-file-btn"
+              type="button"
+              onClick={() => setShowInvalidModal(false)}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
       <div
         className="bulk-upload-dropzone"
         onDragOver={handleDragOver}
