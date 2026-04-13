@@ -194,6 +194,11 @@ faiss/
 *.jsonl
 *.xlsx
 
+# Next.js frontend: do not treat npm/TS config as data (overrides *.json above)
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/tsconfig.json
+
 # Data logs
 data/logs/
 
