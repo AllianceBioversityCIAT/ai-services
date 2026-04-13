@@ -8,6 +8,7 @@ import pandas as pd
 from collections import defaultdict
 from requests_aws4auth import AWS4Auth
 from db_conn.sql_connection import load_data
+from concurrent.futures import ThreadPoolExecutor
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import OPENSEARCH
 from opensearchpy import OpenSearch, RequestsHttpConnection
@@ -274,16 +275,6 @@ def calculate_summary(indicator, year):
     return clean_number(total_expected), clean_number(total_achieved), clean_number(progress)
 
 
-def save_context_to_file(context, filename, indicator, year):
-    try:
-        output_path = f"{filename}_{indicator}_{year}.json"
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(context, f, indent=2, ensure_ascii=False)
-        logger.info(f"📝 Context saved to {output_path}")
-    except Exception as e:
-        logger.error(f"❌ Error saving context to file: {e}")
-
-
 def group_context_by_cluster(chunks):
     """Group context chunks by cluster_acronym. Chunks missing this field are silently excluded."""
     grouped = defaultdict(list)
@@ -492,7 +483,6 @@ def run_pipeline(indicator, year, insert_data=False):
         SEARCH_QUERY = generate_search_prompt(indicator, year)
 
         context, questions = retrieve_context(SEARCH_QUERY, indicator, year)
-        save_context_to_file(context, "context", indicator, year)
         
         grouped_context = group_context_by_cluster(context)
         clusters = sorted(grouped_context.keys())
