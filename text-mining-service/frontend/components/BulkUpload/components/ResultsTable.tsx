@@ -421,6 +421,16 @@ export function ResultsTable({
   const { currentPage, perPage, totalPages, startIndex, endIndex } = pagination;
 
   const [openFilter, setOpenFilter] = useState<{ key: string; rect: DOMRect } | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  const handleSubmitClick = useCallback(() => setShowConfirmModal(true), []);
+
+  const handleConfirmSubmit = useCallback(() => {
+    setShowConfirmModal(false);
+    onSubmitToStar();
+  }, [onSubmitToStar]);
+
+  const handleCancelSubmit = useCallback(() => setShowConfirmModal(false), []);
 
   const paginatedResults = filteredResults.slice(startIndex, endIndex);
 
@@ -505,7 +515,7 @@ export function ResultsTable({
             className="bulk-star-submit-btn"
             type="button"
             disabled={selectedIndices.size === 0}
-            onClick={onSubmitToStar}
+            onClick={handleSubmitClick}
           >
             {StarSubmitSvg}
             Submit to STAR
@@ -635,6 +645,30 @@ export function ResultsTable({
               <path d="M8 1l7 7-7 7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
+        </div>
+      )}
+
+      {/* STAR Submission Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="bulk-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="bulk-confirm-title">
+          <div className="bulk-confirm-modal">
+            <h3 id="bulk-confirm-title" className="bulk-confirm-title">Submit to STAR?</h3>
+            <p className="bulk-confirm-desc">
+              You are about to send{' '}
+              <strong>{selectedIndices.size} record{selectedIndices.size !== 1 ? 's' : ''}</strong>{' '}
+              directly to <strong>STAR</strong>. This action cannot be undone.
+            </p>
+            <p className="bulk-confirm-sub">Please confirm that the selected entries are ready for submission.</p>
+            <div className="bulk-confirm-actions">
+              <button className="bulk-confirm-btn-cancel" type="button" onClick={handleCancelSubmit}>
+                Cancel
+              </button>
+              <button className="bulk-confirm-btn-submit" type="button" onClick={handleConfirmSubmit}>
+                {StarSubmitSvg}
+                Yes, submit to STAR
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
