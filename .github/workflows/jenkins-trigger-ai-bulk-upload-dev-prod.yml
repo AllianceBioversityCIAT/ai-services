@@ -1,9 +1,9 @@
-name: Trigger Jenkins Job AI Bulk Upload service DEV
+name: Trigger Jenkins Job AI Bulk Upload service PROD
 
 on:
   push:
     branches:
-      - "dev-text-mining"
+      - "main-text-mining"
   workflow_dispatch:
 
 jobs:
@@ -14,7 +14,7 @@ jobs:
       # Step 1: Build Jenkins URL
       - name: Build Jenkins URL
         run: |
-          JENKINS_URL="https://automation.prms.cgiar.org/job/bulk-upload-dev/build"
+          JENKINS_URL="https://automation.prms.cgiar.org/job/bulk-upload-prod/build"
           echo "Jenkins job URL: $JENKINS_URL"
           echo "JENKINS_URL=${JENKINS_URL}" >> $GITHUB_ENV
 
