@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - "dev-text-mining"
-  pull_request:
-    branches:
-      - "dev-text-mining"
   workflow_dispatch:
 
 jobs:
