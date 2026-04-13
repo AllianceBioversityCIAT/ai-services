@@ -1,0 +1,176 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Static hosting for the STAR bulk-upload Next.js frontend: private S3 origin,
+  CloudFront with the default *.cloudfront.net certificate (HTTPS, no ACM cost),
+  Origin Access Control (OAC), and outputs for CI/CD. Build must export static
+  assets (output: 'export' in next.config) and sync the out/ directory to the bucket.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Environment
+        Parameters:
+          - EnvironmentName
+      - Label:
+          default: Naming (global S3 uniqueness)
+        Parameters:
+          - BucketNameSuffix
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Description: Logical environment (e.g. dev, staging, prod). Used in names and tags.
+    AllowedPattern: '^[a-z0-9-]+$'
+    ConstraintDescription: Lowercase letters, numbers, and hyphens only.
+
+  BucketNameSuffix:
+    Type: String
+    Description: >
+      Appended to the bucket name for global uniqueness (account-wide). Use a short
+      stable value per environment or stack instance.
+    AllowedPattern: '^[a-z0-9-]+$'
+    ConstraintDescription: Lowercase letters, numbers, and hyphens only.
+
+  PriceClass:
+    Type: String
+    Description: CloudFront price class (edge locations).
+    Default: PriceClass_100
+    AllowedValues:
+      - PriceClass_All
+      - PriceClass_200
+      - PriceClass_100
+
+Resources:
+  CloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${AWS::StackName}-oac'
+        Description: OAC for S3 static origin (SigV4)
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  AssetsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub
+        - 'star-bulk-upload-${EnvironmentName}-${Suffix}'
+        - Suffix: !Ref BucketNameSuffix
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Project
+          Value: STAR
+        - Key: Functionality
+          Value: bulk-upload
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  FrontendDistribution:
+    Type: AWS::CloudFront::Distribution
+    DependsOn:
+      - AssetsBucket
+    Properties:
+      Tags:
+        - Key: Project
+          Value: STAR
+        - Key: Functionality
+          Value: bulk-upload
+        - Key: Environment
+          Value: !Ref EnvironmentName
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub 'STAR bulk-upload frontend (${EnvironmentName})'
+        HttpVersion: http2and3
+        DefaultRootObject: index.html
+        PriceClass: !Ref PriceClass
+        Origins:
+          - Id: S3StaticOrigin
+            DomainName: !GetAtt AssetsBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt CloudFrontOriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          TargetOriginId: S3StaticOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          # Managed-CachingOptimized (IDs are stable per AWS docs)
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        CustomErrorResponses:
+          # Supports client-side routing if you add SPA-style routing later; safe for
+          # static multi-page Next export (wrong paths still resolve to index.html).
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+        # Default CloudFront certificate for *.cloudfront.net (HTTPS, no ACM in this account)
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+  AssetsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn:
+      - FrontendDistribution
+    Properties:
+      Bucket: !Ref AssetsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudFrontReadViaOAC
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub '${AssetsBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${FrontendDistribution}'
+
+Outputs:
+  BucketName:
+    Description: S3 bucket for static assets (deploy out/ here).
+    Value: !Ref AssetsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketName'
+
+  CloudFrontDistributionId:
+    Description: CloudFront distribution ID (for cache invalidation).
+    Value: !Ref FrontendDistribution
+    Export:
+      Name: !Sub '${AWS::StackName}-DistributionId'
+
+  CloudFrontDomainName:
+    Description: CloudFront hostname (xxxxxx.cloudfront.net) for HTTPS with the default certificate.
+    Value: !GetAtt FrontendDistribution.DomainName
+    Export:
+      Name: !Sub '${AWS::StackName}-DomainName'
+
+  FrontendUrl:
+    Description: HTTPS URL of the deployed frontend.
+    Value: !Sub 'https://${FrontendDistribution.DomainName}'
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendUrl'
