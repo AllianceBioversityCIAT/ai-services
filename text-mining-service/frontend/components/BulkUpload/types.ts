@@ -127,4 +127,5 @@ export interface ColumnDef {
   options?: string[];
   tooltip?: string;
   enabledWhen?: { field: string; values: (string | number)[] };
+  width?: string;
 }

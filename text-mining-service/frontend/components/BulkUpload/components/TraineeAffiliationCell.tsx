@@ -46,7 +46,9 @@ export function TraineeAffiliationCell({ value, globalIdx, onEdit, disabled }: T
   const [allInstitutions, setAllInstitutions] = useState<ClarisaInstitution[]>(cachedInstitutions ?? []);
   const [loading, setLoading] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const editBtnRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
 
   // Fetch institution list when popover first opens (not on mount — display name is stored in value)
   useEffect(() => {
@@ -119,9 +121,16 @@ export function TraineeAffiliationCell({ value, globalIdx, onEdit, disabled }: T
         </span>
         <div className="affiliation-actions">
           <button
+            ref={editBtnRef}
             className="affiliation-edit-btn"
             aria-label="Select institution"
-            onClick={openSearch}
+            onClick={() => {
+              if (!showSearch && editBtnRef.current) {
+                const rect = editBtnRef.current.getBoundingClientRect();
+                setPopoverPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - 360) });
+              }
+              openSearch();
+            }}
             title={hasValue ? 'Change institution' : 'Select institution'}
             disabled={disabled}
           >
@@ -142,8 +151,8 @@ export function TraineeAffiliationCell({ value, globalIdx, onEdit, disabled }: T
       </div>
 
       <div className="partner-add-container" ref={popoverRef}>
-        {showSearch && (
-          <div className="partners-search-popover">
+        {showSearch && popoverPos && (
+          <div className="partners-search-popover" style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left }}>
             <div className="partners-search-input-wrap">
               <input
                 ref={inputRef}

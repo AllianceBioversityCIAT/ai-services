@@ -44,7 +44,9 @@ export function TraineeNationalityCell({ value, globalIdx, onEdit, disabled }: T
   const [allCountries, setAllCountries] = useState<ClarisaCountry[]>(cachedCountries ?? []);
   const [loading, setLoading] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const editBtnRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
 
   // Fetch only when popover opens — display name resolved from value.code at render time
   useEffect(() => {
@@ -110,9 +112,16 @@ export function TraineeNationalityCell({ value, globalIdx, onEdit, disabled }: T
         </span>
         <div className="affiliation-actions">
           <button
+            ref={editBtnRef}
             className="affiliation-edit-btn"
             aria-label="Select country"
-            onClick={openSearch}
+            onClick={() => {
+              if (!showSearch && editBtnRef.current) {
+                const rect = editBtnRef.current.getBoundingClientRect();
+                setPopoverPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - 360) });
+              }
+              openSearch();
+            }}
             disabled={disabled}
             title={displayName ? 'Change country' : 'Select country'}
           >
@@ -133,8 +142,8 @@ export function TraineeNationalityCell({ value, globalIdx, onEdit, disabled }: T
       </div>
 
       <div className="partner-add-container" ref={popoverRef}>
-        {showSearch && (
-          <div className="partners-search-popover">
+        {showSearch && popoverPos && (
+          <div className="partners-search-popover" style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left }}>
             <div className="partners-search-input-wrap">
               <input
                 ref={inputRef}
