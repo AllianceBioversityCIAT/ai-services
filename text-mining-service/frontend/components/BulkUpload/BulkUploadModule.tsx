@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { BulkUploadResult, RecordStatus, DocSource, AppStep, UnmappedInstitution } from './types';
 import { useBulkUploadApi } from './hooks/useBulkUploadApi';
 import { useTableFilters } from './hooks/useTableFilters';
@@ -18,6 +18,14 @@ import { UnmappedTable } from './components/UnmappedTable';
 import { ResultsTable } from './components/ResultsTable';
 
 export default function BulkUploadModule() {
+  // ── Scroll to top on page load ────────────────────────
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      history.scrollRestoration = 'manual';
+      window.scrollTo(0, 0);
+    }
+  }, []);
+
   // ── App Step ──────────────────────────────────────────
   const [step, setStep] = useState<AppStep>('upload');
 
