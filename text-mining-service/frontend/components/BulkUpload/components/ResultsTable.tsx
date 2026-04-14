@@ -531,9 +531,11 @@ export function ResultsTable({
         <table id="bulkResultsTable" className="bulk-results-table">
           <colgroup>
             {currentTab === 'pending' && <col style={{ width: RESULTS_TABLE_COLUMNS[0].width }} />}
-            {RESULTS_TABLE_COLUMNS.slice(1).map((col) => (
-              <col key={col.key + col.type} style={{ width: col.width }} />
-            ))}
+            {RESULTS_TABLE_COLUMNS.slice(1)
+              .filter((col) => !(currentTab === 'pending' && col.type === 'link'))
+              .map((col) => (
+                <col key={col.key + col.type} style={{ width: col.width }} />
+              ))}
           </colgroup>
           <thead>
             <tr>
@@ -547,7 +549,9 @@ export function ResultsTable({
                   />
                 </th>
               )}
-              {RESULTS_TABLE_COLUMNS.slice(1).map((col) => {
+              {RESULTS_TABLE_COLUMNS.slice(1)
+                .filter((col) => !(currentTab === 'pending' && col.type === 'link'))
+                .map((col) => {
                 if (col.readonly || col.type === 'status' || col.type === 'link') {
                   return <th key={col.key + col.type}>{col.label}</th>;
                 }
@@ -589,7 +593,9 @@ export function ResultsTable({
                       />
                     </td>
                   )}
-                  {RESULTS_TABLE_COLUMNS.slice(1).map((col) => (
+                  {RESULTS_TABLE_COLUMNS.slice(1)
+                    .filter((col) => !(currentTab === 'pending' && col.type === 'link'))
+                    .map((col) => (
                     <TableCell
                       key={col.key + col.type}
                       col={col}
@@ -646,16 +652,14 @@ export function ResultsTable({
       })()}
 
       {/* Next step — navigates to unmapped institutions */}
-      {currentTab === 'pending' && (
-        <div className="bulk-next-step-container">
-          <button className="bulk-next-step-btn" type="button" onClick={onViewUnmapped}>
-            Next step
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
-              <path d="M8 1l7 7-7 7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        </div>
-      )}
+      <div className="bulk-next-step-container">
+        <button className="bulk-next-step-btn" type="button" onClick={onViewUnmapped}>
+          Next step
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+            <path d="M8 1l7 7-7 7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      </div>
 
       {/* STAR Submission Confirmation Modal */}
       {showConfirmModal && (

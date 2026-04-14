@@ -176,10 +176,12 @@ export function PartnersCell({ partners, globalIdx, onEdit, field = 'partners' }
                       className="partners-search-result"
                       onClick={() => handleAdd(inst)}
                     >
-                      {inst.acronym && <strong className="partners-result-acronym">{inst.acronym}</strong>}
-                      {inst.acronym && <span className="partners-result-sep"> - </span>}
-                      <span className="partners-result-name">{inst.name}</span>
-                      {hq && <span className="partners-result-country"> - {hq.name}</span>}
+                      <span className="partners-result-line1">
+                        {inst.acronym && <strong className="partners-result-acronym">{inst.acronym}</strong>}
+                        {inst.acronym && <span className="partners-result-sep">  </span>}
+                        <span className="partners-result-name">{inst.name}</span>
+                      </span>
+                      {hq && <span className="partners-result-country">{hq.name}</span>}
                     </li>
                   );
                 })}

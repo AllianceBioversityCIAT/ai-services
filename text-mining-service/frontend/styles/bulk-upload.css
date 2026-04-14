@@ -114,9 +114,9 @@
 }
 
 .bulk-upload-wrapper .bulk-processed-file-name {
-    font-size: 1rem;
+    font-size: 0.97rem;
     font-weight: 400;
-    color: var(--bulk-gray-800);
+    color: var(--bulk-primary);
 }
 
 .bulk-upload-wrapper .bulk-new-upload-btn {
@@ -124,7 +124,7 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
-    background: var(--bulk-white);
+    background: transparent;
     border: 1px solid var(--bulk-primary);
     border-radius: 6px;
     color: var(--bulk-primary);
@@ -1670,6 +1670,14 @@
     overflow: visible;
 }
 
+/* Cells with chip/complex components: allow wrapping, never clip the × button */
+.bulk-upload-container .bulk-results-table td:has(.partners-cell),
+.bulk-upload-container .bulk-results-table td:has(.affiliation-cell),
+.bulk-upload-container .bulk-results-table td:has(.geo-cell) {
+    white-space: normal;
+    overflow: hidden;
+}
+
 .bulk-upload-container .bulk-results-table tbody tr {
     background: #FCFCFC;
     transition: background-color 0.15s ease;
@@ -1877,7 +1885,8 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    min-width: 200px;
+    min-width: 0;
+    width: 100%;
 }
 
 .bulk-upload-container .partners-chips {
@@ -1895,7 +1904,9 @@
     font-size: 12px;
     font-weight: 500;
     line-height: 1.4;
-    max-width: 200px;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .bulk-upload-container .partner-chip-label {
@@ -2033,6 +2044,16 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
+}
+
+.bulk-upload-container .partners-result-line1 {
+    display: flex;
+    align-items: baseline;
+    gap: 0;
+    overflow: hidden;
+    width: 100%;
+    min-width: 0;
 }
 
 .bulk-upload-container .partners-result-meta {
@@ -2050,6 +2071,7 @@
 .bulk-upload-container .partners-result-sep {
     flex-shrink: 0;
     color: #6B7280;
+    margin: 0 4px;
 }
 
 .bulk-upload-container .partners-result-country {
