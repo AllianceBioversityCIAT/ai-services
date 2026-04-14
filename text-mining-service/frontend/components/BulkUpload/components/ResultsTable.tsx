@@ -21,6 +21,8 @@ import { StaffCell } from './StaffCell';
 import type { RawStaff } from './StaffCell';
 import { EvidenceCell } from './EvidenceCell';
 import type { Evidence } from './EvidenceCell';
+import { CompletenessCell } from './CompletenessCell';
+import { checkCompleteness } from '../utils/completenessChecker';
 
 // Hoisted static SVGs (rendering-hoist-jsx)
 const StarSubmitSvg = (
@@ -97,6 +99,14 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     const statusClass = status === 'complete' ? 'status-complete' : status === 'failed' ? 'status-failed' : 'status-pending';
     const label = status === 'complete' ? 'Complete' : status === 'failed' ? 'Failed' : 'Pending';
     return <td><span className={statusClass}>{label}</span></td>;
+  }
+
+  if (col.type === 'completeness') {
+    return (
+      <td>
+        <CompletenessCell completeness={checkCompleteness(result)} />
+      </td>
+    );
   }
 
   if (col.type === 'link') {

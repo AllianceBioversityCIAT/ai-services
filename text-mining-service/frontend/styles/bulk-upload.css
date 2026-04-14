@@ -1824,6 +1824,69 @@
     border: 1px solid #6EE7B7;
 }
 
+/* Completeness Badge */
+.bulk-upload-container .completeness-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bulk-upload-container .completeness-badge {
+    display: inline-block;
+    padding: 0.35rem 0.8rem;
+    border-radius: 50px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+    cursor: default;
+    user-select: none;
+}
+
+.bulk-upload-container .completeness-complete {
+    background: #D1FAE5;
+    color: #065F46;
+    border: 1px solid #6EE7B7;
+}
+
+.bulk-upload-container .completeness-incomplete {
+    background: #FEF3C7;
+    color: #92400E;
+    border: 1px solid #FCD34D;
+    cursor: help;
+}
+
+.completeness-tooltip {
+    position: fixed;
+    z-index: 10001;
+    background: #1F2937;
+    color: #F9FAFB;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    max-width: 310px;
+    min-width: 220px;
+    max-height: 260px;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+}
+
+.completeness-tooltip-title {
+    font-size: 12px;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    color: #E5E7EB;
+}
+
+.completeness-tooltip-list {
+    list-style: disc;
+    padding-left: 1.25rem;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #D1D5DB;
+}
+
 /* Keyword Chips */
 .bulk-upload-container .bulk-chips {
     display: flex;

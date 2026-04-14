@@ -8,6 +8,7 @@ import { loadRecordStatuses } from './hooks/useDynamoDB';
 import { extractUnmappedInstitutions } from './utils/dataFormatters';
 import { createUnmappedReportCSV, downloadCSV } from './utils/csvUtils';
 import { setNestedValue } from './utils/tableHelpers';
+import { checkCompleteness } from './utils/completenessChecker';
 
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { ErrorMessage } from './components/ErrorMessage';
