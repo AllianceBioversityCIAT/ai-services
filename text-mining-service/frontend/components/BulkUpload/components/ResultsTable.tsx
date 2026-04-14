@@ -37,9 +37,10 @@ interface TableCellProps {
   recordStatus: RecordStatus | undefined;
   onEdit: (globalIdx: number, field: string, value: unknown) => void;
   authToken: string | null;
+  isReadOnly?: boolean;
 }
 
-const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus, onEdit, authToken }: TableCellProps) {
+const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus, onEdit, authToken, isReadOnly }: TableCellProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea on mount
@@ -87,9 +88,9 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     [col.key, globalIdx, onEdit],
   );
 
-  const isDisabled = col.enabledWhen
+  const isDisabled = !!isReadOnly || (col.enabledWhen
     ? !col.enabledWhen.values.some((v) => String(getNestedValue(result, col.enabledWhen!.field)) === String(v))
-    : false;
+    : false);
 
   if (col.type === 'status') {
     const status = recordStatus?.status ?? 'pending';
@@ -219,7 +220,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     const raw = getNestedValue(result, col.key);
     const partners: RawInstitution[] = Array.isArray(raw) ? (raw as RawInstitution[]) : [];
     return (
-      <td>
+      <td className={isReadOnly ? 'bulk-cell-readonly' : undefined}>
         <PartnersCell
           partners={partners}
           globalIdx={globalIdx}
@@ -257,7 +258,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
       return <td><span className="geo-readonly">{regionCodes.length ? regionCodes.join(', ') : '—'}</span></td>;
     }
     return (
-      <td>
+      <td className={isReadOnly ? 'bulk-cell-readonly' : undefined}>
         <RegionsCell
           values={regionCodes}
           globalIdx={globalIdx}
@@ -280,7 +281,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
       return <td><span className="geo-readonly">{countriesVal.length ? countriesVal.map(c => c.code).join(', ') : '—'}</span></td>;
     }
     return (
-      <td>
+      <td className={isReadOnly ? 'bulk-cell-readonly' : undefined}>
         <CountriesCell
           values={countriesVal}
           geoscopeLevel={geoscopeLevel}
@@ -301,7 +302,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
         : [];
     const field = col.type === 'evidence_desc' ? 'evidence_description' : 'evidence_link';
     return (
-      <td>
+      <td className={isReadOnly ? 'bulk-cell-readonly' : undefined}>
         <EvidenceCell
           evidences={evidences}
           field={field}
@@ -320,7 +321,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
         ? (() => { try { return JSON.parse(raw) as string[]; } catch { return raw ? [raw] : []; } })()
         : raw ? [String(raw)] : [];
     return (
-      <td>
+      <td className={isReadOnly ? 'bulk-cell-readonly' : undefined}>
         <SdgCell
           values={values}
           globalIdx={globalIdx}
@@ -341,6 +342,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
           data-index={globalIdx}
           data-field={col.key}
           onChange={handleChange}
+          disabled={isDisabled}
         />
       </td>
     );
@@ -526,6 +528,12 @@ export function ResultsTable({
       {/* Table */}
       <div className="bulk-table-container">
         <table id="bulkResultsTable" className="bulk-results-table">
+          <colgroup>
+            {currentTab === 'pending' && <col style={{ width: RESULTS_TABLE_COLUMNS[0].width }} />}
+            {RESULTS_TABLE_COLUMNS.slice(1).map((col) => (
+              <col key={col.key + col.type} style={{ width: col.width }} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               {currentTab === 'pending' && (
@@ -590,6 +598,7 @@ export function ResultsTable({
                       recordStatus={recordStatuses[rid]}
                       onEdit={onEdit}
                       authToken={authToken}
+                      isReadOnly={currentTab === 'submitted'}
                     />
                   ))}
                 </tr>

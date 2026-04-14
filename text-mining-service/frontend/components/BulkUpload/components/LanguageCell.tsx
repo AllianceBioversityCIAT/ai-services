@@ -59,7 +59,9 @@ export function LanguageCell({ value, globalIdx, authToken, onEdit, disabled }: 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const editBtnRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
 
   // Pre-fetch on mount (when token is available) so display name resolves immediately
   useEffect(() => {
@@ -136,9 +138,16 @@ export function LanguageCell({ value, globalIdx, authToken, onEdit, disabled }: 
         </span>
         <div className="affiliation-actions">
           <button
+            ref={editBtnRef}
             className="affiliation-edit-btn"
             aria-label="Select language"
-            onClick={openSearch}
+            onClick={() => {
+              if (!showSearch && editBtnRef.current) {
+                const rect = editBtnRef.current.getBoundingClientRect();
+                setPopoverPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - 360) });
+              }
+              openSearch();
+            }}
             title={displayName ? 'Change language' : 'Select language'}
             disabled={disabled}
           >
@@ -159,8 +168,8 @@ export function LanguageCell({ value, globalIdx, authToken, onEdit, disabled }: 
       </div>
 
       <div className="partner-add-container" ref={popoverRef}>
-        {showSearch && (
-          <div className="partners-search-popover">
+        {showSearch && popoverPos && (
+          <div className="partners-search-popover" style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left }}>
             <div className="partners-search-input-wrap">
               <input
                 ref={inputRef}

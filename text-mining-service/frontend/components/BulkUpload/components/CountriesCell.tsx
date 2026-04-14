@@ -92,6 +92,10 @@ export function CountriesCell({ values, geoscopeLevel, globalIdx, authToken, onE
   const areaPopoverRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const areaSearchRef = useRef<HTMLInputElement>(null);
+  const addCountryBtnRef = useRef<HTMLButtonElement>(null);
+  const addAreaBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+  const [areaPopoverPos, setAreaPopoverPos] = useState<{ top: number; left: number } | null>(null);
 
   const isSubnational = geoscopeLevel === 'Sub-national';
 
@@ -220,12 +224,26 @@ export function CountriesCell({ values, geoscopeLevel, globalIdx, authToken, onE
                 <button
                   className="partner-add-btn"
                   aria-label="Add area"
-                  onClick={() => setAreaPopover(p => p === country.code ? null : country.code)}
+                  ref={(el) => {
+                    if (el) addAreaBtnRefs.current.set(country.code, el);
+                    else addAreaBtnRefs.current.delete(country.code);
+                  }}
+                  onClick={() => {
+                    const isOpening = areaPopover !== country.code;
+                    if (isOpening) {
+                      const btn = addAreaBtnRefs.current.get(country.code);
+                      if (btn) {
+                        const rect = btn.getBoundingClientRect();
+                        setAreaPopoverPos({ top: rect.bottom + 4, left: rect.left });
+                      }
+                    }
+                    setAreaPopover(p => p === country.code ? null : country.code);
+                  }}
                 >
                   +
                 </button>
-                {areaPopover === country.code && (
-                  <div className="partners-search-popover">
+                {areaPopover === country.code && areaPopoverPos && (
+                  <div className="partners-search-popover" style={{ position: 'fixed', top: areaPopoverPos.top, left: areaPopoverPos.left }}>
                     <div className="partners-search-input-wrap">
                       <input
                         ref={areaSearchRef}
@@ -263,14 +281,21 @@ export function CountriesCell({ values, geoscopeLevel, globalIdx, authToken, onE
       {/* Add country popover */}
       <div className="partner-add-container" ref={popoverRef}>
         <button
+          ref={addCountryBtnRef}
           className="partner-add-btn"
           aria-label="Add country"
-          onClick={() => setShowPopover(s => !s)}
+          onClick={() => {
+            if (!showPopover && addCountryBtnRef.current) {
+              const rect = addCountryBtnRef.current.getBoundingClientRect();
+              setPopoverPos({ top: rect.bottom + 4, left: rect.left });
+            }
+            setShowPopover(s => !s);
+          }}
         >
           +
         </button>
-        {showPopover && (
-          <div className="partners-search-popover">
+        {showPopover && popoverPos && (
+          <div className="partners-search-popover" style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left }}>
             <div className="partners-search-input-wrap">
               <input
                 ref={searchRef}

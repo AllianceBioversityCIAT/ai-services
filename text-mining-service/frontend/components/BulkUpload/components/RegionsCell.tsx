@@ -41,7 +41,9 @@ export function RegionsCell({ values, globalIdx, onEdit }: RegionsCellProps) {
   const [regions, setRegions] = useState<ClarisaRegion[]>([]);
   const [showPopover, setShowPopover] = useState(false);
   const [search, setSearch] = useState('');
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const addBtnRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Pre-fetch on mount so chip labels are available without opening the popover
@@ -105,14 +107,21 @@ export function RegionsCell({ values, globalIdx, onEdit }: RegionsCellProps) {
 
       <div className="partner-add-container" ref={popoverRef}>
         <button
+          ref={addBtnRef}
           className="partner-add-btn"
           aria-label="Add region"
-          onClick={() => setShowPopover(s => !s)}
+          onClick={() => {
+            if (!showPopover && addBtnRef.current) {
+              const rect = addBtnRef.current.getBoundingClientRect();
+              setPopoverPos({ top: rect.bottom + 4, left: rect.left });
+            }
+            setShowPopover(s => !s);
+          }}
         >
           +
         </button>
-        {showPopover && (
-          <div className="partners-search-popover">
+        {showPopover && popoverPos && (
+          <div className="partners-search-popover" style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left }}>
             <div className="partners-search-input-wrap">
               <input
                 ref={searchRef}

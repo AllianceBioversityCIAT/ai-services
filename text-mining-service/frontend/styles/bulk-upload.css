@@ -702,6 +702,13 @@
     cursor: not-allowed;
 }
 
+/* Read-only cell (Submitted Results tab) */
+.bulk-cell-readonly {
+    pointer-events: none;
+    user-select: none;
+    opacity: 0.65;
+}
+
 /* STAR Submission Confirmation Modal */
 .bulk-confirm-overlay {
     position: fixed;
@@ -1143,10 +1150,7 @@
 
 /* Evidence edit popover */
 .bulk-upload-container .evidence-edit-popover {
-    position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
-    z-index: 200;
+    z-index: 9999;
     background: #fff;
     border: 1px solid #D1D5DB;
     border-radius: 8px;
@@ -1443,6 +1447,7 @@
 
 .bulk-upload-container .bulk-results-table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     background: #FCFCFC;
     font-size: 14px;
@@ -1502,17 +1507,18 @@
     vertical-align: top;
 }
 
-/* Specific column widths - most columns auto-size based on header */
+/* Specific column widths - controlled via <colgroup> in ResultsTable */
 .bulk-upload-container .bulk-results-table th,
 .bulk-upload-container .bulk-results-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 /* Cells containing textareas need to wrap */
 .bulk-upload-container .bulk-results-table td:has(textarea) {
     white-space: normal;
-    min-width: 220px;
-    max-width: 320px;
+    overflow: visible;
 }
 
 .bulk-upload-container .bulk-results-table tbody tr {
@@ -1545,6 +1551,9 @@
     transition: all 0.2s ease;
     outline: none;
     box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Hover state - subtle hint of editability */
@@ -1812,10 +1821,7 @@
 }
 
 .bulk-upload-container .partners-search-popover {
-    position: absolute;
-    top: 26px;
-    left: 0;
-    z-index: 200;
+    z-index: 9999;
     background: #fff;
     border: 1px solid #E5E7EB;
     border-radius: 8px;
