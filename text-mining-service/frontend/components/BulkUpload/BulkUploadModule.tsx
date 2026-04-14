@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import type { BulkUploadResult, RecordStatus, DocSource, AppStep, UnmappedInstitution } from './types';
 import { useBulkUploadApi } from './hooks/useBulkUploadApi';
 import { useTableFilters } from './hooks/useTableFilters';
+import { loadRecordStatuses } from './hooks/useDynamoDB';
 import { extractUnmappedInstitutions } from './utils/dataFormatters';
 import { createUnmappedReportCSV, downloadCSV } from './utils/csvUtils';
 import { setNestedValue } from './utils/tableHelpers';
@@ -33,6 +34,16 @@ export default function BulkUploadModule() {
   // ── Selection State ───────────────────────────────────
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
 
+  // ── Reprocess Modal State ────────────────────────────
+  const [reprocessModalData, setReprocessModalData] = useState<{
+    mode: DocSource;
+    file: File | null;
+    s3Key: string | null;
+    fileName: string;
+    completeCount: number;
+    failedCount: number;
+  } | null>(null);
+
   // ── API ───────────────────────────────────────────────
   const api = useBulkUploadApi();
 
@@ -60,23 +71,48 @@ export default function BulkUploadModule() {
     filters.clearAllFilters();
   }, [filters]);
 
-  const handleProcess = useCallback(
-    (mode: DocSource, file: File | null, s3Key: string | null) => {
-      api.processDocument(mode, file, s3Key, (results, statuses, fileName) => {
-        const unmapped = extractUnmappedInstitutions(results);
-        const cloned = JSON.parse(JSON.stringify(results)) as BulkUploadResult[];
-        setCurrentResults(results);
-        setEditedData(cloned);
-        setUnmappedInstitutions(unmapped);
-        setRecordStatuses(statuses);
-        setCurrentFileName(fileName);
-        filters.clearAllFilters();
-        setSelectedIndices(new Set());
-        setStep('results');
-      });
+  const handleProcessSuccess = useCallback(
+    (results: BulkUploadResult[], statuses: Record<string, RecordStatus>, fileName: string) => {
+      const unmapped = extractUnmappedInstitutions(results);
+      const cloned = JSON.parse(JSON.stringify(results)) as BulkUploadResult[];
+      setCurrentResults(results);
+      setEditedData(cloned);
+      setUnmappedInstitutions(unmapped);
+      setRecordStatuses(statuses);
+      setCurrentFileName(fileName);
+      filters.clearAllFilters();
+      setSelectedIndices(new Set());
+      setStep('results');
     },
-    [api, filters],
+    [filters],
   );
+
+  const handleProcess = useCallback(
+    async (mode: DocSource, file: File | null, s3Key: string | null) => {
+      const fileName =
+        mode === 'upload' ? (file?.name ?? '') : (s3Key?.split('/').pop() ?? s3Key ?? '');
+      const savedStatuses = await loadRecordStatuses(fileName);
+      const completeCount = savedStatuses.complete?.length ?? 0;
+      const failedCount = savedStatuses.failed?.length ?? 0;
+      if (completeCount > 0 || failedCount > 0) {
+        setReprocessModalData({ mode, file, s3Key, fileName, completeCount, failedCount });
+        return;
+      }
+      api.processDocument(mode, file, s3Key, handleProcessSuccess);
+    },
+    [api, handleProcessSuccess],
+  );
+
+  const handleConfirmReprocess = useCallback(() => {
+    if (!reprocessModalData) return;
+    const { mode, file, s3Key } = reprocessModalData;
+    setReprocessModalData(null);
+    api.processDocument(mode, file, s3Key, handleProcessSuccess);
+  }, [reprocessModalData, api, handleProcessSuccess]);
+
+  const handleCancelReprocess = useCallback(() => {
+    setReprocessModalData(null);
+  }, []);
 
   const handleNextStep = useCallback(() => setStep('results'), []);
   const handleViewUnmapped = useCallback(() => setStep('unmapped'), []);
@@ -190,6 +226,36 @@ export default function BulkUploadModule() {
 
       {/* Error message (outside white card) */}
       {api.errorMessage !== null && <ErrorMessage message={api.errorMessage} />}
+
+      {/* Reprocess confirmation modal */}
+      {reprocessModalData !== null && (
+        <div className="bulk-confirm-overlay">
+          <div className="bulk-confirm-modal">
+            <div className="bulk-confirm-icon">⚠️</div>
+            <h2 className="bulk-confirm-title">File already processed</h2>
+            <p className="bulk-confirm-desc">
+              <strong>{reprocessModalData.fileName}</strong> has been processed before.
+              {reprocessModalData.completeCount > 0 && (
+                <> {reprocessModalData.completeCount} record{reprocessModalData.completeCount !== 1 ? 's were' : ' was'} submitted to STAR.</>
+              )}
+              {reprocessModalData.failedCount > 0 && (
+                <> {reprocessModalData.failedCount} record{reprocessModalData.failedCount !== 1 ? 's' : ''} previously failed.</>              )}
+            </p>
+            <p className="bulk-confirm-sub">
+              If you continue, the file will be re-processed by the AI and previous submission statuses will be reloaded.
+              Make sure this file contains the same data — reusing a file name with different records may cause tracking issues.
+            </p>
+            <div className="bulk-confirm-actions">
+              <button className="bulk-confirm-btn-cancel" onClick={handleCancelReprocess}>
+                Cancel
+              </button>
+              <button className="bulk-confirm-btn-submit" onClick={handleConfirmReprocess}>
+                Yes, re-process
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -111,10 +111,6 @@ export function S3FileSelector({
         {RefreshIconSvg}
         Refresh list
       </button>
-
-      <div className="bulk-info-text" style={{ marginTop: '1rem' }}>
-        ℹ️ Files are loaded from S3 bucket. Make sure your file is uploaded before processing.
-      </div>
     </div>
   );
 }
