@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import type { BulkUploadResult, RecordStatus, TabType } from '../types';
-import { formatCellValueForFilter, getNestedValue } from '../utils/tableHelpers';
+import { getFilterTokens, getNestedValue } from '../utils/tableHelpers';
 
 export interface TableFiltersState {
   activeFilters: Record<string, string[]>;
@@ -47,13 +47,14 @@ export function useTableFilters(): TableFiltersState & TableFiltersActions {
         return currentTab === 'pending' ? status === 'pending' || status === 'failed' : status === 'complete';
       });
 
-      // Then: apply column filters (js-early-exit inside filter)
+      // Then: apply column filters — uses token intersection for array columns
       if (Object.keys(activeFilters).length > 0) {
         filtered = filtered.filter((result) => {
           for (const [columnKey, selectedValues] of Object.entries(activeFilters)) {
             if (selectedValues.length === 0) continue;
-            const cellValue = formatCellValueForFilter(getNestedValue(result, columnKey));
-            if (!selectedValues.includes(cellValue)) return false;
+            const tokens = getFilterTokens(columnKey, getNestedValue(result, columnKey));
+            const hasMatch = tokens.some(t => selectedValues.includes(t));
+            if (!hasMatch) return false;
           }
           return true;
         });
