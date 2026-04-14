@@ -474,7 +474,8 @@ export function ResultsTable({
   ) as unknown as (idx: number, checked: boolean) => void;
 
   const openFilterPanel = useCallback((columnKey: string, e: React.MouseEvent<HTMLSpanElement>) => {
-    const rect = (e.currentTarget as HTMLSpanElement).getBoundingClientRect();
+    const th = (e.currentTarget as HTMLSpanElement).closest('th');
+    const rect = (th ?? e.currentTarget as HTMLSpanElement).getBoundingClientRect();
     setOpenFilter((prev) => (prev?.key === columnKey ? null : { key: columnKey, rect }));
   }, []);
 
@@ -563,7 +564,6 @@ export function ResultsTable({
                         className={`filter-icon${hasFilter ? ' filter-active' : ''}`}
                         title="Filter"
                         onClick={(e) => openFilterPanel(col.key, e)}
-                        style={{ cursor: 'pointer' }}
                       >
                         ▼
                       </span>
@@ -685,7 +685,7 @@ export function ResultsTable({
       {openFilter !== null && (
         <FilterPanel
           columnKey={openFilter.key}
-          uniqueValues={getUniqueValues(results, openFilter.key)}
+          uniqueValues={getUniqueValues(editedData, openFilter.key)}
           currentFilters={activeFilters[openFilter.key] ?? []}
           anchorRect={openFilter.rect}
           onApply={onFilterApply}
