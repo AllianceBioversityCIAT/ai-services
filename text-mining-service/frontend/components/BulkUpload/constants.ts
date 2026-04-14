@@ -8,6 +8,8 @@ export const MANAGEMENT_BASE_URL = process.env.NEXT_PUBLIC_MANAGEMENT_API_BASE_U
 export const CLARISA_BASE_URL = process.env.NEXT_PUBLIC_CLARISA_API_BASE_URL;
 export const ENVIRONMENT_URL = `${MANAGEMENT_BASE_URL}/`;
 export const STAR_API_URL = `${STAR_BASE_URL}/results/ai/formalize/bulk`;
+// TODO: replace with the real submit+approve endpoint when available from STAR team
+export const STAR_SUBMIT_APPROVE_API_URL: string | undefined = process.env.NEXT_PUBLIC_STAR_SUBMIT_APPROVE_API_URL;
 
 // Hoisted: module-level maps (js-index-maps, js-cache-function-results)
 export const ASSET_IP_OWNER_NAME_TO_ID: Record<string, number> = {
@@ -99,7 +101,8 @@ export const IP_RIGHTS_YES_NO_FIELDS = [
 export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
   { key: 'select', label: 'Select', type: 'checkbox', width: '50px' },
   { key: 'id', label: 'ID', type: 'text', readonly: true, width: '70px' },
-  { key: 'status', label: 'Status', type: 'status', readonly: true, width: '115px' },
+  { key: 'status', label: 'Status', type: 'status', readonly: true, width: '120px' },
+  { key: 'completeness', label: 'Completeness', type: 'completeness', readonly: true, width: '130px' },
   { key: 'star_link', label: 'STAR Link', type: 'link', readonly: true, width: '130px' },
   { key: 'title', label: 'Title', type: 'textarea', required: true, width: '300px' },
   { key: 'description', label: 'Description', type: 'textarea', width: '485px' },

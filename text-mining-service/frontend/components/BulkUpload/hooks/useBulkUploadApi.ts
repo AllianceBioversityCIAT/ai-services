@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import type { BulkUploadResult, RecordStatus, StarApiResponse } from '../types';
-import { API_BASE_URL, ENVIRONMENT_URL, FOLDER_PATH, S3_BUCKET, STAR_API_URL } from '../constants';
+import type { BulkUploadResult, RecordStatus, StarApiResponse, StarCreatedResult, StarErrorResult } from '../types';
+import { API_BASE_URL, ENVIRONMENT_URL, FOLDER_PATH, S3_BUCKET, STAR_API_URL, STAR_SUBMIT_APPROVE_API_URL } from '../constants';
 import { extractInnerResults, formatResultForSTAR } from '../utils/dataFormatters';
 import { loadRecordStatuses, saveRecordStatus } from './useDynamoDB';
 import { simplifyS3Path } from '../utils/tableHelpers';
+import { checkCompleteness } from '../utils/completenessChecker';
 
 // =========================
 // Auth Token
@@ -174,27 +175,52 @@ export function useBulkUploadApi(): BulkUploadApiState & BulkUploadApiActions {
       onRerender: () => void,
     ) => {
       try {
-        showLoading(`Submitting ${selectedResults.length} records to STAR platform...`);
-        const formattedResults = selectedResults.map(formatResultForSTAR);
+        // Split records by completeness
+        const completeResults = selectedResults.filter((r) => checkCompleteness(r).isComplete);
+        const incompleteResults = selectedResults.filter((r) => !checkCompleteness(r).isComplete);
 
-        const response = await fetch(STAR_API_URL, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ results: formattedResults }),
-        });
+        const allCreated: StarCreatedResult[] = [];
+        const allErrors: StarErrorResult[] = [];
+        let starResponse: StarApiResponse = { data: { results_created: [], results_errors: [] } };
 
-        hideLoading();
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`STAR API error ${response.status}: ${errorText}`);
+        // Submit incomplete → Draft endpoint (current)
+        if (incompleteResults.length > 0) {
+          showLoading(`Saving ${incompleteResults.length} incomplete record${incompleteResults.length !== 1 ? 's' : ''} as Draft...`);
+          const draftResponse = await fetch(STAR_API_URL, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ results: incompleteResults.map(formatResultForSTAR) }),
+          });
+          if (!draftResponse.ok) {
+            const errorText = await draftResponse.text();
+            throw new Error(`STAR Draft API error ${draftResponse.status}: ${errorText}`);
+          }
+          const draftData = (await draftResponse.json()) as StarApiResponse;
+          allCreated.push(...(draftData.data?.results_created ?? []));
+          allErrors.push(...(draftData.data?.results_errors ?? []));
         }
 
-        const starResponse = (await response.json()) as StarApiResponse;
+        // Submit complete → Submit+Approve endpoint (falls back to Draft until endpoint is ready)
+        if (completeResults.length > 0) {
+          showLoading(`Submitting ${completeResults.length} complete record${completeResults.length !== 1 ? 's' : ''} for approval...`);
+          const approveEndpoint = STAR_SUBMIT_APPROVE_API_URL ?? STAR_API_URL;
+          const approveResponse = await fetch(approveEndpoint, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ results: completeResults.map(formatResultForSTAR) }),
+          });
+          if (!approveResponse.ok) {
+            const errorText = await approveResponse.text();
+            throw new Error(`STAR Submit/Approve API error ${approveResponse.status}: ${errorText}`);
+          }
+          const approveData = (await approveResponse.json()) as StarApiResponse;
+          allCreated.push(...(approveData.data?.results_created ?? []));
+          allErrors.push(...(approveData.data?.results_errors ?? []));
+        }
+
+        starResponse = { data: { results_created: allCreated, results_errors: allErrors } };
         setStarSubmissionResponse(starResponse);
+        hideLoading();
 
         // Build map for O(1) lookup (js-index-maps)
         const resultsByTitle = new Map(selectedResults.map((r) => [r.title, r]));
