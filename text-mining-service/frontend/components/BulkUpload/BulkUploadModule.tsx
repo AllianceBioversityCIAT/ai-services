@@ -6,7 +6,7 @@ import { useBulkUploadApi } from './hooks/useBulkUploadApi';
 import { useTableFilters } from './hooks/useTableFilters';
 import { loadRecordStatuses } from './hooks/useDynamoDB';
 import { extractUnmappedInstitutions } from './utils/dataFormatters';
-import { createUnmappedReportCSV, downloadCSV } from './utils/csvUtils';
+import { createUnmappedReportCSV, createDraftReportCSV, downloadCSV } from './utils/csvUtils';
 import { setNestedValue } from './utils/tableHelpers';
 import { checkCompleteness } from './utils/completenessChecker';
 
@@ -79,6 +79,21 @@ export default function BulkUploadModule() {
     setSelectedIndices(new Set());
     filters.clearAllFilters();
   }, [filters]);
+
+  const handleFinishProcess = useCallback(() => {
+    const draftResults = editedData.filter(
+      (r) =>
+        recordStatuses[String(r.id)]?.status === 'complete' &&
+        !checkCompleteness(r).isComplete,
+    );
+    if (draftResults.length > 0) {
+      const csv = createDraftReportCSV(draftResults, recordStatuses);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const baseName = currentFileName?.replace(/\.[^.]+$/, '') ?? 'draft_results';
+      downloadCSV(csv, `draft_report_${baseName}_${timestamp}.csv`);
+    }
+    handleNewUpload();
+  }, [editedData, recordStatuses, currentFileName, handleNewUpload]);
 
   const handleProcessSuccess = useCallback(
     (results: BulkUploadResult[], statuses: Record<string, RecordStatus>, fileName: string) => {
@@ -206,7 +221,7 @@ export default function BulkUploadModule() {
             institutions={unmappedInstitutions}
             onDownloadReport={handleDownloadUnmappedReport}
             onBackToResults={handleNextStep}
-            onFinishProcess={handleNewUpload}
+            onFinishProcess={handleFinishProcess}
           />
         )}
 

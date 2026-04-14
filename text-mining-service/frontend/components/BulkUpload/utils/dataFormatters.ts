@@ -316,10 +316,11 @@ export function formatResultForSTAR(result: BulkUploadResult): Record<string, un
 
   // Step 17: optional string fields
   OPTIONAL_STRING_FIELDS.forEach((field) => {
-    if (formatted[field] === null || formatted[field] === undefined || formatted[field] === '') {
+    const val = formatted[field];
+    if (val === null || val === undefined || val === '' || String(val) === 'undefined' || String(val) === 'null') {
       delete formatted[field];
-    } else if (formatted[field] !== undefined) {
-      formatted[field] = String(formatted[field]);
+    } else if (val !== undefined) {
+      formatted[field] = String(val);
     }
   });
 
