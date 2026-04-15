@@ -9,19 +9,6 @@ import { simplifyS3Path } from '../utils/tableHelpers';
 import { checkCompleteness } from '../utils/completenessChecker';
 
 // =========================
-// Auth Token
-// =========================
-async function fetchAuthToken(): Promise<string> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/token`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!response.ok) throw new Error(`Failed to obtain auth token: ${response.status}`);
-  const data = (await response.json()) as { token: string };
-  return data.token;
-}
-
-// =========================
 // Hook
 // =========================
 export interface BulkUploadApiState {
@@ -52,11 +39,11 @@ export interface BulkUploadApiActions {
   clearError: () => void;
 }
 
-export function useBulkUploadApi(): BulkUploadApiState & BulkUploadApiActions {
+export function useBulkUploadApi(initialToken: string | null = null): BulkUploadApiState & BulkUploadApiActions {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('Processing...');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [authToken, setAuthToken] = useState<string | null>(null);
+  const authToken: string | null = initialToken;
   const [s3Objects, setS3Objects] = useState<string[]>([]);
   const [starSubmissionResponse, setStarSubmissionResponse] = useState<StarApiResponse | null>(null);
 
@@ -82,18 +69,10 @@ export function useBulkUploadApi(): BulkUploadApiState & BulkUploadApiActions {
       s3Key: string | null,
       onSuccess: (results: BulkUploadResult[], statuses: Record<string, RecordStatus>, fileName: string) => void,
     ) => {
-      let token = authToken;
+      const token = authToken;
       if (!token) {
-        try {
-          showLoading('Authenticating...');
-          token = await fetchAuthToken();
-          setAuthToken(token);
-          hideLoading();
-        } catch (error) {
-          hideLoading();
-          showError((error as Error).message);
-          return;
-        }
+        showError('No authentication token available. Please reload the page.');
+        return;
       }
 
       const formData = new FormData();

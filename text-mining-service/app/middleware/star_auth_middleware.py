@@ -13,7 +13,7 @@ class AuthMiddleware:
     def __init__(self):
         self.ms_name = os.getenv('MS_NAME', 'Mining Microservice')
 
-    async def authenticate(self, message: Dict[str, Any]) -> bool:
+    async def authenticate(self, message: Dict[str, Any], require_roles: bool = False) -> bool:
         """Authenticate incoming message with access token"""
         logger.debug(f"Authenticating message: {message}")
         token = message.get('token')
@@ -33,9 +33,9 @@ class AuthMiddleware:
             return False
 
         logger.debug(f"Validating token for {self.ms_name}")
-        return await self.validate_token(token, environmentUrl)
+        return await self.validate_token(token, environmentUrl, require_roles=require_roles)
 
-    async def validate_token(self, token: str, environmentUrl: str) -> bool:
+    async def validate_token(self, token: str, environmentUrl: str, require_roles: bool = False) -> bool:
         """Validate the access token using the management API"""
         if not environmentUrl:
             logger.error("STAR endpoint URL is not configured")
@@ -62,6 +62,11 @@ class AuthMiddleware:
             if response.status_code == 200:
                 data = response.json()
                 is_valid = data.get("data", {}).get("isValid", False)
+                if require_roles:
+                    roles = data.get("data", {}).get("user", {}).get("roles", [])
+                    has_allowed_role = any(r in [1, 10] for r in roles)
+                    logger.debug(f"Token is valid: {is_valid}, roles: {roles}, has_allowed_role: {has_allowed_role}")
+                    return is_valid and has_allowed_role
                 logger.debug(f"Token is valid: {is_valid}")
                 return is_valid
             else:
