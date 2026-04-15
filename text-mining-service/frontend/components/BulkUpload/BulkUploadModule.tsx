@@ -19,6 +19,38 @@ import { UnmappedTable } from './components/UnmappedTable';
 import { ResultsTable } from './components/ResultsTable';
 
 export default function BulkUploadModule() {
+  // ── Auth ──────────────────────────────────────────────
+  const [authStatus, setAuthStatus] = useState<'loading' | 'valid' | 'invalid'>('loading');
+  const [userToken, setUserToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('access_token');
+    // Strip the token from the URL immediately to avoid it lingering in browser history
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (!token) {
+      setAuthStatus('invalid');
+      return;
+    }
+
+    fetch('/api/validate-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+      .then((res) => res.json() as Promise<{ valid: boolean }>)
+      .then((data) => {
+        if (data.valid) {
+          setUserToken(token);
+          setAuthStatus('valid');
+        } else {
+          setAuthStatus('invalid');
+        }
+      })
+      .catch(() => setAuthStatus('invalid'));
+  }, []);
+
   // ── Scroll to top on page load ────────────────────────
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -54,7 +86,7 @@ export default function BulkUploadModule() {
   } | null>(null);
 
   // ── API ───────────────────────────────────────────────
-  const api = useBulkUploadApi();
+  const api = useBulkUploadApi(userToken);
 
   // ── Filters ───────────────────────────────────────────
   const filters = useTableFilters();
@@ -177,6 +209,36 @@ export default function BulkUploadModule() {
   const handleClearSelections = useCallback(() => {
     setSelectedIndices(new Set());
   }, []);
+
+  // ── Auth gate ─────────────────────────────────────────
+  if (authStatus === 'loading') {
+    return (
+      <div className="bulk-upload-wrapper">
+        <div className="bulk-upload-container">
+          <LoadingOverlay text="Verifying access..." />
+        </div>
+      </div>
+    );
+  }
+
+  if (authStatus === 'invalid') {
+    return (
+      <div className="bulk-upload-wrapper">
+        <div className="bulk-upload-container">
+          <div className="bulk-auth-denied">
+            <div className="bulk-auth-denied-icon">
+              <img src="/static/bulk_upload/denied_access.png" alt="Access denied" width={200} height={200} />
+            </div>
+            <h2 className="bulk-auth-denied-title">Access Denied</h2>
+            <p className="bulk-auth-denied-message">
+              You don&apos;t have the necessary permissions to access the Bulk Upload tool.
+              Please contact your administrator if you believe this is a mistake.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bulk-upload-wrapper">
