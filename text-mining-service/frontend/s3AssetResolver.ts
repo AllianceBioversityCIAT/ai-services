@@ -1,16 +1,19 @@
 import { GetObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { InternalEvent, InternalResult } from "@opennextjs/aws/types/open-next.js";
 import type { AssetResolver } from "@opennextjs/aws/types/overrides.js";
-import { Readable } from "node:stream";
 
 /**
  * Sirve estáticos desde S3 cuando solo hay Function URL (sin CloudFront delante).
  * OpenNext 3 usa por defecto assetResolver "dummy" y asume CF→S3 para /_next/static.
  *
- * URL del navegador: /_next/static/media/foo.<hash>.png (Next no usa /static/bulk_upload para imports).
- * Clave S3 canónica: <BUCKET_KEY_PREFIX>/_next/static/media/foo.<hash>.png
- *   con BUCKET_KEY_PREFIX=_assets → _assets/_next/static/media/...
- * Jenkins debe hacer: aws s3 sync .open-next/assets/ s3://$BUCKET/_assets/
+ * URL del navegador: /_next/static/media/foo.<hash>.png
+ * Clave S3: <BUCKET_KEY_PREFIX>/_next/static/media/foo.<hash>.png (p. ej. prefijo _assets)
+ * Jenkins: aws s3 sync .open-next/assets/ s3://$BUCKET/_assets/
+ *
+ * Importante:
+ * - aws-apigw-v2 convertTo() hace buffer.toString("utf8") si isBase64Encoded es false → corrompe PNG.
+ * - Debe ir isBase64Encoded: true (el conversor hace buffer.toString("base64") del binario).
+ * - Leer el body con transformToByteArray(): en Lambda, Readable.toWeb(SDK) a veces no itera y el body queda vacío (200, ~0 B, <img> roto).
  *
  * @see https://opennext.js.org/aws/config/overrides/asset_resolver
  */
@@ -23,10 +26,6 @@ function trimmedPath(rawPath: string): string {
   return pathOnly.startsWith("/") ? pathOnly.slice(1) : pathOnly;
 }
 
-/**
- * Orden: clave canónica primero; si el prefijo es _assets, reintenta bajo "assets/"
- * (syncs erróneos que omiten el guión bajo inicial).
- */
 function candidateObjectKeys(rawPath: string): string[] {
   const trimmed = trimmedPath(rawPath);
   const prefix =
@@ -57,7 +56,6 @@ function isS3NotFound(e: unknown): boolean {
   return name === "NoSuchKey" || name === "NotFound";
 }
 
-/** S3 a veces deja ContentType vacío o application/octet-stream tras sync; el <img> puede fallar en algunos navegadores. */
 function effectiveContentType(key: string, s3ContentType: string | undefined): string {
   const generic =
     !s3ContentType ||
@@ -82,6 +80,15 @@ function effectiveContentType(key: string, s3ContentType: string | undefined): s
 function emptyBody(): ReadableStream<Uint8Array> {
   return new ReadableStream({
     start(controller) {
+      controller.close();
+    },
+  });
+}
+
+function bytesToWebReadableStream(bytes: Uint8Array): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
       controller.close();
     },
   });
@@ -126,10 +133,17 @@ const resolver: AssetResolver = {
         const out = await client.send(
           new GetObjectCommand({ Bucket: bucket, Key: key }),
         );
-        const bodyNode = out.Body as Readable | undefined;
-        if (!bodyNode) return undefined;
+        const sdkBody = out.Body;
+        if (!sdkBody) return undefined;
 
-        const body = Readable.toWeb(bodyNode) as InternalResult["body"];
+        const bytes =
+          typeof sdkBody.transformToByteArray === "function"
+            ? await sdkBody.transformToByteArray()
+            : undefined;
+        if (!bytes || bytes.byteLength === 0) {
+          continue;
+        }
+
         const contentType = effectiveContentType(key, out.ContentType);
 
         return {
@@ -140,8 +154,8 @@ const resolver: AssetResolver = {
             "cache-control":
               out.CacheControl ?? "public, max-age=31536000, immutable",
           },
-          body,
-          isBase64Encoded: false,
+          body: bytesToWebReadableStream(bytes) as InternalResult["body"],
+          isBase64Encoded: true,
         };
       } catch (e: unknown) {
         if (isS3NotFound(e)) continue;
