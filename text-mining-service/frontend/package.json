@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "sst:dev": "sst dev",
+    "sst:deploy": "sst deploy",
+    "sst:remove": "sst remove",
+    "build:open-next": "next build && open-next build"
   },
   "dependencies": {
     "next": "^15.2.4",
@@ -15,6 +19,8 @@
     "styled-jsx": "^5.1.7"
   },
   "devDependencies": {
+    "@opennextjs/aws": "^3.10.1",
+    "sst": "^3.17.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

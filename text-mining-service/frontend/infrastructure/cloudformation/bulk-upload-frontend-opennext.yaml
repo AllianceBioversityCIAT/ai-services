@@ -1,0 +1,203 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Fase 1 (minimal): STAR bulk-upload Next.js en AWS Lambda vía OpenNext — solo Lambda
+  servidor + Function URL + bucket S3 para assets estáticos (.open-next/assets).
+  Sin S3 de cache de OpenNext, sin SQS, sin DynamoDB. OpenNext debe compilarse con
+  open-next.config.ts (overrides dummy). CI sube el zip del servidor y sincroniza assets.
+  El zip NO puede vivir en un bucket que cree este mismo stack en el primer deploy (la Lambda
+  exige que el objeto ya exista). Usa un bucket ya existente o despliega una vez
+  bulk-upload-frontend-opennext-deployment-bucket.yaml y usa su Output como ServerCodeS3Bucket.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Environment
+        Parameters:
+          - EnvironmentName
+      - Label:
+          default: Naming (S3 global)
+        Parameters:
+          - BucketNameSuffix
+      - Label:
+          default: Lambda code (CI)
+        Parameters:
+          - ServerCodeS3Bucket
+          - ServerCodeS3Key
+      - Label:
+          default: CORS (Function URL)
+        Parameters:
+          - CorsAllowOrigin
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Description: Logical environment (e.g. dev, staging, prod).
+    AllowedPattern: '^[a-z0-9-]+$'
+    ConstraintDescription: Lowercase letters, numbers, and hyphens only.
+
+  BucketNameSuffix:
+    Type: String
+    Description: Short suffix for globally unique asset bucket name.
+    AllowedPattern: '^[a-z0-9]+$'
+    ConstraintDescription: Lowercase letters and numbers only.
+
+  ServerCodeS3Bucket:
+    Type: String
+    Description: Bucket where CI uploaded the OpenNext server zip (same account/region).
+
+  ServerCodeS3Key:
+    Type: String
+    Description: S3 key of the zip (root includes index.mjs).
+
+  CorsAllowOrigin:
+    Type: String
+    Default: '*'
+    Description: >-
+      Origen permitido para CORS en la Function URL. Use * solo para pruebas;
+      en producción use un origen explícito (ej. https://tu-app.cgiar.org).
+
+Resources:
+  AssetsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub
+        - 'star-bulk-upload-assets-${EnvironmentName}-${Suffix}'
+        - Suffix: !Ref BucketNameSuffix
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Project
+          Value: STAR
+        - Key: Functionality
+          Value: bulk-upload
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  ServerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Tags:
+        - Key: Project
+          Value: STAR
+        - Key: Functionality
+          Value: bulk-upload
+        - Key: Environment
+          Value: !Ref EnvironmentName
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: opennext-fase1-assets-s3
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: AssetsReadWrite
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt AssetsBucket.Arn
+                  - !Sub '${AssetsBucket.Arn}/*'
+
+  ServerLambda:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - ServerLambdaRole
+    Properties:
+      FunctionName: !Sub 'star-bulk-upload-server-${EnvironmentName}'
+      Role: !GetAtt ServerLambdaRole.Arn
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Architectures:
+        - x86_64
+      Code:
+        S3Bucket: !Ref ServerCodeS3Bucket
+        S3Key: !Ref ServerCodeS3Key
+      MemorySize: 1536
+      Timeout: 60
+      Environment:
+        Variables:
+          NODE_ENV: production
+      Tags:
+        - Key: Project
+          Value: STAR
+        - Key: Functionality
+          Value: bulk-upload
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  ServerLambdaUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      AuthType: NONE
+      TargetFunctionArn: !GetAtt ServerLambda.Arn
+      Cors:
+        AllowOrigins:
+          - !Ref CorsAllowOrigin
+        AllowMethods:
+          - GET
+          - HEAD
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        AllowHeaders:
+          - '*'
+        ExposeHeaders:
+          - '*'
+        MaxAge: 3600
+
+  ServerLambdaUrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ServerLambda
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
+Outputs:
+  AssetsBucketName:
+    Description: Sincronizar aquí el contenido de .open-next/assets/ (raíz del bucket).
+    Value: !Ref AssetsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-AssetsBucketName'
+
+  ServerLambdaArn:
+    Description: ARN de la Lambda OpenNext (servidor Next.js).
+    Value: !GetAtt ServerLambda.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ServerLambdaArn'
+
+  ServerLambdaFunctionName:
+    Description: Nombre físico de la función (para aws lambda update-function-configuration).
+    Value: !Ref ServerLambda
+    Export:
+      Name: !Sub '${AWS::StackName}-ServerLambdaFunctionName'
+
+  ServerLambdaFunctionUrl:
+    Description: HTTPS URL (Lambda Function URL) para pruebas Fase 1; endurecer CORS y considerar CloudFront después.
+    Value: !GetAtt ServerLambdaUrl.FunctionUrl
+    Export:
+      Name: !Sub '${AWS::StackName}-ServerLambdaFunctionUrl'

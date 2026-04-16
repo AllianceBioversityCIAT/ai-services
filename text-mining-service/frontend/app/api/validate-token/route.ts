@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ valid: false, error: 'No token provided' }, { status: 400 });
   }
 
-  const managementApiBaseUrl = process.env.NEXT_PUBLIC_MANAGEMENT_API_BASE_URL;
+  const managementApiBaseUrl =
+    process.env.MANAGEMENT_API_BASE_URL ?? process.env.NEXT_PUBLIC_MANAGEMENT_API_BASE_URL;
   if (!managementApiBaseUrl) {
     return NextResponse.json({ valid: false, error: 'Server configuration error' }, { status: 500 });
   }
