@@ -5,6 +5,9 @@ import type { DocSource } from '../types';
 import { FileDropzone } from './FileDropzone';
 import { S3FileSelector } from './S3FileSelector';
 
+import uploadFileIcon from '../../../public/static/bulk_upload/upload_file.png';
+import previousFileIcon from '../../../public/static/bulk_upload/previous_file.png';
+
 // Hoisted static SVGs (rendering-hoist-jsx)
 const DownloadSvg = (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
@@ -115,7 +118,12 @@ export function Step1Upload({
             onChange={() => handleSourceChange('upload' as DocSource)}
           />
           <div className="bulk-card-icon">
-            <img src="static/bulk_upload/upload_file.png" alt="Upload file icon" width={60} height={60} />
+            <img
+              src={uploadFileIcon.src}
+              alt="Upload file icon"
+              width={60}
+              height={60}
+            />
           </div>
           <div className="bulk-card-title">UPLOAD FILE</div>
           <div className="bulk-card-description">Upload from your computer.</div>
@@ -131,7 +139,12 @@ export function Step1Upload({
             onChange={() => handleSourceChange('s3' as DocSource)}
           />
           <div className="bulk-card-icon">
-            <img src="static/bulk_upload/previous_file.png" alt="Previous file icon" width={60} height={60} />
+            <img
+              src={previousFileIcon.src}
+              alt="Previous file icon"
+              width={60}
+              height={60}
+            />
           </div>
           <div className="bulk-card-title">PREVIOUS FILE</div>
           <div className="bulk-card-description">Choose from saved files.</div>
