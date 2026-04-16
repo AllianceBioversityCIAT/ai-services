@@ -37,6 +37,28 @@ function isS3NotFound(e: unknown): boolean {
   return name === "NoSuchKey" || name === "NotFound";
 }
 
+/** S3 a veces deja ContentType vacío o application/octet-stream tras sync; el <img> puede fallar en algunos navegadores. */
+function effectiveContentType(key: string, s3ContentType: string | undefined): string {
+  const generic =
+    !s3ContentType ||
+    s3ContentType === "binary/octet-stream" ||
+    s3ContentType === "application/octet-stream";
+  if (!generic) return s3ContentType;
+
+  const k = key.toLowerCase();
+  if (k.endsWith(".png")) return "image/png";
+  if (k.endsWith(".jpg") || k.endsWith(".jpeg")) return "image/jpeg";
+  if (k.endsWith(".gif")) return "image/gif";
+  if (k.endsWith(".webp")) return "image/webp";
+  if (k.endsWith(".svg")) return "image/svg+xml";
+  if (k.endsWith(".ico")) return "image/x-icon";
+  if (k.endsWith(".css")) return "text/css; charset=utf-8";
+  if (k.endsWith(".js") || k.endsWith(".mjs")) return "application/javascript; charset=utf-8";
+  if (k.endsWith(".woff2")) return "font/woff2";
+  if (k.endsWith(".woff")) return "font/woff";
+  return s3ContentType ?? "application/octet-stream";
+}
+
 function emptyBody(): ReadableStream<Uint8Array> {
   return new ReadableStream({
     start(controller) {
@@ -69,7 +91,7 @@ const resolver: AssetResolver = {
           type: "core",
           statusCode: 200,
           headers: {
-            "content-type": head.ContentType ?? "application/octet-stream",
+            "content-type": effectiveContentType(key, head.ContentType),
             "cache-control": head.CacheControl ?? "public, max-age=31536000, immutable",
             ...(head.ContentLength != null
               ? { "content-length": String(head.ContentLength) }
@@ -88,7 +110,7 @@ const resolver: AssetResolver = {
       if (!bodyNode) return undefined;
 
       const body = Readable.toWeb(bodyNode) as InternalResult["body"];
-      const contentType = out.ContentType ?? "application/octet-stream";
+      const contentType = effectiveContentType(key, out.ContentType);
 
       const ok: InternalResult = {
         type: "core",
