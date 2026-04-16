@@ -18,35 +18,7 @@ import { Step1Upload } from './components/Step1Upload';
 import { UnmappedTable } from './components/UnmappedTable';
 import { ResultsTable } from './components/ResultsTable';
 
-/** Inline graphic so "Access Denied" works even when /static/* or S3 assets fail to load. */
-function AccessDeniedGraphic() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={200}
-      height={200}
-      viewBox="0 0 200 200"
-      aria-hidden
-      className="bulk-auth-denied-graphic"
-    >
-      <circle cx="100" cy="100" r="82" fill="var(--bulk-bg-light)" stroke="var(--bulk-gray-200)" strokeWidth="2" />
-      <path
-        d="M88 98V78c0-14 12-26 26-26s26 12 26 26v20"
-        fill="none"
-        stroke="var(--bulk-primary)"
-        strokeWidth="8"
-        strokeLinecap="round"
-      />
-      <rect x="72" y="98" width="56" height="48" rx="6" fill="var(--bulk-primary)" />
-      <path
-        d="M58 142 L142 58"
-        stroke="var(--bulk-error)"
-        strokeWidth="10"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
+import deniedAccessImage from '../../public/static/bulk_upload/denied_access.png';
 
 export default function BulkUploadModule() {
   // ── Auth ──────────────────────────────────────────────
@@ -257,7 +229,13 @@ export default function BulkUploadModule() {
         <div className="bulk-upload-container">
           <div className="bulk-auth-denied">
             <div className="bulk-auth-denied-icon">
-              <AccessDeniedGraphic />
+              <img
+                src={deniedAccessImage.src}
+                alt="Access denied"
+                width={deniedAccessImage.width}
+                height={deniedAccessImage.height}
+                className="bulk-auth-denied-image"
+              />
             </div>
             <h2 className="bulk-auth-denied-title">Access Denied</h2>
             <p className="bulk-auth-denied-message">
