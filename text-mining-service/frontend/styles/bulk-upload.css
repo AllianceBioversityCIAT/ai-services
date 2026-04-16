@@ -207,6 +207,12 @@
     margin-bottom: 0.5rem;
 }
 
+.bulk-upload-wrapper .bulk-auth-denied-graphic {
+    display: block;
+    max-width: 200px;
+    height: auto;
+}
+
 .bulk-upload-wrapper .bulk-auth-denied-title {
     font-family: 'Inter', sans-serif;
     font-size: 1.25rem;
