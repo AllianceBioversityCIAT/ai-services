@@ -6,17 +6,37 @@ import { Readable } from "node:stream";
 /**
  * Sirve estáticos desde S3 cuando solo hay Function URL (sin CloudFront delante).
  * OpenNext 3 usa por defecto assetResolver "dummy" y asume CF→S3 para /_next/static.
+ *
+ * URL del navegador: /_next/static/media/foo.<hash>.png (Next no usa /static/bulk_upload para imports).
+ * Clave S3 canónica: <BUCKET_KEY_PREFIX>/_next/static/media/foo.<hash>.png
+ *   con BUCKET_KEY_PREFIX=_assets → _assets/_next/static/media/...
+ * Jenkins debe hacer: aws s3 sync .open-next/assets/ s3://$BUCKET/_assets/
+ *
  * @see https://opennext.js.org/aws/config/overrides/asset_resolver
  */
 const client = new S3Client({
   region: process.env.AWS_REGION ?? process.env.BUCKET_REGION,
 });
 
-function buildObjectKey(rawPath: string): string {
+function trimmedPath(rawPath: string): string {
   const pathOnly = rawPath.split("?")[0];
-  const trimmed = pathOnly.startsWith("/") ? pathOnly.slice(1) : pathOnly;
-  const prefix = process.env.BUCKET_KEY_PREFIX?.replace(/^\/|\/$/g, "") ?? "";
-  return prefix ? `${prefix}/${trimmed}` : trimmed;
+  return pathOnly.startsWith("/") ? pathOnly.slice(1) : pathOnly;
+}
+
+/**
+ * Orden: clave canónica primero; si el prefijo es _assets, reintenta bajo "assets/"
+ * (syncs erróneos que omiten el guión bajo inicial).
+ */
+function candidateObjectKeys(rawPath: string): string[] {
+  const trimmed = trimmedPath(rawPath);
+  const prefix =
+    process.env.BUCKET_KEY_PREFIX?.replace(/^\/|\/$/g, "").trim() ?? "_assets";
+  const primary = prefix ? `${prefix}/${trimmed}` : trimmed;
+  const keys = [primary];
+  if (primary.startsWith("_assets/")) {
+    keys.push(`assets/${trimmed}`);
+  }
+  return keys;
 }
 
 function shouldResolveFromS3(pathOnly: string): boolean {
@@ -80,54 +100,56 @@ const resolver: AssetResolver = {
     const bucket = process.env.BUCKET_NAME;
     if (!bucket) return;
 
-    const key = buildObjectKey(event.rawPath);
+    const keys = candidateObjectKeys(event.rawPath);
 
-    try {
-      if (event.method === "HEAD") {
-        const head = await client.send(
-          new HeadObjectCommand({ Bucket: bucket, Key: key }),
+    for (const key of keys) {
+      try {
+        if (event.method === "HEAD") {
+          const head = await client.send(
+            new HeadObjectCommand({ Bucket: bucket, Key: key }),
+          );
+          return {
+            type: "core",
+            statusCode: 200,
+            headers: {
+              "content-type": effectiveContentType(key, head.ContentType),
+              "cache-control": head.CacheControl ?? "public, max-age=31536000, immutable",
+              ...(head.ContentLength != null
+                ? { "content-length": String(head.ContentLength) }
+                : {}),
+            },
+            body: emptyBody() as InternalResult["body"],
+            isBase64Encoded: false,
+          };
+        }
+
+        const out = await client.send(
+          new GetObjectCommand({ Bucket: bucket, Key: key }),
         );
-        const headResult: InternalResult = {
+        const bodyNode = out.Body as Readable | undefined;
+        if (!bodyNode) return undefined;
+
+        const body = Readable.toWeb(bodyNode) as InternalResult["body"];
+        const contentType = effectiveContentType(key, out.ContentType);
+
+        return {
           type: "core",
           statusCode: 200,
           headers: {
-            "content-type": effectiveContentType(key, head.ContentType),
-            "cache-control": head.CacheControl ?? "public, max-age=31536000, immutable",
-            ...(head.ContentLength != null
-              ? { "content-length": String(head.ContentLength) }
-              : {}),
+            "content-type": contentType,
+            "cache-control":
+              out.CacheControl ?? "public, max-age=31536000, immutable",
           },
-          body: emptyBody() as InternalResult["body"],
+          body,
           isBase64Encoded: false,
         };
-        return headResult;
+      } catch (e: unknown) {
+        if (isS3NotFound(e)) continue;
+        throw e;
       }
-
-      const out = await client.send(
-        new GetObjectCommand({ Bucket: bucket, Key: key }),
-      );
-      const bodyNode = out.Body as Readable | undefined;
-      if (!bodyNode) return undefined;
-
-      const body = Readable.toWeb(bodyNode) as InternalResult["body"];
-      const contentType = effectiveContentType(key, out.ContentType);
-
-      const ok: InternalResult = {
-        type: "core",
-        statusCode: 200,
-        headers: {
-          "content-type": contentType,
-          "cache-control":
-            out.CacheControl ?? "public, max-age=31536000, immutable",
-        },
-        body,
-        isBase64Encoded: false,
-      };
-      return ok;
-    } catch (e: unknown) {
-      if (isS3NotFound(e)) return undefined;
-      throw e;
     }
+
+    return undefined;
   },
 };
 
