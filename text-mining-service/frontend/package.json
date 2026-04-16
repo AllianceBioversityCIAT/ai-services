@@ -13,6 +13,7 @@
     "build:open-next": "next build && open-next build"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.984.0",
     "next": "^15.2.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -20,13 +21,13 @@
   },
   "devDependencies": {
     "@opennextjs/aws": "^3.10.1",
-    "sst": "^3.17.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^15.2.4",
+    "sst": "^3.17.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
