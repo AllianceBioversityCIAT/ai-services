@@ -155,14 +155,9 @@ Resources:
       Cors:
         AllowOrigins:
           - !Ref CorsAllowOrigin
+        # Lambda Function URL CORS allows at most 6 AllowMethods entries; use * for app traffic (Next/OpenNext).
         AllowMethods:
-          - GET
-          - HEAD
-          - POST
-          - PUT
-          - PATCH
-          - DELETE
-          - OPTIONS
+          - '*'
         AllowHeaders:
           - '*'
         ExposeHeaders:
