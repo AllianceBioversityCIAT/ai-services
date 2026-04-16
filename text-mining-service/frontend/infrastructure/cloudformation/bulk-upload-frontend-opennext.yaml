@@ -7,6 +7,7 @@ Description: >
   El zip NO puede vivir en un bucket que cree este mismo stack en el primer deploy (la Lambda
   exige que el objeto ya exista). Usa un bucket ya existente o despliega una vez
   bulk-upload-frontend-opennext-deployment-bucket.yaml y usa su Output como ServerCodeS3Bucket.
+  CI debe sincronizar .open-next/assets/ a s3://<AssetsBucket>/_assets/ (no a la raíz del bucket).
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -139,6 +140,9 @@ Resources:
       Environment:
         Variables:
           NODE_ENV: production
+          # OpenNext default asset resolver: serve /_next/static/* from S3 (must match Jenkins sync prefix).
+          BUCKET_NAME: !Ref AssetsBucket
+          BUCKET_KEY_PREFIX: _assets
       Tags:
         - Key: Project
           Value: STAR
@@ -174,7 +178,7 @@ Resources:
 
 Outputs:
   AssetsBucketName:
-    Description: Sincronizar aquí el contenido de .open-next/assets/ (raíz del bucket).
+    Description: Sincronizar .open-next/assets/ bajo el prefijo _assets/ (OpenNext 3; la Lambda usa BUCKET_NAME + BUCKET_KEY_PREFIX=_assets).
     Value: !Ref AssetsBucket
     Export:
       Name: !Sub '${AWS::StackName}-AssetsBucketName'
