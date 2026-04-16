@@ -1,9 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  Static hosting for the STAR bulk-upload Next.js frontend: private S3 origin,
-  CloudFront with the default *.cloudfront.net certificate (HTTPS, no ACM cost),
-  Origin Access Control (OAC), and outputs for CI/CD. Build must export static
-  assets (output: 'export' in next.config) and sync the out/ directory to the bucket.
+  Legacy static hosting for the STAR bulk-upload Next.js frontend: private S3 origin,
+  CloudFront, OAC, CI/CD outputs. Historically paired with next.config output export
+  and syncing the out/ folder. The app now runs in server mode; prefer SST/OpenNext
+  (see sst.config.ts in the frontend) for Lambda + CloudFront instead of this stack.
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -152,7 +152,7 @@ Resources:
 
 Outputs:
   BucketName:
-    Description: S3 bucket for static assets (deploy out/ here).
+    Description: S3 bucket for static assets (legacy deploy sync out/ here).
     Value: !Ref AssetsBucket
     Export:
       Name: !Sub '${AWS::StackName}-BucketName'

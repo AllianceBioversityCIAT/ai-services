@@ -1,8 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "export",
-  // Keep `next build` focused on the static export; ESLint stays optional for local/IDE use.
+  // Server mode (default): required for App Router API routes (`app/api/*`), SSR, and OpenNext/SST on Lambda.
   eslint: {
     ignoreDuringBuilds: true,
   },
