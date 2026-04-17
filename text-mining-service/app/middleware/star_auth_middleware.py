@@ -64,7 +64,7 @@ class AuthMiddleware:
                 is_valid = data.get("data", {}).get("isValid", False)
                 if require_roles:
                     roles = data.get("data", {}).get("user", {}).get("roles", [])
-                    has_allowed_role = any(r in [1, 10] for r in roles)
+                    has_allowed_role = any(r in [1, 9, 10] for r in roles)
                     logger.debug(f"Token is valid: {is_valid}, roles: {roles}, has_allowed_role: {has_allowed_role}")
                     return is_valid and has_allowed_role
                 logger.debug(f"Token is valid: {is_valid}")
