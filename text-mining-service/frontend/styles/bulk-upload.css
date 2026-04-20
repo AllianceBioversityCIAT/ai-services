@@ -35,7 +35,7 @@
     
     /* Transparent background to blend with STAR's gray background */
     background: transparent;
-    padding: 0;
+    padding: 0 1rem; /* px-4 — keeps scrollbar flush with page edge when embedded */
 }
 
 /* Content Header (outside white card, in gray background) */
