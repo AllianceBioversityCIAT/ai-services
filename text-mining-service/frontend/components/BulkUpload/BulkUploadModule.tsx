@@ -267,11 +267,11 @@ export default function BulkUploadModule() {
         />
       )}
 
-      {/* Step indicator — outside white card, in header background */}
-      <StepIndicator currentStep={step} />
-
       {/* White card container */}
       <div className="bulk-upload-container">
+        {/* Step indicator — inside white card */}
+        <StepIndicator currentStep={step} />
+
         {api.isLoading && <LoadingOverlay text={api.loadingText} />}
 
         {step === 'upload' && (
