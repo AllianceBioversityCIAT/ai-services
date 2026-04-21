@@ -1911,8 +1911,8 @@
 
 .bulk-upload-container .status-failed {
     background: transparent;
-    color: #991B1B;
-    border: 1px solid #FCA5A5;
+    color: #f53939;
+    border: 1px solid #db1616;
 }
 
 .bulk-upload-container .status-complete {
@@ -2243,6 +2243,42 @@
 /* Unmapped Institutions Section */
 .bulk-upload-container .bulk-unmapped-container {
     margin-top: 0;
+}
+
+.bulk-upload-container .bulk-unmapped-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    text-align: center;
+    gap: 0.5rem;
+}
+
+.bulk-upload-container .bulk-unmapped-empty-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #D1FAE5;
+    color: #065F46;
+    font-size: 22px;
+    margin-bottom: 0.5rem;
+}
+
+.bulk-upload-container .bulk-unmapped-empty-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--bulk-primary);
+    margin: 0;
+}
+
+.bulk-upload-container .bulk-unmapped-empty-sub {
+    font-size: 14px;
+    color: var(--bulk-gray-500);
+    margin: 0;
 }
 
 .bulk-upload-container .bulk-unmapped-header {

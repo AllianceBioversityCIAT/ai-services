@@ -99,11 +99,11 @@ export const IP_RIGHTS_YES_NO_FIELDS = [
 
 // Hoisted: static column definitions (rendering-hoist-jsx pattern for data)
 export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
-  { key: 'select', label: 'Select', type: 'checkbox', width: '50px' },
+  { key: 'select', label: 'Select', type: 'checkbox', width: '55px' },
   { key: 'id', label: 'ID', type: 'text', readonly: true, width: '70px' },
   { key: 'status', label: 'Status', type: 'status', readonly: true, width: '125px' },
   { key: 'completeness', label: 'Completeness', type: 'completeness', readonly: true, width: '130px' },
-  { key: 'star_link', label: 'STAR Link', type: 'link', readonly: true, width: '130px' },
+  { key: 'star_link', label: 'STAR Link', type: 'link', readonly: true, width: '150px' },
   { key: 'title', label: 'Title', type: 'textarea', required: true, width: '350px' },
   { key: 'description', label: 'Description', type: 'textarea', width: '485px' },
   { key: 'year', label: 'Year', type: 'text', width: '90px' },
@@ -121,7 +121,7 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
   { key: 'non_binary_participants', label: 'Non-binary Participants', type: 'number', enabledWhen: { field: 'training_type', values: ['Group training'] }, width: '210px' },
   { key: 'training_purpose', label: 'Training Purpose', type: 'training_purpose', riskFlag: true, enabledWhen: { field: 'training_type', values: ['Group training'] }, width: '240px' },
   { key: 'trainees', label: 'Trainees', type: 'select', options: ['Yes', 'No'], enabledWhen: { field: 'training_type', values: ['Group training'] }, width: '155px' },
-  { key: 'trainees_description', label: 'Trainees Organizations', type: 'partners', riskFlag: true, enabledWhen: { field: 'training_type', values: ['Group training'] }, width: '220px' },
+  { key: 'trainees_description', label: 'Trainees Organizations', type: 'partners', riskFlag: true, enabledWhen: { field: 'training_type', values: ['Group training'] }, width: '300px' },
   { key: 'trainee_name', label: 'Trainee Name', type: 'text', enabledWhen: { field: 'training_type', values: ['Individual training'] }, width: '155px' },
   {
     key: 'trainee_gender',
@@ -138,7 +138,7 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
   { key: 'start_date', label: 'Start Date', type: 'date', width: '164px' },
   { key: 'end_date', label: 'End Date', type: 'date', width: '164px' },
   { key: 'delivery_modality', label: 'Delivery Modality', type: 'select', options: ['in-person', 'virtual', 'hybrid'], width: '170px' },
-  { key: 'partners', label: 'Partners', type: 'partners', riskFlag: true, width: '190px' },
+  { key: 'partners', label: 'Partners', type: 'partners', riskFlag: true, width: '250px' },
   {
     key: 'geoscope_level',
     label: 'Geoscope Level',

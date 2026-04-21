@@ -58,7 +58,7 @@ export function extractUnmappedInstitutions(results: BulkUploadResult[]): Unmapp
   };
 
   results.forEach((result, idx) => {
-    const recordId = `Record_${idx + 1}`;
+    const recordId = `Result ${idx + 1}`;
     const title = result.title ?? 'Unknown Title';
 
     if (Array.isArray(result.partners)) {
