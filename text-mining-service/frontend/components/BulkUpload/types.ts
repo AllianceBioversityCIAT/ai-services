@@ -124,6 +124,7 @@ export interface ColumnDef {
   type: 'checkbox' | 'text' | 'number' | 'textarea' | 'select' | 'status' | 'completeness' | 'link' | 'chips' | 'partners' | 'sdg' | 'evidence_desc' | 'evidence_link' | 'training_purpose' | 'date' | 'countries' | 'regions' | 'affiliation' | 'nationality' | 'language' | 'staff';
   readonly?: boolean;
   required?: boolean;
+  riskFlag?: boolean;
   options?: string[];
   tooltip?: string;
   enabledWhen?: { field: string; values: (string | number)[] };

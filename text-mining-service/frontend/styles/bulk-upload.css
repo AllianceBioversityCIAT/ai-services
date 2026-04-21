@@ -1685,6 +1685,39 @@
     opacity: 1;
 }
 
+.bulk-upload-container .risk-flag-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    background: #EF4444;
+    color: #fff;
+    border-radius: 50%;
+    font-size: 10px;
+    font-weight: 700;
+    margin-left: 4px;
+    line-height: 1;
+    vertical-align: middle;
+    cursor: default;
+    flex-shrink: 0;
+}
+
+.risk-flag-tooltip {
+    position: fixed;
+    background: #1F2937;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 400;
+    padding: 6px 10px;
+    border-radius: 6px;
+    white-space: normal;
+    width: 200px;
+    line-height: 1.4;
+    pointer-events: none;
+    z-index: 9999;
+}
+
 .bulk-upload-container .bulk-results-table td {
     padding: 0.5rem 0.75rem;
     font-size: 14px;
