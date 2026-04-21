@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const ALLOWED_ROLES = [1, 10];
+const ALLOWED_ROLES = [1, 9, 10];
 
 export async function POST(request: NextRequest) {
   let token: string;
