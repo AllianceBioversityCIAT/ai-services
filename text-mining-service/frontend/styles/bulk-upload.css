@@ -1911,7 +1911,7 @@
 
 .bulk-upload-container .status-failed {
     background: transparent;
-    color: #f53939;
+    color: #cf2121;
     border: 1px solid #db1616;
 }
 
@@ -1951,6 +1951,48 @@
     color: #f99c4b;
     border: 1px solid #ebb235;
     cursor: help;
+}
+
+.failed-tooltip {
+    position: fixed;
+    z-index: 10001;
+    background: #1F2937;
+    color: #F9FAFB;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    max-width: 320px;
+    min-width: 240px;
+    max-height: 300px;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+}
+
+.failed-tooltip-error {
+    font-size: 12px;
+    font-weight: 500;
+    color: #FCA5A5;
+    background: rgba(239, 68, 68, 0.15);
+    border-radius: 4px;
+    padding: 4px 8px;
+    margin: 0 0 0.6rem 0;
+    line-height: 1.5;
+}
+
+.failed-tooltip-title {
+    font-size: 12px;
+    font-weight: 700;
+    margin: 0 0 0.4rem 0;
+    color: #E5E7EB;
+}
+
+.failed-tooltip-list {
+    list-style: disc;
+    padding-left: 1.25rem;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #D1D5DB;
 }
 
 .completeness-tooltip {

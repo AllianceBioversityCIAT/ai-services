@@ -23,6 +23,7 @@ import { EvidenceCell } from './EvidenceCell';
 import type { Evidence } from './EvidenceCell';
 import { CompletenessCell } from './CompletenessCell';
 import { RiskFlagBadge } from './RiskFlagBadge';
+import { FailedStatusBadge } from './FailedStatusBadge';
 import { checkCompleteness } from '../utils/completenessChecker';
 
 // Hoisted static SVGs (rendering-hoist-jsx)
@@ -97,8 +98,11 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
 
   if (col.type === 'status') {
     const status = recordStatus?.status ?? 'pending';
-    const statusClass = status === 'complete' ? 'status-complete' : status === 'failed' ? 'status-failed' : 'status-pending';
-    const label = status === 'complete' ? 'Submitted' : status === 'failed' ? 'Failed' : 'Pending';
+    if (status === 'failed') {
+      return <td><FailedStatusBadge errorMessage={recordStatus?.errorMessage} /></td>;
+    }
+    const statusClass = status === 'complete' ? 'status-complete' : 'status-pending';
+    const label = status === 'complete' ? 'Submitted' : 'Pending';
     return <td><span className={statusClass}>{label}</span></td>;
   }
 
