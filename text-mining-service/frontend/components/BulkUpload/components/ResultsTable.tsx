@@ -98,7 +98,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
   if (col.type === 'status') {
     const status = recordStatus?.status ?? 'pending';
     const statusClass = status === 'complete' ? 'status-complete' : status === 'failed' ? 'status-failed' : 'status-pending';
-    const label = status === 'complete' ? 'Complete' : status === 'failed' ? 'Failed' : 'Pending';
+    const label = status === 'complete' ? 'Submitted' : status === 'failed' ? 'Failed' : 'Pending';
     return <td><span className={statusClass}>{label}</span></td>;
   }
 

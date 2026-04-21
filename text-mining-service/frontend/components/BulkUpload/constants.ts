@@ -101,10 +101,10 @@ export const IP_RIGHTS_YES_NO_FIELDS = [
 export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
   { key: 'select', label: 'Select', type: 'checkbox', width: '50px' },
   { key: 'id', label: 'ID', type: 'text', readonly: true, width: '70px' },
-  { key: 'status', label: 'Status', type: 'status', readonly: true, width: '120px' },
+  { key: 'status', label: 'Status', type: 'status', readonly: true, width: '125px' },
   { key: 'completeness', label: 'Completeness', type: 'completeness', readonly: true, width: '130px' },
   { key: 'star_link', label: 'STAR Link', type: 'link', readonly: true, width: '130px' },
-  { key: 'title', label: 'Title', type: 'textarea', required: true, width: '300px' },
+  { key: 'title', label: 'Title', type: 'textarea', required: true, width: '350px' },
   { key: 'description', label: 'Description', type: 'textarea', width: '485px' },
   { key: 'year', label: 'Year', type: 'text', width: '90px' },
   { key: 'main_contact_person', label: 'Main Contact Name', type: 'staff', riskFlag: true, width: '200px' },
