@@ -75,6 +75,10 @@ export function checkCompleteness(result: BulkUploadResult): CompletenessResult 
     if (emptyLinks.length > 0) {
       reasons.push('All evidence entries must have a URL');
     }
+    const emptyDescs = result.evidences.filter((e) => isEmpty(e.evidence_description));
+    if (emptyDescs.length > 0) {
+      reasons.push('All evidence entries must have a description');
+    }
   }
 
   // IP Rights: asset_ip_owner_id
