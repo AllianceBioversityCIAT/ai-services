@@ -1877,21 +1877,21 @@
 }
 
 .bulk-upload-container .status-pending {
-    background: #FEF3C7;
-    color: #92400E;
-    border: 1px solid #FCD34D;
+    background: transparent;
+    color: #F58220;
+    border: 1px solid #E69F00;
 }
 
 .bulk-upload-container .status-failed {
-    background: #FEE2E2;
+    background: transparent;
     color: #991B1B;
     border: 1px solid #FCA5A5;
 }
 
 .bulk-upload-container .status-complete {
-    background: #D1FAE5;
-    color: #065F46;
-    border: 1px solid #6EE7B7;
+    background: transparent;
+    color: #173F6F;
+    border: 1px solid #7D9CB9;
 }
 
 /* Completeness Badge */
@@ -1914,15 +1914,15 @@
 }
 
 .bulk-upload-container .completeness-complete {
-    background: #D1FAE5;
-    color: #065F46;
-    border: 1px solid #6EE7B7;
+    background: transparent;
+    color: #0a9d73;
+    border: 1px solid #34c38a;
 }
 
 .bulk-upload-container .completeness-incomplete {
-    background: #FEF3C7;
-    color: #92400E;
-    border: 1px solid #FCD34D;
+    background: transparent;
+    color: #f99c4b;
+    border: 1px solid #ebb235;
     cursor: help;
 }
 
