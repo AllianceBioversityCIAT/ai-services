@@ -62,33 +62,41 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
           </button>
         </div>
 
-        <div className="bulk-table-container">
-          <table className="bulk-results-table">
-            <thead>
-              <tr>
-                <th>Record ID</th>
-                <th>Record title</th>
-                <th>Source field</th>
-                <th>Institution name</th>
-                <th>Institution ID</th>
-              </tr>
-            </thead>
-            <tbody>
-              {page.map((item, i) => (
-                <tr key={`${item.record_id}-${item.institution_name}-${i}`}>
-                  <td style={{ padding: '1rem' }}>{item.record_id}</td>
-                  <td style={{ padding: '1rem' }}>{item.record_title}</td>
-                  <td style={{ padding: '1rem' }}>{item.source_field}</td>
-                  <td style={{ padding: '1rem' }}>{item.institution_name}</td>
-                  <td style={{ padding: '1rem' }}>{item.institution_id ?? 'null'}</td>
+        {institutions.length === 0 ? (
+          <div className="bulk-unmapped-empty">
+            <span className="bulk-unmapped-empty-icon">✓</span>
+            <p className="bulk-unmapped-empty-title">All institutions were successfully mapped</p>
+            <p className="bulk-unmapped-empty-sub">No unmapped institutions were found in this file.</p>
+          </div>
+        ) : (
+          <div className="bulk-table-container">
+            <table className="bulk-results-table">
+              <thead>
+                <tr>
+                  <th>Result ID</th>
+                  <th>Record title</th>
+                  <th>Source field</th>
+                  <th>Institution name</th>
+                  <th>Institution ID</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {page.map((item, i) => (
+                  <tr key={`${item.record_id}-${item.institution_name}-${i}`}>
+                    <td style={{ padding: '1rem' }}>{item.record_id}</td>
+                    <td style={{ padding: '1rem' }}>{item.record_title}</td>
+                    <td style={{ padding: '1rem' }}>{item.source_field}</td>
+                    <td style={{ padding: '1rem' }}>{item.institution_name}</td>
+                    <td style={{ padding: '1rem' }}>{item.institution_id ?? 'null'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-        {/* Pagination */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        {/* Pagination — only when there are institutions */}
+        {institutions.length > 0 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <span style={{ color: 'var(--bulk-gray-600)', fontSize: '0.9rem' }}>
               Showing {startIndex + 1}–{endIndex} of {institutions.length} unmapped institutions
@@ -141,7 +149,7 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
               &gt;&gt;
             </button>
           </div>
-        </div>
+        </div>}
 
         {/* Action buttons */}
         <div className="bulk-next-step-container" style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
