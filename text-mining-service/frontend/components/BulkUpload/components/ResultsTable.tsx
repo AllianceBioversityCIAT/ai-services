@@ -605,7 +605,7 @@ export function ResultsTable({
               const globalIdx = globalIndexMap(localIdx);
               const rid = String(result.id);
               return (
-                <tr key={rid || localIdx}>
+                <tr key={`${currentTab}-${rid || localIdx}`}>
                   {currentTab === 'pending' && (
                     <td>
                       <input
