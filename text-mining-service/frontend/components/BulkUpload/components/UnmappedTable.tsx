@@ -54,7 +54,7 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
       <div className="bulk-unmapped-container">
         <div className="bulk-unmapped-header">
           <span className="bulk-unmapped-info">
-            Showing {startIndex + 1}–{endIndex} of {institutions.length} unmapped institutions
+            INSTITUTION MAPPING REPORT
           </span>
           <button className="bulk-download-unmapped-btn" type="button" onClick={onDownloadReport}>
             {DownloadSvg}
@@ -71,7 +71,6 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
                 <th>Source field</th>
                 <th>Institution name</th>
                 <th>Institution ID</th>
-                <th>Similarity score</th>
               </tr>
             </thead>
             <tbody>
@@ -82,7 +81,6 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
                   <td style={{ padding: '1rem' }}>{item.source_field}</td>
                   <td style={{ padding: '1rem' }}>{item.institution_name}</td>
                   <td style={{ padding: '1rem' }}>{item.institution_id ?? 'null'}</td>
-                  <td style={{ padding: '1rem' }}>{item.similarity_score}</td>
                 </tr>
               ))}
             </tbody>
@@ -93,7 +91,7 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <span style={{ color: 'var(--bulk-gray-600)', fontSize: '0.9rem' }}>
-              Showing {startIndex + 1}–{endIndex} of {institutions.length} results
+              Showing {startIndex + 1}–{endIndex} of {institutions.length} unmapped institutions
             </span>
             <select
               style={{ padding: '0.5rem', border: '1px solid var(--bulk-gray-300)', borderRadius: 6, background: 'var(--bulk-white)' }}

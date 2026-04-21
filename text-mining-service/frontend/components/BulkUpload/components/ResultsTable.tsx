@@ -496,7 +496,32 @@ export function ResultsTable({
 
   return (
     <div className="bulk-step">
-      {/* Tabs */}
+      {/* Title + Controls row */}
+      <div className="bulk-results-controls">
+        <span className="bulk-unmapped-info">UPLOAD RESULTS</span>
+        {currentTab === 'pending' && (
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              className="bulk-unmapped-nav-btn"
+              type="button"
+              disabled={selectedIndices.size === 0}
+              onClick={onClearSelections}
+            >
+              🔄 Clear Selections
+            </button>
+            <button
+              className="bulk-star-submit-btn"
+              type="button"
+              disabled={selectedIndices.size === 0}
+              onClick={handleSubmitClick}
+            >
+              {StarSubmitSvg}
+              Submit to STAR
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="bulk-results-tabs">
         <button
           className={`bulk-tab-btn${currentTab === 'pending' ? ' active' : ''}`}
@@ -513,29 +538,6 @@ export function ResultsTable({
           Submitted Results
         </button>
       </div>
-
-      {/* Controls row — only shown on pending tab */}
-      {currentTab === 'pending' && (
-        <div className="bulk-results-controls">
-          <button
-            className="bulk-unmapped-nav-btn"
-            type="button"
-            disabled={selectedIndices.size === 0}
-            onClick={onClearSelections}
-          >
-            🔄 Clear Selections
-          </button>
-          <button
-            className="bulk-star-submit-btn"
-            type="button"
-            disabled={selectedIndices.size === 0}
-            onClick={handleSubmitClick}
-          >
-            {StarSubmitSvg}
-            Submit to STAR
-          </button>
-        </div>
-      )}
 
       {/* Table */}
       <div className="bulk-table-container">

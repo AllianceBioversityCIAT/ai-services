@@ -185,7 +185,7 @@
     
     /* White background card */
     background: var(--bulk-white);
-    padding: 2rem;
+    padding: 0.5rem 2rem 2rem;
     border-radius: 12px;  /* Bordes redondeados */
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
 }
@@ -1048,7 +1048,7 @@
     display: flex;
     gap: 0;
     border-bottom: 2px solid var(--bulk-gray-200);
-    margin-bottom: 1.5rem;
+    margin-bottom: 0.5rem;
 }
 
 .bulk-upload-container .bulk-tab-btn {
@@ -1080,8 +1080,9 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
-    padding-bottom: 1rem;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
     border-bottom: 1px solid var(--bulk-gray-200);
 }
 
@@ -1494,7 +1495,8 @@
     background: #FCFCFC;
     padding: 0.75rem 1rem;
     text-align: left;
-    font-weight: 600;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 500;
     font-size: 13px;
     color: var(--bulk-primary);
     border-bottom: 1px solid var(--bulk-gray-300);
@@ -2222,15 +2224,17 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 0.5rem;
     padding-bottom: 1rem;
     border-bottom: 1px solid var(--bulk-gray-200);
 }
 
 .bulk-upload-container .bulk-unmapped-info {
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 14px;
-    color: var(--bulk-gray-600);
-    font-weight: 500;
+    color: #8D929A;
+    font-weight: 300;
+    letter-spacing: 0.2em;
 }
 
 .bulk-upload-container .bulk-download-unmapped-btn {
@@ -2253,12 +2257,12 @@
     color: var(--bulk-white);
 }
 
-/* Step Indicator — lives outside white card in header background */
+/* Step Indicator — inside whitelives outside white card in header background */
 .bulk-upload-wrapper .bulk-step-indicator {
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    margin: 1.5rem auto 1.5rem;
+    margin: 1.5rem auto 2.5rem;
     width: fit-content;
     gap: 0;
 }
@@ -2328,7 +2332,7 @@
     white-space: nowrap;
 }
 
-.bulk-upload-wrapper .bulk-step-label-active {
+.bulk-upload-wrappp-label-active {
     color: #1689CA;
 }
 
