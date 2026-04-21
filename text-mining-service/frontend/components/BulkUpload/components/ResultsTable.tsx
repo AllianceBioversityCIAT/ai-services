@@ -22,6 +22,7 @@ import type { RawStaff } from './StaffCell';
 import { EvidenceCell } from './EvidenceCell';
 import type { Evidence } from './EvidenceCell';
 import { CompletenessCell } from './CompletenessCell';
+import { RiskFlagBadge } from './RiskFlagBadge';
 import { checkCompleteness } from '../utils/completenessChecker';
 
 // Hoisted static SVGs (rendering-hoist-jsx)
@@ -563,7 +564,12 @@ export function ResultsTable({
                 .filter((col) => !(currentTab === 'pending' && col.type === 'link'))
                 .map((col) => {
                 if (col.readonly || col.type === 'status' || col.type === 'link') {
-                  return <th key={col.key + col.type}>{col.label}</th>;
+                  return (
+                    <th key={col.key + col.type}>
+                      {col.label}
+                      {col.riskFlag && <RiskFlagBadge />}
+                    </th>
+                  );
                 }
                 const hasFilter = activeFilters[col.key]?.length > 0;
                 return (
@@ -573,6 +579,7 @@ export function ResultsTable({
                         {col.tooltip
                           ? <>{col.label.replace(' ⓘ', '')} <span className="col-tooltip-icon" data-tooltip={col.tooltip}>ⓘ</span></>
                           : col.label}
+                        {col.riskFlag && <RiskFlagBadge />}
                       </span>
                       <span
                         className={`filter-icon${hasFilter ? ' filter-active' : ''}`}
