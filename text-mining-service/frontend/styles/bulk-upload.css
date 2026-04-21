@@ -41,11 +41,36 @@
 /* Content Header (outside white card, in gray background) */
 .bulk-upload-wrapper .bulk-content-header {
     margin-bottom: 1.5rem;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.bulk-upload-wrapper .bulk-welcome {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--bulk-gray-400);
+    font-size: 0.78rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding-bottom: 0.05rem;
+}
+
+.bulk-upload-wrapper .bulk-welcome-label {
+    color: var(--bulk-gray-400);
+    font-weight: 400;
+}
+
+.bulk-upload-wrapper .bulk-welcome-name {
+    color: var(--bulk-primary);
+    font-weight: 600;
 }
 
 .bulk-upload-wrapper .bulk-page-title {
     font-family: 'Inter', sans-serif;
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     font-weight: 700;
     color: var(--bulk-primary);  /* Azul oscuro #183F6F */
     margin-bottom: 0.05rem;

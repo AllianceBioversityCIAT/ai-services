@@ -24,6 +24,7 @@ export default function BulkUploadModule() {
   // ── Auth ──────────────────────────────────────────────
   const [authStatus, setAuthStatus] = useState<'loading' | 'valid' | 'invalid'>('loading');
   const [userToken, setUserToken] = useState<string | null>(null);
+  const [userName, setUserName] = useState<{ firstName: string; lastName: string } | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -41,10 +42,11 @@ export default function BulkUploadModule() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
     })
-      .then((res) => res.json() as Promise<{ valid: boolean }>)
+      .then((res) => res.json() as Promise<{ valid: boolean; firstName?: string; lastName?: string }>)
       .then((data) => {
         if (data.valid) {
           setUserToken(token);
+          setUserName({ firstName: data.firstName ?? '', lastName: data.lastName ?? '' });
           setAuthStatus('valid');
         } else {
           setAuthStatus('invalid');
@@ -251,7 +253,7 @@ export default function BulkUploadModule() {
   return (
     <div className="bulk-upload-wrapper">
       {/* Step-contextual headers */}
-      {step === 'upload' && <UploadHeader />}
+      {step === 'upload' && <UploadHeader userName={userName} />}
       {step === 'unmapped' && currentFileName !== null && (
         <UnmappedHeader
           fileName={currentFileName}

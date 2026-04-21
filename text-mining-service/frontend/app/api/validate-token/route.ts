@@ -35,7 +35,10 @@ export async function POST(request: NextRequest) {
     }
 
     const data = (await response.json()) as {
-      data?: { isValid?: boolean; user?: { roles?: number[] } };
+      data?: {
+        isValid?: boolean;
+        user?: { roles?: number[]; first_name?: string; last_name?: string };
+      };
     };
 
     const isValid = data?.data?.isValid === true;
@@ -49,7 +52,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ valid: true });
+    return NextResponse.json({
+      valid: true,
+      firstName: data?.data?.user?.first_name ?? '',
+      lastName: data?.data?.user?.last_name ?? '',
+    });
   } catch {
     return NextResponse.json({ valid: false, error: 'Token validation error' }, { status: 500 });
   }
