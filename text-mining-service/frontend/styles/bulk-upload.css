@@ -634,8 +634,29 @@
     display: block;
     font-size: 15px;
     font-weight: 500;
-    color: var(--bulk-gray-700);
+    font-family: 'Space Grotesk', sans-serif;
+    color: #163B71;
     margin-bottom: 0.5rem;
+}
+
+.bulk-upload-container .bulk-refresh-s3-list-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1rem;
+    background: transparent;
+    border: 1px solid var(--bulk-buttons);
+    border-radius: 6px;
+    color: var(--bulk-buttons);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.bulk-upload-container .bulk-refresh-s3-list-btn:hover {
+    background: var(--bulk-buttons);
+    color: var(--bulk-white);
 }
 
 .bulk-upload-container .bulk-help-text {
