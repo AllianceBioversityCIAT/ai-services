@@ -29,13 +29,29 @@ const ProcessArrowSvg = (
 );
 
 // Hoisted static guidelines list (rendering-hoist-jsx)
+const TipIcon = (
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4, flexShrink: 0 }} aria-hidden>
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="8" x2="12" y2="12" />
+    <line x1="12" y1="16" x2="12.01" y2="16" />
+  </svg>
+);
+
+const WarnIcon = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4, flexShrink: 0 }} aria-hidden>
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
 const GuidelinesList = (
   <ul className="bulk-requirements-list">
-    <li className="bulk-note-tip"><strong>💡 Tip</strong> → Upload all records in a single Excel file to avoid running the process multiple times.</li>
+    <li className="bulk-note-tip"><strong>{TipIcon} Tip</strong> → Upload all records in a single Excel file to avoid running the process multiple times.</li>
     <li><strong>File name</strong> → Use a distinctive name (e.g., your name or date) to easily identify it.</li>
     <li><strong>Column names</strong> → Follow the template to ensure accurate AI mapping. Remember to add an <strong>ID column</strong> with incremental numbers.</li>
     <li><strong>Recommendation</strong> → Upload files with a maximum of <strong>100 rows</strong> to ensure optimal performance and avoid processing issues.</li>
-    <li className="bulk-note-warning"><strong>⚠️ Warning</strong> → Do not reuse the same file name for different datasets, as this may affect tracking and processing.</li>
+    <li className="bulk-note-warning"><strong>{WarnIcon} Warning</strong> → Do not reuse the same file name for different datasets, as this may affect tracking and processing.</li>
   </ul>
 );
 

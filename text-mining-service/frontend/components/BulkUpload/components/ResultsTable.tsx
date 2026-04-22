@@ -511,7 +511,7 @@ export function ResultsTable({
               disabled={selectedIndices.size === 0}
               onClick={onClearSelections}
             >
-              🔄 Clear Selections
+              Clear Selections
             </button>
             <button
               className="bulk-star-submit-btn"
