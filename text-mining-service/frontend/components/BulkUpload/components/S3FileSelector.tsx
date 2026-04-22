@@ -60,14 +60,16 @@ export function S3FileSelector({
     };
   }, []);
 
+  const excelObjects = s3Objects.filter(k => /\.(xlsx|xls)$/i.test(k));
+
   const caption =
-    s3Objects.length > 0
-      ? `Found ${s3Objects.length} file(s). Selected: ${simplifyS3Path(selectedKey || s3Objects[0])}`
-      : 'No files found.';
+    excelObjects.length > 0
+      ? `Found ${excelObjects.length} file(s). Selected: ${simplifyS3Path(selectedKey || excelObjects[0])}`
+      : 'No Excel files found.';
 
   return (
     <div>
-      <h3 className="bulk-subsection-title">Select file</h3>
+      <h3 className="bulk-subsection-title">Previous file options</h3>
 
       <div className="bulk-form-group">
         <label htmlFor="bulkS3Prefix">Search prefix (optional)</label>
@@ -75,7 +77,7 @@ export function S3FileSelector({
           type="text"
           id="bulkS3Prefix"
           className="bulk-form-input"
-          placeholder="Enter folder path or prefix"
+          placeholder="Enter prefix"
           value={prefix}
           onChange={handlePrefixChange}
           onKeyPress={handlePrefixKeyPress}
@@ -90,10 +92,10 @@ export function S3FileSelector({
           value={selectedKey}
           onChange={(e) => onSelectedKeyChange(e.target.value)}
         >
-          {s3Objects.length === 0 ? (
-            <option value="">No files found</option>
+          {excelObjects.length === 0 ? (
+            <option value="">No Excel files found</option>
           ) : (
-            s3Objects.map((key) => (
+            excelObjects.map((key) => (
               <option key={key} value={key}>
                 {simplifyS3Path(key)}
               </option>
@@ -104,7 +106,7 @@ export function S3FileSelector({
       </div>
 
       <button
-        className="bulk-btn bulk-btn-secondary"
+        className="bulk-refresh-s3-list-btn"
         type="button"
         onClick={() => onRefresh(prefix)}
       >

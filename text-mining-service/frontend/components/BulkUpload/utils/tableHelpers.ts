@@ -132,13 +132,7 @@ export function formatCellValueForFilter(value: unknown): string {
   return String(value);
 }
 
-/** Simplifies an S3 full path to a readable label. */
+/** Simplifies an S3 full path to a readable label (filename only). */
 export function simplifyS3Path(fullPath: string): string {
-  if (fullPath.includes('bulk_upload/')) {
-    return fullPath.substring(fullPath.indexOf('bulk_upload/'));
-  }
-  if (fullPath.includes('test/')) {
-    return fullPath.substring(fullPath.indexOf('test/'));
-  }
   return fullPath.split('/').pop() ?? fullPath;
 }
