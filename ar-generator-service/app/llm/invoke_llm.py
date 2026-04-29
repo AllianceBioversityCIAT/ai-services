@@ -44,9 +44,6 @@ def invoke_model(prompt):
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": 8000,
             "temperature": 0.1,
-            "top_k": 250,
-            "top_p": 0.999,
-            "stop_sequences": [],
             "messages": [
                 {
                     "role": "user",
@@ -57,7 +54,7 @@ def invoke_model(prompt):
             ]
         }
         response_stream = bedrock_runtime.invoke_model_with_response_stream(
-            modelId="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+            modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
             body=json.dumps(request_body),
             contentType="application/json",
             accept="application/json"
