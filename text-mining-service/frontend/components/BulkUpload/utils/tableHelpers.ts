@@ -92,7 +92,7 @@ export function getFilterTokens(columnKey: string, value: unknown): string[] {
     return arr.map(r => String(r));
   }
 
-  // String arrays: keywords, sdg_targets
+  // String arrays: keywords
   if (Array.isArray(value)) {
     if (value.length === 0) return ['(Empty)'];
     return (value as unknown[]).map(v => String(v));

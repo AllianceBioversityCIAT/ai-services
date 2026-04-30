@@ -2046,25 +2046,6 @@
     font-size: 14px;
 }
 
-/* SDG Cell */
-.bulk-upload-container .sdg-cell {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 160px;
-}
-
-.bulk-upload-container .sdg-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.bulk-upload-container .sdg-popover {
-    width: 180px;
-    min-width: 160px;
-}
-
 /* Partner Chips */
 .bulk-upload-container .partners-cell {
     display: flex;

@@ -51,7 +51,6 @@ export const NUMERIC_FIELDS = [
 
 export const JSON_FIELDS = [
   'keywords',
-  'sdg_targets',
   'countries',
   'evidences',
   'partners',
@@ -110,7 +109,6 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
   { key: 'main_contact_person', label: 'Main Contact Name', type: 'staff', riskFlag: true, width: '200px' },
   { key: 'keywords', label: 'Keywords', type: 'chips', width: '400px' },
   { key: 'contract_code', label: 'Contract Code', type: 'text', width: '155px' },
-  { key: 'sdg_targets', label: 'SDG Targets', type: 'sdg', width: '150px' },
   { key: 'training_type', label: 'Training Type', type: 'select', options: ['Individual training', 'Group training'], riskFlag: true, width: '185px' },
   { key: 'training_category', label: 'Training Category', type: 'select', options: ['Training', 'Engagement'], width: '175px' },
   { key: 'length_of_training', label: 'Length of Training', type: 'select', options: ['Short-term', 'Long-term'], width: '175px' },

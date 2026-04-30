@@ -63,12 +63,6 @@ Reporting Project
         • contract_code
     • If no project code is mentioned, return an empty string in the output JSON.
 
-Contribution to SDG targets:
-    • sdg_targets
-    • List all relevant SDG targets mentioned in the document as an array of strings (e.g., ["SDG2", "SDG13", "SDG5"]).
-    • Make sure to include the "SDG" prefix followed by the target number (e.g., "SDG1", "SDG2", ..., "SDG17").
-    • If no SDG targets are mentioned, do not return the sdg_targets field in the output JSON.
-
 Training Category
     • training_category
     • Refers to the category of training being conducted.
@@ -353,7 +347,6 @@ Follow this exact structure:
                 "..."
             ],
             "contract_code": "<value>",
-            "sdg_targets": <[array of sdg targets]>,
             "training_category": "<Training or Engagement>",
             "start_date": "<value>",
             "end_date": "<value>",
