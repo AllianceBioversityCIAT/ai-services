@@ -32,7 +32,6 @@ export interface BulkUploadResult {
   description?: string;
   year?: string | number;
   contract_code?: string;
-  sdg_targets?: string[];
   training_category?: string;
   training_type?: string;
   training_purpose?: string;
@@ -121,7 +120,7 @@ export type TabType = 'pending' | 'submitted';
 export interface ColumnDef {
   key: string;
   label: string;
-  type: 'checkbox' | 'text' | 'number' | 'textarea' | 'select' | 'status' | 'completeness' | 'link' | 'chips' | 'partners' | 'sdg' | 'evidence_desc' | 'evidence_link' | 'training_purpose' | 'date' | 'countries' | 'regions' | 'affiliation' | 'nationality' | 'language' | 'staff';
+  type: 'checkbox' | 'text' | 'number' | 'textarea' | 'select' | 'status' | 'completeness' | 'link' | 'chips' | 'partners' | 'evidence_desc' | 'evidence_link' | 'training_purpose' | 'date' | 'countries' | 'regions' | 'affiliation' | 'nationality' | 'language' | 'staff';
   readonly?: boolean;
   required?: boolean;
   riskFlag?: boolean;

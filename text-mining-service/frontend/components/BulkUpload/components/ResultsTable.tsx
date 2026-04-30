@@ -10,7 +10,6 @@ import { FilterPanel } from './FilterPanel';
 import { useState } from 'react';
 import type { RawInstitution, RawCountry } from '../types';
 import { PartnersCell } from './PartnersCell';
-import { SdgCell } from './SdgCell';
 import { TrainingPurposeCell } from './TrainingPurposeCell';
 import { RegionsCell } from './RegionsCell';
 import { CountriesCell } from './CountriesCell';
@@ -72,7 +71,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
 
       if (
         e.target.tagName === 'TEXTAREA' &&
-        ['keywords', 'partners', 'countries', 'regions', 'sdg_targets', 'trainees_description'].includes(col.key)
+        ['keywords', 'partners', 'countries', 'regions', 'trainees_description'].includes(col.key)
       ) {
         try { value = JSON.parse(value as string); } catch { /* keep as string */ }
       }
@@ -323,24 +322,6 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
           field={field}
           globalIdx={globalIdx}
           onEdit={onEdit as (globalIdx: number, field: string, value: Evidence[]) => void}
-        />
-      </td>
-    );
-  }
-
-  if (col.type === 'sdg') {
-    const raw = getNestedValue(result, col.key);
-    const values: string[] = Array.isArray(raw)
-      ? (raw as string[])
-      : typeof raw === 'string' && raw.trim().startsWith('[')
-        ? (() => { try { return JSON.parse(raw) as string[]; } catch { return raw ? [raw] : []; } })()
-        : raw ? [String(raw)] : [];
-    return (
-      <td className={isReadOnly ? 'bulk-cell-readonly' : undefined}>
-        <SdgCell
-          values={values}
-          globalIdx={globalIdx}
-          onEdit={onEdit as (globalIdx: number, field: string, value: string[]) => void}
         />
       </td>
     );

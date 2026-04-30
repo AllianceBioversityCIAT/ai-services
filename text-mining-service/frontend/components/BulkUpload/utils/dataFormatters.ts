@@ -269,8 +269,8 @@ export function formatResultForSTAR(result: BulkUploadResult): Record<string, un
     }
   }
 
-  // Step 14: keywords, sdg_targets
-  ['keywords', 'sdg_targets'].forEach((field) => {
+  // Step 14: keywords
+  ['keywords'].forEach((field) => {
     if (formatted[field] !== undefined) {
       if (!Array.isArray(formatted[field]) || (formatted[field] as unknown[]).length === 0) {
         delete formatted[field];
