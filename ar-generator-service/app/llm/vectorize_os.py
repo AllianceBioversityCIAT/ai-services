@@ -250,6 +250,30 @@ def save_context_to_file(context, filename, indicator, year):
         logger.error(f"❌ Error saving context to file: {e}")
 
 
+def _filter_chunks_for_contingency(chunks, level):
+    """Apply contingency filters to reduce chunk size when input is too long."""
+    if level == 0:
+        return chunks
+
+    filtered = [
+        c for c in chunks
+        if not (
+            c.get("table_type") == "deliverables" and (
+                c.get("already_disseminated") == "No"
+                or not c.get("dissemination_URL")
+                or c.get("status") != "Completed"
+            )
+        )
+    ]
+
+    if level >= 2:
+        deliverables = [c for c in filtered if c.get("table_type") == "deliverables"][:200]
+        contributions = [c for c in filtered if c.get("table_type") == "contributions"][:1000]
+        filtered = deliverables + contributions
+
+    return filtered
+
+
 def run_pipeline(indicator, year, insert_data=False):
     try:
         if insert_data:
@@ -272,15 +296,46 @@ def run_pipeline(indicator, year, insert_data=False):
         context = retrieve_context(PROMPT, indicator, year)
         save_context_to_file(context, "context", indicator, year)
 
-        query = f"""
-            Using this information:\n{context}\n\n
-            Do the following:\n{PROMPT}
-            """
-
-        final_report = invoke_model(query)
+        try:
+            query = f"""
+                Using this information:\n{context}\n\n
+                Do the following:\n{PROMPT}
+                """
+            final_report = invoke_model(query)
+        except Exception as e:
+            if "Input is too long" in str(e):
+                logger.warning(f"⚠️ Input is too long for {indicator}. Applying Level 1 contingency...")
+                try:
+                    filtered_context = _filter_chunks_for_contingency(context, level=1)
+                    query = f"""
+                        Using this information:\n{filtered_context}\n\n
+                        Do the following:\n{PROMPT}
+                        """
+                    final_report = invoke_model(query)
+                    logger.info(f"✅ Report generated for {indicator} with Level 1 contingency.")
+                except Exception as e2:
+                    if "Input is too long" in str(e2):
+                        logger.warning(f"⚠️ Still too long for {indicator}. Applying Level 2 contingency...")
+                        filtered_context = _filter_chunks_for_contingency(context, level=2)
+                        query = f"""
+                            Using this information:\n{filtered_context}\n\n
+                            Do the following:\n{PROMPT}
+                            """
+                        final_report = invoke_model(query)
+                        logger.info(f"✅ Report generated for {indicator} with Level 2 contingency.")
+                    else:
+                        raise e2
+            else:
+                raise
 
         logger.info("✅ Report generation completed successfully.")
         return final_report
 
     except Exception as e:
         logger.error(f"❌ Error in pipeline execution: {e}")
+
+        if "Input is too long" in str(e):
+            logger.error("❌ Input is still too long even after applying contingency filters.")
+            return f"# Report Generation Error\n\nThe input context for indicator {indicator} in year {year} is too long for the model, even after applying data reduction filters."
+        
+        return None
