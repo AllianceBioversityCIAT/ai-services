@@ -2,6 +2,18 @@
 const API_BASE_URL = 'https://qg53uhgrn7bpofn5eawcuvl62y0akymf.lambda-url.us-east-1.on.aws';
 // const API_BASE_URL = 'http://localhost:8000';
 
+// Data update badge — shows the last Sunday before today
+(function renderDataUpdateBadge() {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ...
+    const daysBack = dayOfWeek === 0 ? 7 : dayOfWeek; // if today IS Sunday, show previous Sunday
+    const lastSunday = new Date(today);
+    lastSunday.setDate(today.getDate() - daysBack);
+    const formatted = lastSunday.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const el = document.getElementById('data-update-text');
+    if (el) el.textContent = `Data updated on ${formatted}`;
+})();
+
 // Tracking configuration
 const AI_FEEDBACK_URL = 'https://i8s5i8c21i.execute-api.us-east-1.amazonaws.com';
 
