@@ -51,13 +51,13 @@ def generate_cluster_prompt(indicator, year, cluster_acronym):
 
   if indicator in pdo_indicators:
     evidence_note = """
-- OICRs: [OICR {{oicr_id}}]({{link_pdf_oicr}}) — use the oicr_id number as the identifier, not the full title.
+- OICRs: [O-{{oicr_id}}]({{link_pdf_oicr}}) — use the oicr_id number as the identifier, not the full title.
 - Write a concise summary of the OICR.
 - Do NOT include innovations for PDO indicators."""
   
   elif indicator in ipi_indicators:
     evidence_note = """
-- Innovations: [Innovation {{id}}]({{link_pdf_innovation}}) — use the id number as the identifier, not the full title.
+- Innovations: [I-{{id}}]({{link_pdf_innovation}}) — use the id number as the identifier, not the full title.
 - Briefly describe the innovation. Keep the synthesis short and focused on what makes this innovation important for the current cluster.
 - Do NOT include OICRs for IPI indicators."""
   
@@ -121,12 +121,12 @@ Do NOT fabricate values, IDs, or links not present in the input.
 
 # REFERENCE FORMAT (CRITICAL — follow exactly)
 Place references as inline citations at the END of the sentence describing the evidence:
-- Deliverables: [Deliverable {{compose_id}}]({{doi}}){evidence_note}
+- Deliverables: [D-{{compose_id}}]({{doi}}){evidence_note}
 
 Correct examples:
-  "A regional training workshop trained 58 climate professionals from 13 countries ([OICR 1435](https://example.org))."
-  "A drought monitoring tool was completed and made publicly available ([Deliverable 892](https://doi.org/...))."
-  "An early warning platform reached 12,000 farmers in three districts ([Innovation 47](https://...))."
+  "A regional training workshop trained 58 climate professionals from 13 countries ([O-1435](https://example.org))."
+  "A drought monitoring tool was completed and made publicly available ([D-892](https://doi.org/...))."
+  "An early warning platform reached 12,000 farmers in three districts ([I-47](https://...))."
 
 FORBIDDEN:
   - NEVER begin a sentence with "The OICR on...", "The Deliverable on...", or "The Innovation on...".
@@ -141,6 +141,7 @@ FORBIDDEN:
 - Write cohesive paragraphs — no bullet points.
 - Do not speculate, report only on what has been achieved by end-year.
 - Bold the cluster name **{cluster_acronym}** at first mention only.
+- If the context contains information from a year other than {year}, always explicitly state that year when referencing it (e.g., "In 2024, ..."). Do NOT omit the year or present prior/future year data as if it belongs to {year}.
 - Quantitative values must be naturally embedded in the narrative. Use percentages in parentheses when helpful (e.g., 38 out of 80, or 48%).
 - Use "By end-year {year}..." or "As of December {year}..." for temporal framing.
 - Format links as markdown-style hyperlinks.
@@ -187,6 +188,7 @@ Not every paragraph needs all four elements, but the overall narrative must prog
 - Preserve ALL references exactly as they appear in the draft: Deliverable IDs and links, OICR IDs and links,
   Innovation IDs and links, and all numerical values. Do not change, drop, or fabricate any of them.
 - Do NOT add information not present in the draft.
+- If the draft references information from a year other than {year}, always explicitly state that year when including it (e.g., "In 2024, ..."). Do NOT omit the year or present prior/future year data as if it belongs to {year}.
 - Emphasize beneficiaries, results, and outcomes — not just activities or outputs.
 - Avoid excessive listing of deliverables. Integrate references naturally into the narrative as supporting evidence.
 - Do not begin sentences with "The OICR on...", "The Deliverable on...", or "The Innovation on...".
