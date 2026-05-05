@@ -2360,7 +2360,7 @@
 }
 
 .bulk-upload-wrapper .bulk-step-line {
-    width: 150px;
+    width: 130px;
     height: 2px;
     flex-shrink: 0;
     margin-top: 17px; /* half of 36px circle = center of circle */
@@ -2482,4 +2482,169 @@
         align-items: flex-start;
         gap: 1rem;
     }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   Step 4 — Submission Summary
+   ════════════════════════════════════════════════════════════════════ */
+.bulk-upload-container .bulk-summary-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    padding-bottom: 1rem;
+}
+
+.bulk-upload-container .bulk-summary-intro-text {
+    margin: 0;
+    color: var(--bulk-gray-600);
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+/* ── Section cards ── */
+.bulk-upload-container .bulk-summary-section {
+    border: 1px solid var(--bulk-gray-200, #E5E7EB);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.bulk-upload-container .bulk-summary-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--bulk-gray-200, #E5E7EB);
+}
+
+.bulk-upload-container .bulk-summary-section-header--approved {
+    background: linear-gradient(90deg, #f2faf2, #f9fafb);
+}
+
+.bulk-upload-container .bulk-summary-section-header--draft {
+    background: linear-gradient(90deg, #edf6fd, #f9fafb);
+}
+
+.bulk-upload-container .bulk-summary-section-header--failed {
+    background: linear-gradient(90deg, #fff5f5, #f9fafb);
+}
+
+.bulk-upload-container .bulk-summary-section-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.bulk-upload-container .bulk-summary-section-icon {
+    display: flex;
+    align-items: center;
+}
+
+.bulk-upload-container .bulk-summary-section-icon--approved { color: #7CB580; }
+.bulk-upload-container .bulk-summary-section-icon--draft    { color: #1689CA; }
+.bulk-upload-container .bulk-summary-section-icon--failed   { color: #b91c1c; }
+
+.bulk-upload-container .bulk-summary-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--bulk-primary);
+    margin: 0;
+}
+
+.bulk-upload-container .bulk-summary-section-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 0.45rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.bulk-upload-container .bulk-summary-section-badge--approved {
+    background: #d4edda;
+    color: #4a8b4e;
+}
+
+.bulk-upload-container .bulk-summary-section-badge--draft {
+    background: #cce8f7;
+    color: #1265a0;
+}
+
+.bulk-upload-container .bulk-summary-section-badge--failed {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+/* Table inside a section */
+.bulk-upload-container .bulk-summary-section .bulk-table-container {
+    border-radius: 0;
+    border: none;
+}
+
+.bulk-upload-container .bulk-summary-section .bulk-risk-notice {
+    margin: 1rem 1.25rem 0;
+}
+
+.bulk-upload-container .bulk-summary-section .bulk-table-container + .bulk-risk-notice,
+.bulk-upload-container .bulk-summary-section .bulk-risk-notice:first-of-type {
+    margin-top: 1rem;
+}
+
+/* ── Table cell content ── */
+.bulk-upload-container .bulk-summary-result-code {
+    display: inline-block;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-weight: 600;
+    font-size: 0.82rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 5px;
+    font-family: 'Space Grotesk', monospace;
+    letter-spacing: 0.02em;
+}
+
+.bulk-upload-container .bulk-summary-code-pending {
+    color: var(--bulk-gray-400);
+    font-style: italic;
+    font-size: 0.85rem;
+}
+
+.bulk-upload-container .bulk-summary-star-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--bulk-buttons);
+    font-weight: 500;
+    font-size: 0.88rem;
+    text-decoration: none;
+    transition: color 0.15s;
+}
+
+.bulk-upload-container .bulk-summary-star-link:hover {
+    color: var(--bulk-primary);
+    text-decoration: underline;
+}
+
+.bulk-upload-container .bulk-summary-error-cell {
+    color: #b91c1c;
+    font-size: 0.85rem;
+    max-width: 300px;
+}
+
+.bulk-upload-container .bulk-summary-empty {
+    padding: 2rem 1.5rem;
+    text-align: center;
+    color: var(--bulk-gray-500);
+    font-style: italic;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+/* ── Action row ── */
+.bulk-upload-container .bulk-summary-actions {
+    justify-content: space-between;
+    margin-top: 0.5rem;
 }

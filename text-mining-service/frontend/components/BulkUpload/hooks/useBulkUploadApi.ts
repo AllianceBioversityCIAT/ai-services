@@ -31,8 +31,7 @@ export interface BulkUploadApiActions {
     selectedResults: BulkUploadResult[],
     currentFileName: string,
     authToken: string,
-    onStatusUpdate: (statuses: Record<string, RecordStatus>) => void,
-    onRerender: () => void,
+    onComplete: (completeIds: Set<string>, newStatuses: Record<string, RecordStatus>) => void,
   ) => Promise<void>;
   loadS3Objects: (searchTerm?: string) => Promise<void>;
   downloadTemplate: (language: 'es' | 'en') => Promise<void>;
@@ -153,8 +152,7 @@ export function useBulkUploadApi(initialToken: string | null = null): BulkUpload
       selectedResults: BulkUploadResult[],
       currentFileName: string,
       token: string,
-      onStatusUpdate: (statuses: Record<string, RecordStatus>) => void,
-      onRerender: () => void,
+      onComplete: (completeIds: Set<string>, newStatuses: Record<string, RecordStatus>) => void,
     ) => {
       try {
         // Split records by completeness
@@ -237,8 +235,7 @@ export function useBulkUploadApi(initialToken: string | null = null): BulkUpload
         // Fire-and-forget DynamoDB saves (server-after-nonblocking pattern)
         Promise.all(saves).catch(console.error);
 
-        onStatusUpdate(newStatuses);
-        onRerender();
+        onComplete(new Set(completeResults.map((r) => String(r.id))), newStatuses);
       } catch (error) {
         hideLoading();
         showError(`Error submitting to STAR: ${(error as Error).message}`);

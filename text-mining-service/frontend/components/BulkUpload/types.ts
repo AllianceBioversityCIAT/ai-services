@@ -114,9 +114,19 @@ export interface StarErrorResult {
 
 export type DocSource = 'upload' | 's3';
 
-export type AppStep = 'upload' | 'unmapped' | 'results';
+export type AppStep = 'upload' | 'unmapped' | 'results' | 'summary';
 
 export type TabType = 'pending' | 'submitted';
+
+export interface SummaryRecord {
+  id: string;
+  title: string;
+  contract_code?: string;
+  result_official_code?: string;
+  star_link?: string;
+  submission_status: 'approved' | 'draft' | 'failed';
+  error_message?: string;
+}
 
 export interface ColumnDef {
   key: string;
