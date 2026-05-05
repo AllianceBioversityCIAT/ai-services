@@ -91,9 +91,11 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     [col.key, globalIdx, onEdit],
   );
 
-  const isDisabled = !!isReadOnly || (col.enabledWhen
-    ? !col.enabledWhen.values.some((v) => String(getNestedValue(result, col.enabledWhen!.field)) === String(v))
-    : false);
+  const isDisabled = !!isReadOnly || (() => {
+    if (!col.enabledWhen) return false;
+    const conditions = Array.isArray(col.enabledWhen) ? col.enabledWhen : [col.enabledWhen];
+    return !conditions.every((cond) => cond.values.some((v) => String(getNestedValue(result, cond.field)) === String(v)));
+  })();
 
   if (col.type === 'status') {
     const status = recordStatus?.status ?? 'pending';
@@ -240,6 +242,8 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
           globalIdx={globalIdx}
           field={col.key}
           onEdit={onEdit as (globalIdx: number, field: string, value: RawInstitution[]) => void}
+          isPartnerNotApplicable={col.key === 'partners' ? result.is_partner_not_applicable as boolean | undefined : undefined}
+          disabled={isDisabled}
         />
       </td>
     );
@@ -525,6 +529,12 @@ export function ResultsTable({
       </div>
 
       {/* Table */}
+      {currentTab === 'pending' && (
+        <div className="bulk-risk-notice">
+          <span className="risk-flag-icon" aria-hidden="true" />
+          <span>Please review all columns marked with this flag — the AI may make mistakes in these fields.</span>
+        </div>
+      )}
       <div className="bulk-table-container">
         <table id="bulkResultsTable" className="bulk-results-table">
           <colgroup>

@@ -44,6 +44,8 @@ interface PartnersCellProps {
   globalIdx: number;
   onEdit: (globalIdx: number, field: string, value: RawInstitution[]) => void;
   field?: string;
+  isPartnerNotApplicable?: boolean;
+  disabled?: boolean;
 }
 
 function chipClass(p: RawInstitution): string {
@@ -56,7 +58,7 @@ function isRemovable(_p: RawInstitution): boolean {
   return true;
 }
 
-export function PartnersCell({ partners, globalIdx, onEdit, field = 'partners' }: PartnersCellProps) {
+export function PartnersCell({ partners, globalIdx, onEdit, field = 'partners', isPartnerNotApplicable, disabled }: PartnersCellProps) {
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
   const [allInstitutions, setAllInstitutions] = useState<ClarisaInstitution[]>(cachedInstitutions ?? []);
@@ -123,11 +125,14 @@ export function PartnersCell({ partners, globalIdx, onEdit, field = 'partners' }
   return (
     <div className="partners-cell">
       <div className="partners-chips">
-        {partners.length === 0 && <span className="bulk-chips-empty">—</span>}
+        {partners.length === 0 && isPartnerNotApplicable && (
+          <span className="bulk-chips-empty partners-not-found">No partners were identified in the data</span>
+        )}
+        {partners.length === 0 && !isPartnerNotApplicable && <span className="bulk-chips-empty">—</span>}
         {partners.map((p, i) => (
           <span key={i} className={chipClass(p)} title={p.institution_name}>
             <span className="partner-chip-label">{p.institution_name}</span>
-            {isRemovable(p) && (
+            {isRemovable(p) && !disabled && (
               <button
                 className="partner-chip-remove"
                 aria-label={`Remove ${p.institution_name}`}
@@ -143,8 +148,9 @@ export function PartnersCell({ partners, globalIdx, onEdit, field = 'partners' }
       <div className="partner-add-container" ref={popoverRef}>
         <button
           ref={addBtnRef}
-          className="partner-add-btn"
+          className={`partner-add-btn${disabled ? ' cell-conditional-disabled' : ''}`}
           aria-label="Add partner institution"
+          disabled={disabled}
           onClick={() => {
             if (!showSearch && addBtnRef.current) {
               const rect = addBtnRef.current.getBoundingClientRect();

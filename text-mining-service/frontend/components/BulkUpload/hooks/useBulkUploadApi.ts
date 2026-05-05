@@ -115,7 +115,10 @@ export function useBulkUploadApi(initialToken: string | null = null): BulkUpload
         }
 
         const payload = extractInnerResults(result);
-        const results = payload.results;
+        const results = payload.results.map((r) => ({
+          ...r,
+          is_partner_not_applicable: !Array.isArray(r.partners) || r.partners.length === 0,
+        }));
 
         // Load DynamoDB statuses (async-parallel: start early, use result below)
         showLoading('Loading previous statuses...');
