@@ -67,6 +67,7 @@ export interface BulkUploadResult {
   potential_asset_description?: string;
   requires_further_development?: string;
   requires_further_development_description?: string;
+  is_partner_not_applicable?: boolean;
   batch_number?: number;
   [key: string]: unknown;
 }
@@ -126,6 +127,6 @@ export interface ColumnDef {
   riskFlag?: boolean;
   options?: string[];
   tooltip?: string;
-  enabledWhen?: { field: string; values: (string | number)[] };
+  enabledWhen?: { field: string; values: (string | number)[] } | { field: string; values: (string | number)[] }[];
   width?: string;
 }

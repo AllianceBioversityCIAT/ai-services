@@ -119,7 +119,7 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
   { key: 'non_binary_participants', label: 'Non-binary Participants', type: 'number', enabledWhen: { field: 'training_type', values: ['Group training'] }, width: '210px' },
   { key: 'training_purpose', label: 'Training Purpose', type: 'training_purpose', riskFlag: true, enabledWhen: { field: 'training_type', values: ['Group training'] }, width: '240px' },
   { key: 'trainees', label: 'Trainees', type: 'select', options: ['Yes', 'No'], enabledWhen: { field: 'training_type', values: ['Group training'] }, width: '155px' },
-  { key: 'trainees_description', label: 'Trainees Organizations', type: 'partners', riskFlag: true, enabledWhen: { field: 'training_type', values: ['Group training'] }, width: '300px' },
+  { key: 'trainees_description', label: 'Trainees Organizations', type: 'partners', riskFlag: true, enabledWhen: [{ field: 'training_type', values: ['Group training'] }, { field: 'trainees', values: ['Yes'] }], width: '300px' },
   { key: 'trainee_name', label: 'Trainee Name', type: 'text', enabledWhen: { field: 'training_type', values: ['Individual training'] }, width: '155px' },
   {
     key: 'trainee_gender',

@@ -55,10 +55,20 @@ export function checkCompleteness(result: BulkUploadResult): CompletenessResult 
     reasons.push('Training Supervisor could not be automatically matched — please add it manually');
   }
 
-  // Partners (required, at least one, all mapped)
-  if (!Array.isArray(result.partners) || result.partners.length === 0) {
-    reasons.push('At least one Partner is required');
-  } else {
+  // Partners (required unless AI found none, in which case is_partner_not_applicable covers it)
+  if (!result.is_partner_not_applicable) {
+    if (!Array.isArray(result.partners) || result.partners.length === 0) {
+      reasons.push('At least one Partner is required');
+    } else {
+      const unmapped = (result.partners as RawInstitution[]).filter((p) => !isMappedInstitution(p));
+      if (unmapped.length > 0) {
+        reasons.push(
+          `${unmapped.length} partner${unmapped.length > 1 ? 's' : ''} could not be automatically matched — please add ${unmapped.length > 1 ? 'them' : 'it'} manually or submit a partner request`,
+        );
+      }
+    }
+  } else if (Array.isArray(result.partners) && result.partners.length > 0) {
+    // User manually added partners after AI found none — validate mapping
     const unmapped = (result.partners as RawInstitution[]).filter((p) => !isMappedInstitution(p));
     if (unmapped.length > 0) {
       reasons.push(
