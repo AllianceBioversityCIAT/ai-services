@@ -42,7 +42,7 @@ export function StaffCell({ value, globalIdx, field, authToken, onEdit, disabled
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
 
-  const hasValue = value != null && Boolean(value.name);
+  const hasValue = value != null && Boolean(value.name) && value.similarity_score >= 70;
 
   function staffDotClass(v: RawStaff): string {
     if (v.similarity_score >= 70) return 'affiliation-dot affiliation-dot-mapped';
@@ -122,7 +122,6 @@ export function StaffCell({ value, globalIdx, field, authToken, onEdit, disabled
   return (
     <div className={`affiliation-cell${disabled ? ' cell-conditional-disabled' : ''}`}>
       <div className="affiliation-text-row">
-        {hasValue && <span className={staffDotClass(value!)} title={`Score: ${value!.similarity_score}`} />}
         <span className="affiliation-name">
           {hasValue ? value!.name : <span className="bulk-chips-empty">—</span>}
         </span>

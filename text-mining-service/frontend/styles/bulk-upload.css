@@ -26,7 +26,7 @@
     
     /* Transparent background to blend with STAR's gray background */
     background: transparent;
-    padding: 0 1rem; /* px-4 — keeps scrollbar flush with page edge when embedded */
+    padding: 1rem 1rem; /* px-4 — keeps scrollbar flush with page edge when embedded */
 }
 
 /* Content Header (outside white card, in gray background) */
@@ -2314,7 +2314,6 @@
     align-items: center;
     margin-bottom: 0.5rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid var(--bulk-gray-200);
 }
 
 .bulk-upload-container .bulk-unmapped-info {
