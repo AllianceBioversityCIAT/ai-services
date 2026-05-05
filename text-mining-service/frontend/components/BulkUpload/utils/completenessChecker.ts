@@ -19,13 +19,13 @@ function isEmpty(value: unknown): boolean {
 function isMappedInstitution(inst: RawInstitution): boolean {
   return inst.institution_id !== null &&
     inst.institution_id !== undefined &&
-    inst.similarity_score > 70;
+    inst.similarity_score >= 70;
 }
 
 function isMappedUser(user: RawUser): boolean {
   return user.code !== null &&
     user.code !== undefined &&
-    user.similarity_score > 70;
+    user.similarity_score >= 70;
 }
 
 // =========================
@@ -45,14 +45,14 @@ export function checkCompleteness(result: BulkUploadResult): CompletenessResult 
   if (!result.main_contact_person) {
     reasons.push('Main Contact Person is required');
   } else if (!isMappedUser(result.main_contact_person as RawUser)) {
-    reasons.push('Main Contact Person is not mapped (similarity ≤ 70 or missing staff ID)');
+    reasons.push('Main Contact Person could not be automatically matched — please add it manually');
   }
 
   // Training supervisor (both types)
   if (!result.training_supervisor) {
     reasons.push('Training Supervisor is required');
   } else if (!isMappedUser(result.training_supervisor as RawUser)) {
-    reasons.push('Training Supervisor is not mapped (similarity ≤ 70 or missing staff ID)');
+    reasons.push('Training Supervisor could not be automatically matched — please add it manually');
   }
 
   // Partners (required, at least one, all mapped)
@@ -62,7 +62,7 @@ export function checkCompleteness(result: BulkUploadResult): CompletenessResult 
     const unmapped = (result.partners as RawInstitution[]).filter((p) => !isMappedInstitution(p));
     if (unmapped.length > 0) {
       reasons.push(
-        `${unmapped.length} partner${unmapped.length > 1 ? 's' : ''} not mapped (similarity ≤ 70 or missing institution ID)`,
+        `${unmapped.length} partner${unmapped.length > 1 ? 's' : ''} could not be automatically matched — please add ${unmapped.length > 1 ? 'them' : 'it'} manually or submit a partner request`,
       );
     }
   }
@@ -157,7 +157,7 @@ export function checkCompleteness(result: BulkUploadResult): CompletenessResult 
         );
         if (unmapped.length > 0) {
           reasons.push(
-            `${unmapped.length} trainee organization${unmapped.length > 1 ? 's' : ''} not mapped`,
+            `${unmapped.length} trainee organization${unmapped.length > 1 ? 's' : ''} could not be automatically matched — please add ${unmapped.length > 1 ? 'them' : 'it'} manually or submit a partner request`,
           );
         }
       }
@@ -183,7 +183,7 @@ export function checkCompleteness(result: BulkUploadResult): CompletenessResult 
     if (!result.trainee_affiliation) {
       reasons.push('Trainee Affiliation is required for Individual training');
     } else if (!isMappedInstitution(result.trainee_affiliation as RawInstitution)) {
-      reasons.push('Trainee Affiliation is not mapped (similarity ≤ 70 or missing institution ID)');
+      reasons.push('Trainee Affiliation could not be automatically matched — please add it manually or submit a partner request');
     }
   }
 
