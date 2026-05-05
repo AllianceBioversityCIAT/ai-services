@@ -168,7 +168,7 @@ export function useBulkUploadApi(initialToken: string | null = null): BulkUpload
           const draftResponse = await fetch(STAR_API_URL, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 6, results: incompleteResults.map(formatResultForSTAR) }),
+            body: JSON.stringify({ results: incompleteResults.map((r) => ({ ...formatResultForSTAR(r), status: 4 })) }),
           });
           if (!draftResponse.ok) {
             const errorText = await draftResponse.text();
@@ -186,7 +186,7 @@ export function useBulkUploadApi(initialToken: string | null = null): BulkUpload
           const approveResponse = await fetch(approveEndpoint, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 4, results: completeResults.map(formatResultForSTAR) }),
+            body: JSON.stringify({ results: completeResults.map((r) => ({ ...formatResultForSTAR(r), status: 6 })) }),
           });
           if (!approveResponse.ok) {
             const errorText = await approveResponse.text();
