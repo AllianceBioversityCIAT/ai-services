@@ -104,7 +104,7 @@ export function TraineeAffiliationCell({ value, globalIdx, onEdit, disabled }: T
     setQuery('');
   }, []);
 
-  const hasValue = value && value.institution_name;
+  const hasValue = value && value.institution_name && value.institution_id !== null && value.similarity_score >= 70;
 
   function affiliationDotClass(inst: RawInstitution): string {
     if (inst.institution_id !== null && inst.similarity_score >= 70) return 'affiliation-dot affiliation-dot-mapped';
@@ -115,7 +115,6 @@ export function TraineeAffiliationCell({ value, globalIdx, onEdit, disabled }: T
   return (
     <div className={`affiliation-cell${disabled ? ' cell-conditional-disabled' : ''}`}>
       <div className="affiliation-text-row">
-        {hasValue && <span className={affiliationDotClass(value!)} title={`Score: ${value!.similarity_score}`} />}
         <span className="affiliation-name" title={hasValue ? `ID: ${value!.institution_id ?? '—'}` : undefined}>
           {hasValue ? value!.institution_name : <span className="bulk-chips-empty">—</span>}
         </span>

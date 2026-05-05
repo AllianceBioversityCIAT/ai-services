@@ -48,14 +48,12 @@ interface PartnersCellProps {
   disabled?: boolean;
 }
 
-function chipClass(p: RawInstitution): string {
-  if (p.institution_id !== null && p.similarity_score >= 70) return 'partner-chip partner-chip-mapped';
-  if (p.institution_id !== null && p.similarity_score < 70) return 'partner-chip partner-chip-low';
-  return 'partner-chip partner-chip-unmapped';
-}
-
 function isRemovable(_p: RawInstitution): boolean {
   return true;
+}
+
+function isMapped(p: RawInstitution): boolean {
+  return p.institution_id !== null && p.institution_id !== undefined && p.similarity_score >= 70;
 }
 
 export function PartnersCell({ partners, globalIdx, onEdit, field = 'partners', isPartnerNotApplicable, disabled }: PartnersCellProps) {
@@ -125,18 +123,18 @@ export function PartnersCell({ partners, globalIdx, onEdit, field = 'partners', 
   return (
     <div className="partners-cell">
       <div className="partners-chips">
-        {partners.length === 0 && isPartnerNotApplicable && (
+        {partners.filter(isMapped).length === 0 && isPartnerNotApplicable && (
           <span className="bulk-chips-empty partners-not-found">No partners were identified in the data</span>
         )}
-        {partners.length === 0 && !isPartnerNotApplicable && <span className="bulk-chips-empty">—</span>}
-        {partners.map((p, i) => (
-          <span key={i} className={chipClass(p)} title={p.institution_name}>
+        {partners.filter(isMapped).length === 0 && !isPartnerNotApplicable && <span className="bulk-chips-empty">—</span>}
+        {partners.filter(isMapped).map((p, i) => (
+          <span key={i} className="partner-chip partner-chip-mapped" title={p.institution_name}>
             <span className="partner-chip-label">{p.institution_name}</span>
             {isRemovable(p) && !disabled && (
               <button
                 className="partner-chip-remove"
                 aria-label={`Remove ${p.institution_name}`}
-                onClick={() => handleRemove(i)}
+                onClick={() => handleRemove(partners.indexOf(p))}
               >
                 ×
               </button>

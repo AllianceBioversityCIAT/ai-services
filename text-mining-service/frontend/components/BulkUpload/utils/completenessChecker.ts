@@ -45,14 +45,16 @@ export function checkCompleteness(result: BulkUploadResult): CompletenessResult 
   if (!result.main_contact_person) {
     reasons.push('Main Contact Person is required');
   } else if (!isMappedUser(result.main_contact_person as RawUser)) {
-    reasons.push('Main Contact Person could not be automatically matched — please add it manually');
+    const name = (result.main_contact_person as RawUser).name;
+    reasons.push(`Main Contact Person “${name}” could not be automatically matched — please add it manually`);
   }
 
   // Training supervisor (both types)
   if (!result.training_supervisor) {
     reasons.push('Training Supervisor is required');
   } else if (!isMappedUser(result.training_supervisor as RawUser)) {
-    reasons.push('Training Supervisor could not be automatically matched — please add it manually');
+    const name = (result.training_supervisor as RawUser).name;
+    reasons.push(`Training Supervisor “${name}” could not be automatically matched — please add it manually`);
   }
 
   // Partners (required unless AI found none, in which case is_partner_not_applicable covers it)

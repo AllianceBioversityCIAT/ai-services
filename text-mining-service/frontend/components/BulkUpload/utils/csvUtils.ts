@@ -1,39 +1,42 @@
 import type { UnmappedInstitution, BulkUploadResult, RecordStatus } from '../types';
 import { checkCompleteness } from './completenessChecker';
 
+const SOURCE_FIELD_LABELS: Record<string, string> = {
+  partners: 'Partners',
+  trainee_affiliation: 'Trainee Affiliation',
+  trainees_description: 'Trainees Organizations',
+};
+
 /** Generates a CSV string from unmapped institutions data. */
 export function createUnmappedReportCSV(unmapped: UnmappedInstitution[]): string {
   if (unmapped.length === 0) return 'No unmapped institutions found.';
 
-  const headers: (keyof UnmappedInstitution)[] = [
-    'record_id',
-    'record_title',
-    'source_field',
-    'institution_name',
-    'institution_id',
-    'similarity_score',
-  ];
+  const headers = ['record_title', 'field', 'institution_name'];
 
-  const rows = unmapped.map((item) =>
-    headers
-      .map((key) => {
-        const val = item[key];
-        if (val === null || val === undefined) return '';
-        const str = String(val);
+  const rows = unmapped.map((item) => {
+    const values = [
+      item.record_title,
+      SOURCE_FIELD_LABELS[item.source_field] ?? item.source_field,
+      item.institution_name,
+    ];
+    return values
+      .map((val) => {
+        const str = val === null || val === undefined ? '' : String(val);
         if (str.includes(',') || str.includes('"') || str.includes('\n')) {
           return '"' + str.replace(/"/g, '""') + '"';
         }
         return str;
       })
-      .join(','),
-  );
+      .join(',');
+  });
 
   return [headers.join(','), ...rows].join('\n');
 }
 
 /** Triggers a browser CSV file download. */
 export function downloadCSV(content: string, filename: string): void {
-  const blob = new Blob([content], { type: 'text/csv' });
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + content], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

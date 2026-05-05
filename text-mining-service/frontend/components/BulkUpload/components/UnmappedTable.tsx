@@ -25,6 +25,13 @@ interface UnmappedTableProps {
   onFinishProcess: () => void;
 }
 
+// Maps internal field names to user-friendly labels
+const SOURCE_FIELD_LABELS: Record<string, string> = {
+  partners: 'Partners',
+  trainee_affiliation: 'Trainee Affiliation',
+  trainees_description: 'Trainees Organizations',
+};
+
 export function UnmappedTable({ institutions, onDownloadReport, onBackToResults, onFinishProcess }: UnmappedTableProps) {
   const pagination = usePagination(5);
   const { setTotalItems } = pagination;
@@ -62,6 +69,15 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
           </button>
         </div>
 
+        <div className="bulk-risk-notice" style={{ marginBottom: '1rem' }}>
+          <span style={{ fontSize: '1rem' }}>ℹ️</span>
+          <span>
+            The following institutions could not be automatically matched in CLARISA. This does not necessarily mean they do not exist — the AI may have failed to find them.
+            Please review this list and, if needed, submit a <strong>partner request</strong> to have them added to CLARISA. Once available, you can return to the record and complete the missing information.
+          </span>
+        </div>
+        <hr style={{ border: 'none', borderTop: '1px solid var(--bulk-gray-200)', margin: '0 0 1rem 0' }} />
+
         {institutions.length === 0 ? (
           <div className="bulk-unmapped-empty">
             <span className="bulk-unmapped-empty-icon">✓</span>
@@ -75,9 +91,8 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
                 <tr>
                   <th>Result ID</th>
                   <th>Record title</th>
-                  <th>Source field</th>
+                  <th>Field</th>
                   <th>Institution name</th>
-                  <th>Institution ID</th>
                 </tr>
               </thead>
               <tbody>
@@ -85,9 +100,8 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
                   <tr key={`${item.record_id}-${item.institution_name}-${i}`}>
                     <td style={{ padding: '1rem' }}>{item.record_id}</td>
                     <td style={{ padding: '1rem' }}>{item.record_title}</td>
-                    <td style={{ padding: '1rem' }}>{item.source_field}</td>
+                    <td style={{ padding: '1rem' }}>{SOURCE_FIELD_LABELS[item.source_field] ?? item.source_field}</td>
                     <td style={{ padding: '1rem' }}>{item.institution_name}</td>
-                    <td style={{ padding: '1rem' }}>{item.institution_id ?? 'null'}</td>
                   </tr>
                 ))}
               </tbody>
