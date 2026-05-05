@@ -22,7 +22,7 @@ interface UnmappedTableProps {
   institutions: UnmappedInstitution[];
   onDownloadReport: () => void;
   onBackToResults: () => void;
-  onFinishProcess: () => void;
+  onGoToSummary: () => void;
 }
 
 // Maps internal field names to user-friendly labels
@@ -32,7 +32,7 @@ const SOURCE_FIELD_LABELS: Record<string, string> = {
   trainees_description: 'Trainees Organizations',
 };
 
-export function UnmappedTable({ institutions, onDownloadReport, onBackToResults, onFinishProcess }: UnmappedTableProps) {
+export function UnmappedTable({ institutions, onDownloadReport, onBackToResults, onGoToSummary }: UnmappedTableProps) {
   const pagination = usePagination(5);
   const { setTotalItems } = pagination;
 
@@ -170,8 +170,8 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
           <button className="bulk-unmapped-nav-btn" type="button" onClick={onBackToResults}>
             ← Back to Results
           </button>
-          <button className="bulk-next-step-btn" type="button" onClick={onFinishProcess}>
-            Finish Process
+          <button className="bulk-next-step-btn" type="button" onClick={onGoToSummary}>
+            View Summary
             {NextArrowSvg}
           </button>
         </div>

@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import type { BulkUploadResult, RecordStatus, DocSource, AppStep, UnmappedInstitution } from './types';
+import type { BulkUploadResult, RecordStatus, DocSource, AppStep, UnmappedInstitution, SummaryRecord } from './types';
 import { useBulkUploadApi } from './hooks/useBulkUploadApi';
 import { useTableFilters } from './hooks/useTableFilters';
 import { loadRecordStatuses } from './hooks/useDynamoDB';
 import { extractUnmappedInstitutions } from './utils/dataFormatters';
-import { createUnmappedReportCSV, createDraftReportCSV, downloadCSV } from './utils/csvUtils';
+import { createUnmappedReportCSV, downloadCSV } from './utils/csvUtils';
 import { setNestedValue } from './utils/tableHelpers';
 import { checkCompleteness } from './utils/completenessChecker';
 
@@ -17,6 +17,7 @@ import { StepIndicator } from './components/StepIndicator';
 import { Step1Upload } from './components/Step1Upload';
 import { UnmappedTable } from './components/UnmappedTable';
 import { ResultsTable } from './components/ResultsTable';
+import { Step4Summary } from './components/Step4Summary';
 
 import deniedAccessImage from '../../public/static/bulk_upload/denied_access.png';
 
@@ -75,6 +76,11 @@ export default function BulkUploadModule() {
   const [currentFileName, setCurrentFileName] = useState<string | null>(null);
   const [recordStatuses, setRecordStatuses] = useState<Record<string, RecordStatus>>({});
   const [unmappedInstitutions, setUnmappedInstitutions] = useState<UnmappedInstitution[]>([]);
+  const [submissionSummary, setSubmissionSummary] = useState<{
+    approved: SummaryRecord[];
+    draft: SummaryRecord[];
+    failed: SummaryRecord[];
+  } | null>(null);
 
   // ── Selection State ───────────────────────────────────
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
@@ -113,23 +119,13 @@ export default function BulkUploadModule() {
     setUnmappedInstitutions([]);
     setRecordStatuses({});
     setSelectedIndices(new Set());
+    setSubmissionSummary(null);
     filters.clearAllFilters();
   }, [filters]);
 
   const handleFinishProcess = useCallback(() => {
-    const draftResults = editedData.filter(
-      (r) =>
-        recordStatuses[String(r.id)]?.status === 'complete' &&
-        !checkCompleteness(r).isComplete,
-    );
-    if (draftResults.length > 0) {
-      const csv = createDraftReportCSV(draftResults, recordStatuses);
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const baseName = currentFileName?.replace(/\.[^.]+$/, '') ?? 'draft_results';
-      downloadCSV(csv, `draft_report_${baseName}_${timestamp}.csv`);
-    }
     handleNewUpload();
-  }, [editedData, recordStatuses, currentFileName, handleNewUpload]);
+  }, [handleNewUpload]);
 
   const handleProcessSuccess = useCallback(
     (results: BulkUploadResult[], statuses: Record<string, RecordStatus>, fileName: string) => {
@@ -204,11 +200,36 @@ export default function BulkUploadModule() {
       .map((idx) => editedData[idx])
       .filter((result) => recordStatuses[String(result.id)]?.status !== 'complete');
     if (selected.length === 0) return;
-    api.submitToSTAR(selected, currentFileName, api.authToken, handleStatusUpdate, () => {
+    api.submitToSTAR(selected, currentFileName, api.authToken, (completeIds, newStatuses) => {
+      setRecordStatuses((prev) => ({ ...prev, ...newStatuses }));
+      // Build summary from this session only
+      const approved: SummaryRecord[] = [];
+      const draft: SummaryRecord[] = [];
+      const failed: SummaryRecord[] = [];
+      for (const r of selected) {
+        const rid = String(r.id);
+        const status = newStatuses[rid];
+        if (!status) continue;
+        const record: SummaryRecord = {
+          id: rid,
+          title: r.title,
+          contract_code: r.contract_code,
+          result_official_code: status.link?.split('/result/').pop(),
+          star_link: status.link ?? undefined,
+          submission_status: status.status === 'complete'
+            ? (completeIds.has(rid) ? 'approved' : 'draft')
+            : 'failed',
+          error_message: status.errorMessage,
+        };
+        if (record.submission_status === 'approved') approved.push(record);
+        else if (record.submission_status === 'draft') draft.push(record);
+        else failed.push(record);
+      }
+      setSubmissionSummary({ approved, draft, failed });
       setSelectedIndices(new Set());
       setEditedData((prev) => [...prev]);
     });
-  }, [api, currentFileName, selectedIndices, editedData, handleStatusUpdate, recordStatuses]);
+  }, [api, currentFileName, selectedIndices, editedData, recordStatuses]);
 
   const handleClearSelections = useCallback(() => {
     setSelectedIndices(new Set());
@@ -261,7 +282,7 @@ export default function BulkUploadModule() {
           onNewUpload={handleNewUpload}
         />
       )}
-      {step === 'results' && currentFileName !== null && (
+      {(step === 'results' || step === 'summary') && currentFileName !== null && (
         <ResultsHeader
           fileName={currentFileName}
           resultsCount={currentResults.length}
@@ -293,6 +314,17 @@ export default function BulkUploadModule() {
             institutions={unmappedInstitutions}
             onDownloadReport={handleDownloadUnmappedReport}
             onBackToResults={handleNextStep}
+            onGoToSummary={() => setStep('summary')}
+          />
+        )}
+
+        {step === 'summary' && currentFileName !== null && submissionSummary !== null && (
+          <Step4Summary
+            approved={submissionSummary.approved}
+            draft={submissionSummary.draft}
+            failed={submissionSummary.failed}
+            fileName={currentFileName}
+            onBackToUnmapped={() => setStep('unmapped')}
             onFinishProcess={handleFinishProcess}
           />
         )}

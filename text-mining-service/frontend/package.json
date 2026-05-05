@@ -17,7 +17,8 @@
     "next": "^15.2.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "styled-jsx": "^5.1.7"
+    "styled-jsx": "^5.1.7",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@opennextjs/aws": "^3.10.1",
