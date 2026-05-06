@@ -1,35 +1,60 @@
 import * as XLSX from 'xlsx';
 import type { SummaryRecord } from '../types';
 
-const APPROVED_COLUMNS = [
-  { key: 'title',                label: 'Title'          },
-  { key: 'contract_code',        label: 'Contract Code'  },
-  { key: 'result_official_code', label: 'Result Code'    },
-  { key: 'star_link',            label: 'STAR Link'      },
+// ── Metadata columns (full BulkUploadResult fields) ──────────────────────────
+const METADATA_COLUMNS: { key: string; label: string }[] = [
+  { key: 'id',                                    label: 'ID'                              },
+  { key: 'title',                                 label: 'Title'                           },
+  { key: 'contract_code',                         label: 'Contract Code'                   },
+  { key: 'description',                           label: 'Description'                     },
+  { key: 'year',                                  label: 'Year'                            },
+  { key: 'training_type',                         label: 'Training Type'                   },
+  { key: 'training_category',                     label: 'Training Category'               },
+  { key: 'training_purpose',                      label: 'Training Purpose'                },
+  { key: 'length_of_training',                    label: 'Length of Training'              },
+  { key: 'degree',                                label: 'Degree'                          },
+  { key: 'delivery_modality',                     label: 'Delivery Modality'               },
+  { key: 'start_date',                            label: 'Start Date'                      },
+  { key: 'end_date',                              label: 'End Date'                        },
+  { key: 'total_participants',                    label: 'Total Participants'              },
+  { key: 'male_participants',                     label: 'Male Participants'               },
+  { key: 'female_participants',                   label: 'Female Participants'             },
+  { key: 'non_binary_participants',               label: 'Non-binary Participants'         },
+  { key: 'trainee_name',                          label: 'Trainee Name'                    },
+  { key: 'trainee_gender',                        label: 'Trainee Gender'                  },
+  { key: 'geoscope_level',                        label: 'Geoscope Level'                  },
+  { key: 'publicity_restriction',                 label: 'Publicity Restriction'           },
+  { key: 'publicity_restriction_description',     label: 'Publicity Restriction Desc.'     },
+  { key: 'potential_asset',                       label: 'Potential Asset'                 },
+  { key: 'potential_asset_description',           label: 'Potential Asset Desc.'           },
+  { key: 'requires_further_development',          label: 'Requires Further Development'    },
+  { key: 'requires_further_development_description', label: 'Further Development Desc.'   },
 ];
 
-const DRAFT_COLUMNS = [
-  { key: 'title',                label: 'Title'          },
-  { key: 'contract_code',        label: 'Contract Code'  },
-  { key: 'result_official_code', label: 'Result Code'    },
-  { key: 'star_link',            label: 'STAR Link'      },
-];
+// Keys that hold arrays/objects — serialized to JSON string in the cell
+const ARRAY_KEYS = new Set([
+  'keywords', 'partners', 'countries', 'regions',
+  'trainees_description', 'evidences',
+  'main_contact_person', 'training_supervisor',
+  'trainee_affiliation', 'trainee_nationality', 'language',
+]);
 
-const FAILED_COLUMNS = [
-  { key: 'title',         label: 'Title'         },
-  { key: 'contract_code', label: 'Contract Code' },
-  { key: 'error_message', label: 'Error'         },
-];
+/** Serialize a raw field value to a readable string for Excel. */
+function serialize(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return JSON.stringify(value);
+}
 
-function buildSheetData(
-  records: SummaryRecord[],
-  columns: { key: string; label: string }[],
-): (string | undefined)[][] {
-  const header = columns.map((c) => c.label);
-  const rows = records.map((r) =>
-    columns.map((c) => r[c.key as keyof SummaryRecord] as string | undefined),
-  );
-  return [header, ...rows];
+/** Build a row of metadata values from a SummaryRecord's rawData. */
+function buildMetadataRow(r: SummaryRecord, cols: { key: string; label: string }[]): string[] {
+  const data = r.rawData as Record<string, unknown> | undefined;
+  return cols.map((col) => {
+    if (!data) return '';
+    const val = data[col.key];
+    if (ARRAY_KEYS.has(col.key)) return serialize(val);
+    return serialize(val);
+  });
 }
 
 function applyHeaderStyle(ws: XLSX.WorkSheet, numCols: number): void {
@@ -44,25 +69,41 @@ function applyHeaderStyle(ws: XLSX.WorkSheet, numCols: number): void {
   }
 }
 
-function setColWidths(
-  ws: XLSX.WorkSheet,
-  columns: { key: string; label: string }[],
+function setColWidths(ws: XLSX.WorkSheet, numCols: number, rows: string[][]): void {
+  const widths: number[] = Array(numCols).fill(10);
+  for (const row of rows) {
+    row.forEach((cell, i) => {
+      if (cell && cell.length > widths[i]) widths[i] = cell.length;
+    });
+  }
+  ws['!cols'] = widths.map((w) => ({ wch: Math.min(w + 14, 150) }));
+}
+
+function buildSheet(
   records: SummaryRecord[],
-): void {
-  ws['!cols'] = columns.map((col) => {
-    const maxLen = Math.max(
-      col.label.length,
-      ...records.map((r) => String(r[col.key as keyof SummaryRecord] ?? '').length),
-    );
-    return { wch: Math.min(maxLen + 4, 60) };
+  extraCols: { key: string; label: string }[],
+): XLSX.WorkSheet {
+  // Header: metadata cols + extra (result code, star link or error)
+  const allCols = [...METADATA_COLUMNS, ...extraCols];
+  const header = allCols.map((c) => c.label);
+
+  const rows = records.map((r) => {
+    const meta = buildMetadataRow(r, METADATA_COLUMNS);
+    const extra = extraCols.map((col) => serialize(r[col.key as keyof SummaryRecord]));
+    return [...meta, ...extra];
   });
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  applyHeaderStyle(ws, allCols.length);
+  setColWidths(ws, allCols.length, rows);
+  return ws;
 }
 
 /**
- * Downloads a summary Excel workbook with three sheets:
- * - Approved: records submitted and approved
- * - Draft: records submitted but saved as draft
- * - Failed: records that could not be submitted
+ * Downloads a summary Excel workbook with full metadata per sheet:
+ * - Approved: all fields + Result Code + STAR Link
+ * - Draft: all fields + Result Code + STAR Link
+ * - Failed: all fields + Error message
  */
 export function downloadSummaryExcel(
   approved: SummaryRecord[],
@@ -72,30 +113,22 @@ export function downloadSummaryExcel(
 ): void {
   const wb = XLSX.utils.book_new();
 
-  // ── Approved sheet ──────────────────────────────────
-  const approvedData = buildSheetData(approved, APPROVED_COLUMNS);
-  const wsApproved = XLSX.utils.aoa_to_sheet(approvedData);
-  applyHeaderStyle(wsApproved, APPROVED_COLUMNS.length);
-  setColWidths(wsApproved, APPROVED_COLUMNS, approved);
-  XLSX.utils.book_append_sheet(wb, wsApproved, 'Approved');
+  const approvedExtras = [
+    { key: 'result_official_code', label: 'Result Code' },
+    { key: 'star_link',            label: 'STAR Link'   },
+  ];
+  const failedExtras = [
+    { key: 'error_message', label: 'Error' },
+  ];
 
-  // ── Draft sheet ─────────────────────────────────────
-  const draftData = buildSheetData(draft, DRAFT_COLUMNS);
-  const wsDraft = XLSX.utils.aoa_to_sheet(draftData);
-  applyHeaderStyle(wsDraft, DRAFT_COLUMNS.length);
-  setColWidths(wsDraft, DRAFT_COLUMNS, draft);
-  XLSX.utils.book_append_sheet(wb, wsDraft, 'Draft');
-
-  // ── Failed sheet (only if there are failures) ───────
+  XLSX.utils.book_append_sheet(wb, buildSheet(approved, approvedExtras), 'Approved');
+  XLSX.utils.book_append_sheet(wb, buildSheet(draft,    approvedExtras), 'Draft');
   if (failed.length > 0) {
-    const failedData = buildSheetData(failed, FAILED_COLUMNS);
-    const wsFailed = XLSX.utils.aoa_to_sheet(failedData);
-    applyHeaderStyle(wsFailed, FAILED_COLUMNS.length);
-    setColWidths(wsFailed, FAILED_COLUMNS, failed);
-    XLSX.utils.book_append_sheet(wb, wsFailed, 'Failed');
+    XLSX.utils.book_append_sheet(wb, buildSheet(failed, failedExtras), 'Failed');
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
   const cleanBase = baseFileName.replace(/\.[^.]+$/, '');
   XLSX.writeFile(wb, `submission_summary_${cleanBase}_${timestamp}.xlsx`);
 }
+
