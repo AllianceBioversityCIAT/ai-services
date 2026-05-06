@@ -26,6 +26,8 @@ export default function BulkUploadModule() {
   const [authStatus, setAuthStatus] = useState<'loading' | 'valid' | 'invalid'>('loading');
   const [userToken, setUserToken] = useState<string | null>(null);
   const [userName, setUserName] = useState<{ firstName: string; lastName: string } | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userFullName, setUserFullName] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -43,11 +45,14 @@ export default function BulkUploadModule() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
     })
-      .then((res) => res.json() as Promise<{ valid: boolean; firstName?: string; lastName?: string }>)
+      .then((res) => res.json() as Promise<{ valid: boolean; firstName?: string; lastName?: string; email?: string | null; userId?: string | null }>)
       .then((data) => {
         if (data.valid) {
           setUserToken(token);
           setUserName({ firstName: data.firstName ?? '', lastName: data.lastName ?? '' });
+          // Prefer email as the user identifier for interaction tracking, fall back to userId
+          setUserId(data.email ?? data.userId ?? null);
+          setUserFullName([data.firstName, data.lastName].filter(Boolean).join(' ') || null);
           setAuthStatus('valid');
         } else {
           setAuthStatus('invalid');
@@ -96,7 +101,7 @@ export default function BulkUploadModule() {
   } | null>(null);
 
   // ── API ───────────────────────────────────────────────
-  const api = useBulkUploadApi(userToken);
+  const api = useBulkUploadApi(userToken, userId, userFullName);
 
   // ── Filters ───────────────────────────────────────────
   const filters = useTableFilters();

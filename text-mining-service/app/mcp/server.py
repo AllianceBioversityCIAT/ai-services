@@ -159,7 +159,7 @@ async def process_document_prms(bucket: str, key: str, token: Any, environmentUr
 
 
 @mcp.tool()
-async def process_document_capdev(bucket: str, key: str, token: Any, environmentUrl: str, skip_ids: list = None) -> dict:
+async def process_document_capdev(bucket: str, key: str, token: Any, environmentUrl: str, skip_ids: list = None, user_id: str = None, user_name: str = None) -> dict:
     logger.info("✅ process_document_capdev invoked via MCP")
 
     try:
@@ -169,9 +169,10 @@ async def process_document_capdev(bucket: str, key: str, token: Any, environment
             raise ValueError("Authentication failed")
 
         logger.info(f"Processing document: {key} from bucket: {bucket}")
+        logger.info(f"👤 User ID for tracking: {user_id} | Name: {user_name}")
 
         result = process_bulk_capdev(
-            bucket_name=bucket, file_key=key, skip_ids=skip_ids or [])
+            bucket_name=bucket, file_key=key, skip_ids=skip_ids or [], user_id=user_id, user_name=user_name)
 
         await notification_service.send_slack_notification(
             emoji=":ai: :pick:",

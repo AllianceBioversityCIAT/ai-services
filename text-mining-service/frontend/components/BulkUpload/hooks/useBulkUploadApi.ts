@@ -38,7 +38,7 @@ export interface BulkUploadApiActions {
   clearError: () => void;
 }
 
-export function useBulkUploadApi(initialToken: string | null = null): BulkUploadApiState & BulkUploadApiActions {
+export function useBulkUploadApi(initialToken: string | null = null, userId: string | null = null, userName: string | null = null): BulkUploadApiState & BulkUploadApiActions {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('Processing...');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -99,6 +99,12 @@ export function useBulkUploadApi(initialToken: string | null = null): BulkUpload
         formData.append('environmentUrl', ENVIRONMENT_URL);
         if (skipIds.length > 0) {
           formData.append('skip_ids', skipIds.join(','));
+        }
+        if (userId) {
+          formData.append('user_id', userId);
+        }
+        if (userName) {
+          formData.append('user_name', userName);
         }
 
         if (mode === 'upload' && file) {
