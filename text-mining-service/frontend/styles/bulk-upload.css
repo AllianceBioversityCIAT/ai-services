@@ -1780,8 +1780,12 @@
     transition: background-color 0.15s ease;
 }
 
+.bulk-upload-container .bulk-results-table tbody tr:nth-child(even) {
+    background: #f8fafc;
+}
+
 .bulk-upload-container .bulk-results-table tbody tr:hover {
-    background: #F5F5F5;
+    background: #edf4fb;
 }
 
 .bulk-upload-container .bulk-results-table tbody tr:last-child td {
@@ -2647,4 +2651,33 @@
 .bulk-upload-container .bulk-summary-actions {
     justify-content: space-between;
     margin-top: 0.5rem;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Submitted Results tab — read-only overrides only
+   ════════════════════════════════════════════════════════════════ */
+
+/* Allow text to wrap naturally (no truncation in read-only view) */
+.bulk-upload-container .bulk-submitted-view .bulk-results-table th,
+.bulk-upload-container .bulk-submitted-view .bulk-results-table td {
+    white-space: normal;
+    overflow: visible;
+    vertical-align: middle;
+    padding: 1rem 1rem;
+}
+
+/* Inputs/textareas look like plain text — no border, no background */
+.bulk-upload-container .bulk-submitted-view .bulk-results-table td textarea,
+.bulk-upload-container .bulk-submitted-view .bulk-results-table td input,
+.bulk-upload-container .bulk-submitted-view .bulk-results-table td select {
+    pointer-events: none;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0;
+    resize: none;
+    font-size: inherit;
+    color: inherit;
+    width: 100%;
+    outline: none;
 }

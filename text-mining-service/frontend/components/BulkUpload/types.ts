@@ -85,12 +85,14 @@ export interface RecordStatus {
   status: 'pending' | 'complete' | 'failed';
   link: string | null;
   errorMessage?: string;
+  submissionType?: 'approved' | 'draft';
 }
 
 export interface DynamoStatuses {
   complete: string[];
   failed: string[];
   links: Record<string, string>;
+  record_data?: Record<string, { title: string; contract_code?: string; submission_type?: 'approved' | 'draft'; year?: string }>;
 }
 
 export interface StarApiResponse {
@@ -139,4 +141,5 @@ export interface ColumnDef {
   tooltip?: string;
   enabledWhen?: { field: string; values: (string | number)[] } | { field: string; values: (string | number)[] }[];
   width?: string;
+  showInSubmitted?: boolean;
 }

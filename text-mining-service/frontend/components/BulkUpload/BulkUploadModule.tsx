@@ -318,11 +318,11 @@ export default function BulkUploadModule() {
           />
         )}
 
-        {step === 'summary' && currentFileName !== null && submissionSummary !== null && (
+        {step === 'summary' && currentFileName !== null && (
           <Step4Summary
-            approved={submissionSummary.approved}
-            draft={submissionSummary.draft}
-            failed={submissionSummary.failed}
+            approved={submissionSummary?.approved ?? []}
+            draft={submissionSummary?.draft ?? []}
+            failed={submissionSummary?.failed ?? []}
             fileName={currentFileName}
             onBackToUnmapped={() => setStep('unmapped')}
             onFinishProcess={handleFinishProcess}
