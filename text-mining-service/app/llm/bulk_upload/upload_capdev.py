@@ -9,6 +9,7 @@ from app.utils.prompt.bulk_upload_capdev_prompt import PROMPT_BULK_UPLOAD_CAPDEV
 from app.llm.vectorize import get_embedding, store_temp_embeddings, get_relevant_chunk
 from app.llm.mining import initialize_reference_data, split_text, invoke_model, is_valid_json, extract_json_from_markdown
 from app.llm.map_fields import map_fields_with_opensearch, clear_mapping_cache, get_cache_stats
+from app.utils.interactions.interaction_client import interaction_client
 
 logger = get_logger()
 mapping_service_url = MAPPING_URL
@@ -208,7 +209,7 @@ def process_batches_in_groups(batches, prompt, all_reference_data, group_size=20
     return all_results
 
 
-def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAPDEV, max_workers=20, group_size=20, skip_ids=None):
+def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAPDEV, max_workers=20, group_size=20, skip_ids=None, user_id: str = None, user_name: str = None):
     start_time = time.time()
 
     try:
@@ -259,8 +260,45 @@ def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAP
             logger.info(f"💾 Cache performance: {cache_stats['total_entries']} unique entities cached")
 
             logger.info(f"✅ Successfully generated response:\n{json.dumps(final_result, indent=2, ensure_ascii=False)}")
-            
-            return {
+
+            interaction_id = None
+            if user_id:
+                try:
+                    skipped_count = len(skip_ids) if skip_ids else 0
+                    tracking_context = {
+                        "bucket_name": bucket_name,
+                        "file_key": file_key,
+                        "user_name": user_name or "Unknown",
+                        "prompt_used": prompt[:500] + "..." if len(prompt) > 500 else prompt,
+                        "prompt_full_length": len(prompt),
+                        "chunks_processed": len(chunks),
+                        "rows_skipped": skipped_count,
+                        "batches_processed": len(batches),
+                        "results_count": len(final_result.get("results", [])),
+                        "model_used": "claude-sonnet-4-5",
+                        "workers_used": max_workers,
+                        "group_size": group_size,
+                    }
+                    interaction_response = interaction_client.track_interaction(
+                        user_id=user_id,
+                        user_input=f"Bulk upload processing request for: {file_key} (Excel file with {len(chunks)} rows, {skipped_count} skipped)",
+                        ai_output=json.dumps(final_result, indent=2, ensure_ascii=False),
+                        service_name="bulk-text-mining",
+                        display_name="STAR Bulk Upload Mining Service",
+                        service_description="A service that bulk-processes Excel files and extracts capacity development results.",
+                        context=tracking_context,
+                        response_time_seconds=elapsed_time,
+                        platform="STAR"
+                    )
+                    if interaction_response:
+                        interaction_id = interaction_response.get('interaction_id')
+                        logger.info(f"📊 Interaction tracked with ID: {interaction_id}")
+                    else:
+                        logger.warning("⚠️ Failed to track interaction with interaction service")
+                except Exception as tracking_error:
+                    logger.error(f"❌ Error tracking interaction: {str(tracking_error)}")
+
+            result_payload = {
                 "content": final_result,
                 "time_taken": f"{elapsed_time:.2f}",
                 "json_content": json.dumps(final_result, ensure_ascii=False, indent=2),
@@ -270,6 +308,9 @@ def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAP
                 "group_size": group_size,
                 "total_groups": (len(batches) + group_size - 1) // group_size
             }
+            if interaction_id:
+                result_payload["interaction_id"] = interaction_id
+            return result_payload
             
         else:
             logger.info(f"📄 Non-Excel file detected. Using standard processing...")

@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     const data = (await response.json()) as {
       data?: {
         isValid?: boolean;
-        user?: { roles?: number[]; first_name?: string; last_name?: string };
+        user?: { roles?: number[]; first_name?: string; last_name?: string; email?: string; sec_user_id?: number | string };
       };
     };
 
@@ -52,10 +52,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const user = data?.data?.user;
     return NextResponse.json({
       valid: true,
-      firstName: data?.data?.user?.first_name ?? '',
-      lastName: data?.data?.user?.last_name ?? '',
+      firstName: user?.first_name ?? '',
+      lastName: user?.last_name ?? '',
+      email: user?.email ?? null,
+      userId: user?.sec_user_id != null ? String(user.sec_user_id) : null,
     });
   } catch {
     return NextResponse.json({ valid: false, error: 'Token validation error' }, { status: 500 });

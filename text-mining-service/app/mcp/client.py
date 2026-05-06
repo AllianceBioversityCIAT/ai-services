@@ -743,6 +743,12 @@ async def bulk_upload_capdev_endpoint(
     ),
     skip_ids: Optional[str] = Form(
         None, description="Comma-separated list of record IDs to skip (already submitted)"
+    ),
+    user_id: Optional[str] = Form(
+        None, description="User identifier for interaction tracking", examples=["user@example.com"]
+    ),
+    user_name: Optional[str] = Form(
+        None, description="Full name of the user for interaction tracking", examples=["John Doe"]
     )
 ):
     """
@@ -804,15 +810,21 @@ async def bulk_upload_capdev_endpoint(
             async with ClientSession(read, write, sampling_callback=handle_sampling_message) as session:
                 await session.initialize()
 
+                mcp_arguments = {
+                    "bucket": bucketName,
+                    "key": key,
+                    "token": token,
+                    "environmentUrl": environmentUrl,
+                    "skip_ids": parsed_skip_ids
+                }
+                if user_id:
+                    mcp_arguments["user_id"] = user_id
+                if user_name:
+                    mcp_arguments["user_name"] = user_name
+
                 result = await session.call_tool(
                     "process_document_capdev",
-                    arguments={
-                        "bucket": bucketName,
-                        "key": key,
-                        "token": token,
-                        "environmentUrl": environmentUrl,
-                        "skip_ids": parsed_skip_ids
-                    }
+                    arguments=mcp_arguments
                 )
                 return result
 
