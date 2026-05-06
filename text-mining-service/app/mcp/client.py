@@ -64,6 +64,10 @@ class RecordStatusUpdate(BaseModel):
     recordId: str = Field(..., description="ID of the record")
     status: str = Field(..., description="Status of the record: 'complete' or 'failed'")
     link: Optional[str] = Field(None, description="Link to the result in STAR (only if status is 'complete')")
+    title: Optional[str] = Field(None, description="Title of the record (stored for re-upload display)")
+    contractCode: Optional[str] = Field(None, description="Contract code of the record (stored for re-upload display)")
+    submissionType: Optional[str] = Field(None, description="Submission type: 'approved' or 'draft'")
+    year: Optional[str] = Field(None, description="Reporting year of the record")
 
 
 class BulkUploadRecord(BaseModel):
@@ -336,6 +340,7 @@ async def get_record_statuses(file_name: str):
             "complete": item.get('complete', []),
             "failed": item.get('failed', []),
             "links": item.get('links', {}),
+            "record_data": item.get('record_data', {}),
             "lastUpdated": item.get('lastUpdated')
         }
     
@@ -410,6 +415,7 @@ async def update_record_status(data: RecordStatusUpdate):
         complete_list = list(item.get('complete', []))
         failed_list = list(item.get('failed', []))
         links_dict = dict(item.get('links', {}))
+        record_data_dict = dict(item.get('record_data', {}))
         
         # Update based on status
         if data.status == "complete":
@@ -432,6 +438,15 @@ async def update_record_status(data: RecordStatusUpdate):
             if data.recordId in links_dict:
                 del links_dict[data.recordId]
         
+        # Store title/contractCode/submissionType/year for re-upload display
+        if data.title or data.contractCode or data.submissionType or data.year:
+            record_data_dict[data.recordId] = {
+                'title': data.title or '',
+                'contract_code': data.contractCode or '',
+                'submission_type': data.submissionType or '',
+                'year': data.year or ''
+            }
+        
         # Save to DynamoDB
         table.put_item(
             Item={
@@ -439,6 +454,7 @@ async def update_record_status(data: RecordStatusUpdate):
                 'complete': complete_list,
                 'failed': failed_list,
                 'links': links_dict,
+                'record_data': record_data_dict,
                 'lastUpdated': datetime.now().isoformat()
             }
         )
@@ -724,6 +740,9 @@ async def bulk_upload_capdev_endpoint(
         default=None, description="Document file to upload and process. Optional if key is provided"),
     environmentUrl: str = Form(
         ..., description="Target environment URL for authentication"
+    ),
+    skip_ids: Optional[str] = Form(
+        None, description="Comma-separated list of record IDs to skip (already submitted)"
     )
 ):
     """
@@ -775,6 +794,11 @@ async def bulk_upload_capdev_endpoint(
     logger.info(
         f"Processing document with key: {key} from bucket {bucketName}")
 
+    # Parse skip_ids from comma-separated string
+    parsed_skip_ids = [sid.strip() for sid in skip_ids.split(",") if sid.strip()] if skip_ids else []
+    if parsed_skip_ids:
+        logger.info(f"⏭️ Skipping {len(parsed_skip_ids)} already-submitted record IDs")
+
     try:
         async with stdio_client(server_params) as (read, write):
             async with ClientSession(read, write, sampling_callback=handle_sampling_message) as session:
@@ -786,7 +810,8 @@ async def bulk_upload_capdev_endpoint(
                         "bucket": bucketName,
                         "key": key,
                         "token": token,
-                        "environmentUrl": environmentUrl
+                        "environmentUrl": environmentUrl,
+                        "skip_ids": parsed_skip_ids
                     }
                 )
                 return result

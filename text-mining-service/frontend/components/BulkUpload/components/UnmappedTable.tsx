@@ -167,7 +167,7 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
 
         {/* Action buttons */}
         <div className="bulk-next-step-container" style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-          <button className="bulk-unmapped-nav-btn" type="button" onClick={onBackToResults}>
+          <button className="bulk-download-unmapped-btn" type="button" onClick={onBackToResults}>
             ← Back to Results
           </button>
           <button className="bulk-next-step-btn" type="button" onClick={onGoToSummary}>

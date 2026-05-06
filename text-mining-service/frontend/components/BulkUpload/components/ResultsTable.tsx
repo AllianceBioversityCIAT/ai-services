@@ -32,6 +32,14 @@ const StarSubmitSvg = (
   </svg>
 );
 
+const ExternalLinkSvg = (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0 }}>
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    <polyline points="15 3 21 3 21 9" />
+    <line x1="10" y1="14" x2="21" y2="3" />
+  </svg>
+);
+
 // ---- TableCell: memoized to prevent re-renders from unrelated state (rerender-memo) ----
 interface TableCellProps {
   col: ColumnDef;
@@ -108,6 +116,36 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
   }
 
   if (col.type === 'completeness') {
+    // Submitted tab: show submission type badge instead of re-running completeness check
+    if (isReadOnly) {
+      const subType = recordStatus?.submissionType;
+      if (subType === 'approved') {
+        return (
+          <td>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.6rem', borderRadius: '999px', background: '#d4edda', color: '#4a8b4e', fontWeight: 600, fontSize: '0.78rem' }}>
+              ✓ Approved
+            </span>
+          </td>
+        );
+      }
+      if (subType === 'draft') {
+        return (
+          <td>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.6rem', borderRadius: '999px', background: '#cce8f7', color: '#1265a0', fontWeight: 600, fontSize: '0.78rem' }}>
+              Draft
+            </span>
+          </td>
+        );
+      }
+      // submissionType not yet stored (legacy records) — show neutral badge
+      return (
+        <td>
+          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '999px', background: '#f0f0f0', color: '#666', fontWeight: 500, fontSize: '0.78rem' }}>
+            Submitted
+          </span>
+        </td>
+      );
+    }
     return (
       <td>
         <CompletenessCell completeness={checkCompleteness(result)} />
@@ -117,7 +155,14 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
 
   if (col.type === 'link') {
     if (recordStatus?.status === 'complete' && recordStatus.link) {
-      return <td><a href={recordStatus.link} target="_blank" rel="noreferrer" className="star-link">🔗 View in STAR</a></td>;
+      return (
+        <td>
+          <a href={recordStatus.link} target="_blank" rel="noreferrer" className="bulk-summary-star-link">
+            View in STAR
+            {ExternalLinkSvg}
+          </a>
+        </td>
+      );
     }
     return <td>-</td>;
   }
@@ -161,6 +206,10 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
   if (col.type === 'textarea') {
     let value = getNestedValue(result, col.key);
     if (typeof value === 'object') value = JSON.stringify(value);
+    // Read-only (submitted tab): plain text, no textarea box
+    if (isReadOnly) {
+      return <td>{String(value ?? '') || <span style={{ color: 'var(--bulk-gray-400)' }}>—</span>}</td>;
+    }
     return (
       <td>
         <textarea
@@ -350,6 +399,10 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
 
   // text / readonly
   const value = getNestedValue(result, col.key) ?? '';
+  // Read-only (submitted tab): plain text
+  if (isReadOnly) {
+    return <td>{String(value) || <span style={{ color: 'var(--bulk-gray-400)' }}>—</span>}</td>;
+  }
   if (col.readonly) {
     return (
       <td>
@@ -535,12 +588,13 @@ export function ResultsTable({
           <span>Please review all columns marked with this flag — the AI may make mistakes in these fields.</span>
         </div>
       )}
-      <div className="bulk-table-container">
+      <div className={`bulk-table-container${currentTab === 'submitted' ? ' bulk-submitted-view' : ''}`}>
         <table id="bulkResultsTable" className="bulk-results-table">
           <colgroup>
             {currentTab === 'pending' && <col style={{ width: RESULTS_TABLE_COLUMNS[0].width }} />}
             {RESULTS_TABLE_COLUMNS.slice(1)
               .filter((col) => !(currentTab === 'pending' && col.type === 'link'))
+              .filter((col) => currentTab !== 'submitted' || col.showInSubmitted)
               .map((col) => (
                 <col key={col.key + col.type} style={{ width: col.width }} />
               ))}
@@ -559,6 +613,7 @@ export function ResultsTable({
               )}
               {RESULTS_TABLE_COLUMNS.slice(1)
                 .filter((col) => !(currentTab === 'pending' && col.type === 'link'))
+                .filter((col) => currentTab !== 'submitted' || col.showInSubmitted)
                 .map((col) => {
                 if (col.readonly || col.type === 'status' || col.type === 'link') {
                   return (
@@ -609,6 +664,7 @@ export function ResultsTable({
                   )}
                   {RESULTS_TABLE_COLUMNS.slice(1)
                     .filter((col) => !(currentTab === 'pending' && col.type === 'link'))
+                    .filter((col) => currentTab !== 'submitted' || col.showInSubmitted)
                     .map((col) => (
                     <TableCell
                       key={col.key + col.type}

@@ -74,19 +74,10 @@ export function useBulkUploadApi(initialToken: string | null = null): BulkUpload
         return;
       }
 
-      const formData = new FormData();
-      formData.append('bucketName', S3_BUCKET);
-      formData.append('token', token);
-      formData.append('environmentUrl', ENVIRONMENT_URL);
-
       let fileName: string;
       if (mode === 'upload' && file) {
-        const fullKey = FOLDER_PATH + file.name;
-        formData.append('file', file);
-        formData.append('key', fullKey);
         fileName = file.name;
       } else if (mode === 's3' && s3Key) {
-        formData.append('key', s3Key);
         fileName = s3Key.split('/').pop() ?? s3Key;
       } else {
         showError('Invalid document source');
@@ -94,6 +85,30 @@ export function useBulkUploadApi(initialToken: string | null = null): BulkUpload
       }
 
       try {
+        // Load DynamoDB statuses BEFORE mining so we can skip already-submitted rows
+        showLoading('Loading previous statuses...');
+        const savedStatuses = await loadRecordStatuses(fileName);
+
+        // Build skip list from already-complete records
+        const completeIdSet = new Set(savedStatuses.complete?.map(String) ?? []);
+        const skipIds = Array.from(completeIdSet);
+
+        const formData = new FormData();
+        formData.append('bucketName', S3_BUCKET);
+        formData.append('token', token);
+        formData.append('environmentUrl', ENVIRONMENT_URL);
+        if (skipIds.length > 0) {
+          formData.append('skip_ids', skipIds.join(','));
+        }
+
+        if (mode === 'upload' && file) {
+          const fullKey = FOLDER_PATH + file.name;
+          formData.append('file', file);
+          formData.append('key', fullKey);
+        } else if (mode === 's3' && s3Key) {
+          formData.append('key', s3Key);
+        }
+
         showLoading('Sending document to the service...');
         const response = await fetch(`${API_BASE_URL}/star/mining-bulk-upload/capdev`, {
           method: 'POST',
@@ -114,20 +129,34 @@ export function useBulkUploadApi(initialToken: string | null = null): BulkUpload
         }
 
         const payload = extractInnerResults(result);
-        const results = payload.results.map((r) => ({
+        const aiResults = payload.results.map((r) => ({
           ...r,
           is_partner_not_applicable: !Array.isArray(r.partners) || r.partners.length === 0,
         }));
 
-        // Load DynamoDB statuses (async-parallel: start early, use result below)
-        showLoading('Loading previous statuses...');
-        const savedStatuses = await loadRecordStatuses(fileName);
-        hideLoading();
+        // Re-inject already-submitted records using stored DynamoDB data so they appear in the table
+        const injectedResults: BulkUploadResult[] = [];
+        for (const id of skipIds) {
+          const stored = savedStatuses.record_data?.[id];
+          injectedResults.push({
+            id,
+            title: stored?.title ?? `Record ${id}`,
+            contract_code: stored?.contract_code ?? undefined,
+            year: stored?.year ?? undefined,
+          } as BulkUploadResult);
+        }
 
-        // Build recordStatuses map (js-index-maps)
+        const results = [...injectedResults, ...aiResults];
+
+        // Build recordStatuses map
         const statuses: Record<string, RecordStatus> = {};
         savedStatuses.complete?.forEach((id) => {
-          statuses[String(id)] = { status: 'complete', link: savedStatuses.links?.[id] ?? null };
+          const stored = savedStatuses.record_data?.[id];
+          statuses[String(id)] = {
+            status: 'complete',
+            link: savedStatuses.links?.[id] ?? null,
+            submissionType: (stored?.submission_type as 'approved' | 'draft' | undefined) ?? undefined,
+          };
         });
         savedStatuses.failed?.forEach((id) => {
           statuses[String(id)] = { status: 'failed', link: null };
@@ -204,6 +233,7 @@ export function useBulkUploadApi(initialToken: string | null = null): BulkUpload
 
         // Build map for O(1) lookup (js-index-maps)
         const resultsByTitle = new Map(selectedResults.map((r) => [r.title, r]));
+        const completeIdSet = new Set(completeResults.map((r) => String(r.id)));
         const newStatuses: Record<string, RecordStatus> = {};
 
         // Process successes and failures in parallel-safe sequential loops
@@ -215,8 +245,15 @@ export function useBulkUploadApi(initialToken: string | null = null): BulkUpload
             if (orig?.id) {
               const rid = String(orig.id);
               const starLink = `https://allianceindicatorstest.ciat.cgiar.org/result/STAR-${created.result_official_code}`;
-              newStatuses[rid] = { status: 'complete', link: starLink };
-              saves.push(saveRecordStatus(currentFileName, rid, 'complete', starLink).catch(console.error));
+              const submissionType = completeIdSet.has(rid) ? 'approved' : 'draft';
+              newStatuses[rid] = { status: 'complete', link: starLink, submissionType };
+              saves.push(
+                saveRecordStatus(
+                  currentFileName, rid, 'complete', starLink,
+                  orig.title, orig.contract_code ?? undefined, submissionType,
+                  orig.year != null ? String(orig.year) : undefined,
+                ).catch(console.error),
+              );
             }
           }
         }
@@ -227,7 +264,13 @@ export function useBulkUploadApi(initialToken: string | null = null): BulkUpload
             if (orig?.id) {
               const rid = String(orig.id);
               newStatuses[rid] = { status: 'failed', link: null, errorMessage: err.message_error };
-              saves.push(saveRecordStatus(currentFileName, rid, 'failed', null).catch(console.error));
+              saves.push(
+                saveRecordStatus(
+                  currentFileName, rid, 'failed', null,
+                  orig.title, orig.contract_code ?? undefined, undefined,
+                  orig.year != null ? String(orig.year) : undefined,
+                ).catch(console.error),
+              );
             }
           }
         }

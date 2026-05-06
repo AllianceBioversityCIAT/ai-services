@@ -208,7 +208,7 @@ def process_batches_in_groups(batches, prompt, all_reference_data, group_size=20
     return all_results
 
 
-def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAPDEV, max_workers=20, group_size=20):
+def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAPDEV, max_workers=20, group_size=20, skip_ids=None):
     start_time = time.time()
 
     try:
@@ -223,6 +223,13 @@ def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAP
 
         document_content = read_document_from_s3(bucket_name, file_key)
         chunks = split_text(document_content)
+
+        # Filter out already-submitted rows so the AI doesn't re-process them
+        if skip_ids and isinstance(document_content, dict) and document_content.get("type") == "excel":
+            skip_set = {str(sid) for sid in skip_ids}
+            original_count = len(chunks)
+            chunks = [c for c in chunks if not any(f"ID: {sid}" in c for sid in skip_set)]
+            logger.info(f"🔽 Skipped {original_count - len(chunks)} already-submitted rows (skip_ids={list(skip_set)})")
 
         all_reference_data = get_all_reference_data()
 

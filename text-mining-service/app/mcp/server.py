@@ -159,7 +159,7 @@ async def process_document_prms(bucket: str, key: str, token: Any, environmentUr
 
 
 @mcp.tool()
-async def process_document_capdev(bucket: str, key: str, token: Any, environmentUrl: str) -> dict:
+async def process_document_capdev(bucket: str, key: str, token: Any, environmentUrl: str, skip_ids: list = None) -> dict:
     logger.info("✅ process_document_capdev invoked via MCP")
 
     try:
@@ -171,7 +171,7 @@ async def process_document_capdev(bucket: str, key: str, token: Any, environment
         logger.info(f"Processing document: {key} from bucket: {bucket}")
 
         result = process_bulk_capdev(
-            bucket_name=bucket, file_key=key)
+            bucket_name=bucket, file_key=key, skip_ids=skip_ids or [])
 
         await notification_service.send_slack_notification(
             emoji=":ai: :pick:",
