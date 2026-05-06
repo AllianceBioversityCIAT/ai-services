@@ -220,6 +220,7 @@ export default function BulkUploadModule() {
             ? (completeIds.has(rid) ? 'approved' : 'draft')
             : 'failed',
           error_message: status.errorMessage,
+          rawData: r,
         };
         if (record.submission_status === 'approved') approved.push(record);
         else if (record.submission_status === 'draft') draft.push(record);

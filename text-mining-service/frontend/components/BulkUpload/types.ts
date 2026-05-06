@@ -128,6 +128,7 @@ export interface SummaryRecord {
   star_link?: string;
   submission_status: 'approved' | 'draft' | 'failed';
   error_message?: string;
+  rawData?: BulkUploadResult;
 }
 
 export interface ColumnDef {
