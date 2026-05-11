@@ -138,6 +138,7 @@ def _apply_mapped_results(mining_result, mapped_dict):
         if key in mapped_dict:
             m = mapped_dict[key]
             mining_result["main_contact_person"]["code"] = m.get("mapped_id")
+            mining_result["main_contact_person"]["mapped_name"] = m.get("mapped_name")
             mining_result["main_contact_person"]["similarity_score"] = m.get("score", 0)
 
     if supervisor := mining_result.get("training_supervisor", {}).get("name"):
@@ -145,6 +146,7 @@ def _apply_mapped_results(mining_result, mapped_dict):
         if key in mapped_dict:
             m = mapped_dict[key]
             mining_result["training_supervisor"]["code"] = m.get("mapped_id")
+            mining_result["training_supervisor"]["mapped_name"] = m.get("mapped_name")
             mining_result["training_supervisor"]["similarity_score"] = m.get("score", 0)
 
     if affiliation := mining_result.get("trainee_affiliation", {}).get("institution_name"):
@@ -152,6 +154,8 @@ def _apply_mapped_results(mining_result, mapped_dict):
         if key in mapped_dict:
             m = mapped_dict[key]
             mining_result["trainee_affiliation"]["institution_id"] = m.get("mapped_id")
+            mining_result["trainee_affiliation"]["mapped_institution_name"] = m.get("mapped_name")
+            mining_result["trainee_affiliation"]["mapped_institution_acronym"] = m.get("mapped_acronym")
             mining_result["trainee_affiliation"]["similarity_score"] = m.get("score", 0)
 
     for partner in mining_result.get("partners", []):
@@ -160,6 +164,8 @@ def _apply_mapped_results(mining_result, mapped_dict):
             if key in mapped_dict:
                 m = mapped_dict[key]
                 partner["institution_id"] = m.get("mapped_id")
+                partner["mapped_institution_name"] = m.get("mapped_name")
+                partner["mapped_institution_acronym"] = m.get("mapped_acronym")
                 partner["similarity_score"] = m.get("score", 0)
 
     for trainee in mining_result.get("trainees_description", []):
@@ -168,6 +174,8 @@ def _apply_mapped_results(mining_result, mapped_dict):
             if key in mapped_dict:
                 m = mapped_dict[key]
                 trainee["institution_id"] = m.get("mapped_id")
+                trainee["mapped_institution_name"] = m.get("mapped_name")
+                trainee["mapped_institution_acronym"] = m.get("mapped_acronym")
                 trainee["similarity_score"] = m.get("score", 0)
 
     # Apply mapping to organizations
@@ -177,6 +185,8 @@ def _apply_mapped_results(mining_result, mapped_dict):
             if key in mapped_dict:
                 m = mapped_dict[key]
                 org["institution_id"] = m.get("mapped_id")
+                org["mapped_institution_name"] = m.get("mapped_name")
+                org["mapped_institution_acronym"] = m.get("mapped_acronym")
                 org["similarity_score"] = m.get("score", 0)
 
 

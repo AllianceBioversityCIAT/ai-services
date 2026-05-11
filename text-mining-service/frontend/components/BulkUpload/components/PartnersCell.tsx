@@ -128,8 +128,10 @@ export function PartnersCell({ partners, globalIdx, onEdit, field = 'partners', 
         )}
         {partners.filter(isMapped).length === 0 && !isPartnerNotApplicable && <span className="bulk-chips-empty">—</span>}
         {partners.filter(isMapped).map((p, i) => (
-          <span key={i} className="partner-chip partner-chip-mapped" title={p.institution_name}>
-            <span className="partner-chip-label">{p.institution_name}</span>
+          <span key={i} className="partner-chip partner-chip-mapped" title={p.mapped_institution_name ?? p.institution_name}>
+            <span className="partner-chip-label">
+              {p.mapped_institution_acronym ? `${p.mapped_institution_acronym} — ${p.mapped_institution_name ?? p.institution_name}` : (p.mapped_institution_name ?? p.institution_name)}
+            </span>
             {isRemovable(p) && !disabled && (
               <button
                 className="partner-chip-remove"

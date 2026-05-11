@@ -116,7 +116,11 @@ export function TraineeAffiliationCell({ value, globalIdx, onEdit, disabled }: T
     <div className={`affiliation-cell${disabled ? ' cell-conditional-disabled' : ''}`}>
       <div className="affiliation-text-row">
         <span className="affiliation-name" title={hasValue ? `ID: ${value!.institution_id ?? '—'}` : undefined}>
-          {hasValue ? value!.institution_name : <span className="bulk-chips-empty">—</span>}
+          {hasValue
+            ? (value!.mapped_institution_acronym
+                ? `${value!.mapped_institution_acronym} — ${value!.mapped_institution_name ?? value!.institution_name}`
+                : (value!.mapped_institution_name ?? value!.institution_name))
+            : <span className="bulk-chips-empty">—</span>}
         </span>
         <div className="affiliation-actions">
           <button
