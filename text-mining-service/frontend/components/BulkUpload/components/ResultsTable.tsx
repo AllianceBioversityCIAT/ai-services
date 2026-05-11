@@ -759,7 +759,7 @@ export function ResultsTable({
       {openFilter !== null && (
         <FilterPanel
           columnKey={openFilter.key}
-          uniqueValues={getUniqueValues(editedData, openFilter.key)}
+          uniqueValues={getUniqueValues(filteredResults, openFilter.key)}
           currentFilters={activeFilters[openFilter.key] ?? []}
           anchorRect={openFilter.rect}
           onApply={onFilterApply}

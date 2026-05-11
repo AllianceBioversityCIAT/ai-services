@@ -51,19 +51,23 @@ export function getFilterTokens(columnKey: string, value: unknown): string[] {
   if (columnKey === 'partners' || columnKey === 'trainees_description') {
     const arr = value as RawInstitution[];
     if (!Array.isArray(arr) || arr.length === 0) return ['(Empty)'];
-    return arr.map(i => i.institution_name ?? '(Empty)');
+    const mapped = arr.filter(i => i.institution_id !== null && i.institution_id !== undefined && i.similarity_score >= 70);
+    if (mapped.length === 0) return ['(Empty)'];
+    return mapped.map(i => i.mapped_institution_name ?? i.institution_name ?? '(Empty)');
   }
 
   // Single institution: trainee_affiliation
   if (columnKey === 'trainee_affiliation') {
     const inst = value as RawInstitution;
-    return [inst.institution_name ?? '(Empty)'];
+    if (inst.institution_id === null || inst.institution_id === undefined || inst.similarity_score < 70) return ['(Empty)'];
+    return [inst.mapped_institution_name ?? inst.institution_name ?? '(Empty)'];
   }
 
   // Staff (RawUser): main_contact_person, training_supervisor
   if (columnKey === 'main_contact_person' || columnKey === 'training_supervisor') {
     const user = value as RawUser;
-    return [user.name ?? '(Empty)'];
+    if (!user.code || user.similarity_score < 70) return ['(Empty)'];
+    return [user.mapped_name ?? user.name ?? '(Empty)'];
   }
 
   // Language
