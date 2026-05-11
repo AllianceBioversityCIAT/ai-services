@@ -1,11 +1,14 @@
 export interface RawInstitution {
   institution_name: string;
+  mapped_institution_name?: string;
+  mapped_institution_acronym?: string;
   institution_id: string | null;
   similarity_score: number;
 }
 
 export interface RawUser {
   name: string;
+  mapped_name?: string;
   code: string | null;
   similarity_score: number;
 }

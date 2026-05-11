@@ -17,6 +17,7 @@ interface StaffPerson {
 
 export interface RawStaff {
   name: string;
+  mapped_name?: string;
   code: string;
   similarity_score: number;
 }
@@ -123,7 +124,7 @@ export function StaffCell({ value, globalIdx, field, authToken, onEdit, disabled
     <div className={`affiliation-cell${disabled ? ' cell-conditional-disabled' : ''}`}>
       <div className="affiliation-text-row">
         <span className="affiliation-name">
-          {hasValue ? value!.name : <span className="bulk-chips-empty">—</span>}
+          {hasValue ? (value!.mapped_name ?? value!.name) : <span className="bulk-chips-empty">—</span>}
         </span>
         <div className="affiliation-actions" ref={popoverRef}>
           <button
