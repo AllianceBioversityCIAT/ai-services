@@ -25,12 +25,12 @@ You are a reporting assistant for AICCRA (Accelerating Impacts of CGIAR Climate 
 
 # TASK
 Write a single concise summary paragraph (3-5 sentences) for the Annual Report submitted to the World Bank.
-This paragraph introduces indicator {indicator} and summarizes overall progress across all clusters by end-year {year}.
+This paragraph introduces indicator {indicator} and summarizes overall progress across all clusters by the end of {year}.
 
 # STRUCTURE
 1. One or two sentences providing brief context about what indicator {indicator} measures, why it matters and its contributions by end-year.
 2. A sentence stating overall end-year achievements and progress across all clusters for this indicator using exactly the values below:
-   "By end-year {year}, AICCRA had achieved {total_achieved} out of {total_expected}, representing {progress}% progress for indicator {indicator}."
+   "By the end of {year}, AICCRA had achieved {total_achieved} out of {total_expected}, representing {progress}% progress for indicator {indicator}."
    Or similar:
    "By the end of {year}, AICCRA aimed to reach {total_expected} (expected units) across all clusters but substantially exceeded this goal, reaching {total_achieved} beneficiaries."
    (You may rephrase naturally, but must use the exact numbers provided.)
@@ -40,6 +40,7 @@ This paragraph introduces indicator {indicator} and summarizes overall progress 
 - Use exactly: Total expected = {total_expected}, Total achieved = {total_achieved}, Progress = {progress}%.
 - Do not use other values from the context for these totals.
 - Do NOT include per-cluster detail; cluster narratives appear in the sections below.
+- Do NOT prepend the word "Indicator" before IPI or PDO acronyms (e.g., write "IPI 1.1 measures..." not "Indicator IPI 1.1 measures..."). On first mention you may optionally spell out the full name (e.g., "Intermediate Performance Indicator (IPI) 1.1...").
 - Tone: formal, fluent, concise.
 - Output: plain paragraph only — no headers, no bullet points, no markdown formatting.
 """
@@ -90,7 +91,7 @@ The data you receive is structured and extracted from AICCRA's internal reportin
 Write 1 well-structured, cohesive paragraph covering cluster **{cluster_acronym}**.
 The paragraph must follow this order:
 1. START with the contribution data: state the achieved value as of end-year and compare it to the annual target. Include the percentage progress. Example of structure:
-   "By end-year {year}, **{cluster_acronym}** achieved {{Milestone reported value}} out of the annual target of {{Milestone expected value}} for {indicator}, representing {{percentage}}% progress."
+   "By the end of {year}, **{cluster_acronym}** achieved {{Milestone reported value}} out of the annual target of {{Milestone expected value}} for {indicator}, representing {{percentage}}% progress."
    - Include appropriate units when the indicator involves hectares, number of tools developed, policies influenced, percentages, or beneficiary numbers.
    - Do not fabricate progress data if it is not explicitly available in the input.
 2. THEN describe key activities, deliverables, outputs, tangible results and measurable outcomes.
@@ -143,7 +144,7 @@ FORBIDDEN:
 - Bold the cluster name **{cluster_acronym}** at first mention only.
 - If the context contains information from a year other than {year}, always explicitly state that year when referencing it (e.g., "In 2024, ..."). Do NOT omit the year or present prior/future year data as if it belongs to {year}.
 - Quantitative values must be naturally embedded in the narrative. Use percentages in parentheses when helpful (e.g., 38 out of 80, or 48%).
-- Use "By end-year {year}..." or "As of December {year}..." for temporal framing.
+- Use "By the end of {year}..." or "As of December {year}..." for temporal framing.
 - Format links as markdown-style hyperlinks.
 - Never cite filenames, JSON, or input schema; use only the content.
 - Keep the narrative focused and concise; avoid overly long paragraphs.
@@ -193,7 +194,8 @@ Not every paragraph needs all four elements, but the overall narrative must prog
 - Avoid excessive listing of deliverables. Integrate references naturally into the narrative as supporting evidence.
 - Do not begin sentences with "The OICR on...", "The Deliverable on...", or "The Innovation on...".
 - Bold the cluster name **{cluster_acronym}** at first mention only.
-- Use "By end-year {year}..." or "As of December {year}..." for temporal framing.
+- Use "By the end of {year}..." or "As of December {year}..." for temporal framing.
+- Do NOT prepend the word "Indicator" before IPI or PDO acronyms (e.g., write "IPI 1.1 measures..." not "Indicator IPI 1.1 measures..."). On first mention you may optionally spell out the full name (e.g., "Intermediate Performance Indicator (IPI) 1.1...").
 - Tone: formal, fluent, and publication-ready. Minimal editing should be required after this step.
 - Write cohesive paragraphs — no bullet points.
 - Output the final narrative only — no meta-commentary, no headers, no explanations.

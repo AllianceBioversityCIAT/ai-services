@@ -139,6 +139,15 @@ function markdownToHtml(text) {
 function downloadAsDocx(content, filename) {
     const htmlBody = markdownToHtml(content);
 
+    const now = new Date();
+    const downloadDate = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    const disclaimerHtml = `
+<div style="border: 1px solid #FFCD2A; background: #FFFBEA; padding: 0.8em 1.2em; margin-bottom: 1.5em; font-size: 10pt; color: #334155;">
+    <strong>⚠ Disclaimer:</strong> This document is for internal AICCRA use only. The content is AI-assisted and should be reviewed and validated by subject matter experts before final publication or use. It is based on available data and may not reflect real-time updates.<br><br>
+    <strong>Generated on:</strong> ${downloadDate}
+</div>`;
+
     const fullHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -155,6 +164,7 @@ function downloadAsDocx(content, filename) {
     </style>
 </head>
 <body>
+${disclaimerHtml}
 ${htmlBody}
 </body>
 </html>`;
