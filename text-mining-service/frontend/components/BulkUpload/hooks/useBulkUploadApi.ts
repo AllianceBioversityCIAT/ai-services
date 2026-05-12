@@ -323,7 +323,10 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
   const downloadTemplate = useCallback(
     async (language: 'es' | 'en') => {
       const label = language === 'es' ? 'Spanish' : 'English';
-      const filename = language === 'es' ? 'capdev_guide_spanish.zip' : 'capdev_guide_english.zip';
+      const today = new Date();
+      const dateSuffix = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+      const langLabel = language === 'es' ? 'spanish' : 'english';
+      const filename = `capdev_guide_${langLabel}_${dateSuffix}.zip`;
       try {
         showLoading(`Downloading guide in ${label}...`);
         const response = await fetch(`${API_BASE_URL}/s3/download-template?language=${language}`);
