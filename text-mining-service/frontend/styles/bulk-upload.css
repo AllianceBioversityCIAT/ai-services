@@ -2468,23 +2468,282 @@
 }
 
 /* Responsive */
+
+/* ── Tablet (≤ 768px) ───────────────────────────────────────────── */
 @media (max-width: 768px) {
-    .bulk-upload-wrapper .bulk-page-title {
-        font-size: 1.25rem;
+    /* Wrapper */
+    .bulk-upload-wrapper {
+        padding: 0.75rem;
     }
-    
+
+    /* Header */
+    .bulk-upload-wrapper .bulk-content-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .bulk-upload-wrapper .bulk-page-title {
+        font-size: 1.15rem;
+    }
+
+    /* Info banner */
+    .bulk-upload-wrapper .bulk-info-banner {
+        padding: 0.75rem 1rem;
+    }
+
+    /* White card */
     .bulk-upload-container {
         padding: 1rem;
     }
-    
+
+    /* Source cards → single column */
     .bulk-upload-container .bulk-source-cards {
         grid-template-columns: 1fr;
+        gap: 1rem;
     }
-    
+
+    .bulk-upload-container .bulk-source-card {
+        padding: 1.25rem 1rem;
+    }
+
+    .bulk-upload-container .bulk-card-icon img,
+    .bulk-upload-container .bulk-card-icon svg {
+        width: 64px;
+        height: 64px;
+    }
+
+    /* Guidelines header → stack */
     .bulk-upload-container .bulk-guidelines-header {
         flex-direction: column;
         align-items: flex-start;
-        gap: 1rem;
+        gap: 0.75rem;
+    }
+
+    /* Process button → full width */
+    .bulk-upload-container .bulk-actions {
+        justify-content: stretch;
+    }
+
+    .bulk-upload-container .bulk-btn-process {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Results file header → wrap */
+    .bulk-upload-wrapper .bulk-results-file-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+    }
+
+    /* Results header → stack */
+    .bulk-upload-container .bulk-results-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    /* Results controls → stack */
+    .bulk-upload-container .bulk-results-controls {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    /* Tabs → allow wrap + smaller padding */
+    .bulk-upload-container .bulk-results-tabs {
+        flex-wrap: wrap;
+        gap: 0;
+    }
+
+    .bulk-upload-container .bulk-tab-btn {
+        padding: 0.6rem 1rem;
+        font-size: 13px;
+    }
+
+    /* Step indicator — shorter connecting lines */
+    .bulk-upload-wrapper .bulk-step-line {
+        width: 60px;
+    }
+
+    /* Modals → comfortable width */
+    .bulk-confirm-modal {
+        padding: 1.5rem 1.25rem;
+        max-width: 95%;
+    }
+
+    .bulk-invalid-file-modal {
+        padding: 1.5rem 1.25rem;
+        max-width: 95%;
+    }
+
+    /* Summary actions */
+    .bulk-upload-container .bulk-summary-actions {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    /* Unmapped header → stack */
+    .bulk-upload-container .bulk-unmapped-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+}
+
+/* ── Mobile (≤ 480px) ───────────────────────────────────────────── */
+@media (max-width: 480px) {
+    /* Wrapper */
+    .bulk-upload-wrapper {
+        padding: 0.5rem;
+        font-size: 14px;
+    }
+
+    /* Header */
+    .bulk-upload-wrapper .bulk-page-title {
+        font-size: 1rem;
+    }
+
+    .bulk-upload-wrapper .bulk-welcome {
+        font-size: 0.7rem;
+    }
+
+    /* White card */
+    .bulk-upload-container {
+        padding: 0.75rem;
+        border-radius: 8px;
+    }
+
+    /* Section title */
+    .bulk-upload-container .bulk-section-title {
+        font-size: 17px;
+    }
+
+    /* Source card — more compact */
+    .bulk-upload-container .bulk-source-card {
+        padding: 1rem 0.75rem;
+    }
+
+    .bulk-upload-container .bulk-card-icon img,
+    .bulk-upload-container .bulk-card-icon svg {
+        width: 48px;
+        height: 48px;
+    }
+
+    .bulk-upload-container .bulk-card-title {
+        font-size: 13px;
+    }
+
+    /* Dropzone */
+    .bulk-upload-container .bulk-dropzone-label {
+        padding: 1.5rem 1rem;
+    }
+
+    /* Guidelines list text */
+    .bulk-upload-container .bulk-requirements-list li {
+        font-size: 13px;
+    }
+
+    /* Process button */
+    .bulk-upload-container .bulk-btn-process {
+        font-size: 14px;
+        padding: 0.75rem 1.25rem;
+    }
+
+    /* Tabs → scrollable row, no wrap */
+    .bulk-upload-container .bulk-results-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .bulk-upload-container .bulk-results-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .bulk-upload-container .bulk-tab-btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    /* Step indicator — very short lines */
+    .bulk-upload-wrapper .bulk-step-line {
+        width: 28px;
+    }
+
+    .bulk-upload-wrapper .bulk-step-circle {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+    }
+
+    .bulk-upload-wrapper .bulk-step-label {
+        font-size: 10px;
+    }
+
+    .bulk-upload-wrapper .bulk-step-line {
+        margin-top: 14px; /* half of 28px */
+    }
+
+    /* Modals → full-width, vertically stacked buttons */
+    .bulk-confirm-modal {
+        padding: 1.25rem 1rem;
+        width: 96%;
+        max-width: 96%;
+        border-radius: 10px;
+    }
+
+    .bulk-confirm-title {
+        font-size: 17px;
+    }
+
+    .bulk-confirm-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .bulk-confirm-btn-cancel,
+    .bulk-confirm-btn-submit {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .bulk-invalid-file-modal {
+        width: 96%;
+        max-width: 96%;
+        padding: 1.25rem 1rem;
+    }
+
+    /* Results controls */
+    .bulk-upload-container .bulk-results-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .bulk-upload-container .bulk-star-submit-btn,
+    .bulk-upload-container .bulk-unmapped-nav-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Next step button */
+    .bulk-upload-container .bulk-next-step-container {
+        justify-content: stretch;
+    }
+
+    .bulk-upload-container .bulk-next-step-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* New upload button */
+    .bulk-upload-wrapper .bulk-new-upload-btn {
+        width: 100%;
+        justify-content: center;
     }
 }
 
