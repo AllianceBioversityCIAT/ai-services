@@ -19,6 +19,17 @@ supabase: Client = create_client(
 TABLE_NAME = "clarisa_institutions_v2"
 
 
+def check_supabase_connection() -> None:
+    """
+    Verifies that the Supabase connection is reachable.
+    Raises ConnectionError if the database cannot be reached.
+    """
+    try:
+        supabase.table(TABLE_NAME).select("id", count='exact').limit(1).execute()
+    except Exception as e:
+        raise ConnectionError(f"Cannot connect to Supabase database: {e}") from e
+
+
 def insert_institution(institution_data: Dict) -> bool:
     """
     Inserts an institution into Supabase

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { partnerService } from '../services';
 import { ApiPartnerRequest } from '../types';
+import { ExcelPreviewModal } from './ExcelPreviewModal';
 
 interface UploadSectionProps {
   file: File | null;
@@ -41,6 +42,7 @@ export const UploadSection = ({
   onProcessApiPartners,
 }: UploadSectionProps) => {
   const [uploadMode, setUploadMode] = useState<'excel' | 'api'>('excel');
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const handleDownloadTemplate = async () => {
     try {
@@ -229,7 +231,7 @@ export const UploadSection = ({
 
             {/* Process Button */}
             <button
-              onClick={onUpload}
+              onClick={() => setPreviewOpen(true)}
               disabled={!file || processing}
               style={{
                 width: '100%',
@@ -542,6 +544,13 @@ export const UploadSection = ({
             </button>
           </motion.div>
         )}
+
+        <ExcelPreviewModal
+          isOpen={previewOpen}
+          file={file}
+          onClose={() => setPreviewOpen(false)}
+          onContinue={onUpload}
+        />
 
         {error && (
           <motion.div

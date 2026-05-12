@@ -18,7 +18,7 @@ export const usePartnerProcessing = () => {
   ) => {
     setProcessing(true);
     setError(null);
-    setMessage('Synchronizing CLARISA database...');
+    setMessage('🔄 Processing partner data...');
 
     try {
       const data = await partnerService.processExcelFile(file, userEmail, userName, authToken);
@@ -26,10 +26,10 @@ export const usePartnerProcessing = () => {
       setMessage('');
       return data;
     } catch (err: any) {
-      const errorMsg = err.response?.data?.detail || 'Error processing file. Please try again.';
+      const errorMsg = err.response?.data?.detail || err.message || 'Error processing file. Please try again.';
+      setResults(null);
       setError(errorMsg);
       setMessage('');
-      throw err;
     } finally {
       setProcessing(false);
     }
@@ -38,7 +38,7 @@ export const usePartnerProcessing = () => {
   const processApiPartners = async () => {
     setProcessing(true);
     setError(null);
-    setMessage('Synchronizing CLARISA database...');
+    setMessage('🔄 Processing partner data...');
 
     try {
       const data = await partnerService.processApiPartners();
@@ -47,9 +47,9 @@ export const usePartnerProcessing = () => {
       return data;
     } catch (err: any) {
       const errorMsg = err.response?.data?.detail || 'Error processing API partners. Please try again.';
+      setResults(null);
       setError(errorMsg);
       setMessage('');
-      throw err;
     } finally {
       setProcessing(false);
     }
@@ -61,6 +61,8 @@ export const usePartnerProcessing = () => {
     setMessage('');
   };
 
+  const clearError = () => setError(null);
+
   return {
     processing,
     results,
@@ -69,6 +71,7 @@ export const usePartnerProcessing = () => {
     processExcelFile,
     processApiPartners,
     clearResults,
+    clearError,
     setResults,
   };
 };

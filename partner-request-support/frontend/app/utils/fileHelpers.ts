@@ -10,9 +10,10 @@ export const downloadFile = (blob: Blob, filename: string) => {
 };
 
 export const filterPartners = <T extends { name: string; acronym?: string }>(
-  items: T[],
+  items: T[] | undefined | null,
   query: string
 ): T[] => {
+  if (!items) return [];
   const lowerQuery = query.toLowerCase();
   return items.filter(
     (item) =>

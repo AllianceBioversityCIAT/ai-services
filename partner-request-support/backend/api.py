@@ -13,14 +13,14 @@ from dotenv import load_dotenv
 from config.config_util import BR
 from typing import List, Dict, Optional
 from logger.logger_util import get_logger
+from fastapi.responses import JSONResponse
 from botocore.exceptions import ClientError
 from fastapi.middleware.cors import CORSMiddleware
 from src.web_search import search_institution_online
 from src.populate_clarisa_db import sync_clarisa_institutions
-from fastapi.responses import JSONResponse, StreamingResponse
 from src.mapping_clarisa_comparison import process_partners_to_json
 from fastapi import FastAPI, File, UploadFile, HTTPException, Body, Form
-from src.supabase_client import get_cached_results_by_name, cache_results_batch, count_institutions
+from src.supabase_client import get_cached_results_by_name, cache_results_batch, count_institutions, check_supabase_connection
 
 
 logger = get_logger()
@@ -291,14 +291,26 @@ async def process_partners(
             status_code=400,
             detail="Invalid file type. Please upload an Excel file (.xlsx or .xls)"
         )
-    
+
     temp_file = None
     try:
+        try:
+            check_supabase_connection()
+        except ConnectionError as e:
+            logger.error(f"❌ Supabase unreachable: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Unable to connect to the database. Please check your internet "
+                    "connection and try again, or contact support if the problem persists."
+                )
+            )
+
         logger.info("🔄 Synchronizing CLARISA institutions database...")
         institutions_before = count_institutions()
         sync_stats = sync_clarisa_institutions(batch_size=50, delete_obsolete=True)
         institutions_after = count_institutions()
-        
+
         sync_info = {
             'sync_performed': True,
             'institutions_before': institutions_before,
@@ -310,32 +322,29 @@ async def process_partners(
             'cache_cleared': sync_stats.get('cache_cleared', 0),
             'sync_message': None
         }
-        
+
         if sync_stats['new'] > 0 or sync_stats['modified'] > 0:
             msg_parts = []
             if sync_stats['new'] > 0:
                 msg_parts.append(f"{sync_stats['new']} new institution(s)")
             if sync_stats['modified'] > 0:
                 msg_parts.append(f"{sync_stats['modified']} modified institution(s)")
-            
             base_msg = f"Found {' and '.join(msg_parts)}. Database has been updated."
-            
             if sync_stats.get('cache_cleared', 0) > 0:
                 base_msg += f" Cache cleared ({sync_stats['cache_cleared']} entries) to ensure fresh matches."
-            
             sync_info['sync_message'] = base_msg
             logger.info(f"✅ {sync_info['sync_message']}")
         else:
             sync_info['sync_message'] = "Database synchronized. No changes found in CLARISA."
             logger.info("✅ Database synchronized - no changes")
-        
+
         with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as temp_file:
             contents = await file.read()
             temp_file.write(contents)
             temp_path = temp_file.name
-        
+
         logger.info(f"📁 Processing file: {file.filename}")
-        
+
         try:
             df = pd.read_excel(temp_path, engine='openpyxl')
             logger.info(f"✅ {len(df)} rows loaded from Excel")
@@ -345,19 +354,19 @@ async def process_partners(
                 status_code=400,
                 detail=f"Error reading Excel file: {str(e)}"
             )
-        
+
         if len(df.columns) < 2:
             raise HTTPException(
                 status_code=400,
                 detail="Excel file must have at least 2 columns (ID and partner_name)"
             )
-        
+
         if df.iloc[:, 1].isna().all():
             raise HTTPException(
                 status_code=400,
                 detail="Partner name column (column 1) is empty"
             )
-        
+
         creation_info = {
             'created': False,
             'total_attempts': 0,
@@ -367,11 +376,11 @@ async def process_partners(
             'existing_ids': [],
             'new_ids': []
         }
-        
+
         if create_requests:
             logger.info("🔨 Processing partner requests creation in CLARISA API...")
             creation_info['created'] = True
-            
+
             logger.info("🔍 Fetching existing pending partner requests...")
             existing_requests = []
             try:
@@ -380,25 +389,20 @@ async def process_partners(
                     headers={"Authorization": f"Bearer {auth_token}"},
                     timeout=30
                 )
-                
                 if fetch_response.status_code == 200:
                     existing_requests = fetch_response.json()
                     logger.info(f"📥 Fetched {len(existing_requests)} existing pending partner requests")
                 else:
                     logger.warning(f"⚠️  Failed to fetch existing requests: {fetch_response.status_code}")
-                    
             except Exception as e:
                 logger.error(f"❌ Error fetching existing requests: {e}")
-            
+
             logger.info("🌍 Fetching countries control list...")
-            countries_list = []
             countries_map = {}
             try:
                 countries_response = requests.get(CLARISA_COUNTRIES_URL, timeout=30)
-                
                 if countries_response.status_code == 200:
-                    countries_list = countries_response.json()
-                    for country in countries_list:
+                    for country in countries_response.json():
                         country_name = country.get('name', '').strip().lower()
                         iso_alpha2 = country.get('isoAlpha2', '')
                         if country_name and iso_alpha2:
@@ -406,19 +410,15 @@ async def process_partners(
                     logger.info(f"🌍 Loaded {len(countries_map)} countries for lookup")
                 else:
                     logger.warning(f"⚠️  Failed to fetch countries list: {countries_response.status_code}")
-                    
             except Exception as e:
                 logger.error(f"❌ Error fetching countries list: {e}")
-            
+
             logger.info("🏢 Fetching institution types control list...")
-            institution_types_list = []
-            institution_types_map = {} 
+            institution_types_map = {}
             try:
                 institution_types_response = requests.get(CLARISA_INSTITUTION_TYPES_URL, timeout=30)
-                
                 if institution_types_response.status_code == 200:
-                    institution_types_list = institution_types_response.json()
-                    for inst_type in institution_types_list:
+                    for inst_type in institution_types_response.json():
                         type_name = inst_type.get('name', '').strip().lower()
                         type_code = inst_type.get('code')
                         if type_name and type_code is not None:
@@ -426,15 +426,14 @@ async def process_partners(
                     logger.info(f"🏢 Loaded {len(institution_types_map)} institution types for lookup")
                 else:
                     logger.warning(f"⚠️  Failed to fetch institution types list: {institution_types_response.status_code}")
-                    
             except Exception as e:
                 logger.error(f"❌ Error fetching institution types list: {e}")
-            
-            partners_to_create = []  
-            
+
+            partners_to_create = []
+
             for idx, row in df.iterrows():
                 creation_info['total_attempts'] += 1
-                
+
                 partner_name = row.iloc[1] if len(row) > 1 and pd.notna(row.iloc[1]) else None
                 acronym = row.iloc[2] if len(row) > 2 and pd.notna(row.iloc[2]) else ""
                 website = row.iloc[3] if len(row) > 3 and pd.notna(row.iloc[3]) else ""
@@ -442,21 +441,20 @@ async def process_partners(
                 country = row.iloc[5] if len(row) > 5 and pd.notna(row.iloc[5]) else ""
                 category_1 = row.iloc[6] if len(row) > 6 and pd.notna(row.iloc[6]) else ""
                 category_2 = row.iloc[7] if len(row) > 7 and pd.notna(row.iloc[7]) else ""
-                
+
                 if not partner_name:
                     logger.warning(f"⚠️  Skipping row {idx}: missing partner name")
                     creation_info['failed'] += 1
                     continue
-                
+
                 partner_name_lower = str(partner_name).strip().lower()
                 existing_match = None
-                
                 for req in existing_requests:
                     existing_name = req.get('partnerName', '').strip().lower()
                     if existing_name == partner_name_lower:
                         existing_match = req
                         break
-                
+
                 if existing_match:
                     existing_id = existing_match.get('id')
                     if existing_id:
@@ -478,7 +476,7 @@ async def process_partners(
                             logger.warning(f"⚠️  Country '{country}' not found in control list. Skipping partner request creation.")
                     else:
                         logger.warning(f"⚠️  No country provided for '{partner_name}'. Skipping partner request creation.")
-                    
+
                     institution_type_code = None
                     if institution_type and institution_types_map:
                         institution_type_lower = str(institution_type).strip().lower()
@@ -489,12 +487,12 @@ async def process_partners(
                             logger.warning(f"⚠️  Institution type '{institution_type}' not found in control list. Skipping partner request creation.")
                     else:
                         logger.warning(f"⚠️  No institution type provided for '{partner_name}'. Skipping partner request creation.")
-                    
+
                     if not country_iso or institution_type_code is None:
                         logger.error(f"❌ Cannot create partner request for '{partner_name}': missing required country or institution type")
                         creation_info['failed'] += 1
                         continue
-                    
+
                     payload = {
                         "name": str(partner_name),
                         "acronym": str(acronym) if acronym else "",
@@ -508,17 +506,15 @@ async def process_partners(
                         "misAcronym": "CLARISA",
                         "externalUserComments": ""
                     }
-                    
                     partners_to_create.append({
                         'idx': idx,
                         'name': str(partner_name),
                         'acronym': str(acronym) if acronym else "",
                         'payload': payload
                     })
-            
+
             if partners_to_create:
                 logger.info(f"🔨 Creating {len(partners_to_create)} new partner requests...")
-                
                 for partner_info in partners_to_create:
                     try:
                         response = requests.post(
@@ -530,20 +526,17 @@ async def process_partners(
                             },
                             timeout=30
                         )
-                        
                         if response.status_code == 201 or response.status_code == 200:
                             creation_info['created_new'] += 1
                             logger.info(f"✅ Created new partner request for: {partner_info['name']}")
                         else:
                             logger.error(f"❌ Failed to create request for {partner_info['name']}: {response.status_code} - {response.text}")
                             creation_info['failed'] += 1
-                            
                     except Exception as e:
                         logger.error(f"❌ Error creating request for {partner_info['name']}: {e}")
                         creation_info['failed'] += 1
-            
+
             newly_created_requests = []
-            
             if creation_info['created_new'] > 0:
                 logger.info("🔍 Fetching IDs for newly created partner requests...")
                 try:
@@ -552,23 +545,18 @@ async def process_partners(
                         headers={"Authorization": f"Bearer {auth_token}"},
                         timeout=30
                     )
-                    
                     if fetch_response.status_code == 200:
                         all_requests = fetch_response.json()
                         logger.info(f"📥 Fetched {len(all_requests)} total partner requests")
-                        
                         for partner_info in partners_to_create:
                             partner_name_lower = partner_info['name'].strip().lower()
-                            
                             matching_requests = [
-                                req for req in all_requests 
+                                req for req in all_requests
                                 if req.get('partnerName', '').strip().lower() == partner_name_lower
                             ]
-                            
                             if matching_requests:
                                 matched_request = matching_requests[-1]
                                 request_id = matched_request.get('id')
-                                
                                 if request_id:
                                     df.at[partner_info['idx'], df.columns[0]] = request_id
                                     creation_info['new_ids'].append(request_id)
@@ -578,37 +566,33 @@ async def process_partners(
                                     logger.warning(f"⚠️  No ID found for: {partner_info['name']}")
                             else:
                                 logger.warning(f"⚠️  Could not find created request for: {partner_info['name']}")
-                        
                         logger.info(f"✅ Retrieved {len(creation_info['new_ids'])} IDs for newly created requests")
-                        
                         if newly_created_requests:
                             synced_partner_requests.extend(newly_created_requests)
                             logger.info(f"📋 Added {len(newly_created_requests)} new requests to synced list")
                     else:
                         logger.error(f"❌ Failed to fetch partner requests: {fetch_response.status_code}")
-                        
                 except Exception as e:
                     logger.error(f"❌ Error fetching partner requests: {e}")
-            
+
             if creation_info['existing_ids']:
                 existing_to_add = []
                 for req in existing_requests:
                     if req.get('id') in creation_info['existing_ids']:
                         if not any(s.get('id') == req.get('id') for s in synced_partner_requests):
                             existing_to_add.append(req)
-                
                 if existing_to_add:
                     synced_partner_requests.extend(existing_to_add)
                     logger.info(f"📋 Added {len(existing_to_add)} existing requests to synced list")
-            
+
             logger.info(f"📊 Summary: {creation_info['found_existing']} existing found, {creation_info['created_new']} newly created, {creation_info['failed']} failed")
-        
+
         partner_names = []
         for idx, row in df.iterrows():
             partner_name = row.iloc[1] if len(row) > 1 and pd.notna(row.iloc[1]) else None
             if partner_name:
                 partner_names.append(str(partner_name))
-        
+
         cached_results_by_name = {}
         cache_info = {
             'total_requests': len(df),
@@ -617,7 +601,7 @@ async def process_partners(
             'from_cache': False,
             'processed_new': False
         }
-        
+
         if partner_names:
             logger.info(f"🔍 Checking cache by name for {len(partner_names)} partners...")
             cached_results_by_name = get_cached_results_by_name(partner_names)
@@ -625,7 +609,7 @@ async def process_partners(
             cache_info['cache_misses'] = len(partner_names) - len(cached_results_by_name)
             cache_info['from_cache'] = len(cached_results_by_name) > 0
             logger.info(f"📦 Cache status: {cache_info['cache_hits']} hits, {cache_info['cache_misses']} misses")
-        
+
         cached_partners = []
         newly_processed_partners = []
         processing_stats = {
@@ -639,18 +623,16 @@ async def process_partners(
             'good': 0,
             'fair': 0
         }
-        
+
         if cached_results_by_name:
             cached_names_lower = set(cached_results_by_name.keys())
             rows_to_process = []
-            
             for idx, row in df.iterrows():
                 partner_name = row.iloc[1] if len(row) > 1 and pd.notna(row.iloc[1]) else None
                 if partner_name:
                     name_lower = str(partner_name).strip().lower()
                     if name_lower in cached_names_lower:
                         cached_result = cached_results_by_name[name_lower].copy()
-                        
                         current_request_id = row.iloc[0] if len(row) > 0 and pd.notna(row.iloc[0]) else None
                         if current_request_id:
                             try:
@@ -659,13 +641,12 @@ async def process_partners(
                                     cached_result['api_data']['request_id'] = int(current_request_id)
                             except (ValueError, TypeError):
                                 pass
-                        
                         cached_partners.append(cached_result)
                     else:
                         rows_to_process.append(idx)
                 else:
                     rows_to_process.append(idx)
-            
+
             if rows_to_process:
                 df_to_process = df.loc[rows_to_process].copy()
                 cache_info['processed_new'] = True
@@ -675,17 +656,16 @@ async def process_partners(
         else:
             df_to_process = df
             cache_info['processed_new'] = True
-        
+
         if not df_to_process.empty:
             logger.info(f"🚀 Processing {len(df_to_process)} new partners...")
             processing_results = process_partners_to_json(df_to_process)
             processing_stats = processing_results['stats']
             newly_processed_partners = processing_results['partners']
-            
+
             for i, partner_result in enumerate(newly_processed_partners):
                 row_idx = df_to_process.index[i]
                 request_id = df_to_process.loc[row_idx].iloc[0] if pd.notna(df_to_process.loc[row_idx].iloc[0]) else None
-                
                 if request_id:
                     try:
                         partner_result['api_data'] = {
@@ -696,15 +676,15 @@ async def process_partners(
                         }
                     except (ValueError, TypeError):
                         pass
-            
+
             if newly_processed_partners:
                 cache_stats = cache_results_batch(newly_processed_partners)
                 logger.info(f"💾 Cached {cache_stats['cached']} new results")
         else:
             logger.info("✨ All partners found in cache - no processing needed")
-        
+
         all_partners = cached_partners + newly_processed_partners
-        
+
         if cached_partners:
             for partner in cached_partners:
                 processing_stats['total'] += 1
@@ -719,12 +699,11 @@ async def process_partners(
                         processing_stats['fair'] += 1
                 else:
                     processing_stats['no_match'] += 1
-                
                 if partner.get('web_search'):
                     processing_stats['web_search_attempted'] += 1
                     if partner['web_search'].get('success'):
                         processing_stats['web_search_success'] += 1
-        
+
         if processing_stats['total'] > 0:
             processing_stats['matched_percentage'] = round(
                 processing_stats['matched'] / processing_stats['total'] * 100, 1
@@ -732,7 +711,7 @@ async def process_partners(
             processing_stats['no_match_percentage'] = round(
                 processing_stats['no_match'] / processing_stats['total'] * 100, 1
             )
-        
+
         results = {
             'partners': all_partners,
             'stats': processing_stats,
@@ -740,11 +719,10 @@ async def process_partners(
             'cache_info': cache_info,
             'sync_info': sync_info
         }
-        
+
         logger.info("✅ Processing completed successfully")
-        
         return JSONResponse(content=results)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -760,6 +738,7 @@ async def process_partners(
                 logger.info("🗑️  Temporary file cleaned up")
             except Exception as e:
                 logger.warning(f"⚠️  Could not delete temporary file: {e}")
+
 
 
 @app.get("/api/sync-partner-requests", tags=["Synchronization"])
@@ -1364,27 +1343,39 @@ async def respond_partner_request(
     
     ## Notes
     
-    - Request must be previously synced via `/api/sync-partner-requests`
+    - Partner request metadata is fetched live from CLARISA at the time of the call
     - Rejection requires justification text (auto-filled if not provided)
-    - Successful responses remove the request from the local cache
     - This operation is final and cannot be undone
     - Authentication token must have appropriate CLARISA permissions
     """
-    global synced_partner_requests
-    
     try:
-        partner_request = None
-        for pr in synced_partner_requests:
-            if pr.get('id') == request_id:
-                partner_request = pr
-                break
-        
+        logger.info(f"🔍 Fetching partner request {request_id} from CLARISA API...")
+        try:
+            fetch_response = requests.get(
+                CLARISA_API_URL,
+                headers={"Authorization": f"Bearer {auth_token}"},
+                timeout=30
+            )
+            fetch_response.raise_for_status()
+            all_requests = fetch_response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ Failed to fetch partner requests from CLARISA: {e}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Error fetching partner request from CLARISA API: {str(e)}"
+            )
+
+        partner_request = next(
+            (pr for pr in all_requests if pr.get('id') == request_id),
+            None
+        )
+
         if not partner_request:
             raise HTTPException(
                 status_code=404,
-                detail=f"Partner request {request_id} not found. Please sync first."
+                detail=f"Partner request {request_id} not found in CLARISA."
             )
-        
+
         payload = {
             "requestId": request_id,
             "userId": user_id,
@@ -1416,12 +1407,7 @@ async def respond_partner_request(
         response.raise_for_status()
         
         logger.info(f"✅ Successfully {action}ed partner request {request_id}")
-        
-        synced_partner_requests = [
-            pr for pr in synced_partner_requests 
-            if pr.get('id') != request_id
-        ]
-        
+
         return {
             "success": True,
             "action": action,
