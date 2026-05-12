@@ -1,9 +1,27 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import * as XLSX from 'xlsx';
 import type { DocSource } from '../types';
 import { FileDropzone } from './FileDropzone';
 import { S3FileSelector } from './S3FileSelector';
+
+// Patterns considered valid ID column names (case-insensitive, trimmed)
+const ID_COLUMN_RE = /^(id|#|no\.?|row_?id|record_?id)$/i;
+
+async function checkFileHasIdColumn(file: File): Promise<boolean> {
+  try {
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { sheetRows: 1 });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+    const headers: string[] = (rows[0] ?? []).map((h) => String(h ?? '').trim());
+    return headers.some((h) => ID_COLUMN_RE.test(h));
+  } catch {
+    // If we can't read the file client-side, let it through — backend will handle it
+    return true;
+  }
+}
 
 import uploadFileIcon from '../../../public/static/bulk_upload/upload_file.png';
 import previousFileIcon from '../../../public/static/bulk_upload/previous_file.png';
@@ -78,6 +96,10 @@ export function Step1Upload({
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [s3Prefix, setS3Prefix] = useState('');
   const [selectedS3Key, setSelectedS3Key] = useState('');
+  // 'hidden' | 'no-id-upload' (upload file missing ID) | 's3-warning' (S3 advisory)
+  const [idModalState, setIdModalState] = useState<'hidden' | 'no-id-upload' | 's3-warning'>('hidden');
+  // Stored args to execute after modal confirmation
+  const [pendingProcess, setPendingProcess] = useState<{ mode: DocSource; file: File | null; s3Key: string | null } | null>(null);
 
   const handleSourceChange = useCallback(
     (value: DocSource | 'previous') => {
@@ -93,13 +115,40 @@ export function Step1Upload({
     setSelectedS3Key(key);
   }, []);
 
-  const handleProcess = useCallback(() => {
+  const handleProcess = useCallback(async () => {
     if (docSource === 'upload') {
-      onProcess('upload', selectedFile, null);
+      const mode: DocSource = 'upload';
+      const file = selectedFile;
+      const s3Key = null;
+      if (file) {
+        const hasId = await checkFileHasIdColumn(file);
+        if (!hasId) {
+          setPendingProcess({ mode, file, s3Key });
+          setIdModalState('no-id-upload');
+          return;
+        }
+      }
+      onProcess(mode, file, s3Key);
     } else {
-      onProcess('s3' as DocSource, null, selectedS3Key || (s3Objects[0] ?? null));
+      const mode: DocSource = 's3';
+      const s3Key = selectedS3Key || (s3Objects[0] ?? null);
+      setPendingProcess({ mode, file: null, s3Key });
+      setIdModalState('s3-warning');
     }
   }, [docSource, selectedFile, selectedS3Key, s3Objects, onProcess]);
+
+  const handleModalConfirm = useCallback(() => {
+    if (pendingProcess) {
+      onProcess(pendingProcess.mode, pendingProcess.file, pendingProcess.s3Key);
+    }
+    setIdModalState('hidden');
+    setPendingProcess(null);
+  }, [pendingProcess, onProcess]);
+
+  const handleModalCancel = useCallback(() => {
+    setIdModalState('hidden');
+    setPendingProcess(null);
+  }, []);
 
   const toggleDownload = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -228,6 +277,56 @@ export function Step1Upload({
           {ProcessArrowSvg}
         </button>
       </div>
+
+      {/* Modal: upload file missing ID column */}
+      {idModalState === 'no-id-upload' && (
+        <div className="bulk-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="no-id-modal-title">
+          <div className="bulk-confirm-modal">
+            <h3 id="no-id-modal-title" className="bulk-confirm-title">No ID column detected</h3>
+            <p className="bulk-confirm-message">
+              Your file does not appear to have an <strong>ID column</strong>. We strongly recommend adding an ID column with incremental
+              numbers (1, 2, 3…) before uploading.
+            </p>
+            <p className="bulk-confirm-message">
+              If this is a mistake and your file actually contains an ID column, you can safely
+              continue with processing.
+            </p>
+            <div className="bulk-confirm-actions">
+              <button className="bulk-confirm-btn-cancel" type="button" onClick={handleModalCancel}>
+                Cancel
+              </button>
+              <button className="bulk-confirm-btn-submit" type="button" onClick={handleModalConfirm}>
+                Continue anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: S3 proactive ID column advisory */}
+      {idModalState === 's3-warning' && (
+        <div className="bulk-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="s3-id-modal-title">
+          <div className="bulk-confirm-modal">
+            <h3 id="s3-id-modal-title" className="bulk-confirm-title">Does your file have an ID column?</h3>
+            <p className="bulk-confirm-message">
+              For re-processing tracking to work correctly, your Excel file must include an{' '}
+              <strong>ID column</strong> with a unique incremental number for each row (e.g., 1, 2, 3…).
+            </p>
+            <p className="bulk-confirm-message">
+              If your file already has this column, click <strong>Yes, continue</strong>. Otherwise, cancel,
+              update your file, and re-upload it.
+            </p>
+            <div className="bulk-confirm-actions">
+              <button className="bulk-confirm-btn-cancel" type="button" onClick={handleModalCancel}>
+                Cancel
+              </button>
+              <button className="bulk-confirm-btn-submit" type="button" onClick={handleModalConfirm}>
+                Yes, continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
