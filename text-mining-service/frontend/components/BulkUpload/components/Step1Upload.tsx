@@ -68,7 +68,7 @@ const GuidelinesList = (
     <li className="bulk-note-tip"><strong>{TipIcon} Tip</strong> → Upload all records in a single Excel file to avoid running the process multiple times.</li>
     <li><strong>File name</strong> → Use a distinctive name (e.g., your name or date) to easily identify it.</li>
     <li><strong>Column names</strong> → Follow the template to ensure accurate AI mapping. Remember to add an <strong>ID column</strong> with incremental numbers.</li>
-    <li><strong>Recommendation</strong> → Upload files with a maximum of <strong>100 rows</strong> to ensure optimal performance and avoid processing issues.</li>
+    <li><strong>Recommendation</strong> → Upload files with a maximum of <strong>100 rows</strong> to ensure optimal performance and avoid processing issues. Only the <strong>first sheet</strong> of the Excel file will be processed.</li>
     <li className="bulk-note-warning"><strong>{WarnIcon} Warning</strong> → Do not reuse the same file name for different datasets, as this may affect tracking and processing.</li>
   </ul>
 );
