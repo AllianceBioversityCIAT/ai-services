@@ -16,7 +16,6 @@ ai-services/
 ├── chatbot-service/               # AICCRA Conversational AI Chatbot
 ├── clarisa-agresso-service/       # Institution Mapping Service
 ├── fast-response-service/         # General-Purpose LLM Response Service
-├── igad-ai/                       # IGAD RFP Analysis Service
 ├── mapping-service/               # Staff & Institution Field Mapping Service
 ├── partner-request-support/       # Partner Institution Matching System
 ├── qa-service/                    # PRMS Metadata QA Service
