@@ -193,6 +193,7 @@ faiss/
 *.csv
 *.jsonl
 *.json
+test_output.md
 
 # Data logs
 data/logs/

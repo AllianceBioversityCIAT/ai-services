@@ -336,6 +336,28 @@
             font-size: 0.9rem;
         }
 
+        .data-update-badge {
+            position: fixed;
+            bottom: 1.25rem;
+            right: 1.25rem;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            padding: 0.5rem 0.875rem;
+            font-size: 0.78rem;
+            color: var(--gray-500);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            z-index: 1000;
+        }
+
+        .data-update-badge i {
+            color: var(--primary-blue);
+            font-size: 0.8rem;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 1rem;
@@ -526,6 +548,12 @@
         </div>
     </div>
 
+    <div class="data-update-badge" id="data-update-badge">
+        <i class="fas fa-database"></i>
+        <span id="data-update-text">Data updated on —</span>
+    </div>
+
+    <script src="https://unpkg.com/html-docx-js/dist/html-docx.js"></script>
     <script src="static/app.js"></script>
 </body>
 </html>

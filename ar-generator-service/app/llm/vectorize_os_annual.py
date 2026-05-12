@@ -5,14 +5,16 @@ import json
 import boto3
 import numpy as np
 import pandas as pd
+from collections import defaultdict
 from requests_aws4auth import AWS4Auth
 from db_conn.sql_connection import load_data
+from concurrent.futures import ThreadPoolExecutor
 from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import OPENSEARCH
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from app.llm.invoke_llm import invoke_model, get_bedrock_embeddings
 from app.utils.prompts.diss_targets_prompt import generate_target_prompt
-from app.utils.prompts.annual_report_prompt import generate_report_prompt
+from app.utils.prompts.annual_report_prompt import generate_search_prompt, generate_summary_prompt, generate_cluster_prompt, generate_cluster_editorial_prompt
 from app.utils.prompts.challenges_prompt import generate_challenges_prompt
 
 logger = get_logger()
@@ -130,28 +132,15 @@ def insert_into_opensearch(table_name: str):
         logger.error(f"❌ Error inserting into OpenSearch for {table_name}: {e}")
 
 
-def retrieve_context(query, indicator, year, top_k=10000, contingency_level=0):
-    """
-    Retrieve context from OpenSearch with contingency levels.
-    
-    contingency_level:
-        0 = Normal (search in all 4 tables)
-        1 = Level 1 contingency (search in all 4 tables with additional filters)
-        2 = Level 2 contingency (search only in deliverables and contributions with additional filters)
-    """
+def retrieve_context(query, indicator, year, top_k=10000):
+    """Retrieve context from OpenSearch for the given indicator and year."""
     try:
-        if contingency_level == 0 or contingency_level == 1:
-            search_tables = [
-                {"term": {"source_table": "vw_ai_deliverables"}},
-                {"term": {"source_table": "vw_ai_project_contribution"}},
-                {"term": {"source_table": "vw_ai_oicrs"}},
-                {"term": {"source_table": "vw_ai_innovations"}}
-            ]
-        else:
-            search_tables = [
-                {"term": {"source_table": "vw_ai_deliverables"}},
-                {"term": {"source_table": "vw_ai_project_contribution"}}
-            ]
+        search_tables = [
+            {"term": {"source_table": "vw_ai_deliverables"}},
+            {"term": {"source_table": "vw_ai_project_contribution"}},
+            {"term": {"source_table": "vw_ai_oicrs"}},
+            {"term": {"source_table": "vw_ai_innovations"}}
+        ]
         
         embedding = get_bedrock_embeddings([query])[0]
         
@@ -187,24 +176,6 @@ def retrieve_context(query, indicator, year, top_k=10000, contingency_level=0):
         knn_response = opensearch.search(index=INDEX_NAME, body=knn_query)
         knn_chunks = [hit["_source"]["chunk"] for hit in knn_response["hits"]["hits"]]
 
-        ## DOI SEARCH
-        doi_query = {
-            "size": 10000,
-            "query": {
-                "bool": {
-                    "filter": [
-                        {"term": {"indicator_acronym": indicator}},
-                        {"term": {"year": year}},
-                        {"exists": {"field": "chunk.doi"}},
-                        {"term": {"source_table": "vw_ai_deliverables"}}
-                    ]
-                }
-            }
-        }
-
-        doi_response = opensearch.search(index=INDEX_NAME, body=doi_query)
-        doi_chunks = [hit["_source"]["chunk"] for hit in doi_response["hits"]["hits"]]
-
         ## QUESTIONS SEARCH
         questions_query = {
             "size": 10000,
@@ -230,27 +201,11 @@ def retrieve_context(query, indicator, year, top_k=10000, contingency_level=0):
         questions_response = opensearch.search(index=INDEX_NAME, body=questions_query)
         questions_chunks = [hit["_source"]["chunk"] for hit in questions_response["hits"]["hits"]]
 
-        ## COMBINE KNN AND DOI CHUNKS
-        seen_keys = set()
-        combined_chunks = []
-
-        for chunk in knn_chunks + doi_chunks:
-            doi = chunk.get("doi")
-            cluster = chunk.get("cluster_acronym")
-            indicator_code = chunk.get("indicator_acronym")
-
-            if doi:
-                key = (doi, cluster, indicator_code)
-                if key not in seen_keys:
-                    seen_keys.add(key)
-                    combined_chunks.append(chunk)
-            else:
-                combined_chunks.append(chunk)
-
-        ## FILTER KNN CHUNKS
         def should_exclude_chunk(chunk):
-            base_filters = (
+            return (
                 (chunk.get("table_type") == "deliverables" and chunk.get("cluster_role") == "Shared")
+                or
+                (chunk.get("table_type") == "deliverables" and chunk.get("status") == "Cancelled")
                 or
                 (chunk.get("table_type") == "innovations" and chunk.get("cluster_role") == "Shared")
                 or
@@ -260,32 +215,8 @@ def retrieve_context(query, indicator, year, top_k=10000, contingency_level=0):
                 or
                 (chunk.get("table_type") == "contributions" and chunk.get("phase_name") == "Progress")
             )
-            
-            contingency_filters = (
-                (chunk.get("table_type") == "deliverables" and chunk.get("already_disseminated") == "No")
-                or
-                (chunk.get("table_type") == "deliverables" and not chunk.get("dissemination_URL"))
-                or
-                (chunk.get("table_type") == "deliverables" and chunk.get("status") != "Completed")
-            )
-            
-            if contingency_level == 0:
-                return base_filters
-            elif contingency_level == 1 or contingency_level == 2:
-                return base_filters or contingency_filters
-            else:
-                return base_filters
-        
-        filtered_knn_chunks = [chunk for chunk in combined_chunks if not should_exclude_chunk(chunk)]
 
-        if contingency_level == 2:
-            deliverables_chunks = [c for c in filtered_knn_chunks if c.get("table_type") == "deliverables"]
-            contributions_chunks = [c for c in filtered_knn_chunks if c.get("table_type") == "contributions"]
-            
-            deliverables_chunks = deliverables_chunks[:200]
-            contributions_chunks = contributions_chunks[:1000]
-        
-            filtered_knn_chunks = deliverables_chunks + contributions_chunks
+        filtered_knn_chunks = [chunk for chunk in knn_chunks if not should_exclude_chunk(chunk)]
 
         ## FILTER QUESTIONS CHUNKS
         filtered_questions_chunks = [
@@ -344,30 +275,89 @@ def calculate_summary(indicator, year):
     return clean_number(total_expected), clean_number(total_achieved), clean_number(progress)
 
 
-def extract_dois_from_text(text):
-    markdown_links = re.findall(r"\[.*?\]\((https?://[^\s)]+)\)", text)
-    plain_links = re.findall(r"(?<!\()https?://[^\s\]\)]+", text)
+def group_context_by_cluster(chunks):
+    """Group context chunks by cluster_acronym. Chunks missing this field are silently excluded."""
+    grouped = defaultdict(list)
+    for chunk in chunks:
+        cluster = chunk.get("cluster_acronym")
+        if cluster:
+            grouped[cluster].append(chunk)
+    return dict(grouped)
 
-    return set(markdown_links + plain_links)
+
+def _get_indicator_title(context, indicator):
+    """Extract indicator title from context chunks."""
+    for chunk in context:
+        title = chunk.get("indicator_title")
+        if title and chunk.get("indicator_acronym") == indicator:
+            return title
+    return indicator
 
 
-def add_missed_links(report, context):
-    logger.info("📍 Adding missed links to the report...")
-    context_dois = {chunk.get("doi") for chunk in context if "doi" in chunk and chunk["doi"]}
-    used_dois = extract_dois_from_text(report)
-    missed_dois = context_dois - used_dois
-    missed_dois = {doi for doi in missed_dois if doi and doi.strip().lower() != "confidential"}
+def _filter_chunks_for_contingency(chunks, level):
+    """Apply contingency filters to reduce chunk size for a cluster's context."""
+    if level == 0:
+        return chunks
 
-    if missed_dois:
-        missed_section = "\n\n## Missed links\nThe following references were part of the context but not explicitly included:\n"
-        doi_to_cluster = {chunk["doi"]: chunk.get("cluster_acronym", "N/A") for chunk in context if "doi" in chunk and chunk["doi"]}
-        missed_section += "\n".join(
-            f"- [{doi}]({doi}) (Cluster: {doi_to_cluster.get(doi, 'N/A')})"
-            for doi in sorted(missed_dois)
+    filtered = [
+        c for c in chunks
+        if not (
+            c.get("table_type") == "deliverables" and (
+                c.get("already_disseminated") == "No"
+                or not c.get("dissemination_URL")
+                or c.get("status") != "Completed"
+            )
         )
-        report += missed_section
-    
-    return report
+    ]
+
+    if level >= 2:
+        deliverables = [c for c in filtered if c.get("table_type") == "deliverables"][:200]
+        contributions = [c for c in filtered if c.get("table_type") == "contributions"][:1000]
+        filtered = deliverables + contributions
+
+    return filtered
+
+
+def _generate_single_cluster_narrative(cluster_acronym, cluster_chunks, indicator, year):
+    """Generate the narrative paragraph for a single cluster."""
+    try:
+        cluster_prompt = generate_cluster_prompt(indicator, year, cluster_acronym)
+
+        try:
+            query = f"Using this information:\n{cluster_chunks}\n\nDo the following:\n{cluster_prompt}"
+            narrative = invoke_model(query)
+            logger.info(f"✅ Narrative generated for cluster: {cluster_acronym}")
+        except Exception as e:
+            if "Input is too long" in str(e):
+                logger.warning(f"⚠️ Input is too long for cluster {cluster_acronym}. Applying Level 1 contingency...")
+                try:
+                    filtered_chunks = _filter_chunks_for_contingency(cluster_chunks, level=1)
+                    query = f"Using this information:\n{filtered_chunks}\n\nDo the following:\n{cluster_prompt}"
+                    narrative = invoke_model(query)
+                    logger.info(f"✅ Narrative generated for cluster {cluster_acronym} with Level 1 contingency.")
+                except Exception as e2:
+                    if "Input is too long" in str(e2):
+                        logger.warning(f"⚠️ Still too long for cluster {cluster_acronym}. Applying Level 2 contingency...")
+                        filtered_chunks = _filter_chunks_for_contingency(cluster_chunks, level=2)
+                        query = f"Using this information:\n{filtered_chunks}\n\nDo the following:\n{cluster_prompt}"
+                        narrative = invoke_model(query)
+                        logger.info(f"✅ Narrative generated for cluster {cluster_acronym} with Level 2 contingency.")
+                    else:
+                        raise e2
+            else:
+                raise
+
+        ## Pass 2: Editorial rewrite for impact-driven narrative
+        logger.info(f"✍️  Rewriting narrative for cluster: {cluster_acronym}...")
+        editorial_prompt = generate_cluster_editorial_prompt(indicator, year, cluster_acronym)
+        editorial_query = f"Raw evidence draft:\n{narrative}\n\nDo the following:\n{editorial_prompt}"
+        final_narrative = invoke_model(editorial_query)
+        logger.info(f"✅ Editorial pass completed for cluster: {cluster_acronym}")
+
+        return cluster_acronym, final_narrative
+    except Exception as e:
+        logger.error(f"❌ Error generating narrative for cluster {cluster_acronym}: {e}")
+        return cluster_acronym, f"*Narrative generation failed for {cluster_acronym}: {str(e)}*"
 
 
 def generate_challenges_report(year):
@@ -449,8 +439,6 @@ def generate_indicator_tables(year):
                 end_year_target = ind_df["Milestone expected value"].sum()
                 achieved = ind_df["Milestone reported value"].sum()
             
-            projected = ""
-            
             cluster_narratives = ind_df.groupby("cluster_acronym")["Milestone achieved narrative"].apply(lambda x: " ".join(x.dropna()))
             formatted_narratives = "\n".join([f"{cluster}: {narrative}" for cluster, narrative in cluster_narratives.items() if narrative.strip()])
             
@@ -467,7 +455,6 @@ def generate_indicator_tables(year):
             table_rows.append({
                 "Indicator statement": indicator_title,
                 "End-year target 2025": end_year_target,
-                #"Projected targets for 2025 (Mid-year report 2025)": projected,
                 "Achieved in 2025": achieved,
                 "Brief overviews": brief_overview
             })
@@ -491,78 +478,68 @@ def run_pipeline(indicator, year, insert_data=False):
             insert_into_opensearch("vw_ai_challenges")
 
             logger.info("✅ Data insertion completed successfully.")
-        
-        ## Part 1: Generate the report with deliverables, contributions, oicrs, and innovations
+
         total_expected, total_achieved, progress = calculate_summary(indicator, year)
+        SEARCH_QUERY = generate_search_prompt(indicator, year)
 
-        PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
+        context, questions = retrieve_context(SEARCH_QUERY, indicator, year)
         
-        context, questions = retrieve_context(PROMPT, indicator, year, contingency_level=0)
+        grouped_context = group_context_by_cluster(context)
+        clusters = sorted(grouped_context.keys())
 
-        query = f"""
-            Using this information:\n{context}\n\n
-            Do the following:\n{PROMPT}
-            """
+        indicator_title = _get_indicator_title(context, indicator)
+        SUMMARY_PROMPT = generate_summary_prompt(indicator, year, total_expected, total_achieved, progress)
 
-        try:
-            generated_report = invoke_model(query)
-        except Exception as e:
-            if "Input is too long" in str(e):
-                logger.warning("⚠️ Input is too long. Applying Level 1 contingency...")
-                try:
-                    context, questions = retrieve_context(PROMPT, indicator, year, contingency_level=1)
-                    
-                    query = f"""
-                        Using this information:\n{context}\n\n
-                        Do the following:\n{PROMPT}
-                        """
-                    
-                    generated_report = invoke_model(query)
-                    logger.info("✅ Report generated successfully with Level 1 contingency.")
-                except Exception as e2:
-                    if "Input is too long" in str(e2):
-                        logger.warning("⚠️ Still too long. Applying Level 2 contingency...")
-                        context, questions = retrieve_context(PROMPT, indicator, year, contingency_level=2)
-                        
-                        query = f"""
-                            Using this information:\n{context}\n\n
-                            Do the following:\n{PROMPT}
-                            """
-                        
-                        generated_report = invoke_model(query)
-                        logger.info("✅ Report generated successfully with Level 2 contingency.")
-                    else:
-                        raise e2
-            else:
-                raise
+        logger.info(f"🚀 Starting parallel generation for {len(clusters)} clusters...")
+
+        def _run_summary():
+            return invoke_model(SUMMARY_PROMPT)
+
+        with ThreadPoolExecutor(max_workers=len(clusters) + 1) as executor:
+            summary_future = executor.submit(_run_summary)
+            cluster_futures = {
+                executor.submit(
+                    _generate_single_cluster_narrative,
+                    cluster,
+                    grouped_context[cluster],
+                    indicator,
+                    year
+                ): cluster
+                for cluster in clusters
+            }
+
+            summary_text = summary_future.result()
+            cluster_narratives = {}
+            for future, cluster in cluster_futures.items():
+                _, narrative = future.result()
+                cluster_narratives[cluster] = narrative
+
+        generated_report = f"# {indicator_title}\n\n"
+        generated_report += summary_text + "\n\n"
+        generated_report += "## Indicator Narrative\n\n"
+        for cluster in clusters:
+            generated_report += cluster_narratives.get(cluster, "") + "\n\n"
 
         ## Part 2: Generate the report with dissagregated targets
         accepted_indicators = ["PDO Indicator 1", "PDO Indicator 2", "PDO Indicator 3", "IPI 2.3"]
-
         if indicator in accepted_indicators:
             TARGET_PROMPT = generate_target_prompt(indicator)
-            
+
             query_questions = f"""
                 Using this information:\n{questions}\n\n
                 Do the following:\n{TARGET_PROMPT}
                 """
-            
+
             logger.info("☑️  Starting disaggregated targets report generation...")
             targets_report = invoke_model(query_questions)
-            
-            ## Combine both reports
-            targets_section = "\n\n## Disaggregated targets\n" + targets_report
-            generated_report += targets_section
-        
-        ## Part 3: Add missed links section
-        final_report = add_missed_links(generated_report, context)
+            generated_report += "\n\n## Disaggregated targets\n" + targets_report
 
         logger.info("✅ Report generation completed successfully.")
-        return final_report
+        return generated_report
 
     except Exception as e:
         logger.error(f"❌ Error in pipeline execution: {e}")
-        
+
         if "Input is too long" in str(e):
             logger.error("❌ Input is still too long even after applying contingency filters.")
             return f"# Report Generation Error\n\nThe input context for indicator {indicator} in year {year} is too long for the model, even after applying data reduction filters."
