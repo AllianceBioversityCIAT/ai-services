@@ -88,14 +88,13 @@ export function FilterPanel({
   const style: React.CSSProperties = {
     position: 'fixed',
     top: anchorRect.bottom + 5,
-    left: anchorRect.left,
+    left: Math.max(8, anchorRect.right - 280),
     zIndex: 9999,
     background: 'white',
     border: '1px solid var(--bulk-gray-300)',
     borderRadius: 6,
     boxShadow: 'var(--bulk-shadow-md)',
-    minWidth: 220,
-    maxWidth: 320,
+    width: 280,
   };
 
   // Use portal to render above all stacking contexts

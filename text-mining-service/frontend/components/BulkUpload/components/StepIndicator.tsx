@@ -6,12 +6,14 @@ const STEPS: { key: AppStep; label: string }[] = [
   { key: 'upload',   label: 'Select file' },
   { key: 'results',  label: 'Review and submit' },
   { key: 'unmapped', label: 'Unmapped institutions' },
+  { key: 'summary',  label: 'Summary' },
 ];
 
 const STEP_INDEX: Record<AppStep, number> = {
   upload:   0,
   results:  1,
   unmapped: 2,
+  summary:  3,
 };
 
 interface StepIndicatorProps {

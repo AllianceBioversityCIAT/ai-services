@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { RawInstitution } from '../types';
+import { CLARISA_BASE_URL } from '../constants';
 
-const CLARISA_INSTITUTIONS_URL = 'https://clarisatest-back.ciat.cgiar.org/api/institutions';
+const CLARISA_INSTITUTIONS_URL = `${CLARISA_BASE_URL}/institutions`;
 
 interface ClarisaCountryOffice {
   name: string;
@@ -43,24 +44,26 @@ interface PartnersCellProps {
   globalIdx: number;
   onEdit: (globalIdx: number, field: string, value: RawInstitution[]) => void;
   field?: string;
-}
-
-function chipClass(p: RawInstitution): string {
-  if (p.institution_id !== null && p.similarity_score >= 70) return 'partner-chip partner-chip-mapped';
-  if (p.institution_id !== null && p.similarity_score < 70) return 'partner-chip partner-chip-low';
-  return 'partner-chip partner-chip-unmapped';
+  isPartnerNotApplicable?: boolean;
+  disabled?: boolean;
 }
 
 function isRemovable(_p: RawInstitution): boolean {
   return true;
 }
 
-export function PartnersCell({ partners, globalIdx, onEdit, field = 'partners' }: PartnersCellProps) {
+function isMapped(p: RawInstitution): boolean {
+  return p.institution_id !== null && p.institution_id !== undefined && p.similarity_score >= 70;
+}
+
+export function PartnersCell({ partners, globalIdx, onEdit, field = 'partners', isPartnerNotApplicable, disabled }: PartnersCellProps) {
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
   const [allInstitutions, setAllInstitutions] = useState<ClarisaInstitution[]>(cachedInstitutions ?? []);
   const [loading, setLoading] = useState(false);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const addBtnRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Fetch institution list when popover first opens
@@ -120,15 +123,20 @@ export function PartnersCell({ partners, globalIdx, onEdit, field = 'partners' }
   return (
     <div className="partners-cell">
       <div className="partners-chips">
-        {partners.length === 0 && <span className="bulk-chips-empty">—</span>}
-        {partners.map((p, i) => (
-          <span key={i} className={chipClass(p)} title={p.institution_name}>
-            <span className="partner-chip-label">{p.institution_name}</span>
-            {isRemovable(p) && (
+        {partners.filter(isMapped).length === 0 && isPartnerNotApplicable && (
+          <span className="bulk-chips-empty partners-not-found">No partners were identified in the data</span>
+        )}
+        {partners.filter(isMapped).length === 0 && !isPartnerNotApplicable && <span className="bulk-chips-empty">—</span>}
+        {partners.filter(isMapped).map((p, i) => (
+          <span key={i} className="partner-chip partner-chip-mapped" title={p.mapped_institution_name ?? p.institution_name}>
+            <span className="partner-chip-label">
+              {p.mapped_institution_acronym ? `${p.mapped_institution_acronym} — ${p.mapped_institution_name ?? p.institution_name}` : (p.mapped_institution_name ?? p.institution_name)}
+            </span>
+            {isRemovable(p) && !disabled && (
               <button
                 className="partner-chip-remove"
                 aria-label={`Remove ${p.institution_name}`}
-                onClick={() => handleRemove(i)}
+                onClick={() => handleRemove(partners.indexOf(p))}
               >
                 ×
               </button>
@@ -139,15 +147,23 @@ export function PartnersCell({ partners, globalIdx, onEdit, field = 'partners' }
 
       <div className="partner-add-container" ref={popoverRef}>
         <button
-          className="partner-add-btn"
+          ref={addBtnRef}
+          className={`partner-add-btn${disabled ? ' cell-conditional-disabled' : ''}`}
           aria-label="Add partner institution"
-          onClick={() => setShowSearch(s => !s)}
+          disabled={disabled}
+          onClick={() => {
+            if (!showSearch && addBtnRef.current) {
+              const rect = addBtnRef.current.getBoundingClientRect();
+              setPopoverPos({ top: rect.bottom + 4, left: rect.left });
+            }
+            setShowSearch(s => !s);
+          }}
         >
           +
         </button>
 
-        {showSearch && (
-          <div className="partners-search-popover">
+        {showSearch && popoverPos && (
+          <div className="partners-search-popover" style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left }}>
             <input
               ref={inputRef}
               className="partners-search-input"
@@ -166,10 +182,12 @@ export function PartnersCell({ partners, globalIdx, onEdit, field = 'partners' }
                       className="partners-search-result"
                       onClick={() => handleAdd(inst)}
                     >
-                      {inst.acronym && <strong className="partners-result-acronym">{inst.acronym}</strong>}
-                      {inst.acronym && <span className="partners-result-sep"> - </span>}
-                      <span className="partners-result-name">{inst.name}</span>
-                      {hq && <span className="partners-result-country"> - {hq.name}</span>}
+                      <span className="partners-result-line1">
+                        {inst.acronym && <strong className="partners-result-acronym">{inst.acronym}</strong>}
+                        {inst.acronym && <span className="partners-result-sep">  </span>}
+                        <span className="partners-result-name">{inst.name}</span>
+                      </span>
+                      {hq && <span className="partners-result-country">{hq.name}</span>}
                     </li>
                   );
                 })}

@@ -58,7 +58,7 @@ export function extractUnmappedInstitutions(results: BulkUploadResult[]): Unmapp
   };
 
   results.forEach((result, idx) => {
-    const recordId = `Record_${idx + 1}`;
+    const recordId = `Result ${idx + 1}`;
     const title = result.title ?? 'Unknown Title';
 
     if (Array.isArray(result.partners)) {
@@ -269,8 +269,8 @@ export function formatResultForSTAR(result: BulkUploadResult): Record<string, un
     }
   }
 
-  // Step 14: keywords, sdg_targets
-  ['keywords', 'sdg_targets'].forEach((field) => {
+  // Step 14: keywords
+  ['keywords'].forEach((field) => {
     if (formatted[field] !== undefined) {
       if (!Array.isArray(formatted[field]) || (formatted[field] as unknown[]).length === 0) {
         delete formatted[field];
@@ -316,10 +316,11 @@ export function formatResultForSTAR(result: BulkUploadResult): Record<string, un
 
   // Step 17: optional string fields
   OPTIONAL_STRING_FIELDS.forEach((field) => {
-    if (formatted[field] === null || formatted[field] === undefined || formatted[field] === '') {
+    const val = formatted[field];
+    if (val === null || val === undefined || val === '' || String(val) === 'undefined' || String(val) === 'null') {
       delete formatted[field];
-    } else if (formatted[field] !== undefined) {
-      formatted[field] = String(formatted[field]);
+    } else if (val !== undefined) {
+      formatted[field] = String(val);
     }
   });
 

@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Bucket S3 dedicado a subir el .zip del código de la Lambda (OpenNext) antes del deploy del stack principal.
+  Despliégalo una vez por entorno; usa el Output BucketName como SERVER_CODE_S3_BUCKET en Jenkins.
+  El stack principal (bulk-upload-frontend-opennext.yaml) no puede crear este bucket y referenciar el zip
+  en el mismo primer deploy: CloudFormation exige que el objeto S3 exista antes de crear la Lambda.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Description: Mismo valor lógico que en el stack del frontend (dev, staging, prod).
+    AllowedPattern: '^[a-z0-9-]+$'
+
+  BucketNameSuffix:
+    Type: String
+    Description: Sufijo para nombre globalmente único (ej. cuenta o hash corto).
+    AllowedPattern: '^[a-z0-9]+$'
+
+Resources:
+  LambdaDeploymentCodeBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub
+        - 'star-bulk-upload-lambda-code-${EnvironmentName}-${Suffix}'
+        - Suffix: !Ref BucketNameSuffix
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Suspended
+      Tags:
+        - Key: Project
+          Value: STAR
+        - Key: Functionality
+          Value: bulk-upload
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+Outputs:
+  BucketName:
+    Description: Usar este valor como SERVER_CODE_S3_BUCKET en el Jenkinsfile.
+    Value: !Ref LambdaDeploymentCodeBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaDeploymentCodeBucketName'
+
+  BucketArn:
+    Description: ARN del bucket (útil para políticas IAM del rol de Jenkins).
+    Value: !GetAtt LambdaDeploymentCodeBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaDeploymentCodeBucketArn'

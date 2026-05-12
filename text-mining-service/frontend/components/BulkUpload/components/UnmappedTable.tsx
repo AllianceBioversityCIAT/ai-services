@@ -22,10 +22,17 @@ interface UnmappedTableProps {
   institutions: UnmappedInstitution[];
   onDownloadReport: () => void;
   onBackToResults: () => void;
-  onFinishProcess: () => void;
+  onGoToSummary: () => void;
 }
 
-export function UnmappedTable({ institutions, onDownloadReport, onBackToResults, onFinishProcess }: UnmappedTableProps) {
+// Maps internal field names to user-friendly labels
+const SOURCE_FIELD_LABELS: Record<string, string> = {
+  partners: 'Partners',
+  trainee_affiliation: 'Trainee Affiliation',
+  trainees_description: 'Trainees Organizations',
+};
+
+export function UnmappedTable({ institutions, onDownloadReport, onBackToResults, onGoToSummary }: UnmappedTableProps) {
   const pagination = usePagination(5);
   const { setTotalItems } = pagination;
 
@@ -54,7 +61,7 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
       <div className="bulk-unmapped-container">
         <div className="bulk-unmapped-header">
           <span className="bulk-unmapped-info">
-            Showing {startIndex + 1}–{endIndex} of {institutions.length} unmapped institutions
+            INSTITUTION MAPPING REPORT
           </span>
           <button className="bulk-download-unmapped-btn" type="button" onClick={onDownloadReport}>
             {DownloadSvg}
@@ -62,38 +69,51 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
           </button>
         </div>
 
-        <div className="bulk-table-container">
-          <table className="bulk-results-table">
-            <thead>
-              <tr>
-                <th>Record ID</th>
-                <th>Record title</th>
-                <th>Source field</th>
-                <th>Institution name</th>
-                <th>Institution ID</th>
-                <th>Similarity score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {page.map((item, i) => (
-                <tr key={`${item.record_id}-${item.institution_name}-${i}`}>
-                  <td style={{ padding: '1rem' }}>{item.record_id}</td>
-                  <td style={{ padding: '1rem' }}>{item.record_title}</td>
-                  <td style={{ padding: '1rem' }}>{item.source_field}</td>
-                  <td style={{ padding: '1rem' }}>{item.institution_name}</td>
-                  <td style={{ padding: '1rem' }}>{item.institution_id ?? 'null'}</td>
-                  <td style={{ padding: '1rem' }}>{item.similarity_score}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="bulk-risk-notice" style={{ marginBottom: '1rem' }}>
+          <span style={{ fontSize: '1rem' }}>ℹ️</span>
+          <span>
+            The following institutions could not be automatically matched in CLARISA. This does not necessarily mean they do not exist — the AI may have failed to find them.
+            Please review this list and, if needed, submit a <strong>partner request</strong> to have them added to CLARISA. Once available, you can return to the record and complete the missing information.
+          </span>
         </div>
+        <hr style={{ border: 'none', borderTop: '1px solid var(--bulk-gray-200)', margin: '0 0 1rem 0' }} />
 
-        {/* Pagination */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        {institutions.length === 0 ? (
+          <div className="bulk-unmapped-empty">
+            <span className="bulk-unmapped-empty-icon">✓</span>
+            <p className="bulk-unmapped-empty-title">All institutions were successfully mapped</p>
+            <p className="bulk-unmapped-empty-sub">No unmapped institutions were found in this file.</p>
+          </div>
+        ) : (
+          <div className="bulk-table-container">
+            <table className="bulk-results-table">
+              <thead>
+                <tr>
+                  <th>Result ID</th>
+                  <th>Record title</th>
+                  <th>Field</th>
+                  <th>Institution name</th>
+                </tr>
+              </thead>
+              <tbody>
+                {page.map((item, i) => (
+                  <tr key={`${item.record_id}-${item.institution_name}-${i}`}>
+                    <td style={{ padding: '1rem' }}>{item.record_id}</td>
+                    <td style={{ padding: '1rem' }}>{item.record_title}</td>
+                    <td style={{ padding: '1rem' }}>{SOURCE_FIELD_LABELS[item.source_field] ?? item.source_field}</td>
+                    <td style={{ padding: '1rem' }}>{item.institution_name}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination — only when there are institutions */}
+        {institutions.length > 0 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <span style={{ color: 'var(--bulk-gray-600)', fontSize: '0.9rem' }}>
-              Showing {startIndex + 1}–{endIndex} of {institutions.length} results
+              Showing {startIndex + 1}–{endIndex} of {institutions.length} unmapped institutions
             </span>
             <select
               style={{ padding: '0.5rem', border: '1px solid var(--bulk-gray-300)', borderRadius: 6, background: 'var(--bulk-white)' }}
@@ -143,15 +163,15 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
               &gt;&gt;
             </button>
           </div>
-        </div>
+        </div>}
 
         {/* Action buttons */}
         <div className="bulk-next-step-container" style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-          <button className="bulk-unmapped-nav-btn" type="button" onClick={onBackToResults}>
+          <button className="bulk-download-unmapped-btn" type="button" onClick={onBackToResults}>
             ← Back to Results
           </button>
-          <button className="bulk-next-step-btn" type="button" onClick={onFinishProcess}>
-            Finish Process
+          <button className="bulk-next-step-btn" type="button" onClick={onGoToSummary}>
+            View Summary
             {NextArrowSvg}
           </button>
         </div>

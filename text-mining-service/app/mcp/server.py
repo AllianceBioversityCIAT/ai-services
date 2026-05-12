@@ -30,7 +30,7 @@ s3_client = boto3.client("s3")
 bedrock_client = boto3.client("bedrock-runtime", region_name="us-west-2")
 
 
-async def authenticate_star(key: str, bucket: str, token: str, environmentUrl: str):
+async def authenticate_star(key: str, bucket: str, token: str, environmentUrl: str, require_roles: bool = False):
     try:
         payload = {
             "token": token,
@@ -38,7 +38,7 @@ async def authenticate_star(key: str, bucket: str, token: str, environmentUrl: s
             "bucket": bucket,
             "environmentUrl": environmentUrl
         }
-        return await star_auth_middleware.authenticate(payload)
+        return await star_auth_middleware.authenticate(payload, require_roles=require_roles)
     except Exception as e:
         logger.error(f"Auth error (STAR): {str(e)}")
         return None
@@ -159,19 +159,20 @@ async def process_document_prms(bucket: str, key: str, token: Any, environmentUr
 
 
 @mcp.tool()
-async def process_document_capdev(bucket: str, key: str, token: Any, environmentUrl: str) -> dict:
+async def process_document_capdev(bucket: str, key: str, token: Any, environmentUrl: str, skip_ids: list = None, user_id: str = None, user_name: str = None) -> dict:
     logger.info("✅ process_document_capdev invoked via MCP")
 
     try:
-        is_authenticated = await authenticate_star(key, bucket, token, environmentUrl)
+        is_authenticated = await authenticate_star(key, bucket, token, environmentUrl, require_roles=True)
         logger.info(f"Authenticated: {is_authenticated}")
         if not is_authenticated:
             raise ValueError("Authentication failed")
 
         logger.info(f"Processing document: {key} from bucket: {bucket}")
+        logger.info(f"👤 User ID for tracking: {user_id} | Name: {user_name}")
 
         result = process_bulk_capdev(
-            bucket_name=bucket, file_key=key)
+            bucket_name=bucket, file_key=key, skip_ids=skip_ids or [], user_id=user_id, user_name=user_name)
 
         await notification_service.send_slack_notification(
             emoji=":ai: :pick:",

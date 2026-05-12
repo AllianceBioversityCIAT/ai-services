@@ -10,7 +10,6 @@ import { FilterPanel } from './FilterPanel';
 import { useState } from 'react';
 import type { RawInstitution, RawCountry } from '../types';
 import { PartnersCell } from './PartnersCell';
-import { SdgCell } from './SdgCell';
 import { TrainingPurposeCell } from './TrainingPurposeCell';
 import { RegionsCell } from './RegionsCell';
 import { CountriesCell } from './CountriesCell';
@@ -21,11 +20,23 @@ import { StaffCell } from './StaffCell';
 import type { RawStaff } from './StaffCell';
 import { EvidenceCell } from './EvidenceCell';
 import type { Evidence } from './EvidenceCell';
+import { CompletenessCell } from './CompletenessCell';
+import { RiskFlagBadge } from './RiskFlagBadge';
+import { FailedStatusBadge } from './FailedStatusBadge';
+import { checkCompleteness } from '../utils/completenessChecker';
 
 // Hoisted static SVGs (rendering-hoist-jsx)
 const StarSubmitSvg = (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
     <path d="M8 1l2.5 5 5.5.8-4 3.9.9 5.3-4.9-2.6-4.9 2.6.9-5.3-4-3.9 5.5-.8L8 1z" />
+  </svg>
+);
+
+const ExternalLinkSvg = (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0 }}>
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    <polyline points="15 3 21 3 21 9" />
+    <line x1="10" y1="14" x2="21" y2="3" />
   </svg>
 );
 
@@ -37,9 +48,10 @@ interface TableCellProps {
   recordStatus: RecordStatus | undefined;
   onEdit: (globalIdx: number, field: string, value: unknown) => void;
   authToken: string | null;
+  isReadOnly?: boolean;
 }
 
-const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus, onEdit, authToken }: TableCellProps) {
+const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus, onEdit, authToken, isReadOnly }: TableCellProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea on mount
@@ -67,7 +79,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
 
       if (
         e.target.tagName === 'TEXTAREA' &&
-        ['keywords', 'partners', 'countries', 'regions', 'sdg_targets', 'trainees_description'].includes(col.key)
+        ['keywords', 'partners', 'countries', 'regions', 'trainees_description'].includes(col.key)
       ) {
         try { value = JSON.parse(value as string); } catch { /* keep as string */ }
       }
@@ -87,20 +99,70 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     [col.key, globalIdx, onEdit],
   );
 
-  const isDisabled = col.enabledWhen
-    ? !col.enabledWhen.values.some((v) => String(getNestedValue(result, col.enabledWhen!.field)) === String(v))
-    : false;
+  const isDisabled = !!isReadOnly || (() => {
+    if (!col.enabledWhen) return false;
+    const conditions = Array.isArray(col.enabledWhen) ? col.enabledWhen : [col.enabledWhen];
+    return !conditions.every((cond) => cond.values.some((v) => String(getNestedValue(result, cond.field)) === String(v)));
+  })();
 
   if (col.type === 'status') {
     const status = recordStatus?.status ?? 'pending';
-    const statusClass = status === 'complete' ? 'status-complete' : status === 'failed' ? 'status-failed' : 'status-pending';
-    const label = status === 'complete' ? 'Complete' : status === 'failed' ? 'Failed' : 'Pending';
+    if (status === 'failed') {
+      return <td><FailedStatusBadge errorMessage={recordStatus?.errorMessage} /></td>;
+    }
+    const statusClass = status === 'complete' ? 'status-complete' : 'status-pending';
+    const label = status === 'complete' ? 'Submitted' : 'Pending';
     return <td><span className={statusClass}>{label}</span></td>;
+  }
+
+  if (col.type === 'completeness') {
+    // Submitted tab: show submission type badge instead of re-running completeness check
+    if (isReadOnly) {
+      const subType = recordStatus?.submissionType;
+      if (subType === 'approved') {
+        return (
+          <td>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.6rem', borderRadius: '999px', background: '#d4edda', color: '#4a8b4e', fontWeight: 600, fontSize: '0.78rem' }}>
+              ✓ Approved
+            </span>
+          </td>
+        );
+      }
+      if (subType === 'draft') {
+        return (
+          <td>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.6rem', borderRadius: '999px', background: '#cce8f7', color: '#1265a0', fontWeight: 600, fontSize: '0.78rem' }}>
+              Draft
+            </span>
+          </td>
+        );
+      }
+      // submissionType not yet stored (legacy records) — show neutral badge
+      return (
+        <td>
+          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '999px', background: '#f0f0f0', color: '#666', fontWeight: 500, fontSize: '0.78rem' }}>
+            Submitted
+          </span>
+        </td>
+      );
+    }
+    return (
+      <td>
+        <CompletenessCell completeness={checkCompleteness(result)} />
+      </td>
+    );
   }
 
   if (col.type === 'link') {
     if (recordStatus?.status === 'complete' && recordStatus.link) {
-      return <td><a href={recordStatus.link} target="_blank" rel="noreferrer" className="star-link">🔗 View in STAR</a></td>;
+      return (
+        <td>
+          <a href={recordStatus.link} target="_blank" rel="noreferrer" className="bulk-summary-star-link">
+            View in STAR
+            {ExternalLinkSvg}
+          </a>
+        </td>
+      );
     }
     return <td>-</td>;
   }
@@ -144,6 +206,10 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
   if (col.type === 'textarea') {
     let value = getNestedValue(result, col.key);
     if (typeof value === 'object') value = JSON.stringify(value);
+    // Read-only (submitted tab): plain text, no textarea box
+    if (isReadOnly) {
+      return <td>{String(value ?? '') || <span style={{ color: 'var(--bulk-gray-400)' }}>—</span>}</td>;
+    }
     return (
       <td>
         <textarea
@@ -219,12 +285,14 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     const raw = getNestedValue(result, col.key);
     const partners: RawInstitution[] = Array.isArray(raw) ? (raw as RawInstitution[]) : [];
     return (
-      <td>
+      <td className={isReadOnly ? 'bulk-cell-readonly' : undefined}>
         <PartnersCell
           partners={partners}
           globalIdx={globalIdx}
           field={col.key}
           onEdit={onEdit as (globalIdx: number, field: string, value: RawInstitution[]) => void}
+          isPartnerNotApplicable={col.key === 'partners' ? result.is_partner_not_applicable as boolean | undefined : undefined}
+          disabled={isDisabled}
         />
       </td>
     );
@@ -257,7 +325,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
       return <td><span className="geo-readonly">{regionCodes.length ? regionCodes.join(', ') : '—'}</span></td>;
     }
     return (
-      <td>
+      <td className={isReadOnly ? 'bulk-cell-readonly' : undefined}>
         <RegionsCell
           values={regionCodes}
           globalIdx={globalIdx}
@@ -280,7 +348,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
       return <td><span className="geo-readonly">{countriesVal.length ? countriesVal.map(c => c.code).join(', ') : '—'}</span></td>;
     }
     return (
-      <td>
+      <td className={isReadOnly ? 'bulk-cell-readonly' : undefined}>
         <CountriesCell
           values={countriesVal}
           geoscopeLevel={geoscopeLevel}
@@ -301,30 +369,12 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
         : [];
     const field = col.type === 'evidence_desc' ? 'evidence_description' : 'evidence_link';
     return (
-      <td>
+      <td className={isReadOnly ? 'bulk-cell-readonly' : undefined}>
         <EvidenceCell
           evidences={evidences}
           field={field}
           globalIdx={globalIdx}
           onEdit={onEdit as (globalIdx: number, field: string, value: Evidence[]) => void}
-        />
-      </td>
-    );
-  }
-
-  if (col.type === 'sdg') {
-    const raw = getNestedValue(result, col.key);
-    const values: string[] = Array.isArray(raw)
-      ? (raw as string[])
-      : typeof raw === 'string' && raw.trim().startsWith('[')
-        ? (() => { try { return JSON.parse(raw) as string[]; } catch { return raw ? [raw] : []; } })()
-        : raw ? [String(raw)] : [];
-    return (
-      <td>
-        <SdgCell
-          values={values}
-          globalIdx={globalIdx}
-          onEdit={onEdit as (globalIdx: number, field: string, value: string[]) => void}
         />
       </td>
     );
@@ -341,6 +391,7 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
           data-index={globalIdx}
           data-field={col.key}
           onChange={handleChange}
+          disabled={isDisabled}
         />
       </td>
     );
@@ -348,6 +399,10 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
 
   // text / readonly
   const value = getNestedValue(result, col.key) ?? '';
+  // Read-only (submitted tab): plain text
+  if (isReadOnly) {
+    return <td>{String(value) || <span style={{ color: 'var(--bulk-gray-400)' }}>—</span>}</td>;
+  }
   if (col.readonly) {
     return (
       <td>
@@ -421,6 +476,16 @@ export function ResultsTable({
   const { currentPage, perPage, totalPages, startIndex, endIndex } = pagination;
 
   const [openFilter, setOpenFilter] = useState<{ key: string; rect: DOMRect } | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  const handleSubmitClick = useCallback(() => setShowConfirmModal(true), []);
+
+  const handleConfirmSubmit = useCallback(() => {
+    setShowConfirmModal(false);
+    onSubmitToStar();
+  }, [onSubmitToStar]);
+
+  const handleCancelSubmit = useCallback(() => setShowConfirmModal(false), []);
 
   const paginatedResults = filteredResults.slice(startIndex, endIndex);
 
@@ -462,7 +527,8 @@ export function ResultsTable({
   ) as unknown as (idx: number, checked: boolean) => void;
 
   const openFilterPanel = useCallback((columnKey: string, e: React.MouseEvent<HTMLSpanElement>) => {
-    const rect = (e.currentTarget as HTMLSpanElement).getBoundingClientRect();
+    const th = (e.currentTarget as HTMLSpanElement).closest('th');
+    const rect = (th ?? e.currentTarget as HTMLSpanElement).getBoundingClientRect();
     setOpenFilter((prev) => (prev?.key === columnKey ? null : { key: columnKey, rect }));
   }, []);
 
@@ -472,7 +538,32 @@ export function ResultsTable({
 
   return (
     <div className="bulk-step">
-      {/* Tabs */}
+      {/* Title + Controls row */}
+      <div className="bulk-results-controls">
+        <span className="bulk-unmapped-info">UPLOAD RESULTS</span>
+        {currentTab === 'pending' && (
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              className="bulk-unmapped-nav-btn"
+              type="button"
+              disabled={selectedIndices.size === 0}
+              onClick={onClearSelections}
+            >
+              Clear Selections
+            </button>
+            <button
+              className="bulk-star-submit-btn"
+              type="button"
+              disabled={selectedIndices.size === 0}
+              onClick={handleSubmitClick}
+            >
+              {StarSubmitSvg}
+              Submit to STAR
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="bulk-results-tabs">
         <button
           className={`bulk-tab-btn${currentTab === 'pending' ? ' active' : ''}`}
@@ -490,32 +581,24 @@ export function ResultsTable({
         </button>
       </div>
 
-      {/* Controls row — only shown on pending tab */}
+      {/* Table */}
       {currentTab === 'pending' && (
-        <div className="bulk-results-controls">
-          <button
-            className="bulk-unmapped-nav-btn"
-            type="button"
-            disabled={selectedIndices.size === 0}
-            onClick={onClearSelections}
-          >
-            🔄 Clear Selections
-          </button>
-          <button
-            className="bulk-star-submit-btn"
-            type="button"
-            disabled={selectedIndices.size === 0}
-            onClick={onSubmitToStar}
-          >
-            {StarSubmitSvg}
-            Submit to STAR
-          </button>
+        <div className="bulk-risk-notice">
+          <span className="risk-flag-icon" aria-hidden="true" />
+          <span>Please review all columns marked with this flag — the AI may make mistakes in these fields.</span>
         </div>
       )}
-
-      {/* Table */}
-      <div className="bulk-table-container">
+      <div className={`bulk-table-container${currentTab === 'submitted' ? ' bulk-submitted-view' : ''}`}>
         <table id="bulkResultsTable" className="bulk-results-table">
+          <colgroup>
+            {currentTab === 'pending' && <col style={{ width: RESULTS_TABLE_COLUMNS[0].width }} />}
+            {RESULTS_TABLE_COLUMNS.slice(1)
+              .filter((col) => !(currentTab === 'pending' && col.type === 'link'))
+              .filter((col) => currentTab !== 'submitted' || col.showInSubmitted)
+              .map((col) => (
+                <col key={col.key + col.type} style={{ width: col.width }} />
+              ))}
+          </colgroup>
           <thead>
             <tr>
               {currentTab === 'pending' && (
@@ -528,9 +611,17 @@ export function ResultsTable({
                   />
                 </th>
               )}
-              {RESULTS_TABLE_COLUMNS.slice(1).map((col) => {
+              {RESULTS_TABLE_COLUMNS.slice(1)
+                .filter((col) => !(currentTab === 'pending' && col.type === 'link'))
+                .filter((col) => currentTab !== 'submitted' || col.showInSubmitted)
+                .map((col) => {
                 if (col.readonly || col.type === 'status' || col.type === 'link') {
-                  return <th key={col.key + col.type}>{col.label}</th>;
+                  return (
+                    <th key={col.key + col.type}>
+                      {col.label}
+                      {col.riskFlag && <RiskFlagBadge />}
+                    </th>
+                  );
                 }
                 const hasFilter = activeFilters[col.key]?.length > 0;
                 return (
@@ -540,12 +631,12 @@ export function ResultsTable({
                         {col.tooltip
                           ? <>{col.label.replace(' ⓘ', '')} <span className="col-tooltip-icon" data-tooltip={col.tooltip}>ⓘ</span></>
                           : col.label}
+                        {col.riskFlag && <RiskFlagBadge />}
                       </span>
                       <span
                         className={`filter-icon${hasFilter ? ' filter-active' : ''}`}
                         title="Filter"
                         onClick={(e) => openFilterPanel(col.key, e)}
-                        style={{ cursor: 'pointer' }}
                       >
                         ▼
                       </span>
@@ -560,7 +651,7 @@ export function ResultsTable({
               const globalIdx = globalIndexMap(localIdx);
               const rid = String(result.id);
               return (
-                <tr key={rid || localIdx}>
+                <tr key={`${currentTab}-${rid || localIdx}`}>
                   {currentTab === 'pending' && (
                     <td>
                       <input
@@ -571,7 +662,10 @@ export function ResultsTable({
                       />
                     </td>
                   )}
-                  {RESULTS_TABLE_COLUMNS.slice(1).map((col) => (
+                  {RESULTS_TABLE_COLUMNS.slice(1)
+                    .filter((col) => !(currentTab === 'pending' && col.type === 'link'))
+                    .filter((col) => currentTab !== 'submitted' || col.showInSubmitted)
+                    .map((col) => (
                     <TableCell
                       key={col.key + col.type}
                       col={col}
@@ -580,6 +674,7 @@ export function ResultsTable({
                       recordStatus={recordStatuses[rid]}
                       onEdit={onEdit}
                       authToken={authToken}
+                      isReadOnly={currentTab === 'submitted'}
                     />
                   ))}
                 </tr>
@@ -627,14 +722,36 @@ export function ResultsTable({
       })()}
 
       {/* Next step — navigates to unmapped institutions */}
-      {currentTab === 'pending' && (
-        <div className="bulk-next-step-container">
-          <button className="bulk-next-step-btn" type="button" onClick={onViewUnmapped}>
-            Next step
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
-              <path d="M8 1l7 7-7 7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
+      <div className="bulk-next-step-container">
+        <button className="bulk-next-step-btn" type="button" onClick={onViewUnmapped}>
+          Next step
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+            <path d="M8 1l7 7-7 7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      </div>
+
+      {/* STAR Submission Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="bulk-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="bulk-confirm-title">
+          <div className="bulk-confirm-modal">
+            <h3 id="bulk-confirm-title" className="bulk-confirm-title">Submit to STAR?</h3>
+            <p className="bulk-confirm-desc">
+              You are about to send{' '}
+              <strong>{selectedIndices.size} record{selectedIndices.size !== 1 ? 's' : ''}</strong>{' '}
+              directly to <strong>STAR</strong>. This action cannot be undone.
+            </p>
+            <p className="bulk-confirm-sub">Please confirm that the selected entries are ready for submission.</p>
+            <div className="bulk-confirm-actions">
+              <button className="bulk-confirm-btn-cancel" type="button" onClick={handleCancelSubmit}>
+                Cancel
+              </button>
+              <button className="bulk-confirm-btn-submit" type="button" onClick={handleConfirmSubmit}>
+                {StarSubmitSvg}
+                Yes, submit to STAR
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -642,7 +759,7 @@ export function ResultsTable({
       {openFilter !== null && (
         <FilterPanel
           columnKey={openFilter.key}
-          uniqueValues={getUniqueValues(results, openFilter.key)}
+          uniqueValues={getUniqueValues(filteredResults, openFilter.key)}
           currentFilters={activeFilters[openFilter.key] ?? []}
           anchorRect={openFilter.rect}
           onApply={onFilterApply}

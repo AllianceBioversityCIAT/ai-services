@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { STAR_BASE_URL } from '../constants';
 
-const STAFF_URL = 'https://main-allianceindicatorstest.ciat.cgiar.org/api/agresso/staff';
+const STAFF_URL = `${STAR_BASE_URL}/agresso/staff`;
 
 interface StaffPerson {
   carnet: string;
@@ -16,6 +17,7 @@ interface StaffPerson {
 
 export interface RawStaff {
   name: string;
+  mapped_name?: string;
   code: string;
   similarity_score: number;
 }
@@ -36,10 +38,12 @@ export function StaffCell({ value, globalIdx, field, authToken, onEdit, disabled
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const editBtnRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
 
-  const hasValue = value != null && Boolean(value.name);
+  const hasValue = value != null && Boolean(value.name) && value.similarity_score >= 70;
 
   function staffDotClass(v: RawStaff): string {
     if (v.similarity_score >= 70) return 'affiliation-dot affiliation-dot-mapped';
@@ -119,15 +123,21 @@ export function StaffCell({ value, globalIdx, field, authToken, onEdit, disabled
   return (
     <div className={`affiliation-cell${disabled ? ' cell-conditional-disabled' : ''}`}>
       <div className="affiliation-text-row">
-        {hasValue && <span className={staffDotClass(value!)} title={`Score: ${value!.similarity_score}`} />}
         <span className="affiliation-name">
-          {hasValue ? value!.name : <span className="bulk-chips-empty">—</span>}
+          {hasValue ? (value!.mapped_name ?? value!.name) : <span className="bulk-chips-empty">—</span>}
         </span>
         <div className="affiliation-actions" ref={popoverRef}>
           <button
+            ref={editBtnRef}
             className="affiliation-edit-btn"
             aria-label="Select person"
-            onClick={openSearch}
+            onClick={() => {
+              if (!showSearch && editBtnRef.current) {
+                const rect = editBtnRef.current.getBoundingClientRect();
+                setPopoverPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - 360) });
+              }
+              openSearch();
+            }}
             title={hasValue ? 'Change person' : 'Select person'}
             disabled={disabled}
           >
@@ -144,8 +154,8 @@ export function StaffCell({ value, globalIdx, field, authToken, onEdit, disabled
               ×
             </button>
           )}
-          {showSearch && (
-            <div className="partners-search-popover">
+          {showSearch && popoverPos && (
+            <div className="partners-search-popover" style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left }}>
               <div className="partners-search-input-wrap">
                 <input
                   ref={inputRef}

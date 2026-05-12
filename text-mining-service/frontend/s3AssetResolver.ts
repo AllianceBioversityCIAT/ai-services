@@ -1,0 +1,170 @@
+import { GetObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import type { InternalEvent, InternalResult } from "@opennextjs/aws/types/open-next.js";
+import type { AssetResolver } from "@opennextjs/aws/types/overrides.js";
+
+/**
+ * Sirve estáticos desde S3 cuando solo hay Function URL (sin CloudFront delante).
+ * OpenNext 3 usa por defecto assetResolver "dummy" y asume CF→S3 para /_next/static.
+ *
+ * URL del navegador: /_next/static/media/foo.<hash>.png
+ * Clave S3: <BUCKET_KEY_PREFIX>/_next/static/media/foo.<hash>.png (p. ej. prefijo _assets)
+ * Jenkins: aws s3 sync .open-next/assets/ s3://$BUCKET/_assets/
+ *
+ * Importante:
+ * - aws-apigw-v2 convertTo() hace buffer.toString("utf8") si isBase64Encoded es false → corrompe PNG.
+ * - Debe ir isBase64Encoded: true (el conversor hace buffer.toString("base64") del binario).
+ * - Leer el body con transformToByteArray(): en Lambda, Readable.toWeb(SDK) a veces no itera y el body queda vacío (200, ~0 B, <img> roto).
+ *
+ * @see https://opennext.js.org/aws/config/overrides/asset_resolver
+ */
+const client = new S3Client({
+  region: process.env.AWS_REGION ?? process.env.BUCKET_REGION,
+});
+
+function trimmedPath(rawPath: string): string {
+  const pathOnly = rawPath.split("?")[0];
+  return pathOnly.startsWith("/") ? pathOnly.slice(1) : pathOnly;
+}
+
+function candidateObjectKeys(rawPath: string): string[] {
+  const trimmed = trimmedPath(rawPath);
+  const prefix =
+    process.env.BUCKET_KEY_PREFIX?.replace(/^\/|\/$/g, "").trim() ?? "_assets";
+  const primary = prefix ? `${prefix}/${trimmed}` : trimmed;
+  const keys = [primary];
+  if (primary.startsWith("_assets/")) {
+    keys.push(`assets/${trimmed}`);
+  }
+  return keys;
+}
+
+function shouldResolveFromS3(pathOnly: string): boolean {
+  if (pathOnly === "/BUILD_ID") return true;
+  if (pathOnly === "/favicon.ico") return true;
+  if (pathOnly.startsWith("/_next/static/")) return true;
+  if (pathOnly.startsWith("/static/")) return true;
+  if (pathOnly.startsWith("/_next/image")) return false;
+  if (pathOnly.startsWith("/_next/data/")) return false;
+  return /\.(svg|ico|png|jpg|jpeg|gif|webp|txt|woff2?|ttf|eot|css|js|map)$/i.test(
+    pathOnly,
+  );
+}
+
+function isS3NotFound(e: unknown): boolean {
+  if (typeof e !== "object" || e === null || !("name" in e)) return false;
+  const name = (e as { name: string }).name;
+  return name === "NoSuchKey" || name === "NotFound";
+}
+
+function effectiveContentType(key: string, s3ContentType: string | undefined): string {
+  const generic =
+    !s3ContentType ||
+    s3ContentType === "binary/octet-stream" ||
+    s3ContentType === "application/octet-stream";
+  if (!generic) return s3ContentType;
+
+  const k = key.toLowerCase();
+  if (k.endsWith(".png")) return "image/png";
+  if (k.endsWith(".jpg") || k.endsWith(".jpeg")) return "image/jpeg";
+  if (k.endsWith(".gif")) return "image/gif";
+  if (k.endsWith(".webp")) return "image/webp";
+  if (k.endsWith(".svg")) return "image/svg+xml";
+  if (k.endsWith(".ico")) return "image/x-icon";
+  if (k.endsWith(".css")) return "text/css; charset=utf-8";
+  if (k.endsWith(".js") || k.endsWith(".mjs")) return "application/javascript; charset=utf-8";
+  if (k.endsWith(".woff2")) return "font/woff2";
+  if (k.endsWith(".woff")) return "font/woff";
+  return s3ContentType ?? "application/octet-stream";
+}
+
+function emptyBody(): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.close();
+    },
+  });
+}
+
+function bytesToWebReadableStream(bytes: Uint8Array): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+}
+
+const resolver: AssetResolver = {
+  name: "s3-function-url",
+  maybeGetAssetResult: async (
+    event: InternalEvent,
+  ): Promise<InternalResult | undefined> => {
+    if (event.method !== "GET" && event.method !== "HEAD") return;
+
+    const pathOnly = event.rawPath.split("?")[0];
+    if (!shouldResolveFromS3(pathOnly)) return;
+
+    const bucket = process.env.BUCKET_NAME;
+    if (!bucket) return;
+
+    const keys = candidateObjectKeys(event.rawPath);
+
+    for (const key of keys) {
+      try {
+        if (event.method === "HEAD") {
+          const head = await client.send(
+            new HeadObjectCommand({ Bucket: bucket, Key: key }),
+          );
+          return {
+            type: "core",
+            statusCode: 200,
+            headers: {
+              "content-type": effectiveContentType(key, head.ContentType),
+              "cache-control": head.CacheControl ?? "public, max-age=31536000, immutable",
+              ...(head.ContentLength != null
+                ? { "content-length": String(head.ContentLength) }
+                : {}),
+            },
+            body: emptyBody() as InternalResult["body"],
+            isBase64Encoded: false,
+          };
+        }
+
+        const out = await client.send(
+          new GetObjectCommand({ Bucket: bucket, Key: key }),
+        );
+        const sdkBody = out.Body;
+        if (!sdkBody) return undefined;
+
+        const bytes =
+          typeof sdkBody.transformToByteArray === "function"
+            ? await sdkBody.transformToByteArray()
+            : undefined;
+        if (!bytes || bytes.byteLength === 0) {
+          continue;
+        }
+
+        const contentType = effectiveContentType(key, out.ContentType);
+
+        return {
+          type: "core",
+          statusCode: 200,
+          headers: {
+            "content-type": contentType,
+            "cache-control":
+              out.CacheControl ?? "public, max-age=31536000, immutable",
+          },
+          body: bytesToWebReadableStream(bytes) as InternalResult["body"],
+          isBase64Encoded: true,
+        };
+      } catch (e: unknown) {
+        if (isS3NotFound(e)) continue;
+        throw e;
+      }
+    }
+
+    return undefined;
+  },
+};
+
+export default resolver;

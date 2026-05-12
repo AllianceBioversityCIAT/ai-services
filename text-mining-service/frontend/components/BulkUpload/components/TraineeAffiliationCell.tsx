@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { RawInstitution } from '../types';
+import { CLARISA_BASE_URL } from '../constants';
 
-const CLARISA_INSTITUTIONS_URL = 'https://clarisatest-back.ciat.cgiar.org/api/institutions';
+const CLARISA_INSTITUTIONS_URL = `${CLARISA_BASE_URL}/institutions`;
 
 interface ClarisaInstitution {
   code: number;
@@ -45,7 +46,9 @@ export function TraineeAffiliationCell({ value, globalIdx, onEdit, disabled }: T
   const [allInstitutions, setAllInstitutions] = useState<ClarisaInstitution[]>(cachedInstitutions ?? []);
   const [loading, setLoading] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const editBtnRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
 
   // Fetch institution list when popover first opens (not on mount — display name is stored in value)
   useEffect(() => {
@@ -101,7 +104,7 @@ export function TraineeAffiliationCell({ value, globalIdx, onEdit, disabled }: T
     setQuery('');
   }, []);
 
-  const hasValue = value && value.institution_name;
+  const hasValue = value && value.institution_name && value.institution_id !== null && value.similarity_score >= 70;
 
   function affiliationDotClass(inst: RawInstitution): string {
     if (inst.institution_id !== null && inst.similarity_score >= 70) return 'affiliation-dot affiliation-dot-mapped';
@@ -112,15 +115,25 @@ export function TraineeAffiliationCell({ value, globalIdx, onEdit, disabled }: T
   return (
     <div className={`affiliation-cell${disabled ? ' cell-conditional-disabled' : ''}`}>
       <div className="affiliation-text-row">
-        {hasValue && <span className={affiliationDotClass(value!)} title={`Score: ${value!.similarity_score}`} />}
         <span className="affiliation-name" title={hasValue ? `ID: ${value!.institution_id ?? '—'}` : undefined}>
-          {hasValue ? value!.institution_name : <span className="bulk-chips-empty">—</span>}
+          {hasValue
+            ? (value!.mapped_institution_acronym
+                ? `${value!.mapped_institution_acronym} — ${value!.mapped_institution_name ?? value!.institution_name}`
+                : (value!.mapped_institution_name ?? value!.institution_name))
+            : <span className="bulk-chips-empty">—</span>}
         </span>
         <div className="affiliation-actions">
           <button
+            ref={editBtnRef}
             className="affiliation-edit-btn"
             aria-label="Select institution"
-            onClick={openSearch}
+            onClick={() => {
+              if (!showSearch && editBtnRef.current) {
+                const rect = editBtnRef.current.getBoundingClientRect();
+                setPopoverPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - 360) });
+              }
+              openSearch();
+            }}
             title={hasValue ? 'Change institution' : 'Select institution'}
             disabled={disabled}
           >
@@ -141,8 +154,8 @@ export function TraineeAffiliationCell({ value, globalIdx, onEdit, disabled }: T
       </div>
 
       <div className="partner-add-container" ref={popoverRef}>
-        {showSearch && (
-          <div className="partners-search-popover">
+        {showSearch && popoverPos && (
+          <div className="partners-search-popover" style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left }}>
             <div className="partners-search-input-wrap">
               <input
                 ref={inputRef}

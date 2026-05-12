@@ -25,8 +25,12 @@ export async function saveRecordStatus(
   recordId: string,
   status: 'complete' | 'failed' | 'pending',
   link: string | null = null,
+  title?: string,
+  contractCode?: string,
+  submissionType?: 'approved' | 'draft',
+  year?: string,
 ): Promise<void> {
-  const payload = { fileName, recordId, status, link };
+  const payload = { fileName, recordId, status, link, title, contractCode, submissionType, year };
   const response = await fetch(`${API_BASE_URL}/dynamo/bulk-upload-records`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -17,7 +17,9 @@ interface EvidenceCellProps {
 export function EvidenceCell({ evidences, field, globalIdx, onEdit }: EvidenceCellProps) {
   const [showPopover, setShowPopover] = useState(false);
   const [editValues, setEditValues] = useState<string[]>([]);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const editBtnRef = useRef<HTMLButtonElement>(null);
 
   const isLink = field === 'evidence_link';
   const displayItems = evidences.map(e => e[field]).filter(Boolean);
@@ -85,9 +87,21 @@ export function EvidenceCell({ evidences, field, globalIdx, onEdit }: EvidenceCe
           ))}
         </div>
         <div className="affiliation-actions" ref={popoverRef}>
-          <button className="affiliation-edit-btn" onClick={openPopover} title="Edit" aria-label="Edit">✎</button>
-          {showPopover && (
-            <div className="evidence-edit-popover">
+          <button
+            ref={editBtnRef}
+            className="affiliation-edit-btn"
+            onClick={() => {
+              if (!showPopover && editBtnRef.current) {
+                const rect = editBtnRef.current.getBoundingClientRect();
+                setPopoverPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - 360) });
+              }
+              openPopover();
+            }}
+            title="Edit"
+            aria-label="Edit"
+          >✎</button>
+          {showPopover && popoverPos && (
+            <div className="evidence-edit-popover" style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left }}>
               {editValues.map((val, i) => (
                 <div key={i} className="evidence-edit-row">
                   <span className="evidence-num">{i + 1}.</span>

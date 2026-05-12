@@ -1,11 +1,14 @@
 export interface RawInstitution {
   institution_name: string;
+  mapped_institution_name?: string;
+  mapped_institution_acronym?: string;
   institution_id: string | null;
   similarity_score: number;
 }
 
 export interface RawUser {
   name: string;
+  mapped_name?: string;
   code: string | null;
   similarity_score: number;
 }
@@ -32,7 +35,6 @@ export interface BulkUploadResult {
   description?: string;
   year?: string | number;
   contract_code?: string;
-  sdg_targets?: string[];
   training_category?: string;
   training_type?: string;
   training_purpose?: string;
@@ -68,6 +70,7 @@ export interface BulkUploadResult {
   potential_asset_description?: string;
   requires_further_development?: string;
   requires_further_development_description?: string;
+  is_partner_not_applicable?: boolean;
   batch_number?: number;
   [key: string]: unknown;
 }
@@ -85,12 +88,14 @@ export interface RecordStatus {
   status: 'pending' | 'complete' | 'failed';
   link: string | null;
   errorMessage?: string;
+  submissionType?: 'approved' | 'draft';
 }
 
 export interface DynamoStatuses {
   complete: string[];
   failed: string[];
   links: Record<string, string>;
+  record_data?: Record<string, { title: string; contract_code?: string; submission_type?: 'approved' | 'draft'; year?: string }>;
 }
 
 export interface StarApiResponse {
@@ -114,17 +119,31 @@ export interface StarErrorResult {
 
 export type DocSource = 'upload' | 's3';
 
-export type AppStep = 'upload' | 'unmapped' | 'results';
+export type AppStep = 'upload' | 'unmapped' | 'results' | 'summary';
 
 export type TabType = 'pending' | 'submitted';
+
+export interface SummaryRecord {
+  id: string;
+  title: string;
+  contract_code?: string;
+  result_official_code?: string;
+  star_link?: string;
+  submission_status: 'approved' | 'draft' | 'failed';
+  error_message?: string;
+  rawData?: BulkUploadResult;
+}
 
 export interface ColumnDef {
   key: string;
   label: string;
-  type: 'checkbox' | 'text' | 'number' | 'textarea' | 'select' | 'status' | 'link' | 'chips' | 'partners' | 'sdg' | 'evidence_desc' | 'evidence_link' | 'training_purpose' | 'date' | 'countries' | 'regions' | 'affiliation' | 'nationality' | 'language' | 'staff';
+  type: 'checkbox' | 'text' | 'number' | 'textarea' | 'select' | 'status' | 'completeness' | 'link' | 'chips' | 'partners' | 'evidence_desc' | 'evidence_link' | 'training_purpose' | 'date' | 'countries' | 'regions' | 'affiliation' | 'nationality' | 'language' | 'staff';
   readonly?: boolean;
   required?: boolean;
+  riskFlag?: boolean;
   options?: string[];
   tooltip?: string;
-  enabledWhen?: { field: string; values: (string | number)[] };
+  enabledWhen?: { field: string; values: (string | number)[] } | { field: string; values: (string | number)[] }[];
+  width?: string;
+  showInSubmitted?: boolean;
 }

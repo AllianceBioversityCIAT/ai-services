@@ -1,24 +1,12 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import type { BulkUploadResult, RecordStatus, StarApiResponse } from '../types';
-import { API_BASE_URL, ENVIRONMENT_URL, FOLDER_PATH, S3_BUCKET, STAR_API_URL } from '../constants';
+import type { BulkUploadResult, RecordStatus, StarApiResponse, StarCreatedResult, StarErrorResult } from '../types';
+import { API_BASE_URL, ENVIRONMENT_URL, FOLDER_PATH, S3_BUCKET, STAR_API_URL, STAR_SUBMIT_APPROVE_API_URL } from '../constants';
 import { extractInnerResults, formatResultForSTAR } from '../utils/dataFormatters';
 import { loadRecordStatuses, saveRecordStatus } from './useDynamoDB';
 import { simplifyS3Path } from '../utils/tableHelpers';
-
-// =========================
-// Auth Token
-// =========================
-async function fetchAuthToken(): Promise<string> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/token`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!response.ok) throw new Error(`Failed to obtain auth token: ${response.status}`);
-  const data = (await response.json()) as { token: string };
-  return data.token;
-}
+import { checkCompleteness } from '../utils/completenessChecker';
 
 // =========================
 // Hook
@@ -43,19 +31,18 @@ export interface BulkUploadApiActions {
     selectedResults: BulkUploadResult[],
     currentFileName: string,
     authToken: string,
-    onStatusUpdate: (statuses: Record<string, RecordStatus>) => void,
-    onRerender: () => void,
+    onComplete: (completeIds: Set<string>, newStatuses: Record<string, RecordStatus>) => void,
   ) => Promise<void>;
   loadS3Objects: (searchTerm?: string) => Promise<void>;
   downloadTemplate: (language: 'es' | 'en') => Promise<void>;
   clearError: () => void;
 }
 
-export function useBulkUploadApi(): BulkUploadApiState & BulkUploadApiActions {
+export function useBulkUploadApi(initialToken: string | null = null, userId: string | null = null, userName: string | null = null): BulkUploadApiState & BulkUploadApiActions {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('Processing...');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [authToken, setAuthToken] = useState<string | null>(null);
+  const authToken: string | null = initialToken;
   const [s3Objects, setS3Objects] = useState<string[]>([]);
   const [starSubmissionResponse, setStarSubmissionResponse] = useState<StarApiResponse | null>(null);
 
@@ -81,33 +68,16 @@ export function useBulkUploadApi(): BulkUploadApiState & BulkUploadApiActions {
       s3Key: string | null,
       onSuccess: (results: BulkUploadResult[], statuses: Record<string, RecordStatus>, fileName: string) => void,
     ) => {
-      let token = authToken;
+      const token = authToken;
       if (!token) {
-        try {
-          showLoading('Authenticating...');
-          token = await fetchAuthToken();
-          setAuthToken(token);
-          hideLoading();
-        } catch (error) {
-          hideLoading();
-          showError((error as Error).message);
-          return;
-        }
+        showError('No authentication token available. Please reload the page.');
+        return;
       }
-
-      const formData = new FormData();
-      formData.append('bucketName', S3_BUCKET);
-      formData.append('token', token);
-      formData.append('environmentUrl', ENVIRONMENT_URL);
 
       let fileName: string;
       if (mode === 'upload' && file) {
-        const fullKey = FOLDER_PATH + file.name;
-        formData.append('file', file);
-        formData.append('key', fullKey);
         fileName = file.name;
       } else if (mode === 's3' && s3Key) {
-        formData.append('key', s3Key);
         fileName = s3Key.split('/').pop() ?? s3Key;
       } else {
         showError('Invalid document source');
@@ -115,6 +85,36 @@ export function useBulkUploadApi(): BulkUploadApiState & BulkUploadApiActions {
       }
 
       try {
+        // Load DynamoDB statuses BEFORE mining so we can skip already-submitted rows
+        showLoading('Loading previous statuses...');
+        const savedStatuses = await loadRecordStatuses(fileName);
+
+        // Build skip list from already-complete records
+        const completeIdSet = new Set(savedStatuses.complete?.map(String) ?? []);
+        const skipIds = Array.from(completeIdSet);
+
+        const formData = new FormData();
+        formData.append('bucketName', S3_BUCKET);
+        formData.append('token', token);
+        formData.append('environmentUrl', ENVIRONMENT_URL);
+        if (skipIds.length > 0) {
+          formData.append('skip_ids', skipIds.join(','));
+        }
+        if (userId) {
+          formData.append('user_id', userId);
+        }
+        if (userName) {
+          formData.append('user_name', userName);
+        }
+
+        if (mode === 'upload' && file) {
+          const fullKey = FOLDER_PATH + file.name;
+          formData.append('file', file);
+          formData.append('key', fullKey);
+        } else if (mode === 's3' && s3Key) {
+          formData.append('key', s3Key);
+        }
+
         showLoading('Sending document to the service...');
         const response = await fetch(`${API_BASE_URL}/star/mining-bulk-upload/capdev`, {
           method: 'POST',
@@ -135,17 +135,34 @@ export function useBulkUploadApi(): BulkUploadApiState & BulkUploadApiActions {
         }
 
         const payload = extractInnerResults(result);
-        const results = payload.results;
+        const aiResults = payload.results.map((r) => ({
+          ...r,
+          is_partner_not_applicable: !Array.isArray(r.partners) || r.partners.length === 0,
+        }));
 
-        // Load DynamoDB statuses (async-parallel: start early, use result below)
-        showLoading('Loading previous statuses...');
-        const savedStatuses = await loadRecordStatuses(fileName);
-        hideLoading();
+        // Re-inject already-submitted records using stored DynamoDB data so they appear in the table
+        const injectedResults: BulkUploadResult[] = [];
+        for (const id of skipIds) {
+          const stored = savedStatuses.record_data?.[id];
+          injectedResults.push({
+            id,
+            title: stored?.title ?? `Record ${id}`,
+            contract_code: stored?.contract_code ?? undefined,
+            year: stored?.year ?? undefined,
+          } as BulkUploadResult);
+        }
 
-        // Build recordStatuses map (js-index-maps)
+        const results = [...injectedResults, ...aiResults];
+
+        // Build recordStatuses map
         const statuses: Record<string, RecordStatus> = {};
         savedStatuses.complete?.forEach((id) => {
-          statuses[String(id)] = { status: 'complete', link: savedStatuses.links?.[id] ?? null };
+          const stored = savedStatuses.record_data?.[id];
+          statuses[String(id)] = {
+            status: 'complete',
+            link: savedStatuses.links?.[id] ?? null,
+            submissionType: (stored?.submission_type as 'approved' | 'draft' | undefined) ?? undefined,
+          };
         });
         savedStatuses.failed?.forEach((id) => {
           statuses[String(id)] = { status: 'failed', link: null };
@@ -170,34 +187,59 @@ export function useBulkUploadApi(): BulkUploadApiState & BulkUploadApiActions {
       selectedResults: BulkUploadResult[],
       currentFileName: string,
       token: string,
-      onStatusUpdate: (statuses: Record<string, RecordStatus>) => void,
-      onRerender: () => void,
+      onComplete: (completeIds: Set<string>, newStatuses: Record<string, RecordStatus>) => void,
     ) => {
       try {
-        showLoading(`Submitting ${selectedResults.length} records to STAR platform...`);
-        const formattedResults = selectedResults.map(formatResultForSTAR);
+        // Split records by completeness
+        const completeResults = selectedResults.filter((r) => checkCompleteness(r).isComplete);
+        const incompleteResults = selectedResults.filter((r) => !checkCompleteness(r).isComplete);
 
-        const response = await fetch(STAR_API_URL, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ results: formattedResults }),
-        });
+        const allCreated: StarCreatedResult[] = [];
+        const allErrors: StarErrorResult[] = [];
+        let starResponse: StarApiResponse = { data: { results_created: [], results_errors: [] } };
 
-        hideLoading();
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`STAR API error ${response.status}: ${errorText}`);
+        // Submit incomplete → Draft endpoint (current)
+        if (incompleteResults.length > 0) {
+          showLoading(`Saving ${incompleteResults.length} incomplete record${incompleteResults.length !== 1 ? 's' : ''} as Draft...`);
+          const draftResponse = await fetch(STAR_API_URL, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ results: incompleteResults.map((r) => ({ ...formatResultForSTAR(r), status: 4 })) }),
+          });
+          if (!draftResponse.ok) {
+            const errorText = await draftResponse.text();
+            throw new Error(`STAR Draft API error ${draftResponse.status}: ${errorText}`);
+          }
+          const draftData = (await draftResponse.json()) as StarApiResponse;
+          allCreated.push(...(draftData.data?.results_created ?? []));
+          allErrors.push(...(draftData.data?.results_errors ?? []));
         }
 
-        const starResponse = (await response.json()) as StarApiResponse;
+        // Submit complete → Submit+Approve endpoint (falls back to Draft until endpoint is ready)
+        if (completeResults.length > 0) {
+          showLoading(`Submitting ${completeResults.length} complete record${completeResults.length !== 1 ? 's' : ''} for approval...`);
+          const approveEndpoint = STAR_SUBMIT_APPROVE_API_URL ?? STAR_API_URL;
+          const approveResponse = await fetch(approveEndpoint, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ results: completeResults.map((r) => ({ ...formatResultForSTAR(r), status: 6 })) }),
+          });
+          if (!approveResponse.ok) {
+            const errorText = await approveResponse.text();
+            throw new Error(`STAR Submit/Approve API error ${approveResponse.status}: ${errorText}`);
+          }
+          const approveData = (await approveResponse.json()) as StarApiResponse;
+          allCreated.push(...(approveData.data?.results_created ?? []));
+          allErrors.push(...(approveData.data?.results_errors ?? []));
+        }
+
+        starResponse = { data: { results_created: allCreated, results_errors: allErrors } };
         setStarSubmissionResponse(starResponse);
+        hideLoading();
 
         // Build map for O(1) lookup (js-index-maps)
         const resultsByTitle = new Map(selectedResults.map((r) => [r.title, r]));
+        const completeIdSet = new Set(completeResults.map((r) => String(r.id)));
         const newStatuses: Record<string, RecordStatus> = {};
 
         // Process successes and failures in parallel-safe sequential loops
@@ -209,8 +251,15 @@ export function useBulkUploadApi(): BulkUploadApiState & BulkUploadApiActions {
             if (orig?.id) {
               const rid = String(orig.id);
               const starLink = `https://allianceindicatorstest.ciat.cgiar.org/result/STAR-${created.result_official_code}`;
-              newStatuses[rid] = { status: 'complete', link: starLink };
-              saves.push(saveRecordStatus(currentFileName, rid, 'complete', starLink).catch(console.error));
+              const submissionType = completeIdSet.has(rid) ? 'approved' : 'draft';
+              newStatuses[rid] = { status: 'complete', link: starLink, submissionType };
+              saves.push(
+                saveRecordStatus(
+                  currentFileName, rid, 'complete', starLink,
+                  orig.title, orig.contract_code ?? undefined, submissionType,
+                  orig.year != null ? String(orig.year) : undefined,
+                ).catch(console.error),
+              );
             }
           }
         }
@@ -221,7 +270,13 @@ export function useBulkUploadApi(): BulkUploadApiState & BulkUploadApiActions {
             if (orig?.id) {
               const rid = String(orig.id);
               newStatuses[rid] = { status: 'failed', link: null, errorMessage: err.message_error };
-              saves.push(saveRecordStatus(currentFileName, rid, 'failed', null).catch(console.error));
+              saves.push(
+                saveRecordStatus(
+                  currentFileName, rid, 'failed', null,
+                  orig.title, orig.contract_code ?? undefined, undefined,
+                  orig.year != null ? String(orig.year) : undefined,
+                ).catch(console.error),
+              );
             }
           }
         }
@@ -229,8 +284,7 @@ export function useBulkUploadApi(): BulkUploadApiState & BulkUploadApiActions {
         // Fire-and-forget DynamoDB saves (server-after-nonblocking pattern)
         Promise.all(saves).catch(console.error);
 
-        onStatusUpdate(newStatuses);
-        onRerender();
+        onComplete(new Set(completeResults.map((r) => String(r.id))), newStatuses);
       } catch (error) {
         hideLoading();
         showError(`Error submitting to STAR: ${(error as Error).message}`);
@@ -269,7 +323,10 @@ export function useBulkUploadApi(): BulkUploadApiState & BulkUploadApiActions {
   const downloadTemplate = useCallback(
     async (language: 'es' | 'en') => {
       const label = language === 'es' ? 'Spanish' : 'English';
-      const filename = language === 'es' ? 'capdev_guide_spanish.zip' : 'capdev_guide_english.zip';
+      const today = new Date();
+      const dateSuffix = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+      const langLabel = language === 'es' ? 'spanish' : 'english';
+      const filename = `capdev_guide_${langLabel}_${dateSuffix}.zip`;
       try {
         showLoading(`Downloading guide in ${label}...`);
         const response = await fetch(`${API_BASE_URL}/s3/download-template?language=${language}`);
