@@ -1,5 +1,6 @@
 import os
 import json
+import unicodedata
 import requests
 from typing import List, Dict, Optional
 from requests.auth import HTTPBasicAuth
@@ -10,6 +11,12 @@ from app.utils.config.config_util import STAR, CLARISA, LLM_API_URL
 from app.utils.prompts.prompt_institutions import prompt_institutions
 
 logger = get_logger()
+
+
+def _normalize(text: str) -> str:
+    """Return a version of text with accent marks stripped (NFD decomposition + remove combining chars)."""
+    return unicodedata.normalize("NFD", text).encode("ascii", "ignore").decode("ascii")
+
 
 OPENSEARCH_URL = STAR["opensearch_url"]
 OPENSEARCH_USERNAME = STAR["opensearch_username"]
@@ -159,29 +166,49 @@ def map_entries_to_ids(entries: List[MappingEntry], environment: str = "prod") -
                 search_fields = ["acronym^2", "name"]
 
             url = f"{opensearch_url}/{index}/_search"
-            
+
+            normalized_value = _normalize(entry.value)
+            # Use a set to avoid duplicate clauses when the value has no accents
+            query_values = list(dict.fromkeys([entry.value, normalized_value]))
+
+            should_clauses = []
+            for qv in query_values:
+                should_clauses.append({
+                    "multi_match": {
+                        "query": qv,
+                        "fields": search_fields,
+                        "type": "best_fields",   # Boost docs where terms appear in same field
+                        "boost": 2.0
+                    }
+                })
+                should_clauses.append({
+                    "multi_match": {
+                        "query": qv,
+                        "fields": search_fields,
+                        "type": "cross_fields",  # Boost docs where terms appear across fields
+                        "boost": 1.0
+                    }
+                })
+
+            # Fuzzy clauses catch residual 1-char differences (e.g. tilde present only in index)
+            for field in search_fields:
+                clean_field = field.split("^")[0]  # strip boost notation
+                should_clauses.append({
+                    "fuzzy": {
+                        clean_field: {
+                            "value": normalized_value,
+                            "fuzziness": 1,
+                            "boost": 0.5
+                        }
+                    }
+                })
+
             query_body = {
                 "size": 3,
                 "query": {
                     "bool": {
-                        "should": [
-                            {
-                                "multi_match": {
-                                    "query": entry.value,
-                                    "fields": search_fields,
-                                    "type": "best_fields",  # Boost docs where terms appear in same field
-                                    "boost": 2.0
-                                }
-                            },
-                            {
-                                "multi_match": {
-                                    "query": entry.value,
-                                    "fields": search_fields,
-                                    "type": "cross_fields",  # Boost docs where terms appear across fields
-                                    "boost": 1.0
-                                }
-                            }
-                        ]
+                        "should": should_clauses,
+                        "minimum_should_match": 1
                     }
                 }
             }
