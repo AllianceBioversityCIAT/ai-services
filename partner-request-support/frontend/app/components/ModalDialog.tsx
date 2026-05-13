@@ -308,7 +308,14 @@ export const Modal = ({
                         color: 'var(--color-text-secondary)',
                         fontFamily: 'var(--font-primary)',
                       }}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm, remarkBreaks]}
+                          components={{
+                            a: ({ href, children }) => (
+                              <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
+                            ),
+                          }}
+                        >
                           {partner.web_search.result || ''}
                         </ReactMarkdown>
                       </div>
