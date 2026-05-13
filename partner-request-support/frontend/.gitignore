@@ -16,6 +16,8 @@
 # next.js
 /.next/
 /out/
+.open-next/
+.sst/
 
 # production
 /build
@@ -46,3 +48,5 @@ next-env.d.ts
 .agent/
 .agents/
 *.backup
+AGENTS.md
+CLAUDE.md
