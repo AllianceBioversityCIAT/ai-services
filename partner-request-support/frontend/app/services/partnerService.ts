@@ -102,4 +102,9 @@ export const partnerService = {
 
     return response.data;
   },
+
+  async clearCache(): Promise<{ success: boolean; cleared: number; message: string }> {
+    const response = await axios.post(`${getApiUrl()}/api/clear-cache`);
+    return response.data;
+  },
 };

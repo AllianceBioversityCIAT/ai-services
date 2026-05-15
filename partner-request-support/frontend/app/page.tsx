@@ -78,6 +78,10 @@ export default function Home() {
     clearFile();
   };
 
+  const handleClearCache = async () => {
+    await partnerService.clearCache();
+  };
+
   // Modal handlers
   const handleViewClarisa = (partner: Partner) => {
     openModal('clarisa', partner);
@@ -247,6 +251,7 @@ export default function Home() {
             syncError={syncError}
             onSyncPartnerRequests={syncPartnerRequests}
             onProcessApiPartners={handleProcessApiPartners}
+            onClearCache={handleClearCache}
           />
         )}
 
