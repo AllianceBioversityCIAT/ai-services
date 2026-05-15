@@ -9,6 +9,7 @@ import {
   FileSpreadsheet,
   Info,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { partnerService } from '../services';
 import { ApiPartnerRequest } from '../types';
@@ -26,6 +27,7 @@ interface UploadSectionProps {
   syncError: string | null;
   onSyncPartnerRequests: () => void;
   onProcessApiPartners: () => void;
+  onClearCache: () => Promise<void>;
 }
 
 export const UploadSection = ({
@@ -40,9 +42,27 @@ export const UploadSection = ({
   syncError,
   onSyncPartnerRequests,
   onProcessApiPartners,
+  onClearCache,
 }: UploadSectionProps) => {
   const [uploadMode, setUploadMode] = useState<'excel' | 'api'>('excel');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearingCache, setClearingCache] = useState(false);
+  const [clearCacheMessage, setClearCacheMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleClearCacheConfirm = async () => {
+    setClearingCache(true);
+    try {
+      await onClearCache();
+      setClearCacheMessage({ type: 'success', text: 'Cache cleared. Next upload will reprocess all partners from scratch.' });
+    } catch {
+      setClearCacheMessage({ type: 'error', text: 'Failed to clear cache. Please try again.' });
+    } finally {
+      setClearingCache(false);
+      setShowClearConfirm(false);
+      setTimeout(() => setClearCacheMessage(null), 5000);
+    }
+  };
 
   const handleDownloadTemplate = async () => {
     try {
@@ -596,6 +616,151 @@ export const UploadSection = ({
           onClose={() => setPreviewOpen(false)}
           onContinue={onUpload}
         />
+
+        {/* Clear Cache Button */}
+        <div style={{ marginTop: 'var(--space-md)', textAlign: 'center' }}>
+          <button
+            onClick={() => setShowClearConfirm(true)}
+            disabled={processing || clearingCache}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-text-muted)',
+              fontSize: '0.75rem',
+              cursor: processing || clearingCache ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px 8px',
+              borderRadius: 'var(--radius-sm)',
+              transition: 'color 0.2s',
+              textDecoration: 'underline',
+              textDecorationStyle: 'dotted',
+            }}
+            onMouseOver={(e) => { if (!processing && !clearingCache) e.currentTarget.style.color = 'var(--color-error)'; }}
+            onMouseOut={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+          >
+            <Trash2 size={12} />
+            Clear result cache
+          </button>
+        </div>
+
+        {/* Clear Cache Feedback */}
+        {clearCacheMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              marginTop: 'var(--space-sm)',
+              padding: 'var(--space-sm) var(--space-md)',
+              background: clearCacheMessage.type === 'success' ? '#F0F9E8' : '#FEF2F2',
+              border: `1px solid ${clearCacheMessage.type === 'success' ? 'var(--cgiar-green)' : '#FCA5A5'}`,
+              borderRadius: 'var(--radius-md)',
+              color: clearCacheMessage.type === 'success' ? 'var(--cgiar-green)' : '#991B1B',
+              fontSize: '0.8125rem',
+              textAlign: 'center',
+            }}
+          >
+            {clearCacheMessage.text}
+          </motion.div>
+        )}
+
+        {/* Clear Cache Confirm Modal */}
+        {showClearConfirm && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.45)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+            }}
+            onClick={() => !clearingCache && setShowClearConfirm(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              style={{
+                background: 'white',
+                borderRadius: 'var(--radius-xl)',
+                padding: 'var(--space-lg)',
+                maxWidth: '420px',
+                width: '90%',
+                boxShadow: 'var(--shadow-xl)',
+                textAlign: 'center',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  background: '#FEF2F2',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto var(--space-md)',
+                }}
+              >
+                <Trash2 size={22} style={{ color: 'var(--color-error)' }} />
+              </div>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--cgiar-navy)', marginBottom: 'var(--space-xs)' }}>
+                Clear Result Cache?
+              </h3>
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', lineHeight: 1.5, marginBottom: 'var(--space-md)' }}>
+                All cached matching results will be deleted. The next time you upload an Excel file,
+                every partner will be reprocessed from scratch. This cannot be undone.
+              </p>
+              <div style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'center' }}>
+                <button
+                  onClick={() => setShowClearConfirm(false)}
+                  disabled={clearingCache}
+                  style={{
+                    padding: 'var(--space-sm) var(--space-md)',
+                    background: 'var(--cgiar-light-gray)',
+                    color: 'var(--cgiar-navy)',
+                    border: '1px solid var(--cgiar-gray)',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    cursor: clearingCache ? 'not-allowed' : 'pointer',
+                    minWidth: '100px',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleClearCacheConfirm}
+                  disabled={clearingCache}
+                  style={{
+                    padding: 'var(--space-sm) var(--space-md)',
+                    background: clearingCache ? 'var(--cgiar-gray)' : 'var(--color-error)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    cursor: clearingCache ? 'not-allowed' : 'pointer',
+                    minWidth: '100px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  {clearingCache ? (
+                    <><div className="spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }} /> Clearing...</>
+                  ) : (
+                    <><Trash2 size={14} /> Clear Cache</>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
 
         {error && (
           <motion.div

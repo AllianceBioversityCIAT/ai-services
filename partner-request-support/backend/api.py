@@ -13,14 +13,14 @@ from dotenv import load_dotenv
 from config.config_util import BR
 from typing import List, Dict, Optional
 from logger.logger_util import get_logger
-from fastapi.responses import JSONResponse
 from botocore.exceptions import ClientError
 from fastapi.middleware.cors import CORSMiddleware
 from src.web_search import search_institution_online
+from fastapi.responses import JSONResponse, StreamingResponse
 from src.populate_clarisa_db import sync_clarisa_institutions
 from src.mapping_clarisa_comparison import process_partners_to_json
 from fastapi import FastAPI, File, UploadFile, HTTPException, Body, Form
-from src.supabase_client import get_cached_results_by_name, cache_results_batch, count_institutions, check_supabase_connection
+from src.supabase_client import get_cached_results_by_name, cache_results_batch, count_institutions, check_supabase_connection, clear_all_cache
 
 
 logger = get_logger()
@@ -180,6 +180,40 @@ async def health():
     - **200**: Service is healthy and operational
     """
     return {"status": "healthy"}
+
+
+@app.post("/api/clear-cache", tags=["Partner Processing"])
+async def clear_cache():
+    """
+    # Clear Partner Request Cache
+    
+    Deletes all cached partner matching results from the database.
+    Use this when an Excel file was uploaded with incorrect column order,
+    or when you need to force reprocessing of all partners with fresh data.
+    
+    ## Response
+    ```json
+    {
+        "success": true,
+        "cleared": 12,
+        "message": "Cache cleared successfully. 12 entries removed."
+    }
+    ```
+    
+    ## HTTP Status Codes
+    - **200**: Cache cleared successfully
+    - **500**: Internal server error
+    """
+    try:
+        cleared = clear_all_cache()
+        return {
+            "success": True,
+            "cleared": cleared,
+            "message": f"Cache cleared successfully. {cleared} entries removed."
+        }
+    except Exception as e:
+        logger.error(f"❌ Error clearing cache via API: {e}")
+        raise HTTPException(status_code=500, detail=f"Error clearing cache: {str(e)}")
 
 
 @app.post("/api/process-partners", tags=["Partner Processing"])
