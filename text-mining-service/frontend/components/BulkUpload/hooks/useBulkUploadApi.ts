@@ -25,7 +25,7 @@ export interface BulkUploadApiActions {
     mode: 'upload' | 's3',
     file: File | null,
     s3Key: string | null,
-    onSuccess: (results: BulkUploadResult[], recordStatuses: Record<string, RecordStatus>, fileName: string) => void,
+    onSuccess: (results: BulkUploadResult[], recordStatuses: Record<string, RecordStatus>, fileName: string, interactionId: string | null) => void,
   ) => Promise<void>;
   submitToSTAR: (
     selectedResults: BulkUploadResult[],
@@ -66,7 +66,7 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
       mode: 'upload' | 's3',
       file: File | null,
       s3Key: string | null,
-      onSuccess: (results: BulkUploadResult[], statuses: Record<string, RecordStatus>, fileName: string) => void,
+      onSuccess: (results: BulkUploadResult[], statuses: Record<string, RecordStatus>, fileName: string, interactionId: string | null) => void,
     ) => {
       const token = authToken;
       if (!token) {
@@ -134,6 +134,22 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
           return;
         }
 
+        // interaction_id may be at top level of the HTTP response, or embedded
+        // inside the MCP content text alongside `results`.
+        let interactionId: string | null = typeof result.interaction_id === 'string' ? result.interaction_id : null;
+        if (!interactionId && Array.isArray(result.content)) {
+          for (const item of result.content as Array<{ text?: string }>) {
+            if (item.text) {
+              try {
+                const parsed = JSON.parse(item.text) as Record<string, unknown>;
+                if (typeof parsed.interaction_id === 'string') {
+                  interactionId = parsed.interaction_id;
+                  break;
+                }
+              } catch { /* ignore */ }
+            }
+          }
+        }
         const payload = extractInnerResults(result);
         const aiResults = payload.results.map((r) => ({
           ...r,
@@ -172,7 +188,7 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
           if (r.id && !statuses[rid]) statuses[rid] = { status: 'pending', link: null };
         });
 
-        onSuccess(results, statuses, fileName);
+        onSuccess(results, statuses, fileName, interactionId);
       } catch (error) {
         hideLoading();
         showError(`Could not reach the API: ${(error as Error).message}`);

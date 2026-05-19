@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { SummaryRecord } from '../types';
 import { downloadSummaryExcel } from '../utils/excelUtils';
 import { usePagination } from '../hooks/usePagination';
+import { API_BASE_URL } from '../constants';
 
 // ── Hoisted SVGs ─────────────────────────────────────────────────
 const CheckCircleSvg = (
@@ -51,6 +52,140 @@ const FinishSvg = (
     <polyline points="20 6 9 17 4 12" />
   </svg>
 );
+
+// ── Feedback Modal ──────────────────────────────────────────────
+
+const ThumbUpSvg = (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
+    <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+  </svg>
+);
+
+const ThumbDownSvg = (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/>
+    <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
+  </svg>
+);
+
+interface FeedbackModalProps {
+  fileName: string;
+  userId?: string | null;
+  interactionId?: string | null;
+  onFinish: () => void;
+}
+
+function FeedbackModal({ fileName, userId, interactionId, onFinish }: FeedbackModalProps) {
+  const [vote, setVote] = useState<'up' | 'down' | null>(null);
+  const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isNegative = vote === 'down';
+  const canSubmit = vote !== null && (!isNegative || comment.trim().length > 0);
+
+  const handleVote = (v: 'up' | 'down') => {
+    setVote((prev) => (prev === v ? null : v));
+    setComment('');
+    setError(null);
+  };
+
+  const handleSubmitAndFinish = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await fetch(`${API_BASE_URL}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          feedback_type: vote === 'up' ? 'positive' : 'negative',
+          feedback_comment: comment.trim() || null,
+          file_name: fileName,
+          user_id: userId ?? null,
+          interaction_id: interactionId ?? null,
+        }),
+      });
+    } catch {
+      // Don't block the user from finishing if the request fails
+    } finally {
+      setSubmitting(false);
+      onFinish();
+    }
+  };
+
+  return (
+    <div className="bulk-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="feedback-modal-title">
+      <div className="bulk-feedback-modal">
+        <div className="bulk-feedback-modal-header">
+          <p className="bulk-feedback-title" id="feedback-modal-title">How was your experience?</p>
+          <p className="bulk-feedback-sub">Take a second to rate this bulk upload. Your feedback is optional.</p>
+        </div>
+
+        <div className="bulk-feedback-votes">
+          <button
+            type="button"
+            className={`bulk-feedback-thumb bulk-feedback-thumb--up${vote === 'up' ? ' active' : ''}${vote === 'down' ? ' dimmed' : ''}`}
+            onClick={() => handleVote('up')}
+            aria-pressed={vote === 'up'}
+            aria-label="Positive feedback"
+          >
+            {ThumbUpSvg}
+            <span>Great!</span>
+          </button>
+
+          <button
+            type="button"
+            className={`bulk-feedback-thumb bulk-feedback-thumb--down${vote === 'down' ? ' active' : ''}${vote === 'up' ? ' dimmed' : ''}`}
+            onClick={() => handleVote('down')}
+            aria-pressed={vote === 'down'}
+            aria-label="Negative feedback"
+          >
+            {ThumbDownSvg}
+            <span>Needs work</span>
+          </button>
+        </div>
+
+        {vote !== null && (
+          <div className="bulk-feedback-comment-wrap">
+            <label className="bulk-feedback-comment-label" htmlFor="bulk-feedback-modal-comment">
+              {isNegative ? (
+                <>What could be improved? <span className="bulk-feedback-required">*</span></>
+              ) : (
+                'What went well? (optional)'
+              )}
+            </label>
+            <textarea
+              id="bulk-feedback-modal-comment"
+              className="bulk-feedback-textarea"
+              rows={3}
+              placeholder={isNegative ? 'Please describe what could be better…' : 'Tell us what you liked…'}
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+            />
+          </div>
+        )}
+
+        {error && <p className="bulk-feedback-error">{error}</p>}
+
+        <div className="bulk-feedback-modal-actions">
+          <button type="button" className="bulk-confirm-btn-cancel" onClick={onFinish}>
+            Skip
+          </button>
+          <button
+            type="button"
+            className="bulk-confirm-btn-submit"
+            disabled={!canSubmit || submitting}
+            onClick={handleSubmitAndFinish}
+          >
+            {submitting ? 'Sending…' : 'Submit & Finish'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Sub-components ────────────────────────────────────────────────
 
@@ -194,12 +329,15 @@ interface Step4SummaryProps {
   draft: SummaryRecord[];
   failed: SummaryRecord[];
   fileName: string;
+  userId?: string | null;
+  interactionId?: string | null;
   onBackToUnmapped: () => void;
   onFinishProcess: () => void;
 }
 
-export function Step4Summary({ approved, draft, failed, fileName, onBackToUnmapped, onFinishProcess }: Step4SummaryProps) {
+export function Step4Summary({ approved, draft, failed, fileName, userId, interactionId, onBackToUnmapped, onFinishProcess }: Step4SummaryProps) {
   const total = approved.length + draft.length + failed.length;
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const handleDownload = () => {
     downloadSummaryExcel(approved, draft, failed, fileName);
@@ -274,7 +412,7 @@ export function Step4Summary({ approved, draft, failed, fileName, onBackToUnmapp
               {DownloadSvg}
               Download summary (.xlsx)
             </button>
-            <button className="bulk-next-step-btn" type="button" onClick={onFinishProcess}>
+            <button className="bulk-next-step-btn" type="button" onClick={() => setShowFeedback(true)}>
               {FinishSvg}
               Finish Process
             </button>
@@ -282,6 +420,16 @@ export function Step4Summary({ approved, draft, failed, fileName, onBackToUnmapp
         </div>
 
       </div>
+
+      {/* ── Feedback Modal ── */}
+      {showFeedback && (
+        <FeedbackModal
+          fileName={fileName}
+          userId={userId}
+          interactionId={interactionId}
+          onFinish={onFinishProcess}
+        />
+      )}
     </div>
   );
 }

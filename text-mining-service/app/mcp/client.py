@@ -2,6 +2,7 @@ import os
 import json
 import base64
 import boto3
+import requests
 import uvicorn
 from io import BytesIO
 from typing import Optional, Union
@@ -76,6 +77,14 @@ class BulkUploadRecord(BaseModel):
     failed: list[str] = Field(default_factory=list, description="List of failed record IDs")
     links: dict[str, str] = Field(default_factory=dict, description="Dictionary of {recordId: starLink}")
     lastUpdated: str = Field(..., description="Timestamp of last update")
+
+
+class FeedbackRequest(BaseModel):
+    feedback_type: str = Field(..., description="Feedback type: 'positive' or 'negative'")
+    feedback_comment: Optional[str] = Field(None, description="Optional comment (required when feedback_type is 'negative')")
+    file_name: Optional[str] = Field(None, description="Name of the processed file")
+    user_id: Optional[str] = Field(None, description="User identifier")
+    interaction_id: Optional[str] = Field(None, description="ID of the original processing interaction to link feedback to")
 
 
 app = FastAPI(
@@ -961,7 +970,46 @@ async def process_document_aiccra_endpoint(
     except Exception as e:
         logger.error(f"Error processing document: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
+@app.post("/feedback",
+          summary="Submit user feedback for bulk upload experience",
+          tags=["Feedback"])
+async def submit_feedback(req: FeedbackRequest):
+    """Receive thumbs-up / thumbs-down feedback from the bulk upload UI and update
+    the original processing interaction via the interaction tracking service."""
+    logger.info(f"📝 Feedback received: feedback_type={req.feedback_type}, user={req.user_id}, file={req.file_name}, interaction_id={req.interaction_id}")
+    if req.feedback_comment:
+        logger.info(f"💬 Feedback comment: {req.feedback_comment}")
+
+    try:
+        from app.utils.interactions.interaction_client import INTERACTION_SERVICE_URL
+        payload = {
+            "user_id": req.user_id or "anonymous",
+            "service_name": "bulk-text-mining",
+            "update_mode": True,
+            "interaction_id": req.interaction_id,
+            "feedback_type": req.feedback_type,
+            "feedback_comment": req.feedback_comment,
+        }
+        
+        payload = {k: v for k, v in payload.items() if v is not None}
+        logger.info(f"📦 Sending feedback payload to interaction service: {payload}")
+        response = requests.post(
+            f"{INTERACTION_SERVICE_URL.rstrip('/')}/api/interactions",
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=10,
+        )
+        if response.status_code == 200:
+            logger.info(f"✅ Feedback tracked successfully: {response.json()}")
+        else:
+            logger.error(f"❌ Interaction service returned {response.status_code}: {response.text}")
+    except Exception as e:
+        logger.error(f"Failed to send feedback to interaction service: {e}")
+
+    return {"status": "ok"}
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,4 +1,5 @@
 import sys
+import json
 import boto3
 import logging
 from typing import Any
@@ -184,7 +185,12 @@ async def process_document_capdev(bucket: str, key: str, token: Any, environment
             priority="Low"
         )
 
-        return result["json_content"]
+        if "interaction_id" in result:
+            parsed = json.loads(result["json_content"])
+            parsed["interaction_id"] = result["interaction_id"]
+            return parsed
+        else:
+            return result["json_content"]
 
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
