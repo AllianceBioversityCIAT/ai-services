@@ -1,12 +1,12 @@
 """REST API endpoints for AICCRA Report Generator Service."""
 
-from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import StreamingResponse
+import json
 import time
 from typing import Iterator
-
-from app.api.models import ChatRequest, ChatResponse, ErrorResponse
+from fastapi.responses import StreamingResponse
 from app.utils.logger.logger_util import get_logger
+from fastapi import APIRouter, HTTPException, status
+from app.api.models import ChatRequest, ChatResponse, ErrorResponse
 
 logger = get_logger()
 
@@ -607,10 +607,10 @@ async def generate_annual_tables(request: ChatRequest):
         logger.info("🔍 Executing annual tables generation...")
         tables = generate_tables_func(request.year)
         
-        # Convert DataFrames to dictionaries for JSON response
+        # Convert DataFrames to JSON-safe records (handles NaN and numpy types)
         tables_dict = {}
         for group_name, df_table in tables.items():
-            tables_dict[group_name] = df_table.to_dict(orient="records")
+            tables_dict[group_name] = json.loads(df_table.to_json(orient="records", force_ascii=False))
         
         # Calculate processing time
         processing_time = round(time.time() - start_time, 2)

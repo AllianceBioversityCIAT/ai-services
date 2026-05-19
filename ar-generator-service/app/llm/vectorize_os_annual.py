@@ -466,8 +466,8 @@ def generate_indicator_tables(year):
             
             table_rows.append({
                 "Indicator statement": indicator_title,
-                "End-year target 2025": end_year_target,
-                "Achieved in 2025": achieved,
+                f"End-year target {year}": end_year_target,
+                f"Achieved in {year}": achieved,
                 "Brief overviews": brief_overview
             })
         tables[group_name] = pd.DataFrame(table_rows)
