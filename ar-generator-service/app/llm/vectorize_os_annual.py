@@ -488,7 +488,7 @@ def run_pipeline(indicator, year, insert_data=False):
         clusters = sorted(grouped_context.keys())
 
         indicator_title = _get_indicator_title(context, indicator)
-        SUMMARY_PROMPT = generate_summary_prompt(indicator, year, total_expected, total_achieved, progress)
+        SUMMARY_PROMPT = generate_summary_prompt(indicator, indicator_title, year, total_expected, total_achieved, progress)
 
         logger.info(f"🚀 Starting parallel generation for {len(clusters)} clusters...")
 
