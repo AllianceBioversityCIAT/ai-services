@@ -80,6 +80,7 @@ export default function BulkUploadModule() {
   const [editedData, setEditedData] = useState<BulkUploadResult[]>([]);
   const [currentFileName, setCurrentFileName] = useState<string | null>(null);
   const [currentInteractionId, setCurrentInteractionId] = useState<string | null>(null);
+  const [editedIds, setEditedIds] = useState<Set<string>>(new Set());
   const [recordStatuses, setRecordStatuses] = useState<Record<string, RecordStatus>>({});
   const [unmappedInstitutions, setUnmappedInstitutions] = useState<UnmappedInstitution[]>([]);
   const [submissionSummary, setSubmissionSummary] = useState<{
@@ -127,6 +128,7 @@ export default function BulkUploadModule() {
     setSelectedIndices(new Set());
     setSubmissionSummary(null);
     setCurrentInteractionId(null);
+    setEditedIds(new Set());
     filters.clearAllFilters();
   }, [filters]);
 
@@ -144,6 +146,7 @@ export default function BulkUploadModule() {
       setRecordStatuses(statuses);
       setCurrentFileName(fileName);
       setCurrentInteractionId(interactionId);
+      setEditedIds(new Set());
       filters.clearAllFilters();
       setSelectedIndices(new Set());
       setStep('results');
@@ -189,6 +192,7 @@ export default function BulkUploadModule() {
   }, [unmappedInstitutions]);
 
   const handleCellEdit = useCallback((globalIdx: number, field: string, value: unknown) => {
+    const recordId = editedData[globalIdx]?.id;
     setEditedData((prev) => {
       const next = [...prev];
       const updated = { ...next[globalIdx] } as BulkUploadResult;
@@ -196,7 +200,14 @@ export default function BulkUploadModule() {
       next[globalIdx] = updated;
       return next;
     });
-  }, []);
+    if (recordId != null) {
+      setEditedIds((prev) => {
+        const next = new Set(prev);
+        next.add(String(recordId));
+        return next;
+      });
+    }
+  }, [editedData]);
 
   const handleStatusUpdate = useCallback((newStatuses: Record<string, RecordStatus>) => {
     setRecordStatuses((prev) => ({ ...prev, ...newStatuses }));
@@ -237,8 +248,8 @@ export default function BulkUploadModule() {
       setSubmissionSummary({ approved, draft, failed });
       setSelectedIndices(new Set());
       setEditedData((prev) => [...prev]);
-    });
-  }, [api, currentFileName, selectedIndices, editedData, recordStatuses]);
+    }, currentInteractionId, editedIds);
+  }, [api, currentFileName, selectedIndices, editedData, recordStatuses, currentInteractionId, editedIds]);
 
   const handleClearSelections = useCallback(() => {
     setSelectedIndices(new Set());

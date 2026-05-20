@@ -32,6 +32,8 @@ export interface BulkUploadApiActions {
     currentFileName: string,
     authToken: string,
     onComplete: (completeIds: Set<string>, newStatuses: Record<string, RecordStatus>) => void,
+    interactionId?: string | null,
+    editedIds?: Set<string>,
   ) => Promise<void>;
   loadS3Objects: (searchTerm?: string) => Promise<void>;
   downloadTemplate: (language: 'es' | 'en') => Promise<void>;
@@ -204,11 +206,32 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
       currentFileName: string,
       token: string,
       onComplete: (completeIds: Set<string>, newStatuses: Record<string, RecordStatus>) => void,
+      interactionId?: string | null,
+      editedIds?: Set<string>,
     ) => {
       try {
-        // Split records by completeness
-        const completeResults = selectedResults.filter((r) => checkCompleteness(r).isComplete);
-        const incompleteResults = selectedResults.filter((r) => !checkCompleteness(r).isComplete);
+        // Compute completeness once per result to avoid double-checking
+        const completenessMap = new Map(
+          selectedResults.map((r) => [String(r.id), checkCompleteness(r)]),
+        );
+        const completeResults = selectedResults.filter((r) => completenessMap.get(String(r.id))!.isComplete);
+        const incompleteResults = selectedResults.filter((r) => !completenessMap.get(String(r.id))!.isComplete);
+
+        // Process-level metadata — sent alongside every STAR request
+        const processMeta = {
+          file_name: currentFileName,
+          ai_interaction_id: interactionId ?? null,
+        };
+
+        // Helper: attach result-level metadata to each formatted result
+        const withMeta = (r: BulkUploadResult, status: number) => ({
+          ...formatResultForSTAR(r),
+          status,
+          metadata: {
+            missing_fields: completenessMap.get(String(r.id))?.missing_fields ?? [],
+            manually_edited: editedIds?.has(String(r.id)) ?? false,
+          },
+        });
 
         const allCreated: StarCreatedResult[] = [];
         const allErrors: StarErrorResult[] = [];
@@ -217,10 +240,12 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
         // Submit incomplete → Draft endpoint (current)
         if (incompleteResults.length > 0) {
           showLoading(`Saving ${incompleteResults.length} incomplete record${incompleteResults.length !== 1 ? 's' : ''} as Draft...`);
+          const draftPayload = { results: incompleteResults.map((r) => withMeta(r, 4)), metadata: processMeta };
+          console.log('[BulkUpload] STAR Draft payload:', JSON.parse(JSON.stringify(draftPayload)));
           const draftResponse = await fetch(STAR_API_URL, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ results: incompleteResults.map((r) => ({ ...formatResultForSTAR(r), status: 4 })) }),
+            body: JSON.stringify(draftPayload),
           });
           if (!draftResponse.ok) {
             const errorText = await draftResponse.text();
@@ -235,10 +260,12 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
         if (completeResults.length > 0) {
           showLoading(`Submitting ${completeResults.length} complete record${completeResults.length !== 1 ? 's' : ''} for approval...`);
           const approveEndpoint = STAR_SUBMIT_APPROVE_API_URL ?? STAR_API_URL;
+          const approvePayload = { results: completeResults.map((r) => withMeta(r, 6)), metadata: processMeta };
+          console.log('[BulkUpload] STAR Approve payload:', JSON.parse(JSON.stringify(approvePayload)));
           const approveResponse = await fetch(approveEndpoint, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ results: completeResults.map((r) => ({ ...formatResultForSTAR(r), status: 6 })) }),
+            body: JSON.stringify(approvePayload),
           });
           if (!approveResponse.ok) {
             const errorText = await approveResponse.text();
