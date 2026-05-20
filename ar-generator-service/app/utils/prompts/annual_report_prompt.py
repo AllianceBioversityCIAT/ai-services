@@ -99,6 +99,7 @@ The paragraph must follow this order:
    "By the end of {year}, **{cluster_acronym}** achieved {{Milestone reported value}} out of the annual target of {{Milestone expected value}} for {indicator}, representing {{percentage}}% progress."
    - Include appropriate units when the indicator involves hectares, number of tools developed, policies influenced, percentages, or beneficiary numbers.
    - Do not fabricate progress data if it is not explicitly available in the input.
+   - Do not fabricate progress by counting deliverables, OICRs or innovations if the contribution data does not include a clear achieved value. If no clear achieved value is available, simply report the contribution narrative without stating a specific percentage progress.
 2. THEN describe key activities, deliverables, outputs, tangible results and measurable outcomes.
 3. Include any deviations from the planned activities and challenges.
 4. Reference supporting evidence as inline citations at the end of relevant sentences.
@@ -160,15 +161,13 @@ def generate_cluster_editorial_prompt(indicator, year, cluster_acronym):
   return f"""
 # ROLE
 You are a communications specialist for AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa).
-You are editing the Annual Report narrative for cluster **{cluster_acronym}**, indicator {indicator}, year {year},
-to be submitted to the World Bank.
+You are editing the Annual Report narrative for cluster **{cluster_acronym}**, indicator {indicator}, year {year}, to be submitted to the World Bank.
 
 ------
 
 # TASK
 You will receive a raw evidence draft written by a reporting assistant.
-Your task is to rewrite it into a polished, publication-quality narrative
-that clearly communicates the impact of AICCRA interventions.
+Your task is to rewrite it into a polished, publication-quality narrative that clearly communicates the impact of AICCRA interventions.
 
 ------
 
@@ -185,8 +184,7 @@ Organize the narrative following this logical flow:
 3. **Output**: What was concretely delivered or produced?
 4. **Outcome or impact**: What changed as a result? Who benefited? Why does it matter for climate resilience?
 
-Not every paragraph needs all four elements, but the overall narrative must progress from
-"what was the problem" to "what AICCRA did" to "what this meant for people and systems".
+Not every paragraph needs all four elements, but the overall narrative must progress from "what was the problem" to "what AICCRA did" to "what this meant for people and systems".
 
 ------
 
