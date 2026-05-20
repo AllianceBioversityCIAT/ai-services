@@ -16,7 +16,7 @@ from app.utils.logger.logger_util import get_logger
 from botocore.exceptions import BotoCoreError, ClientError
 from mcp import ClientSession, StdioServerParameters, types
 from app.utils.prompt.prompt_aiccra import DEFAULT_PROMPT_AICCRA
-from app.utils.config.config_util import AWS, CLIENT_ID, CLIENT_SECRET
+from app.utils.config.config_util import AWS, CLIENT_ID, CLIENT_SECRET, IS_PROD
 from fastapi import FastAPI, HTTPException, Body, UploadFile, File, Form
 from app.utils.dynamo.create_bulk_table import create_bulk_upload_table_if_not_exists
 from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, AICCRA_BUCKET_KEY_NAME
@@ -26,6 +26,7 @@ logger = get_logger()
 
 dynamodb = boto3.resource('dynamodb', region_name=AWS.get('region', 'us-east-1'))
 BULK_UPLOAD_TABLE_NAME = 'bulk_upload_records'
+AI_REQUESTS_TABLE_NAME = 'ai-requests-prod' if IS_PROD else 'ai-requests-testing'
 
 server_params = StdioServerParameters(
     command="python",
@@ -1009,6 +1010,44 @@ async def submit_feedback(req: FeedbackRequest):
         logger.error(f"Failed to send feedback to interaction service: {e}")
 
     return {"status": "ok"}
+
+
+@app.get("/feedback/{interaction_id}",
+         summary="Query feedback by interaction ID",
+         description="""
+         Retrieve feedback data stored in DynamoDB for a specific AI processing interaction.
+
+         Intended for STAR backend services to check whether a user left feedback
+         for a given bulk upload session identified by its AI interaction ID.
+
+         Returns feedback_type ('positive' or 'negative'), optional comment, file name,
+         user identifier, and timestamp.
+         """,
+         responses={
+             200: {"description": "Feedback record found"},
+             404: {"description": "No feedback found for this interaction_id"},
+             500: {"description": "Internal server error"},
+         },
+         tags=["Feedback"])
+async def get_feedback_by_interaction(interaction_id: str):
+    """Query DynamoDB for feedback associated with a given AI interaction ID."""
+    try:
+        ai_requests_table = dynamodb.Table(AI_REQUESTS_TABLE_NAME)
+        response = ai_requests_table.get_item(Key={
+            "interaction_id": interaction_id,
+            "service_name": "bulk-text-mining",
+        })
+        if "Item" not in response:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No record found for interaction_id: {interaction_id}"
+            )
+        return {"status": "ok", "data": response["Item"]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error querying feedback for interaction_id={interaction_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error querying feedback: {str(e)}")
 
 
 if __name__ == "__main__":
