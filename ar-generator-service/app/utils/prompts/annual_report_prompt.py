@@ -92,14 +92,21 @@ The data you receive is structured and extracted from AICCRA's internal reportin
 
 ------
 
+# ⚠️ CRITICAL RULE — READ BEFORE WRITING
+If the input data does NOT contain a "contributions" entry with explicit "Milestone reported value" and "Milestone expected value" fields, you MUST NOT state any achievement count, target, or percentage progress for this cluster.
+DO NOT count deliverables, innovations, or OICRs to derive a number. DO NOT invent or estimate a milestone value.
+Simply describe the outputs and activities without stating any milestone achievement figure.
+
+------
+
 # OBJECTIVE
 Write 1 well-structured, cohesive paragraph covering cluster **{cluster_acronym}**.
 The paragraph must follow this order:
-1. START with the contribution data: state the achieved value as of end-year and compare it to the annual target. Include the percentage progress. Example of structure:
+1. START with the contribution data: state the achieved value as of end-year and compare it to the annual target ONLY IF a "contributions" entry with explicit milestone values is present in the input. Include the percentage progress. Example of structure::
    "By the end of {year}, **{cluster_acronym}** achieved {{Milestone reported value}} out of the annual target of {{Milestone expected value}} for {indicator}, representing {{percentage}}% progress."
    - Include appropriate units when the indicator involves hectares, number of tools developed, policies influenced, percentages, or beneficiary numbers.
    - Do not fabricate progress data if it is not explicitly available in the input.
-   - Do not fabricate progress by counting deliverables, OICRs or innovations if the contribution data does not include a clear achieved value. If no clear achieved value is available, simply report the contribution narrative without stating a specific percentage progress.
+   - If no contribution entry with explicit milestone values is present, skip this sentence entirely and go directly to describing deliverables and activities.
 2. THEN describe key activities, deliverables, outputs, tangible results and measurable outcomes.
 3. Include any deviations from the planned activities and challenges.
 4. Reference supporting evidence as inline citations at the end of relevant sentences.
