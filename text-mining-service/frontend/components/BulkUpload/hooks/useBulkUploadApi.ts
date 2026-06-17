@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import type { BulkUploadResult, RecordStatus, StarApiResponse, StarCreatedResult, StarErrorResult } from '../types';
-import { API_BASE_URL, ENVIRONMENT_URL, FOLDER_PATH, S3_BUCKET, STAR_API_URL, STAR_SUBMIT_APPROVE_API_URL } from '../constants';
+import type { BulkUploadResult, RecordStatus, StarApiResponse } from '../types';
+import { API_BASE_URL, ENVIRONMENT_URL, FOLDER_PATH, S3_BUCKET, STAR_API_URL } from '../constants';
 import { extractInnerResults, formatResultForSTAR } from '../utils/dataFormatters';
 import { loadRecordStatuses, saveRecordStatus } from './useDynamoDB';
 import { simplifyS3Path } from '../utils/tableHelpers';
@@ -215,7 +215,6 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
           selectedResults.map((r) => [String(r.id), checkCompleteness(r)]),
         );
         const completeResults = selectedResults.filter((r) => completenessMap.get(String(r.id))!.isComplete);
-        const incompleteResults = selectedResults.filter((r) => !completenessMap.get(String(r.id))!.isComplete);
 
         // Process-level metadata — sent alongside every STAR request
         const processMeta = {
@@ -233,50 +232,28 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
           },
         });
 
-        const allCreated: StarCreatedResult[] = [];
-        const allErrors: StarErrorResult[] = [];
-        let starResponse: StarApiResponse = { data: { results_created: [], results_errors: [] } };
+        showLoading(`Submitting ${selectedResults.length} record${selectedResults.length !== 1 ? 's' : ''} to STAR...`);
 
-        // Submit incomplete → Draft endpoint (current)
-        if (incompleteResults.length > 0) {
-          showLoading(`Saving ${incompleteResults.length} incomplete record${incompleteResults.length !== 1 ? 's' : ''} as Draft...`);
-          const draftPayload = { results: incompleteResults.map((r) => withMeta(r, 4)), metadata: processMeta };
-          console.log('[BulkUpload] STAR Draft payload:', JSON.parse(JSON.stringify(draftPayload)));
-          const draftResponse = await fetch(STAR_API_URL, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(draftPayload),
-          });
-          if (!draftResponse.ok) {
-            const errorText = await draftResponse.text();
-            throw new Error(`STAR Draft API error ${draftResponse.status}: ${errorText}`);
-          }
-          const draftData = (await draftResponse.json()) as StarApiResponse;
-          allCreated.push(...(draftData.data?.results_created ?? []));
-          allErrors.push(...(draftData.data?.results_errors ?? []));
+        // Single bulk request: status 4 (draft) or 6 (approved) per result
+        const payload = {
+          results: selectedResults.map((r) =>
+            withMeta(r, completenessMap.get(String(r.id))!.isComplete ? 6 : 4),
+          ),
+          metadata: processMeta,
+        };
+        console.log('[BulkUpload] STAR payload:', JSON.parse(JSON.stringify(payload)));
+
+        const response = await fetch(STAR_API_URL, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`STAR API error ${response.status}: ${errorText}`);
         }
 
-        // Submit complete → Submit+Approve endpoint (falls back to Draft until endpoint is ready)
-        if (completeResults.length > 0) {
-          showLoading(`Submitting ${completeResults.length} complete record${completeResults.length !== 1 ? 's' : ''} for approval...`);
-          const approveEndpoint = STAR_SUBMIT_APPROVE_API_URL ?? STAR_API_URL;
-          const approvePayload = { results: completeResults.map((r) => withMeta(r, 6)), metadata: processMeta };
-          console.log('[BulkUpload] STAR Approve payload:', JSON.parse(JSON.stringify(approvePayload)));
-          const approveResponse = await fetch(approveEndpoint, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(approvePayload),
-          });
-          if (!approveResponse.ok) {
-            const errorText = await approveResponse.text();
-            throw new Error(`STAR Submit/Approve API error ${approveResponse.status}: ${errorText}`);
-          }
-          const approveData = (await approveResponse.json()) as StarApiResponse;
-          allCreated.push(...(approveData.data?.results_created ?? []));
-          allErrors.push(...(approveData.data?.results_errors ?? []));
-        }
-
-        starResponse = { data: { results_created: allCreated, results_errors: allErrors } };
+        const starResponse = (await response.json()) as StarApiResponse;
         setStarSubmissionResponse(starResponse);
         hideLoading();
 
