@@ -18,3 +18,4 @@ python-crontab
 mangum
 python-pptx
 python-multipart
+pylance
