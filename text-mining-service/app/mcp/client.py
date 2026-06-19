@@ -2,24 +2,25 @@ import os
 import json
 import base64
 import boto3
+import httpx
 import requests
 import uvicorn
 from io import BytesIO
 from typing import Optional, Union
 from pydantic import BaseModel, Field
 from mcp.client.stdio import stdio_client
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.utils.s3.s3_util import upload_file_to_s3
 from app.utils.logger.logger_util import get_logger
 from botocore.exceptions import BotoCoreError, ClientError
 from mcp import ClientSession, StdioServerParameters, types
+from fastapi.responses import FileResponse, StreamingResponse
 from app.utils.prompt.prompt_aiccra import DEFAULT_PROMPT_AICCRA
-from app.utils.config.config_util import AWS, CLIENT_ID, CLIENT_SECRET, IS_PROD
-from fastapi import FastAPI, HTTPException, Body, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Body, UploadFile, File, Form, Depends, Request, status
 from app.utils.dynamo.create_bulk_table import create_bulk_upload_table_if_not_exists
-from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, AICCRA_BUCKET_KEY_NAME
+from app.utils.config.config_util import AWS, CLIENT_ID, CLIENT_SECRET, IS_PROD, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, AICCRA_BUCKET_KEY_NAME, CLARISA_VALIDATE_URL
 
 
 logger = get_logger()
@@ -134,6 +135,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+API_KEY_NAME = "X-API-Key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
+MICROSERVICE_NAME = "AI Text Mining - STAR"
+
 
 # Create table on startup
 try:
@@ -150,6 +155,46 @@ async def handle_sampling_message(message: types.CreateMessageRequestParams) -> 
         model="mock-model",
         stopReason="endTurn"
     )
+
+
+http_client = httpx.AsyncClient()
+
+async def validate_with_clarisa(request: Request, api_key: str = Depends(api_key_header)):
+    client_ip = request.client.host if request.client else "0.0.0.0"
+    endpoint = request.url.path
+
+    payload = {
+        "api_key": api_key,
+        "microservice_name": MICROSERVICE_NAME,
+        "endpoint_accessed": endpoint,
+        "ip_address": client_ip
+    }
+
+    try:
+        response = await http_client.post(CLARISA_VALIDATE_URL, json=payload, timeout=5.0)
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Communication error with the authentication service"
+            )
+
+        data = response.json()
+
+        if not data.get("valid"):
+            error_msg = data.get("error", "Invalid API Key")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=error_msg
+            )
+
+        return data.get("mis")
+
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service is temporarily unavailable"
+        )
 
 
 app.mount("/static", StaticFiles(directory="interface"), name="static")
@@ -517,6 +562,7 @@ async def update_record_status(data: RecordStatusUpdate):
           },
           tags=["STAR Project"])
 async def process_document_endpoint(
+    request: Request,
     bucketName: str = Form(
         ..., description="Name of the S3 bucket where the document is/will be located", examples=["cgiar-documents"]),
     token: str = Form(
@@ -530,7 +576,8 @@ async def process_document_endpoint(
     ),
     user_id: Optional[str] = Form(
         None, description="User identifier for interaction tracking", examples=["user@example.com", "researcher@cgiar.org"]
-    )
+    ),
+    mis: str = Depends(validate_with_clarisa)
 ):
     """
     Process a document stored in S3 using text mining techniques.
