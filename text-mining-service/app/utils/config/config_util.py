@@ -21,3 +21,5 @@ CLIENT_ID = os.getenv("CLIENT_ID", None)
 CLIENT_SECRET = os.getenv("CLIENT_SECRET", None)
 
 IS_PROD = os.getenv("IS_PROD", "false").lower() == "true"
+
+CLARISA_VALIDATE_URL = os.getenv("CLARISA_VALIDATE_URL")
