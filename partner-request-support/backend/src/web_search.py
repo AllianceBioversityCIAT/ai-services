@@ -402,6 +402,232 @@ def search_institution_online(
 
 
 # ============================================================================
+# PHASE 2 (AUTO-DECISION): STRUCTURED YES/NO DECISION (AWS Bedrock Claude)
+# ============================================================================
+
+def _phase2_auto_decision(
+    institution_name: str,
+    raw_content: str,
+    sources: list
+) -> Dict[str, Any]:
+    """
+    Phase 2 (Auto-Decision mode): Analyze gathered information and return a
+    structured YES/NO decision for CGIAR partnership eligibility.
+    Uses AWS Bedrock Claude Sonnet 4.6.
+
+    Returns:
+        dict: {
+            "approved": bool,
+            "confidence": "high" | "medium" | "low",
+            "institution_name": str,
+            "institution_type": str,
+            "is_legal_entity": bool | None,
+            "has_research_mandate": bool | None,
+            "reason": str,
+            "summary": str
+        }
+    """
+    try:
+        sources_text = "\n".join([f"- {url}" for url in sources[:10]]) if sources else "No sources available"
+
+        prompt = f"""You are evaluating whether an institution qualifies as a CGIAR partner based on web search information.
+
+INSTITUTION SEARCHED: {institution_name}
+
+INFORMATION GATHERED FROM WEB SEARCH:
+{raw_content}
+
+SOURCES CONSULTED:
+{sources_text}
+
+CGIAR PARTNERSHIP ELIGIBILITY CRITERIA:
+1. The institution must be a legal entity (or formally affiliated with one that can sign contracts).
+2. It must belong to one of these recognized types:
+   - University or academic institution
+   - National/local research institution
+   - International/regional research institution
+   - Government entity (ministry, department, agency)
+   - Bilateral development agency (e.g., USAID, DFID, GIZ)
+   - International/regional financial institution (e.g., World Bank, IDB)
+   - UN entity or international organization
+   - NGO (with legal registration)
+   - Private company (with legal registration)
+3. Sub-departments, units, or divisions WITHOUT independent legal status must be REJECTED.
+   They may request partnership through their parent organization instead.
+
+DECISION RULES:
+- APPROVE (true): Institution is a recognized legal entity of an eligible type.
+- REJECT (false): It is a non-independent sub-unit or department, does not exist,
+  cannot be verified online, or clearly does not meet the criteria above.
+- When available information is very limited or contradictory, lean toward REJECT with low confidence.
+
+Analyze the information and respond ONLY with a valid JSON object. No markdown fences, no extra text:
+{{
+  "approved": true or false,
+  "confidence": "high" or "medium" or "low",
+  "institution_name": "Official name found or original name if not found",
+  "institution_type": "Most specific CGIAR category that applies",
+  "is_legal_entity": true, false, or null,
+  "has_research_mandate": true, false, or null,
+  "reason": "Clear 1-2 sentence explanation of the decision",
+  "summary": "Brief 1-2 sentence description of the institution"
+}}"""
+
+        response = bedrock_client.invoke_model(
+            modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            contentType="application/json",
+            accept="application/json",
+            body=json.dumps({
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 1000,
+                "messages": [{"role": "user", "content": prompt}]
+            })
+        )
+
+        response_body = json.loads(response['body'].read())
+        raw_text = response_body['content'][0]['text'].strip()
+
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r'^```(?:json)?\s*', '', raw_text)
+            raw_text = re.sub(r'\s*```$', '', raw_text.strip()).strip()
+
+        logger.info(f"Auto-decision raw response: {raw_text}")
+
+        decision_data = json.loads(raw_text)
+
+        return {
+            "approved": bool(decision_data.get("approved", False)),
+            "confidence": decision_data.get("confidence", "low"),
+            "institution_name": decision_data.get("institution_name", institution_name),
+            "institution_type": decision_data.get("institution_type", ""),
+            "is_legal_entity": decision_data.get("is_legal_entity"),
+            "has_research_mandate": decision_data.get("has_research_mandate"),
+            "reason": decision_data.get("reason", ""),
+            "summary": decision_data.get("summary", "")
+        }
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse auto-decision JSON: {e}. Raw text: {raw_text if 'raw_text' in dir() else 'N/A'}")
+        return {
+            "approved": False,
+            "confidence": "low",
+            "institution_name": institution_name,
+            "institution_type": "",
+            "is_legal_entity": None,
+            "has_research_mandate": None,
+            "reason": "Could not parse analysis result. Manual review required.",
+            "summary": ""
+        }
+    except Exception as e:
+        logger.error(f"Phase 2 auto-decision error: {str(e)}")
+        return {
+            "approved": False,
+            "confidence": "low",
+            "institution_name": institution_name,
+            "institution_type": "",
+            "is_legal_entity": None,
+            "has_research_mandate": None,
+            "reason": f"Analysis failed: {str(e)}",
+            "summary": ""
+        }
+
+
+# ============================================================================
+# AUTO-DECISION SEARCH FUNCTION (Coordinates Phase 1 + Phase 2 Auto-Decision)
+# ============================================================================
+
+def search_institution_auto_decision(
+    name: str,
+    country: Optional[str] = None,
+    website: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    TWO-PHASE search that returns a structured YES/NO eligibility decision for
+    automated CGIAR partner request processing. Does NOT use the narrative
+    formatting of search_institution_online — returns structured JSON instead.
+
+    Phase 1: Exploratory search (OpenAI gpt-5-mini) — gather all available info.
+    Phase 2: Auto-decision (AWS Bedrock Claude Sonnet 4.6) — structured YES/NO.
+
+    Args:
+        name: Institution name (required)
+        country: Country hint (optional, improves search accuracy)
+        website: Official website (optional, enables focused domain search)
+
+    Returns:
+        dict: {
+            "success": bool,
+            "approved": bool | None,
+            "confidence": "high" | "medium" | "low",
+            "institution_name": str,
+            "institution_type": str,
+            "is_legal_entity": bool | None,
+            "has_research_mandate": bool | None,
+            "reason": str,
+            "summary": str,
+            "error": str | None
+        }
+    """
+    _empty = {
+        "success": False,
+        "approved": None,
+        "confidence": "low",
+        "institution_name": name or "",
+        "institution_type": "",
+        "is_legal_entity": None,
+        "has_research_mandate": None,
+        "reason": "",
+        "summary": "",
+        "error": None
+    }
+
+    try:
+        if not name or str(name).strip() == "":
+            return {**_empty, "reason": "Institution name is required.", "error": "Institution name is required"}
+
+        name = str(name).strip()
+        logger.info(f"🤖 Starting AUTO-DECISION search for: {name}")
+
+        logger.info("   Phase 1/2: Gathering information (OpenAI)...")
+        phase1_result = _phase1_exploratory_search(name, country, website)
+
+        if not phase1_result["success"]:
+            return {
+                **_empty,
+                "institution_name": name,
+                "reason": f"Web search failed: {phase1_result['error']}",
+                "error": phase1_result["error"]
+            }
+
+        logger.info("   Phase 2/2: Making auto-decision (Claude Sonnet 4.6)...")
+        decision = _phase2_auto_decision(
+            institution_name=name,
+            raw_content=phase1_result["raw_content"],
+            sources=phase1_result["sources"]
+        )
+
+        verdict = "APPROVED" if decision["approved"] else "REJECTED"
+        logger.info(f"🤖 Auto-decision: {verdict} ({decision['confidence']} confidence) — {name}")
+
+        return {
+            "success": True,
+            "approved": decision["approved"],
+            "confidence": decision["confidence"],
+            "institution_name": decision["institution_name"],
+            "institution_type": decision["institution_type"],
+            "is_legal_entity": decision["is_legal_entity"],
+            "has_research_mandate": decision["has_research_mandate"],
+            "reason": decision["reason"],
+            "summary": decision["summary"],
+            "error": None
+        }
+
+    except Exception as e:
+        logger.error(f"Auto-decision search error for '{name}': {str(e)}")
+        return {**_empty, "institution_name": name, "reason": f"Processing error: {str(e)}", "error": str(e)}
+
+
+# ============================================================================
 # TEST FUNCTION
 # ============================================================================
 

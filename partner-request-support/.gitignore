@@ -67,3 +67,5 @@ secrets.py
 
 .agent/
 .agents/
+
+backend/test/test_auto.py

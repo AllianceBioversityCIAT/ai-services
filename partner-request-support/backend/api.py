@@ -9,17 +9,18 @@ import uvicorn
 import tempfile
 import requests
 import pandas as pd
+from pydantic import BaseModel
 from dotenv import load_dotenv
 from config.config_util import BR
 from typing import List, Dict, Optional
 from logger.logger_util import get_logger
 from botocore.exceptions import ClientError
 from fastapi.middleware.cors import CORSMiddleware
-from src.web_search import search_institution_online
 from fastapi.responses import JSONResponse, StreamingResponse
 from src.populate_clarisa_db import sync_clarisa_institutions
-from src.mapping_clarisa_comparison import process_partners_to_json
 from fastapi import FastAPI, File, UploadFile, HTTPException, Body, Form
+from src.web_search import search_institution_online, search_institution_auto_decision
+from src.mapping_clarisa_comparison import process_partners_to_json, search_institution_for_excel
 from src.supabase_client import get_cached_results_by_name, cache_results_batch, count_institutions, check_supabase_connection, clear_all_cache
 
 
@@ -115,6 +116,10 @@ app = FastAPI(
         {
             "name": "Templates",
             "description": "Download Excel templates and resources"
+        },
+        {
+            "name": "Automated Processing",
+            "description": "Fully automated partner request evaluation with AI-driven accept/reject decisions"
         }
     ]
 )
@@ -128,6 +133,41 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ============================================================================
+# PYDANTIC MODELS — Automated Processing
+# ============================================================================
+
+class AutoPartnerRequest(BaseModel):
+    partner_name: str
+    country: Optional[str] = None
+    website: Optional[str] = None
+    acronym: Optional[str] = None
+    institution_type: Optional[str] = None
+    # Fields for responding to an existing CLARISA request
+    request_id: Optional[int] = None
+    auth_token: Optional[str] = None
+    user_id: Optional[int] = None
+    auto_respond: bool = False
+    # Fields for creating a new CLARISA request (create_in_clarisa=True)
+    create_in_clarisa: bool = False
+    external_user_mail: Optional[str] = None
+    external_user_name: Optional[str] = None
+    external_user_comments: Optional[str] = None
+    mis_acronym: str = "CLARISA"
+
+
+class AutoPartnerResponse(BaseModel):
+    decision: str
+    confidence: str
+    reason: str
+    match_quality: str
+    clarisa_match: Optional[Dict] = None
+    web_search_performed: bool
+    web_search_result: Optional[Dict] = None
+    auto_responded_to_clarisa: bool = False
+    clarisa_response: Optional[Dict] = None
 
 
 @app.get("/", tags=["Health"])
@@ -1683,6 +1723,454 @@ async def download_template():
         raise HTTPException(
             status_code=500,
             detail=f"Error downloading template: {str(e)}"
+        )
+
+
+
+
+# ============================================================================
+# AUTOMATED PARTNER REQUEST PROCESSING ENDPOINT
+# ============================================================================
+
+@app.post("/api/auto-partner-request", tags=["Automated Processing"], response_model=AutoPartnerResponse)
+async def auto_partner_request(body: AutoPartnerRequest):
+    """
+    # Automated Partner Request Evaluation
+
+    Fully automated evaluation of a single partner institution request.
+    Runs the complete pipeline — CLARISA hybrid search + AI web search — and
+    returns a standardized **ACCEPT / REJECT** decision without any human
+    intervention.
+
+    This endpoint is designed for external platforms that need to automate the
+    partner approval workflow. It reuses all existing matching and search
+    components but is completely independent from the manual review frontend.
+
+    ## Decision Logic
+
+    | CLARISA match quality | Web search triggered | Decision |
+    |---|---|---|
+    | Excellent (≥ 0.85) | No | REJECT (institution already exists in CLARISA) |
+    | Good (≥ 0.70) | No | REJECT (probable duplicate in CLARISA) |
+    | Fair (≥ 0.60) | Yes — Claude decides | ACCEPT (new valid institution) or REJECT |
+    | No match | Yes — Claude decides | ACCEPT (new valid institution) or REJECT |
+
+    When web search is triggered, Claude evaluates CGIAR eligibility criteria:
+    legal entity status, institution type, and research mandate.
+    If the institution is valid and not a duplicate → ACCEPT. Otherwise → REJECT.
+
+    ## Request Body
+
+    ```json
+    {
+        "partner_name": "University of Nairobi",
+        "country": "Kenya",
+        "website": "https://www.uonbi.ac.ke",
+        "acronym": "UoN",
+        "institution_type": "University",
+        "create_in_clarisa": true,
+        "external_user_mail": "requester@cgiar.org",
+        "external_user_name": "Jane Doe",
+        "external_user_comments": "Needed for project INIT-2024",
+        "mis_acronym": "CLARISA",
+        "auth_token": "Bearer eyJ...",
+        "user_id": 456,
+        "auto_respond": true,
+        "request_id": null
+    }
+    ```
+
+    ## Parameters
+
+    - **partner_name** *(required)*: Full institution name
+    - **country** *(optional)*: Country name — improves search accuracy. Required when `create_in_clarisa=true`
+    - **website** *(optional)*: Official website — enables focused domain search
+    - **acronym** *(optional)*: Institution acronym — improves CLARISA matching
+    - **institution_type** *(optional)*: Declared institution type. Required when `create_in_clarisa=true`
+    - **create_in_clarisa** *(optional, default false)*: If `true`, creates the partner request in CLARISA first,
+      then analyzes and auto-responds. Requires `country`, `institution_type`, `auth_token`, `user_id`,
+      `external_user_mail`, and `external_user_name`
+    - **external_user_mail** *(optional)*: Email of the user requesting the partnership. Required when `create_in_clarisa=true`
+    - **external_user_name** *(optional)*: Name of the user requesting the partnership. Required when `create_in_clarisa=true`
+    - **external_user_comments** *(optional)*: Additional comments from the requester
+    - **mis_acronym** *(optional, default "CLARISA")*: MIS system acronym for the request source
+    - **request_id** *(optional)*: CLARISA partner request ID. Required when `auto_respond=true` and `create_in_clarisa=false`
+    - **auth_token** *(optional)*: CLARISA Bearer token. Required when `auto_respond=true` or `create_in_clarisa=true`
+    - **user_id** *(optional)*: CLARISA user ID. Required when `auto_respond=true` or `create_in_clarisa=true`
+    - **auto_respond** *(optional, default false)*: If `true`, automatically submits the decision to CLARISA.
+      Always `true` implicitly when `create_in_clarisa=true`
+
+    ## Response
+
+    ```json
+    {
+        "decision": "ACCEPT",
+        "confidence": "high",
+        "reason": "Excellent CLARISA match found (score: 0.92)",
+        "match_quality": "excellent",
+        "clarisa_match": { ... },
+        "web_search_performed": false,
+        "web_search_result": null,
+        "auto_responded_to_clarisa": false,
+        "clarisa_response": null
+    }
+    ```
+
+    ## Response Fields
+
+    - **decision**: `"ACCEPT"` or `"REJECT"`
+    - **confidence**: `"high"`, `"medium"`, or `"low"`
+    - **reason**: Human-readable explanation of the decision
+    - **match_quality**: `"excellent"`, `"good"`, `"fair"`, or `"no_match"`
+    - **clarisa_match**: Best CLARISA match found, or `null`
+    - **web_search_performed**: Whether AI web search was triggered
+    - **web_search_result**: Structured web search decision (when performed)
+    - **auto_responded_to_clarisa**: Whether the decision was automatically submitted to CLARISA
+    - **clarisa_response**: CLARISA API response (when `auto_respond=true`)
+
+    ## HTTP Status Codes
+
+    - **200**: Evaluation completed successfully (decision may be ACCEPT or REJECT)
+    - **400**: Missing required fields for `auto_respond=true`
+    - **500**: Internal processing error
+    - **502**: Network error communicating with CLARISA (only when `auto_respond=true`)
+
+    ## Notes
+
+    - No caching is used in this endpoint
+    - This endpoint does **not** affect the manual review frontend in any way
+    - Typical response time: 2–5 s for CLARISA-only matches; 10–25 s when web search is triggered
+    """
+    try:
+        partner_name = body.partner_name.strip()
+        logger.info(f"🤖 AUTO-PARTNER-REQUEST received for: '{partner_name}'")
+
+        raw_token = (body.auth_token or "").strip()
+        if raw_token.lower().startswith("bearer "):
+            raw_token = raw_token[7:].strip()
+        auth_header = f"Bearer {raw_token}" if raw_token else ""
+
+        # ------------------------------------------------------------------
+        # STEP 0 — Create partner request in CLARISA (when requested)
+        # ------------------------------------------------------------------
+        created_request_id: Optional[int] = body.request_id
+
+        if body.create_in_clarisa:
+            missing = [
+                f for f, v in [
+                    ("country", body.country),
+                    ("institution_type", body.institution_type),
+                    ("auth_token", body.auth_token),
+                    ("user_id", body.user_id),
+                    ("external_user_mail", body.external_user_mail),
+                    ("external_user_name", body.external_user_name),
+                ]
+                if not v
+            ]
+            if missing:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"create_in_clarisa=true requires: {', '.join(missing)}"
+                )
+
+            logger.info(f"🔨 Creating partner request in CLARISA for: '{partner_name}'")
+
+            # Fetch country ISO code
+            country_iso = None
+            try:
+                countries_resp = requests.get(CLARISA_COUNTRIES_URL, timeout=30)
+                countries_resp.raise_for_status()
+                countries_list = countries_resp.json()
+                countries_map = {c.get("name", "").strip().lower(): c.get("isoAlpha2") for c in countries_list}
+                country_iso = countries_map.get(body.country.strip().lower())
+                if not country_iso:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Country '{body.country}' not found in CLARISA control list."
+                    )
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=502, detail=f"Error fetching CLARISA countries: {str(e)}")
+
+            # Fetch institution type code
+            institution_type_code = None
+            try:
+                types_resp = requests.get(CLARISA_INSTITUTION_TYPES_URL, timeout=30)
+                types_resp.raise_for_status()
+                types_list = types_resp.json()
+                types_map = {t.get("name", "").strip().lower(): t.get("code") for t in types_list}
+                institution_type_code = types_map.get(body.institution_type.strip().lower())
+                if institution_type_code is None:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Institution type '{body.institution_type}' not found in CLARISA control list."
+                    )
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=502, detail=f"Error fetching CLARISA institution types: {str(e)}")
+
+            # Create the partner request
+            create_payload = {
+                "name": partner_name,
+                "acronym": body.acronym or "",
+                "websiteLink": body.website or "",
+                "hqCountryIso": country_iso,
+                "institutionTypeCode": institution_type_code,
+                "externalUserMail": body.external_user_mail,
+                "externalUserName": body.external_user_name,
+                "externalUserComments": body.external_user_comments or "",
+                "misAcronym": body.mis_acronym
+            }
+            try:
+                create_resp = requests.post(
+                    CLARISA_CREATE_URL,
+                    json=create_payload,
+                    headers={
+                        "Authorization": auth_header,
+                        "Content-Type": "application/json"
+                    },
+                    timeout=30
+                )
+                create_resp.raise_for_status()
+                logger.info(f"✅ Partner request created in CLARISA for: '{partner_name}'")
+            except requests.exceptions.RequestException as e:
+                raise HTTPException(status_code=502, detail=f"Error creating partner request in CLARISA: {str(e)}")
+
+            # Retrieve the newly assigned request_id
+            try:
+                fetch_resp = requests.get(
+                    CLARISA_API_URL,
+                    headers={"Authorization": auth_header},
+                    timeout=30
+                )
+                fetch_resp.raise_for_status()
+                all_requests = fetch_resp.json()
+                name_lower = partner_name.lower()
+                user_mail_lower = (body.external_user_mail or "").strip().lower()
+                matched_request = next(
+                    (
+                        r for r in sorted(
+                            all_requests,
+                            key=lambda x: x.get("id", 0),
+                            reverse=True
+                        )
+                        if (
+                            r.get("partnerName", "").strip().lower() == name_lower
+                            or name_lower in r.get("partnerName", "").strip().lower()
+                            or r.get("partnerName", "").strip().lower() in name_lower
+                        )
+                        and r.get("externalUserMail", "").strip().lower() == user_mail_lower
+                    ),
+                    None
+                )
+                if matched_request:
+                    created_request_id = matched_request.get("id")
+                    logger.info(f"📋 Retrieved CLARISA request_id: {created_request_id} for '{partner_name}'")
+                else:
+                    logger.warning(f"⚠️  Could not retrieve request_id for '{partner_name}' — auto-respond will be skipped")
+            except Exception as e:
+                logger.warning(f"⚠️  Error fetching request_id after creation: {e}")
+
+        # ------------------------------------------------------------------
+        # STEP 1 — CLARISA hybrid search
+        # ------------------------------------------------------------------
+        try:
+            search_result = search_institution_for_excel(partner_name, body.acronym)
+        except Exception as e:
+            logger.warning(f"⚠️  CLARISA search unavailable for '{partner_name}': {e}. Falling back to web search.")
+            search_result = None
+
+        clarisa_match_data = None
+        match_quality = "no_match"
+        decision = None
+        confidence = "low"
+        reason = ""
+        web_search_performed = False
+        web_search_result = None
+
+        if search_result and search_result.get("best_match"):
+            best_match = search_result["best_match"]
+            score = best_match["final_score"]
+
+            clarisa_match_data = {
+                "clarisa_id": best_match["clarisa_id"],
+                "name": best_match["name"],
+                "acronym": best_match.get("acronym", ""),
+                "countries": best_match.get("countries", []),
+                "institution_type": best_match.get("institution_type", ""),
+                "website": best_match.get("website", ""),
+                "used_translation": best_match.get("used_translation", False),
+                "scores": {
+                    "cosine_similarity": round(best_match["cosine_similarity"], 4),
+                    "fuzz_name_score": round(best_match["fuzz_name_score"], 4),
+                    "fuzz_acronym_score": round(best_match["fuzz_acronym_score"], 4),
+                    "final_score": round(score, 4)
+                }
+            }
+
+            if score >= 0.85:
+                match_quality = "excellent"
+                decision = "REJECT"
+                confidence = "high"
+                reason = (
+                    f"Institution already exists in CLARISA: '{best_match['name']}' "
+                    f"(score: {score:.2f}). Duplicate partner requests are not accepted. "
+                    f"Use the existing CLARISA entry (ID: {best_match['clarisa_id']})."
+                )
+            elif score >= 0.70:
+                match_quality = "good"
+                decision = "REJECT"
+                confidence = "medium"
+                reason = (
+                    f"Institution likely already exists in CLARISA: '{best_match['name']}' "
+                    f"(score: {score:.2f}). Probable duplicate — use the existing CLARISA entry "
+                    f"(ID: {best_match['clarisa_id']})."
+                )
+            else:
+                # Fair match — uncertain, escalate to web search for verification
+                match_quality = "fair"
+
+        # ------------------------------------------------------------------
+        # STEP 2 — AI web search (triggered for fair matches and no-match)
+        # ------------------------------------------------------------------
+        if decision is None:
+            web_search_performed = True
+            logger.info(f"   Triggering auto-decision web search for: '{partner_name}'")
+
+            ws = search_institution_auto_decision(
+                name=partner_name,
+                country=body.country,
+                website=body.website
+            )
+
+            web_search_result = {
+                "approved": ws.get("approved"),
+                "confidence": ws.get("confidence", "low"),
+                "institution_name": ws.get("institution_name", ""),
+                "institution_type": ws.get("institution_type", ""),
+                "is_legal_entity": ws.get("is_legal_entity"),
+                "has_research_mandate": ws.get("has_research_mandate"),
+                "reason": ws.get("reason", ""),
+                "summary": ws.get("summary", "")
+            }
+
+            if ws.get("success") and ws.get("approved") is not None:
+                decision = "ACCEPT" if ws["approved"] else "REJECT"
+                confidence = ws.get("confidence", "low")
+                reason = ws.get("reason", "")
+                if not reason:
+                    reason = f"Web search {'confirmed' if ws['approved'] else 'could not confirm'} the institution meets CGIAR eligibility criteria."
+            else:
+                decision = "REJECT"
+                confidence = "low"
+                reason = ws.get("reason") or ws.get("error") or "Web search did not return a conclusive result. Manual review recommended."
+
+        logger.info(f"🤖 Decision: {decision} ({confidence}) — {partner_name}")
+
+        # ------------------------------------------------------------------
+        # STEP 3 — Optional: auto-respond to CLARISA
+        # ------------------------------------------------------------------
+        auto_responded = False
+        clarisa_response_data = None
+
+        if body.auto_respond or body.create_in_clarisa:
+            effective_request_id = created_request_id
+            if not effective_request_id or not body.auth_token or not body.user_id:
+                if body.create_in_clarisa and not effective_request_id:
+                    logger.warning("⚠️  Could not auto-respond: request_id was not retrieved after creation")
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="auto_respond=true requires request_id (or create_in_clarisa=true), auth_token, and user_id."
+                    )
+            else:
+                logger.info(f"📤 Auto-responding to CLARISA request {effective_request_id}: {decision}")
+                accept_flag = decision == "ACCEPT"
+                reject_justification = reason if not accept_flag else None
+
+                try:
+                    fetch_response = requests.get(
+                        CLARISA_API_URL,
+                        headers={"Authorization": auth_header},
+                        timeout=30
+                    )
+                    fetch_response.raise_for_status()
+                    all_requests = fetch_response.json()
+
+                    partner_request = next(
+                        (pr for pr in all_requests if pr.get("id") == effective_request_id),
+                        None
+                    )
+
+                    if not partner_request:
+                        raise HTTPException(
+                            status_code=404,
+                            detail=f"Partner request {effective_request_id} not found in CLARISA."
+                        )
+
+                    payload = {
+                        "requestId": effective_request_id,
+                        "userId": body.user_id,
+                        "accept": accept_flag,
+                        "misAcronym": partner_request.get("mis", body.mis_acronym),
+                        "externalUserMail": partner_request.get("externalUserMail", body.external_user_mail or ""),
+                        "externalUserName": partner_request.get("externalUserName", body.external_user_name or ""),
+                        "externalUserComments": partner_request.get("externalUserComments", body.external_user_comments or "")
+                    }
+                    if not accept_flag:
+                        payload["rejectJustification"] = reject_justification or "Rejected by automated evaluation"
+
+                    clarisa_post = requests.post(
+                        CLARISA_RESPOND_URL,
+                        json=payload,
+                        headers={
+                            "Content-Type": "application/json",
+                            "Authorization": auth_header
+                        },
+                        timeout=30
+                    )
+                    clarisa_post.raise_for_status()
+
+                    auto_responded = True
+                    clarisa_response_data = {
+                        "success": True,
+                        "action": "accept" if accept_flag else "reject",
+                        "request_id": effective_request_id,
+                        "message": f"Partner request successfully {'accepted' if accept_flag else 'rejected'}"
+                    }
+                    logger.info(f"✅ CLARISA auto-respond successful for request {effective_request_id}")
+
+                except HTTPException:
+                    raise
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"❌ CLARISA auto-respond network error: {e}")
+                    clarisa_response_data = {"success": False, "error": str(e)}
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"Network error communicating with CLARISA API: {str(e)}"
+                    )
+
+        return AutoPartnerResponse(
+            decision=decision,
+            confidence=confidence,
+            reason=reason,
+            match_quality=match_quality,
+            clarisa_match=clarisa_match_data,
+            web_search_performed=web_search_performed,
+            web_search_result=web_search_result,
+            auto_responded_to_clarisa=auto_responded,
+            clarisa_response=clarisa_response_data
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error in auto-partner-request: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing automated partner request: {str(e)}"
         )
 
 
