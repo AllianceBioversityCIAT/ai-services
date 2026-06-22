@@ -1,16 +1,63 @@
 """REST API endpoints for PRMS QA Service."""
 
+import httpx
 import traceback
+from fastapi.security import APIKeyHeader
 from app.utils.logger.logger_util import get_logger
-from fastapi import APIRouter, HTTPException, status
 from app.llm.mining import improve_prms_result_metadata
+from app.utils.config.config_util import CLARISA_VALIDATE_URL
 from app.api.models import PrmsRequest, PrmsResponse, ErrorResponse
+from fastapi import APIRouter, HTTPException, status, Request, Depends
 from app.utils.notification.notification_service import NotificationService
 
 logger = get_logger()
 router = APIRouter()
 
 notification_service = NotificationService()
+
+
+API_KEY_NAME = "X-API-Key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
+
+http_client = httpx.AsyncClient()
+
+async def validate_with_clarisa(request: Request, api_key: str = Depends(api_key_header)):
+    client_ip = request.client.host if request.client else "0.0.0.0"
+    endpoint = request.url.path
+
+    payload = {
+        "api_key": api_key,
+        "microservice_name": "AI Review - PRMS",
+        "endpoint_accessed": endpoint,
+        "ip_address": client_ip
+    }
+
+    try:
+        response = await http_client.post(CLARISA_VALIDATE_URL, json=payload, timeout=5.0)
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Communication error with the authentication service"
+            )
+
+        data = response.json()
+
+        if not data.get("valid"):
+            error_msg = data.get("error", "Invalid API Key")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=error_msg
+            )
+
+        return data.get("mis")
+
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service is temporarily unavailable"
+        )
+
 
 @router.post(
     "/api/prms-qa",
@@ -87,7 +134,7 @@ notification_service = NotificationService()
         }
     }
 )
-async def prms_qa(request: PrmsRequest) -> PrmsResponse:
+async def prms_qa(request: PrmsRequest, mis: str = Depends(validate_with_clarisa)) -> PrmsResponse:
     """
     Process PRMS result metadata using an LLM.
     - result_metadata: JSON dict with PRMS result details.

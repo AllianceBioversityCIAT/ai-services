@@ -22,5 +22,6 @@ dependencies = [
     "playwright",
     "pymupdf",
     "lxml",
-    "beautifulsoup4"
+    "beautifulsoup4",
+    "httpx"
 ]
