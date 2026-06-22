@@ -135,10 +135,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-API_KEY_NAME = "X-API-Key"
-api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
-MICROSERVICE_NAME = "AI Text Mining - STAR"
-
 
 # Create table on startup
 try:
@@ -157,44 +153,50 @@ async def handle_sampling_message(message: types.CreateMessageRequestParams) -> 
     )
 
 
+API_KEY_NAME = "X-API-Key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
+
 http_client = httpx.AsyncClient()
 
-async def validate_with_clarisa(request: Request, api_key: str = Depends(api_key_header)):
-    client_ip = request.client.host if request.client else "0.0.0.0"
-    endpoint = request.url.path
+def validate_with_clarisa(microservice_name: str):
+    async def _validate(request: Request, api_key: str = Depends(api_key_header)):
+        client_ip = request.client.host if request.client else "0.0.0.0"
+        endpoint = request.url.path
 
-    payload = {
-        "api_key": api_key,
-        "microservice_name": MICROSERVICE_NAME,
-        "endpoint_accessed": endpoint,
-        "ip_address": client_ip
-    }
+        payload = {
+            "api_key": api_key,
+            "microservice_name": microservice_name,
+            "endpoint_accessed": endpoint,
+            "ip_address": client_ip
+        }
 
-    try:
-        response = await http_client.post(CLARISA_VALIDATE_URL, json=payload, timeout=5.0)
+        try:
+            response = await http_client.post(CLARISA_VALIDATE_URL, json=payload, timeout=5.0)
 
-        if response.status_code != 200:
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Communication error with the authentication service"
+                )
+
+            data = response.json()
+
+            if not data.get("valid"):
+                error_msg = data.get("error", "Invalid API Key")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=error_msg
+                )
+
+            return data.get("mis")
+
+        except httpx.RequestError:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Communication error with the authentication service"
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service is temporarily unavailable"
             )
 
-        data = response.json()
-
-        if not data.get("valid"):
-            error_msg = data.get("error", "Invalid API Key")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=error_msg
-            )
-
-        return data.get("mis")
-
-    except httpx.RequestError:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service is temporarily unavailable"
-        )
+    return _validate
 
 
 app.mount("/static", StaticFiles(directory="interface"), name="static")
@@ -577,7 +579,7 @@ async def process_document_endpoint(
     user_id: Optional[str] = Form(
         None, description="User identifier for interaction tracking", examples=["user@example.com", "researcher@cgiar.org"]
     ),
-    mis: str = Depends(validate_with_clarisa)
+    mis: str = Depends(validate_with_clarisa("AI Text Mining - STAR"))
 ):
     """
     Process a document stored in S3 using text mining techniques.
@@ -787,6 +789,7 @@ async def process_document_prms_endpoint(
           },
           tags=["STAR Project"])
 async def bulk_upload_capdev_endpoint(
+    request: Request,
     bucketName: str = Form(
         ..., description="Name of the S3 bucket where the document is/will be located", examples=["cgiar-documents"]),
     token: str = Form(
@@ -806,7 +809,8 @@ async def bulk_upload_capdev_endpoint(
     ),
     user_name: Optional[str] = Form(
         None, description="Full name of the user for interaction tracking", examples=["John Doe"]
-    )
+    ),
+    mis: str = Depends(validate_with_clarisa("AI Bulk Upload - STAR"))
 ):
     """
     Process a document stored in S3 using text mining techniques.

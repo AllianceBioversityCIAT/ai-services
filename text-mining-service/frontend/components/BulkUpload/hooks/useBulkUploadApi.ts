@@ -118,7 +118,7 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
         }
 
         showLoading('Sending document to the service...');
-        const response = await fetch(`${API_BASE_URL}/star/mining-bulk-upload/capdev`, {
+        const response = await fetch('/api/bulk-upload', {
           method: 'POST',
           body: formData,
         });
