@@ -80,8 +80,8 @@ async def process_document(bucket: str, key: str, token: Any, environmentUrl: st
             app_name="AI-MCP Mining Service (STAR)",
             color="#36a64f",
             title="Document Processed",
-            message=f"Successfully processed document: *{key}*\nBucket: *{bucket}*",
-            time_taken=f"Time taken: *{result['time_taken']}* seconds",
+            message=f"Successfully processed document: *{key}*\n*Bucket:* {bucket}\n*User:* {user_id or 'N/A'}",
+            time_taken=f"*Time taken:* {result['time_taken']} seconds",
             priority="Low"
         )
 
@@ -102,8 +102,8 @@ async def process_document(bucket: str, key: str, token: Any, environmentUrl: st
             app_name="AI-MCP Mining Service (STAR)",
             color="#FF0000",
             title="Document Processing Failed",
-            message=f"Error processing document: *{key}*\nError: *{str(e)}*",
-            time_taken="Time taken: *N/A*",
+            message=f"Error processing document: *{key}*\n*Error:* {str(e)}\n*User:* {user_id or 'N/A'}",
+            time_taken="*Time taken:* N/A",
             priority="High"
         )
         return {"status": "error", "key": key, "error": str(e)}
@@ -130,8 +130,8 @@ async def process_document_prms(bucket: str, key: str, token: Any, environmentUr
             app_name="AI-MCP Mining Service (PRMS)",
             color="#36a64f",
             title="PRMS Document Processed",
-            message=f"Successfully processed document for PRMS: *{key}*\nBucket: *{bucket}*",
-            time_taken=f"Time taken: *{result['time_taken']}* seconds",
+            message=f"Successfully processed document for PRMS: *{key}*\n*Bucket:* {bucket}\n*User:* {user_id or 'N/A'}",
+            time_taken=f"*Time taken:* {result['time_taken']} seconds",
             priority="Low"
         )
 
@@ -152,8 +152,8 @@ async def process_document_prms(bucket: str, key: str, token: Any, environmentUr
             app_name="AI-MCP Mining Service (PRMS)",
             color="#FF0000",
             title="PRMS Document Processing Failed",
-            message=f"Error processing document for PRMS: *{key}*\nError: *{str(e)}*",
-            time_taken="Time taken: *N/A*",
+            message=f"Error processing document for PRMS: *{key}*\n*Error:* {str(e)}\n*User:* {user_id or 'N/A'}",
+            time_taken="*Time taken:* N/A",
             priority="High"
         )
         return {"status": "error", "key": key, "error": str(e), "project": "PRMS"}
@@ -180,8 +180,8 @@ async def process_document_capdev(bucket: str, key: str, token: Any, environment
             app_name="Bulk upload via Mining Service (STAR)",
             color="#36a64f",
             title="Document Processed",
-            message=f"Successfully processed document: *{key}*\nBucket: *{bucket}*",
-            time_taken=f"Time taken: *{result['time_taken']}* seconds",
+            message=f"Successfully processed document: *{key}*\n*Bucket:* {bucket}\n*User:* {user_name or user_id or 'N/A'}",
+            time_taken=f"*Time taken:* {result['time_taken']} seconds",
             priority="Low"
         )
 
@@ -199,8 +199,8 @@ async def process_document_capdev(bucket: str, key: str, token: Any, environment
             app_name="Bulk upload via Mining Service (STAR)",
             color="#FF0000",
             title="Document Processing Failed",
-            message=f"Error processing document: *{key}*\nError: *{str(e)}*",
-            time_taken="Time taken: *N/A*",
+            message=f"Error processing document: *{key}*\n*Error:* {str(e)}\n*User:* {user_name or user_id or 'N/A'}",
+            time_taken="*Time taken:* N/A",
             priority="High"
         )
         return {"status": "error", "key": key, "error": str(e)}
@@ -226,8 +226,8 @@ async def process_document_aiccra(bucket: str, key: str, token: Any, environment
             app_name="AI-MCP Mining Service (AICCRA)",
             color="#36a64f",
             title="Document Processed",
-            message=f"Successfully processed document: *{key}*\nBucket: *{bucket}*",
-            time_taken=f"Time taken: *{result['time_taken']}* seconds",
+            message=f"Successfully processed document: *{key}*\n*Bucket:* {bucket}\n*User:* {user_id or 'N/A'}",
+            time_taken=f"*Time taken:* {result['time_taken']} seconds",
             priority="Low"
         )
 
@@ -248,8 +248,8 @@ async def process_document_aiccra(bucket: str, key: str, token: Any, environment
             app_name="AI-MCP Mining Service (AICCRA)",
             color="#FF0000",
             title="Document Processing Failed",
-            message=f"Error processing document: *{key}*\nError: *{str(e)}*",
-            time_taken="Time taken: *N/A*",
+            message=f"Error processing document: *{key}*\n*Error:* {str(e)}\n*User:* {user_id or 'N/A'}",
+            time_taken="*Time taken:* N/A",
             priority="High"
         )
         return {"status": "error", "key": key, "error": str(e)}
