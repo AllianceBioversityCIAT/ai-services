@@ -1,15 +1,15 @@
 import time
 import json
 from app.utils.logger.logger_util import get_logger
-from app.llm.vectorize import get_all_reference_data
 from app.utils.s3.s3_util import read_document_from_s3
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from app.utils.interactions.interaction_client import interaction_client
 from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, MAPPING_URL
 from app.utils.prompt.bulk_upload_capdev_prompt import PROMPT_BULK_UPLOAD_CAPDEV
+from app.llm.reference_cache import get_reference_data, format_reference_for_prompt
 from app.llm.vectorize import get_embedding, store_temp_embeddings, get_relevant_chunk
-from app.llm.mining import initialize_reference_data, split_text, invoke_model, is_valid_json, extract_json_from_markdown
+from app.llm.mining import split_text, invoke_model, is_valid_json, extract_json_from_markdown
 from app.llm.map_fields import map_fields_with_opensearch, clear_mapping_cache, get_cache_stats
-from app.utils.interactions.interaction_client import interaction_client
 
 logger = get_logger()
 mapping_service_url = MAPPING_URL
@@ -26,7 +26,7 @@ def process_excel_in_batches(chunks, batch_size=5):
     return batches
 
 
-def process_single_batch(batch_chunks, prompt, batch_number, all_reference_data, mapping_service_url=mapping_service_url):
+def process_single_batch(batch_chunks, prompt, batch_number, reference_data, mapping_service_url=mapping_service_url):
     """
     Process a single batch of chunks (thread-safe)
     """
@@ -34,21 +34,18 @@ def process_single_batch(batch_chunks, prompt, batch_number, all_reference_data,
     
     try:
         batch_data = "\n".join(batch_chunks)
-        
-        if isinstance(all_reference_data, list):
-            reference_text = "\n".join(all_reference_data)
-        elif isinstance(all_reference_data, str):
-            reference_text = all_reference_data
-        else:
-            logger.warning(f"⚠️ [Thread-{batch_number}] Unexpected reference_data type: {type(all_reference_data)}")
-            reference_text = str(all_reference_data)
-        
-        context = reference_text + f"\n\nBatch Data to Process:\n{batch_data}"
+        reference_section = format_reference_for_prompt(reference_data)
 
-        query = f"""
-        Based on this context:\n{context}\n\n
-        Do the following:\n{prompt}
-        """
+        query = f"""{"=" * 80}
+BATCH DATA TO PROCESS:
+{"=" * 80}
+{batch_data}
+
+{"=" * 80}
+{reference_section}
+{"=" * 80}
+
+{prompt}"""
 
         response_text = invoke_model(query, max_tokens=8000)
         
@@ -159,7 +156,7 @@ def merge_batch_results(batch_results_with_numbers):
     return merged_results
 
 
-def process_batches_in_groups(batches, prompt, all_reference_data, group_size=20, max_workers=20):
+def process_batches_in_groups(batches, prompt, reference_data, group_size=20, max_workers=20):
     """
     Process batches in sequential groups to avoid overwhelming services
     """
@@ -183,7 +180,7 @@ def process_batches_in_groups(batches, prompt, all_reference_data, group_size=20
                 batch_number = group_idx + batch_idx + 1
                 future = executor.submit(
                     process_single_batch,
-                    batch, prompt, batch_number, all_reference_data
+                    batch, prompt, batch_number, reference_data
                 )
                 future_to_batch[future] = batch_number
             
@@ -219,8 +216,9 @@ def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAP
         
         reference_file_regions = f"{STAR_BUCKET_KEY_NAME}/clarisa_regions.xlsx"
         reference_file_countries = f"{STAR_BUCKET_KEY_NAME}/clarisa_countries.xlsx"
-        initialize_reference_data(
-            bucket_name, reference_file_regions, reference_file_countries)
+        reference_data = get_reference_data(
+            bucket_name, STAR_BUCKET_KEY_NAME, reference_file_regions, reference_file_countries
+        )
 
         document_content = read_document_from_s3(bucket_name, file_key)
         chunks = split_text(document_content)
@@ -232,8 +230,6 @@ def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAP
             chunks = [c for c in chunks if not any(f"ID: {sid}" in c for sid in skip_set)]
             logger.info(f"🔽 Skipped {original_count - len(chunks)} already-submitted rows (skip_ids={list(skip_set)})")
 
-        all_reference_data = get_all_reference_data()
-
         if isinstance(document_content, dict) and document_content.get("type") == "excel":
             logger.info(f"📊 Excel file detected with {len(chunks)} rows. Processing in sequential groups...")
 
@@ -243,7 +239,7 @@ def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAP
             logger.info(f"📋 Each group processes {group_size * 5} rows ({group_size} batches x 5 rows per batch)")
             
             batch_results_with_numbers = process_batches_in_groups(
-                batches, prompt, all_reference_data, group_size, max_workers
+                batches, prompt, reference_data, group_size, max_workers
             )
             
             final_result = merge_batch_results(batch_results_with_numbers)
@@ -319,16 +315,20 @@ def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAP
             embeddings = [get_embedding(chunk) for chunk in chunks]
             db, temp_table_name, document_name = store_temp_embeddings(chunks, embeddings, file_key)
             relevant_chunks = get_relevant_chunk(prompt, db, temp_table_name, document_name)
-            
-            if isinstance(all_reference_data, list):
-                context = "\n".join(all_reference_data) + relevant_chunks
-            else:
-                context = str(all_reference_data) + relevant_chunks
 
-            query = f"""
-            Based on this context:\n{context}\n\n
-            Do the following:\n{prompt}
-            """
+            document_text = "\n\n---\n\n".join(relevant_chunks)
+            reference_section = format_reference_for_prompt(reference_data)
+
+            query = f"""{"=" * 80}
+DOCUMENT TO ANALYZE:
+{"=" * 80}
+{document_text}
+
+{"=" * 80}
+{reference_section}
+{"=" * 80}
+
+{prompt}"""
 
             response_text = invoke_model(query, max_tokens=15000)
             extracted_json = extract_json_from_markdown(response_text)

@@ -13,11 +13,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.utils.interactions.interaction_client import interaction_client
 from app.utils.config.config_util import AWS, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, MAPPING_URL
 from app.schemas.mining_schemas import MiningResponse, InnovationDevelopmentResult, PolicyChangeResult, CapacityDevelopmentResult
+from app.llm.reference_cache import get_reference_data, format_reference_for_prompt
 from app.llm.vectorize import (get_embedding,
-                               check_reference_exists,
-                               store_reference_embeddings,
                                store_temp_embeddings,
-                               get_all_reference_data,
                                get_relevant_chunk
                                )
 
@@ -212,46 +210,6 @@ def _clean_organization_fields(mining_result):
         logger.info(f"🧹 All organizations removed - no valid data")
 
 
-def initialize_reference_data(bucket_name, file_key_regions, file_key_countries):
-    """Initialize reference data if it doesn't exist"""
-    try:
-        if check_reference_exists():
-            logger.info("✅ Reference data already exists in the database")
-            return True
-
-        logger.info("🔄 Initializing reference data...")
-
-        document_content_regions = read_document_from_s3(bucket_name, file_key_regions)
-        document_content_countries = read_document_from_s3(bucket_name, file_key_countries)
-
-        if isinstance(document_content_regions, dict) and document_content_regions.get("type") == "excel":
-            regions_chunks = document_content_regions["chunks"]
-        else:
-            regions_chunks = [document_content_regions]
-         
-        if isinstance(document_content_countries, dict) and document_content_countries.get("type") == "excel":
-            countries_chunks = document_content_countries["chunks"]
-        else:
-            countries_chunks = [document_content_countries]
-
-        logger.info(f"📊 Generating embeddings for {len(regions_chunks)} region chunks and {len(countries_chunks)} country chunks...")
-        
-        regions_embeddings = [get_embedding(chunk) for chunk in regions_chunks]
-        countries_embeddings = [get_embedding(chunk) for chunk in countries_chunks]
-
-        all_content = regions_chunks + countries_chunks
-        all_embeddings = regions_embeddings + countries_embeddings
-
-        store_reference_embeddings(all_content, all_embeddings)
-
-        logger.info("✅ Reference data initialized successfully")
-        return True
-
-    except Exception as e:
-        logger.error(f"❌ Error initializing reference data: {str(e)}")
-        raise
-
-
 def format_mining_response(raw_response: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
     """
     Format the mining response to ensure consistent structure with indicator-specific fields
@@ -334,27 +292,33 @@ def process_document(bucket_name, file_key, prompt=DEFAULT_PROMPT_STAR, user_id:
     try:
         reference_file_regions = f"{STAR_BUCKET_KEY_NAME}/clarisa_regions.xlsx"
         reference_file_countries = f"{STAR_BUCKET_KEY_NAME}/clarisa_countries.xlsx"
-        initialize_reference_data(
-            bucket_name, reference_file_regions, reference_file_countries)
+        reference_data = get_reference_data(
+            bucket_name, STAR_BUCKET_KEY_NAME, reference_file_regions, reference_file_countries
+        )
 
         document_content = read_document_from_s3(bucket_name, file_key)
         chunks = split_text(document_content)
 
-        logger.info("#️⃣ Generating embeddings...")
+        logger.info("#️⃣  Generating embeddings...")
         embeddings = [get_embedding(chunk) for chunk in chunks]
 
         db, temp_table_name, document_name = store_temp_embeddings(chunks, embeddings, file_key)
 
-        all_reference_data = get_all_reference_data()
-
         relevant_chunks = get_relevant_chunk(prompt, db, temp_table_name, document_name)
 
-        context = all_reference_data + relevant_chunks
+        document_text = "\n\n---\n\n".join(relevant_chunks)
+        reference_section = format_reference_for_prompt(reference_data)
 
-        query = f"""
-        Based on this context:\n{context}\n\n
-        Answer the question:\n{prompt}
-        """
+        query = f"""{"=" * 80}
+DOCUMENT TO ANALYZE:
+{"=" * 80}
+{document_text}
+
+{"=" * 80}
+{reference_section}
+{"=" * 80}
+
+{prompt}"""
 
         response_text = invoke_model(query)
         
@@ -450,8 +414,9 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS, use
     try:
         reference_file_regions = f"{PRMS_BUCKET_KEY_NAME}/clarisa_regions.xlsx"
         reference_file_countries = f"{PRMS_BUCKET_KEY_NAME}/clarisa_countries.xlsx"
-        initialize_reference_data(
-            bucket_name, reference_file_regions, reference_file_countries)
+        reference_data = get_reference_data(
+            bucket_name, PRMS_BUCKET_KEY_NAME, reference_file_regions, reference_file_countries
+        )
 
         document_content = read_document_from_s3(bucket_name, file_key)
         chunks = split_text(document_content)
@@ -461,16 +426,21 @@ def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS, use
 
         db, temp_table_name, document_name = store_temp_embeddings(chunks, embeddings, file_key)
 
-        all_reference_data = get_all_reference_data()
-
         relevant_chunks = get_relevant_chunk(prompt, db, temp_table_name, document_name)
 
-        context = all_reference_data + relevant_chunks
+        document_text = "\n\n---\n\n".join(relevant_chunks)
+        reference_section = format_reference_for_prompt(reference_data)
 
-        query = f"""
-        Based on this context:\n{context}\n\n
-        Answer the question:\n{prompt}
-        """
+        query = f"""{"=" * 80}
+DOCUMENT TO ANALYZE:
+{"=" * 80}
+{document_text}
+
+{"=" * 80}
+{reference_section}
+{"=" * 80}
+
+{prompt}"""
 
         response_text = invoke_model(query)
         
