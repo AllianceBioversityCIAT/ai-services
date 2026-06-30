@@ -19,7 +19,6 @@ logger.info(f"Production mode: DB path set to {DB_PATH}")
 # DB_PATH = str(BASE_DIR / "app" / "db" / "miningdb")
 # logger.info(f"Development mode: DB path set to {DB_PATH}")
 
-REFERENCE_TABLE_NAME = "clarisa_reference"
 TEMP_TABLE_NAME = "temp_documents"
 
 
@@ -66,16 +65,6 @@ def get_embedding(text):
         raise
 
 
-def check_reference_exists(db_path=DB_PATH):
-    """Check if reference table already exists in the database"""
-    try:
-        db = lancedb.connect(db_path)
-        return REFERENCE_TABLE_NAME in db.table_names()
-    except Exception as e:
-        logger.error(f"❌ Error checking reference table: {str(e)}")
-        return False
-
-
 def normalize_filename(filename):
     filename = unicodedata.normalize('NFKD', filename)
     filename = filename.encode('ASCII', 'ignore').decode('utf-8')
@@ -83,27 +72,6 @@ def normalize_filename(filename):
     filename = re.sub(r'[^a-z0-9_\-\.]', '', filename)
 
     return filename
-
-
-def store_reference_embeddings(chunks, embeddings, db_path=DB_PATH):
-    """Store reference data embeddings that should persist"""
-    try:
-        logger.info("💾 Storing reference embeddings in LanceDB...")
-        db = lancedb.connect(db_path)
-
-        data = [{"text": chunk, "vector": embedding, "is_reference": True}
-                for chunk, embedding in zip(chunks, embeddings)]
-
-        if REFERENCE_TABLE_NAME not in db.table_names():
-            db.create_table(REFERENCE_TABLE_NAME, data=data)
-            logger.info(f"✅ Created reference table with {len(data)} entries")
-        else:
-            logger.info("✅ Reference table already exists")
-
-        return db
-    except Exception as e:
-        logger.error(f"❌ Error storing reference embeddings: {str(e)}")
-        raise
 
 
 def store_temp_embeddings(chunks, embeddings, file_key, db_path=DB_PATH):
@@ -132,29 +100,6 @@ def store_temp_embeddings(chunks, embeddings, file_key, db_path=DB_PATH):
         return db, TEMP_TABLE_NAME, document_name
     except Exception as e:
         logger.error(f"❌ Error storing temporary embeddings: {str(e)}")
-        raise
-
-
-def get_all_reference_data(db_path=DB_PATH):
-    """
-    Retrieve all data from the reference table without filtering by relevance
-    """
-    try:
-        logger.info("📚 Retrieving all reference data...")
-        db = lancedb.connect(db_path)
-
-        if REFERENCE_TABLE_NAME not in db.table_names():
-            logger.warning("⚠️ Reference table does not exist!")
-            return []
-
-        ref_table = db.open_table(REFERENCE_TABLE_NAME)
-        all_data = ref_table.to_pandas()
-
-        logger.info(f"✅ Retrieved {len(all_data)} reference records")
-        return all_data["text"].tolist()
-
-    except Exception as e:
-        logger.error(f"❌ Error retrieving all reference data: {str(e)}")
         raise
 
 
