@@ -231,12 +231,6 @@ async def serve_ui_alt():
     return FileResponse('interface/aiccra_mining/index.html')
 
 
-@app.get("/bulk-upload", tags=["STAR Project"])
-async def serve_bulk_upload():
-    """Serve the bulk upload interface"""
-    return FileResponse('interface/bulk_upload/bulk_upload.html')
-
-
 @app.get("/aiccra/prompt", tags=["AICCRA Project"])
 async def get_aiccra_prompt():
     """Get the default AICCRA prompt template"""
