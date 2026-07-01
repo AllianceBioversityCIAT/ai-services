@@ -1728,6 +1728,24 @@ class AICCRATextMiningUI {
         resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    parseJsonFromText(text) {
+        if (!text || typeof text !== 'string') return null;
+
+        const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+        const candidates = codeBlockMatch ? [codeBlockMatch[1].trim(), text.trim()] : [text.trim()];
+
+        for (const candidate of candidates) {
+            try {
+                const parsed = JSON.parse(candidate);
+                if (parsed.results) return parsed;
+            } catch (e) {
+                // Try next candidate
+            }
+        }
+
+        return null;
+    }
+
     extractResults(result) {
         // First, check if we already have a structured results format
         if (result.results) return result;
@@ -1744,7 +1762,9 @@ class AICCRATextMiningUI {
                         
                         // Check if there's a nested json_content with text
                         if (parsed.json_content && parsed.json_content.text) {
-                            // This is likely a free-form response, not structured JSON
+                            const nestedResults = this.parseJsonFromText(parsed.json_content.text);
+                            if (nestedResults) return nestedResults;
+
                             return {
                                 results: [],
                                 freeFormResponse: parsed.json_content.text,
@@ -1880,8 +1900,8 @@ class AICCRATextMiningUI {
         // Clean up the response text
         let cleanResponse = response;
         
-        // Remove code blocks but keep their content
-        cleanResponse = cleanResponse.replace(/```[\s\S]*?```/g, '');
+        // Unwrap code blocks but keep their content
+        cleanResponse = cleanResponse.replace(/```(?:json)?\s*\n?([\s\S]*?)\n?```/g, '$1');
         
         // Convert markdown headers to HTML
         cleanResponse = cleanResponse.replace(/^### (.*$)/gim, '<h3 style="color: var(--primary-blue); margin: 1.5rem 0 0.75rem 0; font-size: 1.1rem;">$1</h3>');
