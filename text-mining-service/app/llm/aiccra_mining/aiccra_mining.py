@@ -6,7 +6,7 @@ from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
 from app.utils.config.config_util import AICCRA_BUCKET_KEY_NAME
 from app.utils.prompt.prompt_aiccra import DEFAULT_PROMPT_AICCRA
-from app.llm.mining import split_text, invoke_model, is_valid_json
+from app.llm.mining import split_text, invoke_model, is_valid_json, extract_json_from_markdown
 from app.utils.interactions.interaction_client import interaction_client
 from app.llm.reference_cache import get_reference_data, format_reference_for_prompt
 from app.llm.vectorize import get_embedding, store_temp_embeddings, get_relevant_chunk
@@ -55,7 +55,8 @@ DOCUMENT TO ANALYZE:
 {prompt}"""
 
         response_text = invoke_model(query)
-        json_content = json.loads(response_text) if is_valid_json(response_text) else {"text": response_text}
+        extracted_json = extract_json_from_markdown(response_text)
+        json_content = json.loads(extracted_json) if is_valid_json(extracted_json) else {"text": response_text}
 
         end_time = time.time()
         elapsed_time = end_time - start_time
