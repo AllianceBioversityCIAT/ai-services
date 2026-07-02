@@ -3,6 +3,8 @@ import type { BulkUploadResult, RawInstitution, RawUser } from '../types';
 export interface CompletenessResult {
   isComplete: boolean;
   reasons: string[];
+  /** Actual field keys that are missing/invalid, e.g. ["title", "training_type"] */
+  missing_fields: string[];
 }
 
 // =========================
@@ -34,37 +36,39 @@ function isMappedUser(user: RawUser): boolean {
 
 export function checkCompleteness(result: BulkUploadResult): CompletenessResult {
   const reasons: string[] = [];
+  const fields = new Set<string>();
+  const fail = (field: string, reason: string) => { reasons.push(reason); fields.add(field); };
 
-  // ── Universal fields ─────────────────────────────────
+  // ── Universal fields ──────────────────────────────────────────
 
-  if (isEmpty(result.title)) reasons.push('Title is required');
-  if (isEmpty(result.year)) reasons.push('Year is required');
-  if (isEmpty(result.training_type)) reasons.push('Training Type is required');
+  if (isEmpty(result.title)) fail('title', 'Title is required');
+  if (isEmpty(result.year)) fail('year', 'Year is required');
+  if (isEmpty(result.training_type)) fail('training_type', 'Training Type is required');
 
   // Main contact person
   if (!result.main_contact_person) {
-    reasons.push('Main Contact Person is required');
+    fail('main_contact_person', 'Main Contact Person is required');
   } else if (!isMappedUser(result.main_contact_person as RawUser)) {
     const name = (result.main_contact_person as RawUser).name;
-    reasons.push(`Main Contact Person “${name}” could not be automatically matched — please add it manually`);
+    fail('main_contact_person', `Main Contact Person "${name}" could not be automatically matched — please add it manually`);
   }
 
   // Training supervisor (both types)
   if (!result.training_supervisor) {
-    reasons.push('Training Supervisor is required');
+    fail('training_supervisor', 'Training Supervisor is required');
   } else if (!isMappedUser(result.training_supervisor as RawUser)) {
     const name = (result.training_supervisor as RawUser).name;
-    reasons.push(`Training Supervisor “${name}” could not be automatically matched — please add it manually`);
+    fail('training_supervisor', `Training Supervisor "${name}" could not be automatically matched — please add it manually`);
   }
 
   // Partners (required unless AI found none, in which case is_partner_not_applicable covers it)
   if (!result.is_partner_not_applicable) {
     if (!Array.isArray(result.partners) || result.partners.length === 0) {
-      reasons.push('At least one Partner is required');
+      fail('partners', 'At least one Partner is required');
     } else {
       const unmapped = (result.partners as RawInstitution[]).filter((p) => !isMappedInstitution(p));
       if (unmapped.length > 0) {
-        reasons.push(
+        fail('partners',
           `${unmapped.length} partner${unmapped.length > 1 ? 's' : ''} could not be automatically matched — please add ${unmapped.length > 1 ? 'them' : 'it'} manually or submit a partner request`,
         );
       }
@@ -73,7 +77,7 @@ export function checkCompleteness(result: BulkUploadResult): CompletenessResult 
     // User manually added partners after AI found none — validate mapping
     const unmapped = (result.partners as RawInstitution[]).filter((p) => !isMappedInstitution(p));
     if (unmapped.length > 0) {
-      reasons.push(
+      fail('partners',
         `${unmapped.length} partner${unmapped.length > 1 ? 's' : ''} could not be automatically matched — please add ${unmapped.length > 1 ? 'them' : 'it'} manually or submit a partner request`,
       );
     }
@@ -81,68 +85,68 @@ export function checkCompleteness(result: BulkUploadResult): CompletenessResult 
 
   // Evidences
   if (!Array.isArray(result.evidences) || result.evidences.length === 0) {
-    reasons.push('At least one Evidence Link is required');
+    fail('evidences', 'At least one Evidence Link is required');
   } else {
     const emptyLinks = result.evidences.filter((e) => isEmpty(e.evidence_link));
     if (emptyLinks.length > 0) {
-      reasons.push('All evidence entries must have a URL');
+      fail('evidences', 'All evidence entries must have a URL');
     }
     const emptyDescs = result.evidences.filter((e) => isEmpty(e.evidence_description));
     if (emptyDescs.length > 0) {
-      reasons.push('All evidence entries must have a description');
+      fail('evidences', 'All evidence entries must have a description');
     }
   }
 
   // IP Rights: asset_ip_owner_id
   if (isEmpty(result.asset_ip_owner_id)) {
-    reasons.push('Asset IP Owner is required');
+    fail('asset_ip_owner_id', 'Asset IP Owner is required');
   } else if (result.asset_ip_owner_id === 4 || result.asset_ip_owner_id === 'Others') {
     if (isEmpty(result.asset_ip_owner_description)) {
-      reasons.push('Asset IP Owner Description is required when "Others" is selected');
+      fail('asset_ip_owner_description', 'Asset IP Owner Description is required when "Others" is selected');
     }
   }
 
   // IP Rights: publicity_restriction
   if (isEmpty(result.publicity_restriction)) {
-    reasons.push('Publicity Restriction is required');
+    fail('publicity_restriction', 'Publicity Restriction is required');
   } else if (result.publicity_restriction === 'Yes' && isEmpty(result.publicity_restriction_description)) {
-    reasons.push('Publicity Restriction Description is required when "Yes"');
+    fail('publicity_restriction_description', 'Publicity Restriction Description is required when "Yes"');
   }
 
   // IP Rights: potential_asset
   if (isEmpty(result.potential_asset)) {
-    reasons.push('Potential Asset is required');
+    fail('potential_asset', 'Potential Asset is required');
   } else if (result.potential_asset === 'Yes' && isEmpty(result.potential_asset_description)) {
-    reasons.push('Potential Asset Description is required when "Yes"');
+    fail('potential_asset_description', 'Potential Asset Description is required when "Yes"');
   }
 
   // IP Rights: requires_further_development
   if (isEmpty(result.requires_further_development)) {
-    reasons.push('Requires Further Development is required');
+    fail('requires_further_development', 'Requires Further Development is required');
   } else if (result.requires_further_development === 'Yes' && isEmpty(result.requires_further_development_description)) {
-    reasons.push('Further Development Description is required when "Yes"');
+    fail('requires_further_development_description', 'Further Development Description is required when "Yes"');
   }
 
   // Geoscope
   if (isEmpty(result.geoscope_level)) {
-    reasons.push('Geoscope Level is required');
+    fail('geoscope_level', 'Geoscope Level is required');
   } else {
     const level = result.geoscope_level as string;
     if (level === 'Regional') {
       if (!Array.isArray(result.regions) || result.regions.length === 0) {
-        reasons.push('Regions is required for "Regional" geoscope');
+        fail('regions', 'Regions is required for "Regional" geoscope');
       }
     } else if (level === 'National') {
       if (!Array.isArray(result.countries) || result.countries.length === 0) {
-        reasons.push('Countries is required for "National" geoscope');
+        fail('countries', 'Countries is required for "National" geoscope');
       }
     } else if (level === 'Sub-national') {
       if (!Array.isArray(result.countries) || result.countries.length === 0) {
-        reasons.push('Countries is required for "Sub-national" geoscope');
+        fail('countries', 'Countries is required for "Sub-national" geoscope');
       } else {
         const noAreas = result.countries.filter((c) => !c.areas || c.areas.length === 0);
         if (noAreas.length > 0) {
-          reasons.push(
+          fail('countries',
             `${noAreas.length} country${noAreas.length > 1 ? 'ies' : ''} must have at least one sub-national area`,
           );
         }
@@ -155,20 +159,20 @@ export function checkCompleteness(result: BulkUploadResult): CompletenessResult 
 
   if (result.training_type === 'Group training') {
     if (!result.total_participants || (result.total_participants as number) <= 0) {
-      reasons.push('Total Participants is required for Group training');
+      fail('total_participants', 'Total Participants is required for Group training');
     }
     if (isEmpty(result.training_purpose)) {
-      reasons.push('Training Purpose is required for Group training');
+      fail('training_purpose', 'Training Purpose is required for Group training');
     }
     if (result.trainees === 'Yes') {
       if (!Array.isArray(result.trainees_description) || result.trainees_description.length === 0) {
-        reasons.push('Trainees Organizations are required when Trainees is "Yes"');
+        fail('trainees_description', 'Trainees Organizations are required when Trainees is "Yes"');
       } else {
         const unmapped = (result.trainees_description as RawInstitution[]).filter(
           (t) => !isMappedInstitution(t),
         );
         if (unmapped.length > 0) {
-          reasons.push(
+          fail('trainees_description',
             `${unmapped.length} trainee organization${unmapped.length > 1 ? 's' : ''} could not be automatically matched — please add ${unmapped.length > 1 ? 'them' : 'it'} manually or submit a partner request`,
           );
         }
@@ -178,26 +182,26 @@ export function checkCompleteness(result: BulkUploadResult): CompletenessResult 
 
   // ── Degree: universal (applies whenever Long-term is set) ──
   if (result.length_of_training === 'Long-term' && isEmpty(result.degree)) {
-    reasons.push('Degree is required when Length of Training is "Long-term"');
+    fail('degree', 'Degree is required when Length of Training is "Long-term"');
   }
 
   // ── Branch: Individual training ──────────────────────
 
   if (result.training_type === 'Individual training') {
-    if (isEmpty(result.trainee_name)) reasons.push('Trainee Name is required for Individual training');
-    if (isEmpty(result.trainee_gender)) reasons.push('Trainee Gender is required for Individual training');
-    if (isEmpty(result.trainee_nationality)) reasons.push('Trainee Nationality is required for Individual training');
+    if (isEmpty(result.trainee_name)) fail('trainee_name', 'Trainee Name is required for Individual training');
+    if (isEmpty(result.trainee_gender)) fail('trainee_gender', 'Trainee Gender is required for Individual training');
+    if (isEmpty(result.trainee_nationality)) fail('trainee_nationality', 'Trainee Nationality is required for Individual training');
 
     if (isEmpty(result.length_of_training)) {
-      reasons.push('Length of Training is required for Individual training');
+      fail('length_of_training', 'Length of Training is required for Individual training');
     }
 
     if (!result.trainee_affiliation) {
-      reasons.push('Trainee Affiliation is required for Individual training');
+      fail('trainee_affiliation', 'Trainee Affiliation is required for Individual training');
     } else if (!isMappedInstitution(result.trainee_affiliation as RawInstitution)) {
-      reasons.push('Trainee Affiliation could not be automatically matched — please add it manually or submit a partner request');
+      fail('trainee_affiliation', 'Trainee Affiliation could not be automatically matched — please add it manually or submit a partner request');
     }
   }
 
-  return { isComplete: reasons.length === 0, reasons };
+  return { isComplete: reasons.length === 0, reasons, missing_fields: Array.from(fields) };
 }

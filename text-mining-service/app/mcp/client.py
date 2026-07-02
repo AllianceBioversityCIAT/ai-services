@@ -2,29 +2,32 @@ import os
 import json
 import base64
 import boto3
+import httpx
+import requests
 import uvicorn
 from io import BytesIO
 from typing import Optional, Union
 from pydantic import BaseModel, Field
 from mcp.client.stdio import stdio_client
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.utils.s3.s3_util import upload_file_to_s3
 from app.utils.logger.logger_util import get_logger
 from botocore.exceptions import BotoCoreError, ClientError
 from mcp import ClientSession, StdioServerParameters, types
+from fastapi.responses import FileResponse, StreamingResponse
 from app.utils.prompt.prompt_aiccra import DEFAULT_PROMPT_AICCRA
-from app.utils.config.config_util import AWS, CLIENT_ID, CLIENT_SECRET
-from fastapi import FastAPI, HTTPException, Body, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Body, UploadFile, File, Form, Depends, Request, status
 from app.utils.dynamo.create_bulk_table import create_bulk_upload_table_if_not_exists
-from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, AICCRA_BUCKET_KEY_NAME
+from app.utils.config.config_util import AWS, CLIENT_ID, CLIENT_SECRET, IS_PROD, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, AICCRA_BUCKET_KEY_NAME, CLARISA_VALIDATE_URL
 
 
 logger = get_logger()
 
 dynamodb = boto3.resource('dynamodb', region_name=AWS.get('region', 'us-east-1'))
 BULK_UPLOAD_TABLE_NAME = 'bulk_upload_records'
+AI_REQUESTS_TABLE_NAME = 'ai-requests-prod' if IS_PROD else 'ai-requests-testing'
 
 server_params = StdioServerParameters(
     command="python",
@@ -76,6 +79,14 @@ class BulkUploadRecord(BaseModel):
     failed: list[str] = Field(default_factory=list, description="List of failed record IDs")
     links: dict[str, str] = Field(default_factory=dict, description="Dictionary of {recordId: starLink}")
     lastUpdated: str = Field(..., description="Timestamp of last update")
+
+
+class FeedbackRequest(BaseModel):
+    feedback_type: str = Field(..., description="Feedback type: 'positive' or 'negative'")
+    feedback_comment: Optional[str] = Field(None, description="Optional comment (required when feedback_type is 'negative')")
+    file_name: Optional[str] = Field(None, description="Name of the processed file")
+    user_id: Optional[str] = Field(None, description="User identifier")
+    interaction_id: Optional[str] = Field(None, description="ID of the original processing interaction to link feedback to")
 
 
 app = FastAPI(
@@ -142,6 +153,52 @@ async def handle_sampling_message(message: types.CreateMessageRequestParams) -> 
     )
 
 
+API_KEY_NAME = "X-API-Key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
+
+http_client = httpx.AsyncClient()
+
+def validate_with_clarisa(microservice_name: str):
+    async def _validate(request: Request, api_key: str = Depends(api_key_header)):
+        client_ip = request.client.host if request.client else "0.0.0.0"
+        endpoint = request.url.path
+
+        payload = {
+            "api_key": api_key,
+            "microservice_name": microservice_name,
+            "endpoint_accessed": endpoint,
+            "ip_address": client_ip
+        }
+
+        try:
+            response = await http_client.post(CLARISA_VALIDATE_URL, json=payload, timeout=5.0)
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Communication error with the authentication service"
+                )
+
+            data = response.json()
+
+            if not data.get("valid"):
+                error_msg = data.get("error", "Invalid API Key")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=error_msg
+                )
+
+            return data.get("mis")
+
+        except httpx.RequestError:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service is temporarily unavailable"
+            )
+
+    return _validate
+
+
 app.mount("/static", StaticFiles(directory="interface"), name="static")
 
 
@@ -172,12 +229,6 @@ async def get_auth_token():
 async def serve_ui_alt():
     """Alternative endpoint for the UI"""
     return FileResponse('interface/aiccra_mining/index.html')
-
-
-@app.get("/bulk-upload", tags=["STAR Project"])
-async def serve_bulk_upload():
-    """Serve the bulk upload interface"""
-    return FileResponse('interface/bulk_upload/bulk_upload.html')
 
 
 @app.get("/aiccra/prompt", tags=["AICCRA Project"])
@@ -507,6 +558,7 @@ async def update_record_status(data: RecordStatusUpdate):
           },
           tags=["STAR Project"])
 async def process_document_endpoint(
+    request: Request,
     bucketName: str = Form(
         ..., description="Name of the S3 bucket where the document is/will be located", examples=["cgiar-documents"]),
     token: str = Form(
@@ -520,7 +572,8 @@ async def process_document_endpoint(
     ),
     user_id: Optional[str] = Form(
         None, description="User identifier for interaction tracking", examples=["user@example.com", "researcher@cgiar.org"]
-    )
+    ),
+    mis: str = Depends(validate_with_clarisa("AI Text Mining - STAR"))
 ):
     """
     Process a document stored in S3 using text mining techniques.
@@ -730,6 +783,7 @@ async def process_document_prms_endpoint(
           },
           tags=["STAR Project"])
 async def bulk_upload_capdev_endpoint(
+    request: Request,
     bucketName: str = Form(
         ..., description="Name of the S3 bucket where the document is/will be located", examples=["cgiar-documents"]),
     token: str = Form(
@@ -749,7 +803,8 @@ async def bulk_upload_capdev_endpoint(
     ),
     user_name: Optional[str] = Form(
         None, description="Full name of the user for interaction tracking", examples=["John Doe"]
-    )
+    ),
+    mis: str = Depends(validate_with_clarisa("AI Bulk Upload - STAR"))
 ):
     """
     Process a document stored in S3 using text mining techniques.
@@ -961,7 +1016,84 @@ async def process_document_aiccra_endpoint(
     except Exception as e:
         logger.error(f"Error processing document: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
+@app.post("/feedback",
+          summary="Submit user feedback for bulk upload experience",
+          tags=["Feedback"])
+async def submit_feedback(req: FeedbackRequest):
+    """Receive thumbs-up / thumbs-down feedback from the bulk upload UI and update
+    the original processing interaction via the interaction tracking service."""
+    logger.info(f"📝 Feedback received: feedback_type={req.feedback_type}, user={req.user_id}, file={req.file_name}, interaction_id={req.interaction_id}")
+    if req.feedback_comment:
+        logger.info(f"💬 Feedback comment: {req.feedback_comment}")
+
+    try:
+        from app.utils.interactions.interaction_client import INTERACTION_SERVICE_URL
+        payload = {
+            "user_id": req.user_id or "anonymous",
+            "service_name": "bulk-text-mining",
+            "update_mode": True,
+            "interaction_id": req.interaction_id,
+            "feedback_type": req.feedback_type,
+            "feedback_comment": req.feedback_comment,
+        }
+        
+        payload = {k: v for k, v in payload.items() if v is not None}
+        logger.info(f"📦 Sending feedback payload to interaction service: {payload}")
+        response = requests.post(
+            f"{INTERACTION_SERVICE_URL.rstrip('/')}/api/interactions",
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=10,
+        )
+        if response.status_code == 200:
+            logger.info(f"✅ Feedback tracked successfully: {response.json()}")
+        else:
+            logger.error(f"❌ Interaction service returned {response.status_code}: {response.text}")
+    except Exception as e:
+        logger.error(f"Failed to send feedback to interaction service: {e}")
+
+    return {"status": "ok"}
+
+
+@app.get("/feedback/{interaction_id}",
+         summary="Query feedback by interaction ID",
+         description="""
+         Retrieve feedback data stored in DynamoDB for a specific AI processing interaction.
+
+         Intended for STAR backend services to check whether a user left feedback
+         for a given bulk upload session identified by its AI interaction ID.
+
+         Returns feedback_type ('positive' or 'negative'), optional comment, file name,
+         user identifier, and timestamp.
+         """,
+         responses={
+             200: {"description": "Feedback record found"},
+             404: {"description": "No feedback found for this interaction_id"},
+             500: {"description": "Internal server error"},
+         },
+         tags=["Feedback"])
+async def get_feedback_by_interaction(interaction_id: str):
+    """Query DynamoDB for feedback associated with a given AI interaction ID."""
+    try:
+        ai_requests_table = dynamodb.Table(AI_REQUESTS_TABLE_NAME)
+        response = ai_requests_table.get_item(Key={
+            "interaction_id": interaction_id,
+            "service_name": "bulk-text-mining",
+        })
+        if "Item" not in response:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No record found for interaction_id: {interaction_id}"
+            )
+        return {"status": "ok", "data": response["Item"]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error querying feedback for interaction_id={interaction_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error querying feedback: {str(e)}")
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -125,6 +125,8 @@ export function formatResultForSTAR(result: BulkUploadResult): Record<string, un
     const aff = formatted.trainee_affiliation as Record<string, unknown>;
     if (aff.similarity_score !== undefined && aff.similarity_score !== null) aff.similarity_score = Number(aff.similarity_score);
     if (aff.institution_id !== undefined && aff.institution_id !== null) aff.institution_id = String(aff.institution_id);
+    delete aff.mapped_institution_name;
+    delete aff.mapped_institution_acronym;
     if (!aff.institution_name || !aff.similarity_score) delete formatted.trainee_affiliation;
   }
 
@@ -133,6 +135,7 @@ export function formatResultForSTAR(result: BulkUploadResult): Record<string, un
     const sup = formatted.training_supervisor as Record<string, unknown>;
     if (sup.similarity_score !== undefined && sup.similarity_score !== null) sup.similarity_score = Number(sup.similarity_score);
     if (sup.code !== undefined && sup.code !== null) sup.code = String(sup.code);
+    delete sup.mapped_name;
     if (!sup.name || !sup.similarity_score) delete formatted.training_supervisor;
   }
 
@@ -141,6 +144,7 @@ export function formatResultForSTAR(result: BulkUploadResult): Record<string, un
     const mcp = formatted.main_contact_person as Record<string, unknown>;
     if (mcp.similarity_score !== undefined && mcp.similarity_score !== null) mcp.similarity_score = Number(mcp.similarity_score);
     if (mcp.code !== undefined && mcp.code !== null) mcp.code = String(mcp.code);
+    delete mcp.mapped_name;
     if (!mcp.name || !mcp.similarity_score) delete formatted.main_contact_person;
   }
 
@@ -189,6 +193,8 @@ export function formatResultForSTAR(result: BulkUploadResult): Record<string, un
             const partner = { ...p };
             if (partner.similarity_score !== undefined && partner.similarity_score !== null) partner.similarity_score = Number(partner.similarity_score);
             if (partner.institution_id !== undefined && partner.institution_id !== null) partner.institution_id = String(partner.institution_id);
+            delete partner.mapped_institution_name;
+            delete partner.mapped_institution_acronym;
             return partner;
           }
           return p;
@@ -210,6 +216,8 @@ export function formatResultForSTAR(result: BulkUploadResult): Record<string, un
             const trainee = { ...t };
             if (trainee.similarity_score !== undefined && trainee.similarity_score !== null) trainee.similarity_score = Number(trainee.similarity_score);
             if (trainee.institution_id !== undefined && trainee.institution_id !== null) trainee.institution_id = String(trainee.institution_id);
+            delete trainee.mapped_institution_name;
+            delete trainee.mapped_institution_acronym;
             return trainee;
           }
           return t;
