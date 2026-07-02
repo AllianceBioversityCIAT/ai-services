@@ -1,0 +1,17 @@
+boto3
+numpy
+pandas
+openpyxl
+tqdm
+python-dotenv
+pyjwt
+aiohttp
+certifi
+requests
+fastapi
+uvicorn
+python-multipart
+mangum
+pydantic
+mammoth
+python-pptx
