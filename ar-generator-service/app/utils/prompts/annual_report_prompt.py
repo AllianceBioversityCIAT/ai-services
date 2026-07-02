@@ -9,7 +9,7 @@ Theme 1, Theme 2, Theme 3, Theme 4.
 """
 
 
-def generate_summary_prompt(indicator, year, total_expected, total_achieved, progress):
+def generate_summary_prompt(indicator, indicator_title, year, total_expected, total_achieved, progress):
   return f"""
 # CONTEXT
 AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa) is a multi-country initiative led by CGIAR. Its mission is to scale the impact of climate-smart agriculture, climate information services, and innovative practices to improve resilience, livelihoods, 
@@ -26,6 +26,11 @@ You are a reporting assistant for AICCRA (Accelerating Impacts of CGIAR Climate 
 # TASK
 Write a single concise summary paragraph (3-5 sentences) for the Annual Report submitted to the World Bank.
 This paragraph introduces indicator {indicator} and summarizes overall progress across all clusters by the end of {year}.
+
+# INDICATOR
+- Acronym: {indicator}
+- Full title: {indicator_title}
+- Use the full title to determine the correct unit of measurement (e.g., people, hectares, institutions, etc.) when describing achievements.
 
 # STRUCTURE
 1. One or two sentences providing brief context about what indicator {indicator} measures, why it matters and its contributions by end-year.
@@ -87,13 +92,21 @@ The data you receive is structured and extracted from AICCRA's internal reportin
 
 ------
 
+# ⚠️ CRITICAL RULE — READ BEFORE WRITING
+If the input data does NOT contain a "contributions" entry with explicit "Milestone reported value" and "Milestone expected value" fields, you MUST NOT state any achievement count, target, or percentage progress for this cluster.
+DO NOT count deliverables, innovations, or OICRs to derive a number. DO NOT invent or estimate a milestone value.
+Simply describe the outputs and activities without stating any milestone achievement figure.
+
+------
+
 # OBJECTIVE
 Write 1 well-structured, cohesive paragraph covering cluster **{cluster_acronym}**.
 The paragraph must follow this order:
-1. START with the contribution data: state the achieved value as of end-year and compare it to the annual target. Include the percentage progress. Example of structure:
+1. START with the contribution data: state the achieved value as of end-year and compare it to the annual target ONLY IF a "contributions" entry with explicit milestone values is present in the input. Include the percentage progress. Example of structure::
    "By the end of {year}, **{cluster_acronym}** achieved {{Milestone reported value}} out of the annual target of {{Milestone expected value}} for {indicator}, representing {{percentage}}% progress."
    - Include appropriate units when the indicator involves hectares, number of tools developed, policies influenced, percentages, or beneficiary numbers.
    - Do not fabricate progress data if it is not explicitly available in the input.
+   - If no contribution entry with explicit milestone values is present, skip this sentence entirely and go directly to describing deliverables and activities.
 2. THEN describe key activities, deliverables, outputs, tangible results and measurable outcomes.
 3. Include any deviations from the planned activities and challenges.
 4. Reference supporting evidence as inline citations at the end of relevant sentences.
@@ -155,15 +168,13 @@ def generate_cluster_editorial_prompt(indicator, year, cluster_acronym):
   return f"""
 # ROLE
 You are a communications specialist for AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa).
-You are editing the Annual Report narrative for cluster **{cluster_acronym}**, indicator {indicator}, year {year},
-to be submitted to the World Bank.
+You are editing the Annual Report narrative for cluster **{cluster_acronym}**, indicator {indicator}, year {year}, to be submitted to the World Bank.
 
 ------
 
 # TASK
 You will receive a raw evidence draft written by a reporting assistant.
-Your task is to rewrite it into a polished, publication-quality narrative
-that clearly communicates the impact of AICCRA interventions.
+Your task is to rewrite it into a polished, publication-quality narrative that clearly communicates the impact of AICCRA interventions.
 
 ------
 
@@ -180,8 +191,7 @@ Organize the narrative following this logical flow:
 3. **Output**: What was concretely delivered or produced?
 4. **Outcome or impact**: What changed as a result? Who benefited? Why does it matter for climate resilience?
 
-Not every paragraph needs all four elements, but the overall narrative must progress from
-"what was the problem" to "what AICCRA did" to "what this meant for people and systems".
+Not every paragraph needs all four elements, but the overall narrative must progress from "what was the problem" to "what AICCRA did" to "what this meant for people and systems".
 
 ------
 

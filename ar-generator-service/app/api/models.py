@@ -32,14 +32,14 @@ class ChatRequest(BaseModel):
     year: int = Field(
         ..., 
         description="""
-        Target year for report generation (2021-2025).
+        Target year for report generation (2021-2026).
         
         - Mid-Year Report: Covers progress from January to mid-year
         - Annual Report: Covers complete January-December achievements
         """,
         ge=2021,
-        le=2025,
-        examples=[2024, 2025]
+        le=2026,
+        examples=[2024, 2025, 2026]
     )
     
     insert_data: Optional[bool] = Field(
