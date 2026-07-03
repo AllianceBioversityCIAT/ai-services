@@ -18,10 +18,10 @@ app = FastAPI(
     using large language models (LLM) via AWS Bedrock.
 
     **Use cases:**
-    - Generate comprehensive overviews and summaries of research documents
-    - Extract key findings, recommendations, and metadata from reports
+    - Generate comprehensive project overviews from up to 3 documents per project
+    - Extract key findings, recommendations, and metadata from project reports
     - Support multiple document formats: PDF, DOCX, TXT, XLSX, PPTX
-    - Optional OCR-quality text extraction via Amazon Textract (scanned PDFs, images)
+    - Parallel text extraction with Amazon Textract for PDFs and images
 
     **Tech Stack**
     - FastAPI
@@ -40,7 +40,7 @@ app = FastAPI(
     openapi_tags=[
         {
             "name": "Document Overview",
-            "description": "Generate structured overviews and insights from documents stored in S3"
+            "description": "Generate structured project overviews from documents stored in an S3 folder"
         },
         {
             "name": "Health",
@@ -72,14 +72,14 @@ async def root():
     return {
         "service": "AI Insights API",
         "version": "1.0.0",
-        "description": "REST API for document analysis and insight generation using LLMs",
+        "description": "REST API for project document analysis and insight generation using LLMs",
         "documentation": {
             "swagger_ui": "/docs",
             "redoc": "/redoc",
             "openapi_json": "/openapi.json"
         },
         "endpoints": {
-            "POST /api/document-overview": "Generate a structured overview of a document stored in S3",
+            "POST /api/document-overview": "Generate a structured overview from 1-3 project documents in an S3 folder",
             "GET /health": "Health check endpoint"
         },
         "technology_stack": ["FastAPI", "AWS Bedrock (Claude)", "Amazon Textract", "Python 3.13"]

@@ -1,21 +1,21 @@
 """Pydantic models for the AI Insights API."""
 
 from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 
 class DocumentOverviewRequest(BaseModel):
-    """Request model for generating a document overview."""
+    """Request model for generating a project overview."""
 
     bucket_name: str = Field(
         ...,
-        description="Name of the S3 bucket containing the document",
-        examples=["cgiar-insights-documents"]
+        description="Name of the S3 bucket containing the project documents",
+        examples=["ai-services-ibd"]
     )
-    file_key: str = Field(
+    project_folder: str = Field(
         ...,
-        description="S3 object key (path) of the document to analyze",
-        examples=["reports/annual_report_2024.pdf"]
+        description="S3 folder prefix for the project (1-3 documents)",
+        examples=["star/ai-insights/projects/abc123"]
     )
     user_id: Optional[str] = Field(
         default=None,
@@ -24,30 +24,41 @@ class DocumentOverviewRequest(BaseModel):
     )
 
 
+class ProcessedDocument(BaseModel):
+    """Metadata for a document processed during overview generation."""
+
+    file_key: str = Field(..., description="S3 object key of the processed document")
+    extraction_method: str = Field(
+        ...,
+        description="Text extraction method used: 'textract' or 'standard'",
+        examples=["textract", "standard"]
+    )
+    character_count: int = Field(..., description="Number of characters extracted from the document")
+
+
 class DocumentOverviewResponse(BaseModel):
-    """Successful response model for the document overview endpoint."""
+    """Successful response model for the project overview endpoint."""
 
     overview: Dict[str, Any] = Field(
         ...,
-        description="Structured document overview extracted by the LLM"
+        description="Structured project overview extracted by the LLM"
     )
     time_taken: str = Field(
         ...,
         description="Total processing time in seconds",
-        examples=["4.32"]
+        examples=["24.32"]
     )
-    file_key: str = Field(
+    project_folder: str = Field(
         ...,
-        description="S3 object key of the analyzed document"
+        description="S3 folder prefix of the analyzed project"
     )
     bucket_name: str = Field(
         ...,
-        description="S3 bucket of the analyzed document"
+        description="S3 bucket of the analyzed project"
     )
-    extraction_method: str = Field(
+    documents_processed: List[ProcessedDocument] = Field(
         ...,
-        description="Text extraction method used: 'textract' or 'standard'",
-        examples=["standard", "textract"]
+        description="List of documents extracted and analyzed"
     )
     interaction_id: Optional[str] = Field(
         default=None,

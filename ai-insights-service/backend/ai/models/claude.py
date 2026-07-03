@@ -58,7 +58,7 @@ def invoke_model(prompt, max_tokens=15000):
         logger.info(f"📊 Token usage - Input: {input_tokens}, Output: {output_tokens}")
         
         response_text = response_body['content'][0]['text']
-        logger.info(f"📄 Model response (first 500 chars): {response_text[:500]}...")
+        logger.info(f"📄 Model response (first 1000 chars): {response_text[:1000]}...")
         
         if stop_reason != 'end_turn':
             logger.warning(f"⚠️ Model stopped with reason: {stop_reason} (may indicate truncation or max_tokens reached)")

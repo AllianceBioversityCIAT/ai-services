@@ -4,7 +4,7 @@ import certifi
 import logging
 import aiohttp
 from typing import Dict, Any, Optional
-from app.utils.config.config_util import IS_PROD
+from utils.config.config_util import IS_PROD, SLACK_WEBHOOK_URL
 
 
 class NotificationService:
@@ -12,7 +12,7 @@ class NotificationService:
         """Initialize notification service"""
         self.is_prod = IS_PROD
         self.logger = logging.getLogger(__name__)
-        self.slack_webhook = os.getenv('SLACK_WEBHOOK_URL')
+        self.slack_webhook = SLACK_WEBHOOK_URL
 
     async def send_slack_notification(
         self,
@@ -64,3 +64,6 @@ class NotificationService:
         except Exception as e:
             self.logger.error(f"Error sending Slack notification: {str(e)}")
             return False
+
+
+notification_service = NotificationService()

@@ -8,6 +8,12 @@ from utils.logger.logger_util import get_logger
 
 logger = get_logger()
 
+SUPPORTED_DOCUMENT_EXTENSIONS = {
+    'pdf', 'jpg', 'jpeg', 'png', 'tiff', 'tif',
+    'docx', 'txt', 'xls', 'xlsx', 'pptx',
+}
+MAX_PROJECT_DOCUMENTS = 3
+
 s3_client = boto3.client(
     's3',
     aws_access_key_id=AWS['aws_access_key'],
@@ -77,7 +83,65 @@ def _process_file_content(file_extension, file_content):
                     text += shape.text + "\n"
         return text
     else:
-        raise ValueError(f"❌ File format not supported: {file_extension}")
+        raise ValueError(f"File format not supported: {file_extension}")
+
+
+def list_project_documents(
+    bucket_name: str,
+    project_folder: str,
+    max_documents: int = MAX_PROJECT_DOCUMENTS,
+) -> list[str]:
+    """
+    List supported document keys under a project folder in S3.
+
+    Args:
+        bucket_name: S3 bucket name
+        project_folder: Folder prefix for the project (e.g. star/ai-insights/projects/abc123)
+        max_documents: Maximum number of documents allowed (default: 3)
+
+    Returns:
+        Sorted list of S3 object keys
+
+    Raises:
+        ValueError: If no supported documents are found or the limit is exceeded
+    """
+    prefix = project_folder.strip('/')
+    if prefix:
+        prefix = f"{prefix}/"
+
+    logger.info(f"Listing documents in s3://{bucket_name}/{prefix}")
+
+    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+    contents = response.get('Contents', [])
+
+    document_keys = []
+    for obj in contents:
+        key = obj['Key']
+        if key.endswith('/') or obj.get('Size', 0) == 0:
+            continue
+
+        extension = key.lower().rsplit('.', 1)[-1]
+        if extension not in SUPPORTED_DOCUMENT_EXTENSIONS:
+            logger.warning(f"Skipping unsupported file: {key}")
+            continue
+
+        document_keys.append(key)
+
+    document_keys.sort()
+
+    if not document_keys:
+        raise ValueError(
+            f"No supported documents found in s3://{bucket_name}/{project_folder}"
+        )
+
+    if len(document_keys) > max_documents:
+        raise ValueError(
+            f"Found {len(document_keys)} documents in project folder "
+            f"(maximum allowed: {max_documents})"
+        )
+
+    logger.info(f"Found {len(document_keys)} document(s): {document_keys}")
+    return document_keys
 
 
 def read_document_from_s3(bucket_name, file_key):

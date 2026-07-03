@@ -1,11 +1,10 @@
 import json
 import requests
 from typing import Dict, Any, Optional
-from app.utils.logger.logger_util import get_logger
+from utils.logger.logger_util import get_logger
+from utils.config.config_util import INTERACTION_SERVICE_URL
 
 logger = get_logger()
-
-INTERACTION_SERVICE_URL = "https://i8s5i8c21i.execute-api.us-east-1.amazonaws.com"
 
 class InteractionClient:
     """Client for interacting with the external interaction service."""
@@ -18,7 +17,7 @@ class InteractionClient:
         user_id: str,
         user_input: Optional[str],
         ai_output: Optional[str],
-        service_name: str = "text-mining",
+        service_name: str = "ai-insights",
         display_name: Optional[str] = None,
         service_description: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,

@@ -9,12 +9,7 @@ AWS = {
     "aws_region": os.getenv("AWS_REGION", "us-east-1")
 }
 
-STAR_BUCKET_KEY_NAME = os.getenv("STAR_BUCKET_KEY_NAME")
-
-MAPPING_URL = os.getenv("MAPPING_URL")
-
-CLIENT_ID = os.getenv("CLIENT_ID", None)
-CLIENT_SECRET = os.getenv("CLIENT_SECRET", None)
+SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
 
 IS_PROD = os.getenv("IS_PROD", "false").lower() == "true"
 
