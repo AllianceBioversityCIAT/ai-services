@@ -14,3 +14,5 @@ SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
 IS_PROD = os.getenv("IS_PROD", "false").lower() == "true"
 
 CLARISA_VALIDATE_URL = os.getenv("CLARISA_VALIDATE_URL")
+
+INTERACTION_SERVICE_URL = os.getenv("INTERACTION_SERVICE_URL")
