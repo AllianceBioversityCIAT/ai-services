@@ -615,7 +615,7 @@ export function ResultsTable({
                 .filter((col) => !(currentTab === 'pending' && col.type === 'link'))
                 .filter((col) => currentTab !== 'submitted' || col.showInSubmitted)
                 .map((col) => {
-                if (col.readonly || col.type === 'status' || col.type === 'link') {
+                if ((col.readonly && col.type !== 'completeness') || col.type === 'status' || col.type === 'link') {
                   return (
                     <th key={col.key + col.type}>
                       {col.label}
@@ -759,7 +759,7 @@ export function ResultsTable({
       {openFilter !== null && (
         <FilterPanel
           columnKey={openFilter.key}
-          uniqueValues={getUniqueValues(filteredResults, openFilter.key)}
+          uniqueValues={getUniqueValues(filteredResults, openFilter.key, recordStatuses, currentTab)}
           currentFilters={activeFilters[openFilter.key] ?? []}
           anchorRect={openFilter.rect}
           onApply={onFilterApply}

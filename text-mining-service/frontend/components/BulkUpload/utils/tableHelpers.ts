@@ -1,4 +1,5 @@
-import type { BulkUploadResult, RawInstitution, RawUser, RawLanguage, RawCountry, RawEvidence } from '../types';
+import type { BulkUploadResult, RawInstitution, RawUser, RawLanguage, RawCountry, RawEvidence, RecordStatus, TabType } from '../types';
+import { checkCompleteness } from './completenessChecker';
 
 const ASSET_IP_OWNER_ID_TO_NAME: Record<number, string> = {
   1: 'International Center for Tropical Agriculture - CIAT',
@@ -119,11 +120,38 @@ export function getFilterTokens(columnKey: string, value: unknown): string[] {
   return [String(value)];
 }
 
+/** Returns filter tokens for a column, including computed columns like completeness. */
+export function getColumnFilterTokens(
+  columnKey: string,
+  result: BulkUploadResult,
+  recordStatus?: RecordStatus,
+  tab: TabType = 'pending',
+): string[] {
+  if (columnKey === 'completeness') {
+    if (tab === 'submitted') {
+      const subType = recordStatus?.submissionType;
+      if (subType === 'approved') return ['✓ Approved'];
+      if (subType === 'draft') return ['Draft'];
+      return ['Submitted'];
+    }
+    const { isComplete } = checkCompleteness(result);
+    return [isComplete ? '✓ Complete' : '⚠ Incomplete'];
+  }
+
+  return getFilterTokens(columnKey, getNestedValue(result, columnKey));
+}
+
 /** Returns sorted unique human-readable filter values for a column across all rows. */
-export function getUniqueValues(results: BulkUploadResult[], columnKey: string): string[] {
+export function getUniqueValues(
+  results: BulkUploadResult[],
+  columnKey: string,
+  recordStatuses?: Record<string, RecordStatus>,
+  tab: TabType = 'pending',
+): string[] {
   const values = new Set<string>();
   for (const result of results) {
-    const tokens = getFilterTokens(columnKey, getNestedValue(result, columnKey));
+    const recordStatus = recordStatuses?.[String(result.id)];
+    const tokens = getColumnFilterTokens(columnKey, result, recordStatus, tab);
     tokens.forEach(t => values.add(t));
   }
   return Array.from(values).sort();
