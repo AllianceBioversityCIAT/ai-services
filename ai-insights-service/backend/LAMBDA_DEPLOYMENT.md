@@ -234,10 +234,30 @@ The Jenkins pipeline is **not stored in this git repo** (see root `.gitignore`).
 | Push ECR | Tag `latest` | Same idea |
 | Deploy | SSH → `aws lambda update-function-code` | **`aws cloudformation deploy`** with `ImageUri` (creates/updates Lambda) |
 
+### Environment switch (`dev` / `prod`)
+
+Set a single variable in the Jenkinsfile `environment` block:
+
+```groovy
+ENVIRONMENT = 'dev'   // or 'prod'
+```
+
+The **Resolve Environment** stage derives branch, stack name, ECR tag, Secrets Manager id, and `IsProd` from that value.
+
+| Setting | `dev` | `prod` |
+|---------|-------|--------|
+| Git branch | `dev-ai-insights` | `main-ai-insights` |
+| CFN stack | `ai-insights-service-dev` | `ai-insights-service-prod` |
+| ECR image tag | `dev` | `latest` |
+| Secrets Manager id | `dev/microservice/ai-insights` | `prod/microservice/ai-insights` |
+| `IsProd` (CFN) | `false` | `true` |
+
+Edit the `envConfig` map in the Jenkinsfile to match your real branch names and credential ids.
+
 ### What to configure before the first Jenkins run
 
 1. Create ECR repository `ai-insights-service` (if missing).
-2. Create Secrets Manager secret (dotenv text), e.g. `prod/microservice/ai-insights`, optional keys:
+2. Create Secrets Manager secrets (dotenv text), one per environment, optional keys:
    - `SLACK_WEBHOOK_URL`
    - `CLARISA_VALIDATE_URL`
    - `INTERACTION_SERVICE_URL`
