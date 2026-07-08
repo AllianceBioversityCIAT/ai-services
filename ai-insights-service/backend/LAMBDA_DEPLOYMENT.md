@@ -27,7 +27,7 @@ Mark each item when adapting a new component:
 | 3 | Write only under `/tmp` (logs, DBs, locks, temp) | Lambda filesystem is read-only except `/tmp` | Already present (`utils/logger`) |
 | 4 | `Dockerfile` based on `public.ecr.aws/lambda/python:3.13` | Official Lambda runtime/image | **Added** |
 | 5 | `.dockerignore` | Smaller image; keep local secrets out of the build | **Added** |
-| 6 | AWS clients optionally use static keys (fallback to IAM role) | Do not embed `AWS_ACCESS_KEY_ID` / secret in Lambda | **Added** |
+| 6 | AWS clients use `INSIGHTS_AWS_*` keys (fallback to `AWS_*` locally) | Lambda blocks reserved `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | **Added** |
 | 7 | CloudFormation template (Image Lambda + URL + IAM) | Infra as code, reusable per environment | **Added** |
 | 8 | Document env vars, timeout/memory, and IAM permissions | Avoid blind deploys on the next service | This file |
 | 9 | CI: ECR push + `cloudformation deploy` (no SSH/`update-function-code`) | CFN owns Lambda create/update | Documented below (Jenkinsfile kept outside git) |
@@ -68,8 +68,9 @@ Files:
 
 Behavior:
 
-- If `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` are set → use them (local dev).
-- Otherwise → `boto3` uses the default credential chain (**Lambda execution role**).
+- If `INSIGHTS_AWS_ACCESS_KEY_ID` + `INSIGHTS_AWS_SECRET_ACCESS_KEY` are set → use them (Lambda + local).
+- Else if `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` are set → use them (local dev only).
+- Else → `boto3` uses the Lambda execution role.
 
 #### 4. CloudFormation
 
@@ -264,12 +265,14 @@ Edit the `envConfig` map in the Jenkinsfile to match your real branch names and 
 2. Create Secrets Manager secrets (dotenv text), one per environment. **All keys** in the file are synced to Lambda after deploy. Example:
 
 ```dotenv
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
+INSIGHTS_AWS_ACCESS_KEY_ID=...
+INSIGHTS_AWS_SECRET_ACCESS_KEY=...
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 CLARISA_VALIDATE_URL=https://...
 INTERACTION_SERVICE_URL=https://...
 ```
+
+Do **not** use `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` in the secret for Lambda — AWS reserves those keys. The Jenkins sync maps legacy `AWS_*` names to `INSIGHTS_*` automatically if present.
 
 3. In the Jenkins job environment (not git): branch, stack name, ECR image URI, Secrets Manager id, optional `DocumentsBucketArn`.
 4. Jenkins AWS credentials need: ECR push, Secrets Manager read, CloudFormation deploy, IAM role create/update (`CAPABILITY_NAMED_IAM`), Lambda create/update, `lambda:UpdateFunctionConfiguration`.
@@ -282,7 +285,7 @@ INTERACTION_SERVICE_URL=https://...
 4. Build — tag + push image to ECR  
 5. Deploy — `cloudformation deploy` (Jenkins creds only) → sync **full** Secrets Manager file to Lambda env → print stack outputs
 
-**Credential split:** `prms-test-aws-creds` is used for every `aws` CLI call (ECR, CloudFormation, Lambda update). The secret file is **never** sourced into the deploy shell. After the stack deploy, Jenkins runs `aws lambda update-function-configuration` with **all** keys from the secret (dotenv format). `IS_PROD` is set by the pipeline (`dev`/`prod` map), not by the secret. Reserved Lambda keys such as `AWS_REGION` are skipped.  
+**Credential split:** `prms-test-aws-creds` is used for every `aws` CLI call (ECR, CloudFormation, Lambda update). The secret file is **never** sourced into the deploy shell. After deploy, Jenkins syncs the secret to Lambda env vars, mapping `AWS_ACCESS_KEY_ID` → `INSIGHTS_AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` → `INSIGHTS_AWS_SECRET_ACCESS_KEY` (Lambda blocks reserved `AWS_*` keys). `IS_PROD` is set by the pipeline. Reserved keys such as `AWS_REGION` are skipped.  
 
 First successful deploy **creates** the Lambda, execution role, and Function URL. Later builds push a new image and update the same stack with the new `ImageUri`.
 

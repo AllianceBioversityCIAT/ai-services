@@ -4,9 +4,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 AWS = {
-    "aws_access_key": os.getenv("AWS_ACCESS_KEY_ID"),
-    "aws_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY"),
-    "aws_region": os.getenv("AWS_REGION", "us-east-1")
+    # Lambda cannot use reserved AWS_* env vars — use INSIGHTS_* in Secrets Manager.
+    "aws_access_key": os.getenv("INSIGHTS_AWS_ACCESS_KEY_ID") or os.getenv("AWS_ACCESS_KEY_ID"),
+    "aws_secret_key": os.getenv("INSIGHTS_AWS_SECRET_ACCESS_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY"),
+    "aws_region": os.getenv("AWS_REGION", "us-east-1"),
 }
 
 SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
