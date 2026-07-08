@@ -90,9 +90,10 @@ Relevant parameters:
 | `ImageUri` | Full ECR image URI (with tag) |
 | `MemorySize` / `Timeout` / `EphemeralStorageSize` | Sizing (defaults: 2048 MB / 300 s / 1024 MB) |
 | `CorsAllowOrigin` | Function URL CORS |
-| `IsProd` | App `IS_PROD` flag |
-| `SlackWebhookUrl`, `ClarisaValidateUrl`, `InteractionServiceUrl` | Optional env vars |
+| `IsProd` | Bootstrap `IS_PROD` (Jenkins overwrites after secret sync) |
 | `DocumentsBucketArn` | Optional IAM scope for S3 |
+
+Application env vars (Slack, AWS keys, CLARISA, etc.) come from **Secrets Manager** and are synced to Lambda by Jenkins after deploy — not via CloudFormation parameters.
 
 **Note:** do not set `AWS_REGION` in Environment — it is a reserved variable; Lambda injects it automatically.
 
@@ -260,12 +261,18 @@ Edit the `envConfig` map in the Jenkinsfile to match your real branch names and 
 ### What to configure before the first Jenkins run
 
 1. Create ECR repository `ai-insights-service` (if missing).
-2. Create Secrets Manager secrets (dotenv text), one per environment, optional keys:
-   - `SLACK_WEBHOOK_URL`
-   - `CLARISA_VALIDATE_URL`
-   - `INTERACTION_SERVICE_URL`
+2. Create Secrets Manager secrets (dotenv text), one per environment. **All keys** in the file are synced to Lambda after deploy. Example:
+
+```dotenv
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+CLARISA_VALIDATE_URL=https://...
+INTERACTION_SERVICE_URL=https://...
+```
+
 3. In the Jenkins job environment (not git): branch, stack name, ECR image URI, Secrets Manager id, optional `DocumentsBucketArn`.
-4. Jenkins AWS credentials need: ECR push, Secrets Manager read, CloudFormation deploy, IAM role create/update (`CAPABILITY_NAMED_IAM`), Lambda create/update.
+4. Jenkins AWS credentials need: ECR push, Secrets Manager read, CloudFormation deploy, IAM role create/update (`CAPABILITY_NAMED_IAM`), Lambda create/update, `lambda:UpdateFunctionConfiguration`.
 
 ### Pipeline stages (summary)
 
@@ -273,7 +280,9 @@ Edit the `envConfig` map in the Jenkinsfile to match your real branch names and 
 2. Clone — checkout deploy branch  
 3. Startup — `docker build` in `ai-insights-service/backend`  
 4. Build — tag + push image to ECR  
-5. Deploy — load secrets → `cloudformation deploy` → print stack outputs (Function URL)  
+5. Deploy — `cloudformation deploy` (Jenkins creds only) → sync **full** Secrets Manager file to Lambda env → print stack outputs
+
+**Credential split:** `prms-test-aws-creds` is used for every `aws` CLI call (ECR, CloudFormation, Lambda update). The secret file is **never** sourced into the deploy shell. After the stack deploy, Jenkins runs `aws lambda update-function-configuration` with **all** keys from the secret (dotenv format). `IS_PROD` is set by the pipeline (`dev`/`prod` map), not by the secret. Reserved Lambda keys such as `AWS_REGION` are skipped.  
 
 First successful deploy **creates** the Lambda, execution role, and Function URL. Later builds push a new image and update the same stack with the new `ImageUri`.
 

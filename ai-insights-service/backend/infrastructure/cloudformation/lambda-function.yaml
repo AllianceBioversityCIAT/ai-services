@@ -31,9 +31,6 @@ Metadata:
           default: Application environment variables
         Parameters:
           - IsProd
-          - SlackWebhookUrl
-          - ClarisaValidateUrl
-          - InteractionServiceUrl
       - Label:
           default: Optional S3 scope for IAM
         Parameters:
@@ -94,23 +91,7 @@ Parameters:
     Type: String
     Default: 'false'
     AllowedValues: ['true', 'false']
-    Description: Maps to IS_PROD application environment variable.
-
-  SlackWebhookUrl:
-    Type: String
-    Default: ''
-    NoEcho: true
-    Description: Optional Slack webhook URL (leave empty to skip notifications).
-
-  ClarisaValidateUrl:
-    Type: String
-    Default: ''
-    Description: Optional CLARISA validate URL.
-
-  InteractionServiceUrl:
-    Type: String
-    Default: ''
-    Description: Optional interaction/feedback service base URL.
+    Description: Bootstrap IS_PROD until Jenkins syncs the full secret to Lambda.
 
   DocumentsBucketArn:
     Type: String
@@ -121,9 +102,6 @@ Parameters:
 
 Conditions:
   HasDocumentsBucketArn: !Not [!Equals [!Ref DocumentsBucketArn, '']]
-  HasSlackWebhookUrl: !Not [!Equals [!Ref SlackWebhookUrl, '']]
-  HasClarisaValidateUrl: !Not [!Equals [!Ref ClarisaValidateUrl, '']]
-  HasInteractionServiceUrl: !Not [!Equals [!Ref InteractionServiceUrl, '']]
 
 Resources:
   LambdaExecutionRole:
@@ -195,21 +173,8 @@ Resources:
         Size: !Ref EphemeralStorageSize
       Environment:
         Variables:
+          # Bootstrap only — Jenkins syncs the full Secrets Manager file after deploy.
           IS_PROD: !Ref IsProd
-          # AWS_REGION is reserved/injected by Lambda runtime — do not set it here.
-          # Prefer IAM role credentials; do not inject static access keys.
-          SLACK_WEBHOOK_URL: !If
-            - HasSlackWebhookUrl
-            - !Ref SlackWebhookUrl
-            - !Ref AWS::NoValue
-          CLARISA_VALIDATE_URL: !If
-            - HasClarisaValidateUrl
-            - !Ref ClarisaValidateUrl
-            - !Ref AWS::NoValue
-          INTERACTION_SERVICE_URL: !If
-            - HasInteractionServiceUrl
-            - !Ref InteractionServiceUrl
-            - !Ref AWS::NoValue
       Tags:
         - Key: Project
           Value: !Ref Project
