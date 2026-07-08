@@ -138,7 +138,7 @@ aws cloudformation deploy \
   --tags Key=Project,Value=STAR Key=Environment,Value=dev Key=Functionality,Value=ai-insights \
   --parameter-overrides \
     EnvironmentName=dev \
-    Project=STAR \
+    ProjectTagValue=STAR \
     ImageUri=${IMAGE_URI} \
     IsProd=false \
     CorsAllowOrigin=* \
