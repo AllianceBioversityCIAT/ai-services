@@ -14,7 +14,7 @@ bedrock_config = Config(
 )
 
 def _build_bedrock_client():
-    """Use explicit keys locally; fall back to the Lambda execution role in AWS."""
+    """Use explicit keys locally; use the Lambda execution role in AWS."""
     kwargs = {
         "service_name": "bedrock-runtime",
         "region_name": AWS.get("aws_region", "us-east-1"),

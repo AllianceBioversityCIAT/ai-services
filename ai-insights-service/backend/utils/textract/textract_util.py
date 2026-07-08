@@ -15,7 +15,7 @@ POLL_INTERVAL_SECONDS = 5
 MAX_POLL_ATTEMPTS = 60  # 5 minutes max
 
 def _build_textract_client():
-    """Use explicit keys locally; fall back to the Lambda execution role in AWS."""
+    """Use explicit keys locally; use the Lambda execution role in AWS."""
     kwargs = {"region_name": AWS.get("aws_region", "us-east-1")}
     if AWS.get("aws_access_key") and AWS.get("aws_secret_key"):
         kwargs["aws_access_key_id"] = AWS["aws_access_key"]

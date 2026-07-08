@@ -15,7 +15,7 @@ SUPPORTED_DOCUMENT_EXTENSIONS = {
 MAX_PROJECT_DOCUMENTS = 3
 
 def _build_s3_client():
-    """Use explicit keys locally; fall back to the Lambda execution role in AWS."""
+    """Use explicit keys locally; use the Lambda execution role in AWS."""
     kwargs = {"region_name": AWS.get("aws_region", "us-east-1")}
     if AWS.get("aws_access_key") and AWS.get("aws_secret_key"):
         kwargs["aws_access_key_id"] = AWS["aws_access_key"]
