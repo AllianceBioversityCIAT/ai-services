@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import type { BulkUploadResult, RecordStatus, DocSource, AppStep, UnmappedInstitution, SummaryRecord } from './types';
 import { useBulkUploadApi } from './hooks/useBulkUploadApi';
 import { useTableFilters } from './hooks/useTableFilters';
+import { useNavigationGuard } from './hooks/useNavigationGuard';
 import { loadRecordStatuses } from './hooks/useDynamoDB';
 import { extractUnmappedInstitutions } from './utils/dataFormatters';
 import { createUnmappedReportCSV, downloadCSV } from './utils/csvUtils';
@@ -110,6 +111,9 @@ export default function BulkUploadModule() {
 
   // ── Derived: filtered results (rerender-derived-state-no-effect) ──
   const filteredResults = filters.applyFilters(editedData, recordStatuses);
+
+  const hasWorkInProgress = step !== 'upload' || api.isLoading;
+  useNavigationGuard(hasWorkInProgress);
 
   // ══════════════════════════════════════════
   // Handlers
