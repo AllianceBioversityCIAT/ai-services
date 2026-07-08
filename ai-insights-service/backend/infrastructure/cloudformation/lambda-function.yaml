@@ -11,7 +11,7 @@ Metadata:
           default: Environment
         Parameters:
           - EnvironmentName
-          - ProjectTag
+          - Project
           - FunctionalityTag
       - Label:
           default: Lambda container image
@@ -46,10 +46,10 @@ Parameters:
     AllowedPattern: '^[a-z0-9-]+$'
     ConstraintDescription: Lowercase letters, numbers, and hyphens only.
 
-  ProjectTag:
+  Project:
     Type: String
     Default: STAR
-    Description: Project tag applied to resources.
+    Description: Value for the Project tag applied to all taggable stack resources.
 
   FunctionalityTag:
     Type: String
@@ -171,7 +171,7 @@ Resources:
                 Resource: '*'
       Tags:
         - Key: Project
-          Value: !Ref ProjectTag
+          Value: !Ref Project
         - Key: Functionality
           Value: !Ref FunctionalityTag
         - Key: Environment
@@ -212,7 +212,7 @@ Resources:
             - !Ref AWS::NoValue
       Tags:
         - Key: Project
-          Value: !Ref ProjectTag
+          Value: !Ref Project
         - Key: Functionality
           Value: !Ref FunctionalityTag
         - Key: Environment
