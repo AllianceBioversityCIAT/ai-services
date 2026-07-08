@@ -99,7 +99,7 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
   { key: 'select', label: 'Select', type: 'checkbox', width: '55px' },
   { key: 'id', label: 'ID', type: 'text', readonly: true, width: '70px', showInSubmitted: true },
   { key: 'status', label: 'Status', type: 'status', readonly: true, width: '125px', showInSubmitted: true },
-  { key: 'completeness', label: 'Completeness', type: 'completeness', readonly: true, width: '130px', showInSubmitted: true },
+  { key: 'completeness', label: 'Completeness', type: 'completeness', readonly: true, width: '150px', showInSubmitted: true },
   { key: 'star_link', label: 'STAR Link', type: 'link', readonly: true, width: '150px', showInSubmitted: true },
   { key: 'title', label: 'Title', type: 'textarea', required: true, width: '350px', showInSubmitted: true },
   { key: 'description', label: 'Description', type: 'textarea', width: '485px' },

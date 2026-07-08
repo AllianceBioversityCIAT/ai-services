@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import type { BulkUploadResult, RecordStatus, TabType } from '../types';
-import { getFilterTokens, getNestedValue } from '../utils/tableHelpers';
+import { getColumnFilterTokens } from '../utils/tableHelpers';
 
 export interface TableFiltersState {
   activeFilters: Record<string, string[]>;
@@ -52,7 +52,8 @@ export function useTableFilters(): TableFiltersState & TableFiltersActions {
         filtered = filtered.filter((result) => {
           for (const [columnKey, selectedValues] of Object.entries(activeFilters)) {
             if (selectedValues.length === 0) continue;
-            const tokens = getFilterTokens(columnKey, getNestedValue(result, columnKey));
+            const recordStatus = recordStatuses[String(result.id)];
+            const tokens = getColumnFilterTokens(columnKey, result, recordStatus, currentTab);
             const hasMatch = tokens.some(t => selectedValues.includes(t));
             if (!hasMatch) return false;
           }
