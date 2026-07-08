@@ -31,10 +31,52 @@ Mark each item when adapting a new component:
 | 7 | CloudFormation template (Image Lambda + URL + IAM) | Infra as code, reusable per environment | **Added** |
 | 8 | Document env vars, timeout/memory, and IAM permissions | Avoid blind deploys on the next service | This file |
 | 9 | CI: ECR push + `cloudformation deploy` (no SSH/`update-function-code`) | CFN owns Lambda create/update | Documented below (Jenkinsfile kept outside git) |
+| 10 | Unique ECR tag per build (`dev-{BUILD_NUMBER}`) | CFN skips Lambda image update if `ImageUri` is always `:dev` | **Added** (Jenkinsfile) |
+| 11 | Lazy boto3 clients + strip only `INSIGHTS_AWS_*` from env | Avoid cached bad clients; keep Lambda runtime `AWS_*` creds | **Added** |
 
 ---
 
 ## Changes applied to this service (changelog)
+
+### Session 1 — Initial Lambda setup
+
+- `Dockerfile`, `.dockerignore`, CloudFormation template, Mangum entrypoint.
+- Logs under `/tmp/logs`.
+
+### Session 2 — Jenkins pipeline (not in git)
+
+- `ENVIRONMENT` = `dev` | `prod` drives branch, stack, secret id, `IsProd`.
+- `PROJECT` auto-built as `STAR-ai-insights-{ENVIRONMENT}` → CFN param `ProjectTagValue`.
+- Deploy: ECR push → `cloudformation deploy` → sync Secrets Manager → `lambda update-function-configuration`.
+- Jenkins credential `prms-test-aws-creds` for all `aws` CLI — secret file never `source`d in deploy shell.
+- CloudFormation stack tags via CLI `--tags` removed (parsing errors); resource tags come from the template only.
+- Shell is `/bin/sh` (dash) — parameter overrides built in Groovy, not bash arrays.
+
+### Session 3 — Credentials (lessons learned)
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| `InvalidAccessKeyId` | Static keys from secret synced to Lambda | Stop syncing `INSIGHTS_AWS_*`; use IAM role |
+| `InvalidAccessKeyId` after fix | Old image still running (`s3_client` in traceback) | Unique ECR tag per build |
+| `Unable to locate credentials` | Code removed Lambda runtime `AWS_ACCESS_KEY_ID` / `AWS_SESSION_TOKEN` | Only strip `INSIGHTS_AWS_*`; never pop runtime `AWS_*` |
+| Lambda env blocked `AWS_ACCESS_KEY_ID` | Reserved key name | Use `INSIGHTS_AWS_*` in secret for **local dev only** |
+
+**Final credential model:**
+
+- **Jenkins deploy:** `prms-test-aws-creds` only.
+- **Lambda runtime:** IAM role via env vars injected by AWS (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`).
+- **Local dev:** `INSIGHTS_AWS_ACCESS_KEY_ID` / `INSIGHTS_AWS_SECRET_ACCESS_KEY` (or `AWS_*` fallback).
+- **Secret sync to Lambda:** all keys except `INSIGHTS_AWS_*`, legacy `AWS_*` keys, and reserved Lambda keys (`AWS_REGION`, etc.).
+
+**Code:**
+
+- `utils/config/config_util.py` — `is_lambda_runtime()`, `get_boto3_client_kwargs()`, `clear_static_aws_credentials_from_environ()`.
+- `utils/s3/s3_util.py`, `utils/textract/textract_util.py`, `ai/models/claude.py` — lazy clients via `_get_*_client()`.
+- `main.py` — calls `clear_static_aws_credentials_from_environ()` before app import.
+
+---
+
+## Changes applied to this service (detail)
 
 ### Already present (audit 2026-07-08)
 
@@ -58,18 +100,22 @@ Mark each item when adapting a new component:
 
 Excludes `.env`, virtualenvs, caches, markdown, and `infrastructure/` from the build context.
 
-#### 3. boto3 clients (IAM-friendly)
+#### 3. boto3 clients (IAM role in Lambda)
 
 Files:
 
+- `utils/config/config_util.py`
 - `utils/s3/s3_util.py`
 - `utils/textract/textract_util.py`
 - `ai/models/claude.py`
+- `main.py`
 
 Behavior:
 
-- **Lambda:** always uses the execution role (ignores `INSIGHTS_AWS_*` even if present in env).
+- **Lambda:** boto3 client created with no static keys → uses execution role (via runtime-injected `AWS_*` env vars).
 - **Local:** uses `INSIGHTS_AWS_ACCESS_KEY_ID` + `INSIGHTS_AWS_SECRET_ACCESS_KEY`, or falls back to `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`.
+- Clients are **lazy** (created on first use) so warm containers do not cache stale credential config.
+- `clear_static_aws_credentials_from_environ()` removes only `INSIGHTS_AWS_*` — **never** `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` on Lambda.
 
 #### 4. CloudFormation
 
@@ -88,12 +134,14 @@ Relevant parameters:
 |-----------|---------|
 | `EnvironmentName` | Name suffix (`dev`, `prod`, …) |
 | `ImageUri` | Full ECR image URI (with tag) |
+| `ProjectTagValue` | `Project` tag on IAM role + Lambda (e.g. `STAR-ai-insights-dev`) |
+| `FunctionalityTag` | `Functionality` tag (default `ai-insights`) |
 | `MemorySize` / `Timeout` / `EphemeralStorageSize` | Sizing (defaults: 2048 MB / 300 s / 1024 MB) |
 | `CorsAllowOrigin` | Function URL CORS |
 | `IsProd` | Bootstrap `IS_PROD` (Jenkins overwrites after secret sync) |
 | `DocumentsBucketArn` | Optional IAM scope for S3 |
 
-Application env vars (Slack, AWS keys, CLARISA, etc.) come from **Secrets Manager** and are synced to Lambda by Jenkins after deploy — not via CloudFormation parameters.
+Application env vars (Slack, CLARISA, interaction URL, etc.) are synced to Lambda by Jenkins after deploy — not via CloudFormation parameters. `INSIGHTS_AWS_*` are **not** synced.
 
 **Note:** do not set `AWS_REGION` in Environment — it is a reserved variable; Lambda injects it automatically.
 
@@ -117,13 +165,15 @@ From `ai-insights-service/backend`:
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 REGION=us-east-1
 REPO=${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/ai-insights-service
-TAG=dev  # or commit sha / semver
+TAG=dev-1  # must change each deploy — use dev-{BUILD_NUMBER} in Jenkins
 
 aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com
 
 docker build -t ${REPO}:${TAG} .
 docker push ${REPO}:${TAG}
 ```
+
+**Important:** if `ImageUri` stays `...:dev` across builds, CloudFormation may not update the Lambda image. Jenkins uses `dev-{BUILD_NUMBER}` / `prod-{BUILD_NUMBER}`.
 
 ### C. Create / update CloudFormation stack
 
@@ -137,7 +187,7 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
     "EnvironmentName=dev" \
-    "ProjectTagValue=STAR" \
+    "ProjectTagValue=STAR-ai-insights-dev" \
     "ImageUri=${IMAGE_URI}" \
     "IsProd=false" \
     "CorsAllowOrigin=*" \
@@ -161,10 +211,19 @@ curl -sS "${FUNCTION_URL}health"
 
 ### E. Later code updates
 
-After pushing a new image, either:
+After pushing a new image with a **new tag** (required), redeploy the stack:
 
-1. Redeploy the stack with the same or a new `ImageUri` (tag or digest), **or**
-2. `aws lambda update-function-code --function-name ai-insights-service-dev --image-uri ${IMAGE_URI}`
+```bash
+aws cloudformation deploy ... --parameter-overrides "ImageUri=${REPO}:dev-42" ...
+```
+
+Or manually:
+
+```bash
+aws lambda update-function-code --function-name ai-insights-service-dev --image-uri ${IMAGE_URI}
+```
+
+The **stack name stays the same** (`ai-insights-service-dev`); only the Lambda image URI changes.
 
 ---
 
@@ -233,7 +292,7 @@ The Jenkins pipeline is **not stored in this git repo** (see root `.gitignore`).
 |------|-------------|-------------|
 | Clone | Same pattern | Same |
 | Build image | Bake `.env` into Docker context | Build `ai-insights-service/backend` with **no** `.env` in the image |
-| Push ECR | Tag `latest` | Same idea |
+| Push ECR | Tag `latest` | Tag `dev-{BUILD_NUMBER}` / `prod-{BUILD_NUMBER}` |
 | Deploy | SSH → `aws lambda update-function-code` | **`aws cloudformation deploy`** with `ImageUri` (creates/updates Lambda) |
 
 ### Environment switch (`dev` / `prod`)
@@ -288,6 +347,23 @@ INTERACTION_SERVICE_URL=https://...
 **Credential split:** Jenkins uses `prms-test-aws-creds` for deploy only. The secret sync omits `INSIGHTS_AWS_*` keys. In Lambda, boto3 uses the execution role via runtime-injected `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` — do not remove those env vars in code.  
 
 First successful deploy **creates** the Lambda, execution role, and Function URL. Later builds push a new image and update the same stack with the new `ImageUri`.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause | What to check |
+|---------|----------------|---------------|
+| Traceback shows `s3_client` not `_get_s3_client()` | Old Docker image still on Lambda | ECR tag unchanged; redeploy with new `ImageUri` |
+| `InvalidAccessKeyId` | Static keys in Lambda env or old image | Remove `INSIGHTS_AWS_*` from Lambda env; deploy new image |
+| `Unable to locate credentials` | Code removed runtime `AWS_*` env vars | Only strip `INSIGHTS_AWS_*`; keep Lambda-injected `AWS_*` |
+| `AccessDenied` on S3 | IAM role lacks bucket permission | Set `DOCUMENTS_BUCKET_ARN` in Jenkinsfile or widen role policy |
+| CFN `Tag [Key] contained invalid characters` | `--tags` CLI parsing | Use template resource tags only (no `--tags` on deploy) |
+| `Syntax error: "(" unexpected` in Jenkins | Bash arrays in `sh` step | Build overrides in Groovy; Jenkins uses `/bin/sh` |
+| Console `Cannot read properties of undefined (reading 'ImageConfig')` | AWS Console UI bug for container Lambdas | Ignore if Function URL + CloudWatch logs work |
+| `InvalidParameterValueException` reserved keys | Tried to set `AWS_ACCESS_KEY_ID` on Lambda | Use `INSIGHTS_AWS_*` locally only; IAM role in Lambda |
+
+Verify deployed code in CloudWatch: line numbers and function names in tracebacks should match the current repo.
 
 ---
 
