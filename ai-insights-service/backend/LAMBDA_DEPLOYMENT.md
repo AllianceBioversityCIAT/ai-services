@@ -135,14 +135,13 @@ aws cloudformation deploy \
   --stack-name ${STACK} \
   --template-file infrastructure/cloudformation/lambda-function.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
-  --tags Key=Project,Value=STAR Key=Environment,Value=dev Key=Functionality,Value=ai-insights \
   --parameter-overrides \
-    EnvironmentName=dev \
-    ProjectTagValue=STAR \
-    ImageUri=${IMAGE_URI} \
-    IsProd=false \
-    CorsAllowOrigin=* \
-    DocumentsBucketArn=arn:aws:s3:::YOUR_DOCS_BUCKET
+    "EnvironmentName=dev" \
+    "ProjectTagValue=STAR" \
+    "ImageUri=${IMAGE_URI}" \
+    "IsProd=false" \
+    "CorsAllowOrigin=*" \
+    "DocumentsBucketArn=arn:aws:s3:::YOUR_DOCS_BUCKET"
 ```
 
 ### D. Retrieve the Function URL
@@ -243,10 +242,11 @@ Set a single variable in the Jenkinsfile `environment` block:
 
 ```groovy
 ENVIRONMENT = 'dev'   // or 'prod'
-PROJECT = 'STAR'      // Project tag on stack + IAM role + Lambda
 ```
 
-The **Resolve Environment** stage derives branch, stack name, ECR tag, Secrets Manager id, and `IsProd` from `ENVIRONMENT`. `PROJECT` is passed to CloudFormation as the `Project` parameter and as a stack-level tag on deploy.
+`PROJECT` is built automatically as `STAR-ai-insights-{ENVIRONMENT}` (e.g. `STAR-ai-insights-dev`) and passed as `ProjectTagValue` to tag IAM role + Lambda.
+
+The **Resolve Environment** stage derives branch, stack name, ECR tag, Secrets Manager id, `IsProd`, and `PROJECT` from `ENVIRONMENT`.
 
 | Setting | `dev` | `prod` |
 |---------|-------|--------|

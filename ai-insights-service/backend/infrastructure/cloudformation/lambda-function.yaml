@@ -46,11 +46,13 @@ Parameters:
   ProjectTagValue:
     Type: String
     Default: STAR
-    Description: Value for the Project tag applied to all taggable stack resources.
+    AllowedPattern: '^[a-zA-Z0-9][a-zA-Z0-9_./:=+\-@]*$'
+    Description: Value for the Project tag on IAM role and Lambda (e.g. STAR-ai-insights-dev).
 
   FunctionalityTag:
     Type: String
     Default: ai-insights
+    AllowedPattern: '^[a-zA-Z0-9][a-zA-Z0-9_./:=+\-@]*$'
     Description: Functionality tag applied to resources.
 
   ImageUri:
