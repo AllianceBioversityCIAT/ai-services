@@ -14,12 +14,16 @@ SUPPORTED_DOCUMENT_EXTENSIONS = {
 }
 MAX_PROJECT_DOCUMENTS = 3
 
-s3_client = boto3.client(
-    's3',
-    aws_access_key_id=AWS['aws_access_key'],
-    aws_secret_access_key=AWS['aws_secret_key'],
-    region_name=AWS.get('aws_region', 'us-east-1')
-)
+def _build_s3_client():
+    """Use explicit keys locally; fall back to the Lambda execution role in AWS."""
+    kwargs = {"region_name": AWS.get("aws_region", "us-east-1")}
+    if AWS.get("aws_access_key") and AWS.get("aws_secret_key"):
+        kwargs["aws_access_key_id"] = AWS["aws_access_key"]
+        kwargs["aws_secret_access_key"] = AWS["aws_secret_key"]
+    return boto3.client("s3", **kwargs)
+
+
+s3_client = _build_s3_client()
 
 
 def _process_file_content(file_extension, file_content):

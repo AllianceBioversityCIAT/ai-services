@@ -14,12 +14,16 @@ ASYNC_REQUIRED_EXTENSIONS = {'pdf', 'tiff', 'tif'}
 POLL_INTERVAL_SECONDS = 5
 MAX_POLL_ATTEMPTS = 60  # 5 minutes max
 
-textract_client = boto3.client(
-    'textract',
-    aws_access_key_id=AWS['aws_access_key'],
-    aws_secret_access_key=AWS['aws_secret_key'],
-    region_name=AWS.get('aws_region', 'us-east-1')
-)
+def _build_textract_client():
+    """Use explicit keys locally; fall back to the Lambda execution role in AWS."""
+    kwargs = {"region_name": AWS.get("aws_region", "us-east-1")}
+    if AWS.get("aws_access_key") and AWS.get("aws_secret_key"):
+        kwargs["aws_access_key_id"] = AWS["aws_access_key"]
+        kwargs["aws_secret_access_key"] = AWS["aws_secret_key"]
+    return boto3.client("textract", **kwargs)
+
+
+textract_client = _build_textract_client()
 
 
 def _blocks_to_text(blocks: list) -> str:

@@ -1,0 +1,268 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AI Insights Service backend — container image Lambda + Function URL.
+  Build/push the image to ECR first, then create or update this stack with ImageUri.
+  Pattern is reusable for other FastAPI + Mangum Python services.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Environment
+        Parameters:
+          - EnvironmentName
+          - ProjectTag
+          - FunctionalityTag
+      - Label:
+          default: Lambda container image
+        Parameters:
+          - ImageUri
+      - Label:
+          default: Lambda sizing
+        Parameters:
+          - MemorySize
+          - Timeout
+          - EphemeralStorageSize
+      - Label:
+          default: Function URL CORS
+        Parameters:
+          - CorsAllowOrigin
+      - Label:
+          default: Application environment variables
+        Parameters:
+          - IsProd
+          - SlackWebhookUrl
+          - ClarisaValidateUrl
+          - InteractionServiceUrl
+      - Label:
+          default: Optional S3 scope for IAM
+        Parameters:
+          - DocumentsBucketArn
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Description: Logical environment (e.g. dev, staging, prod).
+    AllowedPattern: '^[a-z0-9-]+$'
+    ConstraintDescription: Lowercase letters, numbers, and hyphens only.
+
+  ProjectTag:
+    Type: String
+    Default: STAR
+    Description: Project tag applied to resources.
+
+  FunctionalityTag:
+    Type: String
+    Default: ai-insights
+    Description: Functionality tag applied to resources.
+
+  ImageUri:
+    Type: String
+    Description: >
+      Full ECR image URI including tag
+      (e.g. 123456789012.dkr.ecr.us-east-1.amazonaws.com/ai-insights-service:dev).
+
+  MemorySize:
+    Type: Number
+    Default: 2048
+    MinValue: 128
+    MaxValue: 10240
+    Description: Lambda memory in MB.
+
+  Timeout:
+    Type: Number
+    Default: 300
+    MinValue: 1
+    MaxValue: 900
+    Description: Lambda timeout in seconds (document overview + Textract can be slow).
+
+  EphemeralStorageSize:
+    Type: Number
+    Default: 1024
+    MinValue: 512
+    MaxValue: 10240
+    Description: /tmp size in MB.
+
+  CorsAllowOrigin:
+    Type: String
+    Default: '*'
+    Description: >
+      Allowed Origin for Lambda Function URL CORS. Use * only for non-prod;
+      prefer an explicit origin in production.
+
+  IsProd:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Maps to IS_PROD application environment variable.
+
+  SlackWebhookUrl:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: Optional Slack webhook URL (leave empty to skip notifications).
+
+  ClarisaValidateUrl:
+    Type: String
+    Default: ''
+    Description: Optional CLARISA validate URL.
+
+  InteractionServiceUrl:
+    Type: String
+    Default: ''
+    Description: Optional interaction/feedback service base URL.
+
+  DocumentsBucketArn:
+    Type: String
+    Default: ''
+    Description: >
+      Optional S3 bucket ARN to scope IAM (e.g. arn:aws:s3:::my-docs-bucket).
+      Leave empty to allow all buckets (less secure; useful for first deploy).
+
+Conditions:
+  HasDocumentsBucketArn: !Not [!Equals [!Ref DocumentsBucketArn, '']]
+  HasSlackWebhookUrl: !Not [!Equals [!Ref SlackWebhookUrl, '']]
+  HasClarisaValidateUrl: !Not [!Equals [!Ref ClarisaValidateUrl, '']]
+  HasInteractionServiceUrl: !Not [!Equals [!Ref InteractionServiceUrl, '']]
+
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'ai-insights-lambda-role-${EnvironmentName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ai-insights-aws-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: S3ReadDocuments
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource: !If
+                  - HasDocumentsBucketArn
+                  - - !Ref DocumentsBucketArn
+                    - !Sub '${DocumentsBucketArn}/*'
+                  - - 'arn:aws:s3:::*'
+                    - 'arn:aws:s3:::*/*'
+              - Sid: BedrockInvoke
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource: '*'
+              - Sid: TextractAnalyze
+                Effect: Allow
+                Action:
+                  - textract:DetectDocumentText
+                  - textract:StartDocumentTextDetection
+                  - textract:GetDocumentTextDetection
+                  - textract:AnalyzeDocument
+                Resource: '*'
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Functionality
+          Value: !Ref FunctionalityTag
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  InsightsLambda:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - LambdaExecutionRole
+    Properties:
+      FunctionName: !Sub 'ai-insights-service-${EnvironmentName}'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      PackageType: Image
+      Architectures:
+        - x86_64
+      Code:
+        ImageUri: !Ref ImageUri
+      MemorySize: !Ref MemorySize
+      Timeout: !Ref Timeout
+      EphemeralStorage:
+        Size: !Ref EphemeralStorageSize
+      Environment:
+        Variables:
+          IS_PROD: !Ref IsProd
+          # AWS_REGION is reserved/injected by Lambda runtime — do not set it here.
+          # Prefer IAM role credentials; do not inject static access keys.
+          SLACK_WEBHOOK_URL: !If
+            - HasSlackWebhookUrl
+            - !Ref SlackWebhookUrl
+            - !Ref AWS::NoValue
+          CLARISA_VALIDATE_URL: !If
+            - HasClarisaValidateUrl
+            - !Ref ClarisaValidateUrl
+            - !Ref AWS::NoValue
+          INTERACTION_SERVICE_URL: !If
+            - HasInteractionServiceUrl
+            - !Ref InteractionServiceUrl
+            - !Ref AWS::NoValue
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Functionality
+          Value: !Ref FunctionalityTag
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  InsightsLambdaUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      AuthType: NONE
+      TargetFunctionArn: !GetAtt InsightsLambda.Arn
+      Cors:
+        AllowOrigins:
+          - !Ref CorsAllowOrigin
+        AllowMethods:
+          - '*'
+        AllowHeaders:
+          - '*'
+        ExposeHeaders:
+          - '*'
+        MaxAge: 3600
+
+  InsightsLambdaUrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref InsightsLambda
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
+Outputs:
+  LambdaArn:
+    Description: ARN of the AI Insights Lambda function.
+    Value: !GetAtt InsightsLambda.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaArn'
+
+  LambdaFunctionName:
+    Description: Physical function name (useful for aws lambda update-function-code).
+    Value: !Ref InsightsLambda
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaFunctionName'
+
+  LambdaFunctionUrl:
+    Description: HTTPS Function URL for invoking the FastAPI service via Mangum.
+    Value: !GetAtt InsightsLambdaUrl.FunctionUrl
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaFunctionUrl'
+
+  LambdaExecutionRoleArn:
+    Description: Execution role ARN used by the Lambda.
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaExecutionRoleArn'

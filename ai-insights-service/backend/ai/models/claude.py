@@ -13,13 +13,20 @@ bedrock_config = Config(
     retries={'max_attempts': 3, 'mode': 'adaptive'}
 )
 
-bedrock_runtime = boto3.client(
-    service_name='bedrock-runtime',
-    aws_access_key_id=AWS['aws_access_key'],
-    aws_secret_access_key=AWS['aws_secret_key'],
-    region_name='us-east-1',
-    config=bedrock_config
-)
+def _build_bedrock_client():
+    """Use explicit keys locally; fall back to the Lambda execution role in AWS."""
+    kwargs = {
+        "service_name": "bedrock-runtime",
+        "region_name": AWS.get("aws_region", "us-east-1"),
+        "config": bedrock_config,
+    }
+    if AWS.get("aws_access_key") and AWS.get("aws_secret_key"):
+        kwargs["aws_access_key_id"] = AWS["aws_access_key"]
+        kwargs["aws_secret_access_key"] = AWS["aws_secret_key"]
+    return boto3.client(**kwargs)
+
+
+bedrock_runtime = _build_bedrock_client()
 
 
 def invoke_model(prompt, max_tokens=15000):
