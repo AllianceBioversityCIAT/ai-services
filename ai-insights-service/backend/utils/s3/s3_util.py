@@ -3,7 +3,7 @@ import mammoth
 import pandas as pd
 from io import BytesIO
 from pptx import Presentation
-from utils.config.config_util import AWS
+from utils.config.config_util import get_boto3_client_kwargs
 from utils.logger.logger_util import get_logger
 
 logger = get_logger()
@@ -14,16 +14,15 @@ SUPPORTED_DOCUMENT_EXTENSIONS = {
 }
 MAX_PROJECT_DOCUMENTS = 3
 
-def _build_s3_client():
-    """Use explicit keys locally; use the Lambda execution role in AWS."""
-    kwargs = {"region_name": AWS.get("aws_region", "us-east-1")}
-    if AWS.get("aws_access_key") and AWS.get("aws_secret_key"):
-        kwargs["aws_access_key_id"] = AWS["aws_access_key"]
-        kwargs["aws_secret_access_key"] = AWS["aws_secret_key"]
-    return boto3.client("s3", **kwargs)
+_s3_client = None
 
 
-s3_client = _build_s3_client()
+def _get_s3_client():
+    """Lazy client — avoids caching invalid keys across warm Lambda containers."""
+    global _s3_client
+    if _s3_client is None:
+        _s3_client = boto3.client("s3", **get_boto3_client_kwargs())
+    return _s3_client
 
 
 def _process_file_content(file_extension, file_content):
@@ -115,7 +114,7 @@ def list_project_documents(
 
     logger.info(f"Listing documents in s3://{bucket_name}/{prefix}")
 
-    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+    response = _get_s3_client().list_objects_v2(Bucket=bucket_name, Prefix=prefix)
     contents = response.get('Contents', [])
 
     document_keys = []
@@ -152,7 +151,7 @@ def read_document_from_s3(bucket_name, file_key):
     try:
         logger.info(
             f"📂 Downloading the {file_key} file from the bucket {bucket_name}...")
-        response = s3_client.get_object(Bucket=bucket_name, Key=file_key)
+        response = _get_s3_client().get_object(Bucket=bucket_name, Key=file_key)
         file_content = response['Body'].read()
         file_extension = file_key.lower().split('.')[-1]
 
@@ -181,7 +180,7 @@ def download_file_from_s3(bucket_name: str, file_key: str) -> bytes:
     """
     try:
         logger.info(f"Downloading raw file {file_key} from bucket {bucket_name}...")
-        response = s3_client.get_object(Bucket=bucket_name, Key=file_key)
+        response = _get_s3_client().get_object(Bucket=bucket_name, Key=file_key)
         file_content = response['Body'].read()
         logger.info(f"Successfully downloaded {file_key} ({len(file_content)} bytes)")
         return file_content
@@ -221,7 +220,7 @@ def upload_file_to_s3(file_content, bucket_name, file_key, content_type=None):
             upload_args['ContentType'] = content_type
 
         # Upload the file
-        response = s3_client.put_object(**upload_args)
+        response = _get_s3_client().put_object(**upload_args)
 
         logger.info(
             f"✅ File successfully uploaded to {bucket_name}/{file_key}")

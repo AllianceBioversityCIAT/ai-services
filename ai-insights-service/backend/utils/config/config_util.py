@@ -33,3 +33,31 @@ IS_PROD = os.getenv("IS_PROD", "false").lower() == "true"
 CLARISA_VALIDATE_URL = os.getenv("CLARISA_VALIDATE_URL")
 
 INTERACTION_SERVICE_URL = os.getenv("INTERACTION_SERVICE_URL")
+
+
+def get_boto3_client_kwargs() -> dict:
+    """Extra kwargs for boto3.client(). Empty in Lambda → IAM execution role."""
+    kwargs = {"region_name": AWS["aws_region"]}
+    if is_lambda_runtime():
+        return kwargs
+    if AWS.get("aws_access_key") and AWS.get("aws_secret_key"):
+        kwargs["aws_access_key_id"] = AWS["aws_access_key"]
+        kwargs["aws_secret_access_key"] = AWS["aws_secret_key"]
+    return kwargs
+
+
+def clear_static_aws_credentials_from_environ() -> None:
+    """Prevent stale secret keys from overriding the Lambda execution role."""
+    if not is_lambda_runtime():
+        return
+    for key in (
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+        "INSIGHTS_AWS_ACCESS_KEY_ID",
+        "INSIGHTS_AWS_SECRET_ACCESS_KEY",
+    ):
+        os.environ.pop(key, None)
+
+
+clear_static_aws_credentials_from_environ()

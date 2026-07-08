@@ -2,7 +2,7 @@ import boto3
 import json
 from botocore.config import Config
 from utils.logger.logger_util import get_logger
-from utils.config.config_util import AWS
+from utils.config.config_util import get_boto3_client_kwargs
 
 
 logger = get_logger()
@@ -13,20 +13,17 @@ bedrock_config = Config(
     retries={'max_attempts': 3, 'mode': 'adaptive'}
 )
 
-def _build_bedrock_client():
-    """Use explicit keys locally; use the Lambda execution role in AWS."""
-    kwargs = {
-        "service_name": "bedrock-runtime",
-        "region_name": AWS.get("aws_region", "us-east-1"),
-        "config": bedrock_config,
-    }
-    if AWS.get("aws_access_key") and AWS.get("aws_secret_key"):
-        kwargs["aws_access_key_id"] = AWS["aws_access_key"]
-        kwargs["aws_secret_access_key"] = AWS["aws_secret_key"]
-    return boto3.client(**kwargs)
+_bedrock_runtime = None
 
 
-bedrock_runtime = _build_bedrock_client()
+def _get_bedrock_runtime():
+    global _bedrock_runtime
+    if _bedrock_runtime is None:
+        kwargs = get_boto3_client_kwargs()
+        kwargs["service_name"] = "bedrock-runtime"
+        kwargs["config"] = bedrock_config
+        _bedrock_runtime = boto3.client(**kwargs)
+    return _bedrock_runtime
 
 
 def invoke_model(prompt, max_tokens=15000):
@@ -46,7 +43,7 @@ def invoke_model(prompt, max_tokens=15000):
             ]
         }
         
-        response = bedrock_runtime.invoke_model(
+        response = _get_bedrock_runtime().invoke_model(
             # modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
             modelId="us.anthropic.claude-sonnet-4-6",
             body=json.dumps(request_body),
