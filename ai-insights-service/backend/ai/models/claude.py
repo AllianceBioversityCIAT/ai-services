@@ -2,7 +2,7 @@ import boto3
 import json
 from botocore.config import Config
 from utils.logger.logger_util import get_logger
-from utils.config.config_util import AWS
+from utils.config.config_util import get_boto3_client_kwargs
 
 
 logger = get_logger()
@@ -13,13 +13,17 @@ bedrock_config = Config(
     retries={'max_attempts': 3, 'mode': 'adaptive'}
 )
 
-bedrock_runtime = boto3.client(
-    service_name='bedrock-runtime',
-    aws_access_key_id=AWS['aws_access_key'],
-    aws_secret_access_key=AWS['aws_secret_key'],
-    region_name='us-east-1',
-    config=bedrock_config
-)
+_bedrock_runtime = None
+
+
+def _get_bedrock_runtime():
+    global _bedrock_runtime
+    if _bedrock_runtime is None:
+        kwargs = get_boto3_client_kwargs()
+        kwargs["service_name"] = "bedrock-runtime"
+        kwargs["config"] = bedrock_config
+        _bedrock_runtime = boto3.client(**kwargs)
+    return _bedrock_runtime
 
 
 def invoke_model(prompt, max_tokens=15000):
@@ -39,7 +43,7 @@ def invoke_model(prompt, max_tokens=15000):
             ]
         }
         
-        response = bedrock_runtime.invoke_model(
+        response = _get_bedrock_runtime().invoke_model(
             # modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
             modelId="us.anthropic.claude-sonnet-4-6",
             body=json.dumps(request_body),
