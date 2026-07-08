@@ -27,6 +27,7 @@
     /* Transparent background to blend with STAR's gray background */
     background: transparent;
     padding: 1rem 1rem; /* px-4 — keeps scrollbar flush with page edge when embedded */
+    overscroll-behavior-x: none;
 }
 
 /* Content Header (outside white card, in gray background) */
@@ -1498,6 +1499,7 @@
 
 .bulk-upload-container .bulk-table-container {
     overflow-x: auto;
+    overscroll-behavior-x: contain;
     border: none;
     border-radius: 0;
     margin-bottom: 1.5rem;
