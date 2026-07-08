@@ -2,7 +2,7 @@ import type { ColumnDef } from './types';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_MINING_API_BASE_URL;
 export const S3_BUCKET = 'ai-services-ibd';
-export const FOLDER_PATH = 'star/text-mining/files/test/bulk_upload/';
+export const FOLDER_PATH = 'star/text-mining/files/prod/bulk_upload/';
 export const STAR_BASE_URL = process.env.NEXT_PUBLIC_STAR_API_BASE_URL;
 export const MANAGEMENT_BASE_URL = process.env.NEXT_PUBLIC_MANAGEMENT_API_BASE_URL;
 export const CLARISA_BASE_URL = process.env.NEXT_PUBLIC_CLARISA_API_BASE_URL;
