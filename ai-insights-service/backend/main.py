@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Strip static AWS keys before app imports create boto3 clients (Lambda uses IAM role).
+# Drop INSIGHTS_AWS_* from env if present; Lambda IAM creds stay in AWS_ACCESS_KEY_ID (runtime-injected).
 from utils.config.config_util import clear_static_aws_credentials_from_environ
 
 clear_static_aws_credentials_from_environ()

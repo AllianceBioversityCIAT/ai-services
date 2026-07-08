@@ -252,7 +252,7 @@ The **Resolve Environment** stage derives branch, stack name, ECR tag, Secrets M
 |---------|-------|--------|
 | Git branch | `dev-ai-insights` | `main-ai-insights` |
 | CFN stack | `ai-insights-service-dev` | `ai-insights-service-prod` |
-| ECR image tag | `dev` | `latest` |
+| ECR image tag | `dev-{BUILD_NUMBER}` | `prod-{BUILD_NUMBER}` |
 | Secrets Manager id | `dev/microservice/ai-insights` | `prod/microservice/ai-insights` |
 | `IsProd` (CFN) | `false` | `true` |
 
@@ -285,7 +285,7 @@ INTERACTION_SERVICE_URL=https://...
 4. Build — tag + push image to ECR  
 5. Deploy — `cloudformation deploy` (Jenkins creds only) → sync **full** Secrets Manager file to Lambda env → print stack outputs
 
-**Credential split:** Jenkins uses `prms-test-aws-creds` for deploy only. The secret sync pushes app config to Lambda but **omits** `INSIGHTS_AWS_*` and reserved `AWS_*` keys — boto3 on Lambda uses the execution role for S3, Bedrock, and Textract.  
+**Credential split:** Jenkins uses `prms-test-aws-creds` for deploy only. The secret sync omits `INSIGHTS_AWS_*` keys. In Lambda, boto3 uses the execution role via runtime-injected `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` — do not remove those env vars in code.  
 
 First successful deploy **creates** the Lambda, execution role, and Function URL. Later builds push a new image and update the same stack with the new `ImageUri`.
 

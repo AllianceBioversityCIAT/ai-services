@@ -47,13 +47,10 @@ def get_boto3_client_kwargs() -> dict:
 
 
 def clear_static_aws_credentials_from_environ() -> None:
-    """Prevent stale secret keys from overriding the Lambda execution role."""
+    """Remove app-specific static keys only — do not touch AWS_* vars Lambda injects for the IAM role."""
     if not is_lambda_runtime():
         return
     for key in (
-        "AWS_ACCESS_KEY_ID",
-        "AWS_SECRET_ACCESS_KEY",
-        "AWS_SESSION_TOKEN",
         "INSIGHTS_AWS_ACCESS_KEY_ID",
         "INSIGHTS_AWS_SECRET_ACCESS_KEY",
     ):
