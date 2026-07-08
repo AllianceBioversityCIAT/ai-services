@@ -1,6 +1,6 @@
 import time
 import boto3
-from utils.config.config_util import AWS
+from utils.config.config_util import get_boto3_client_kwargs
 from utils.logger.logger_util import get_logger
 
 logger = get_logger()
@@ -14,12 +14,14 @@ ASYNC_REQUIRED_EXTENSIONS = {'pdf', 'tiff', 'tif'}
 POLL_INTERVAL_SECONDS = 5
 MAX_POLL_ATTEMPTS = 60  # 5 minutes max
 
-textract_client = boto3.client(
-    'textract',
-    aws_access_key_id=AWS['aws_access_key'],
-    aws_secret_access_key=AWS['aws_secret_key'],
-    region_name=AWS.get('aws_region', 'us-east-1')
-)
+_textract_client = None
+
+
+def _get_textract_client():
+    global _textract_client
+    if _textract_client is None:
+        _textract_client = boto3.client("textract", **get_boto3_client_kwargs())
+    return _textract_client
 
 
 def _blocks_to_text(blocks: list) -> str:
@@ -42,7 +44,7 @@ def extract_text_sync(bucket_name: str, file_key: str) -> str:
     """
     logger.info(f"Starting synchronous Textract extraction for s3://{bucket_name}/{file_key}...")
 
-    response = textract_client.detect_document_text(
+    response = _get_textract_client().detect_document_text(
         Document={'S3Object': {'Bucket': bucket_name, 'Name': file_key}}
     )
 
@@ -71,7 +73,7 @@ def extract_text_async(bucket_name: str, file_key: str) -> str:
     """
     logger.info(f"Starting asynchronous Textract extraction for s3://{bucket_name}/{file_key}...")
 
-    start_response = textract_client.start_document_text_detection(
+    start_response = _get_textract_client().start_document_text_detection(
         DocumentLocation={'S3Object': {'Bucket': bucket_name, 'Name': file_key}}
     )
     job_id = start_response['JobId']
@@ -80,7 +82,7 @@ def extract_text_async(bucket_name: str, file_key: str) -> str:
     for attempt in range(1, MAX_POLL_ATTEMPTS + 1):
         time.sleep(POLL_INTERVAL_SECONDS)
 
-        result = textract_client.get_document_text_detection(JobId=job_id)
+        result = _get_textract_client().get_document_text_detection(JobId=job_id)
         status = result['JobStatus']
         logger.info(f"Textract job status (attempt {attempt}/{MAX_POLL_ATTEMPTS}): {status}")
 
@@ -89,7 +91,7 @@ def extract_text_async(bucket_name: str, file_key: str) -> str:
 
             # Handle paginated results
             while 'NextToken' in result:
-                result = textract_client.get_document_text_detection(
+                result = _get_textract_client().get_document_text_detection(
                     JobId=job_id,
                     NextToken=result['NextToken']
                 )
