@@ -1,10 +1,13 @@
 """REST API endpoints for AI Insights Service."""
 
+import httpx
 import traceback
-from fastapi import APIRouter, HTTPException, status
+from fastapi.security import APIKeyHeader
 from utils.logger.logger_util import get_logger
-from modules.document_overview.processing import process_project_overview
+from utils.config.config_util import CLARISA_VALIDATE_URL
+from fastapi import APIRouter, HTTPException, status, Request, Depends
 from utils.notification.notification_service import notification_service
+from modules.document_overview.processing import process_project_overview
 from api.models import (
     DocumentOverviewRequest,
     DocumentOverviewResponse,
@@ -16,6 +19,52 @@ logger = get_logger()
 router = APIRouter()
 
 APP_NAME = "AI Insights Service (STAR)"
+
+
+API_KEY_NAME = "X-API-Key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
+
+http_client = httpx.AsyncClient()
+
+def validate_with_clarisa(microservice_name: str):
+    async def _validate(request: Request, api_key: str = Depends(api_key_header)):
+        client_ip = request.client.host if request.client else "0.0.0.0"
+        endpoint = request.url.path
+
+        payload = {
+            "api_key": api_key,
+            "microservice_name": microservice_name,
+            "endpoint_accessed": endpoint,
+            "ip_address": client_ip
+        }
+
+        try:
+            response = await http_client.post(CLARISA_VALIDATE_URL, json=payload, timeout=5.0)
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Communication error with the authentication service"
+                )
+
+            data = response.json()
+
+            if not data.get("valid"):
+                error_msg = data.get("error", "Invalid API Key")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=error_msg
+                )
+
+            return data.get("mis")
+
+        except httpx.RequestError:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service is temporarily unavailable"
+            )
+
+    return _validate
 
 
 @router.post(
@@ -75,7 +124,7 @@ APP_NAME = "AI Insights Service (STAR)"
         }
     }
 )
-async def document_overview(request: DocumentOverviewRequest) -> DocumentOverviewResponse:
+async def document_overview(request: DocumentOverviewRequest, mis: str = Depends(validate_with_clarisa("AI Insights Service - STAR"))) -> DocumentOverviewResponse:
     """
     Generate a structured project overview from documents in an S3 folder.
 

@@ -22,4 +22,5 @@ dependencies = [
     "pydantic",
     "mammoth",
     "python-pptx",
+    "httpx",
 ]
