@@ -203,11 +203,22 @@ Resources:
 
   InsightsLambdaUrlInvokePermission:
     Type: AWS::Lambda::Permission
+    DependsOn:
+      - InsightsLambdaUrl
     Properties:
       FunctionName: !Ref InsightsLambda
       Action: lambda:InvokeFunctionUrl
       Principal: '*'
       FunctionUrlAuthType: NONE
+
+  InsightsLambdaPublicInvokePermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - InsightsLambdaUrl
+    Properties:
+      FunctionName: !Ref InsightsLambda
+      Action: lambda:InvokeFunction
+      Principal: '*'
 
 Outputs:
   LambdaArn:
