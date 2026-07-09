@@ -5,11 +5,15 @@ import traceback
 from fastapi.security import APIKeyHeader
 from utils.logger.logger_util import get_logger
 from utils.config.config_util import CLARISA_VALIDATE_URL
-from fastapi import APIRouter, HTTPException, status, Request, Depends
 from utils.notification.notification_service import notification_service
-from modules.document_overview.processing import process_project_overview
+from fastapi import APIRouter, HTTPException, status, Request, Depends, Body
+from modules.document_overview.processing import (
+    process_project_overview,
+    get_cached_project_overview,
+)
 from api.models import (
     DocumentOverviewRequest,
+    DocumentOverviewGetRequest,
     DocumentOverviewResponse,
     ProcessedDocument,
     ErrorResponse,
@@ -65,6 +69,91 @@ def validate_with_clarisa(microservice_name: str):
             )
 
     return _validate
+
+
+def _build_overview_response(result: dict, cached: bool = False) -> DocumentOverviewResponse:
+    documents_processed = []
+    for doc in result["documents_processed"]:
+        documents_processed.append(
+            ProcessedDocument(
+                file_key=doc["file_key"],
+                file_name=doc.get("file_name") or doc["file_key"].rsplit("/", 1)[-1],
+                extraction_method=doc["extraction_method"],
+                character_count=doc["character_count"],
+            )
+        )
+
+    return DocumentOverviewResponse(
+        overview=result["overview"],
+        time_taken=result["time_taken"],
+        project_folder=result["project_folder"],
+        bucket_name=result["bucket_name"],
+        documents_processed=documents_processed,
+        interaction_id=result.get("interaction_id"),
+        status=result.get("status", "success"),
+        generated_at=result.get("generated_at"),
+        cached=cached,
+    )
+
+
+@router.get(
+    "/api/document-overview",
+    response_model=DocumentOverviewResponse,
+    tags=["Document Overview"],
+    summary="Get a cached project overview",
+    description="""
+    Retrieve a previously generated project overview from `response.json` stored
+    in the project's S3 folder.
+
+    STAR should call this endpoint when a user opens a project. If a cached overview
+    exists, it is returned immediately without reprocessing documents.
+
+    Returns 404 if no cached overview exists for the project folder.
+    """,
+    response_description="Cached project overview",
+    responses={
+        200: {
+            "description": "Cached project overview found",
+            "model": DocumentOverviewResponse,
+        },
+        404: {
+            "description": "No cached overview found for this project",
+            "model": ErrorResponse,
+        },
+    },
+)
+async def get_document_overview(
+    request: DocumentOverviewGetRequest = Body(...),
+) -> DocumentOverviewResponse:
+    logger.info(
+        f"📥 Cached project overview request — "
+        f"s3://{request.bucket_name}/{request.project_folder}"
+    )
+
+    cached_result = get_cached_project_overview(
+        bucket_name=request.bucket_name,
+        project_folder=request.project_folder,
+    )
+
+    if not cached_result:
+        logger.warning(
+            f"📭 No cached overview found for project folder: {request.project_folder}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": "Overview not found",
+                "status": "error",
+                "details": (
+                    f"No cached overview found for project folder: {request.project_folder}"
+                ),
+            },
+        )
+
+    logger.info(
+        f"✅ Cached project overview returned for: {request.project_folder}"
+    )
+    return _build_overview_response(cached_result, cached=True)
 
 
 @router.post(
@@ -158,17 +247,7 @@ async def document_overview(request: DocumentOverviewRequest, mis: str = Depends
             priority="Low",
         )
 
-        return DocumentOverviewResponse(
-            overview=result["overview"],
-            time_taken=result["time_taken"],
-            project_folder=result["project_folder"],
-            bucket_name=result["bucket_name"],
-            documents_processed=[
-                ProcessedDocument(**doc) for doc in result["documents_processed"]
-            ],
-            interaction_id=result.get("interaction_id"),
-            status="success",
-        )
+        return _build_overview_response(result, cached=False)
 
     except ValueError as e:
         logger.error(f"Validation error: {str(e)}")

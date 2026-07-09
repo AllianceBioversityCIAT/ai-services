@@ -24,10 +24,26 @@ class DocumentOverviewRequest(BaseModel):
     )
 
 
+class DocumentOverviewGetRequest(BaseModel):
+    """Request model for retrieving a cached project overview."""
+
+    bucket_name: str = Field(
+        ...,
+        description="Name of the S3 bucket containing the project documents",
+        examples=["ai-services-ibd"]
+    )
+    project_folder: str = Field(
+        ...,
+        description="S3 folder prefix for the project",
+        examples=["star/ai-insights/projects/abc123"]
+    )
+
+
 class ProcessedDocument(BaseModel):
     """Metadata for a document processed during overview generation."""
 
     file_key: str = Field(..., description="S3 object key of the processed document")
+    file_name: str = Field(..., description="File name extracted from the S3 object key")
     extraction_method: str = Field(
         ...,
         description="Text extraction method used: 'textract' or 'standard'",
@@ -69,7 +85,15 @@ class DocumentOverviewResponse(BaseModel):
         description="Processing status",
         examples=["success"]
     )
-
+    generated_at: Optional[str] = Field(
+        default=None,
+        description="UTC timestamp when the overview was generated (ISO 8601)",
+        examples=["2026-07-03T15:32:29.230000+00:00"]
+    )
+    cached: bool = Field(
+        default=False,
+        description="True when the response was loaded from a cached response.json file"
+    )
 
 class ErrorResponse(BaseModel):
     """Error response model."""

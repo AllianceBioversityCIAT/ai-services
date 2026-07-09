@@ -1,10 +1,12 @@
+import json
 import boto3
 import mammoth
 import pandas as pd
 from io import BytesIO
 from pptx import Presentation
-from utils.config.config_util import get_boto3_client_kwargs
+from botocore.exceptions import ClientError
 from utils.logger.logger_util import get_logger
+from utils.config.config_util import get_boto3_client_kwargs
 
 logger = get_logger()
 
@@ -13,6 +15,7 @@ SUPPORTED_DOCUMENT_EXTENSIONS = {
     'docx', 'txt', 'xls', 'xlsx', 'pptx',
 }
 MAX_PROJECT_DOCUMENTS = 3
+RESPONSE_JSON_FILENAME = "response.json"
 
 _s3_client = None
 
@@ -89,6 +92,16 @@ def _process_file_content(file_extension, file_content):
         raise ValueError(f"File format not supported: {file_extension}")
 
 
+def _normalize_project_folder(project_folder: str) -> str:
+    return project_folder.strip('/')
+
+
+def get_response_json_key(project_folder: str) -> str:
+    """Build the S3 key for the cached project overview response."""
+    prefix = _normalize_project_folder(project_folder)
+    return f"{prefix}/{RESPONSE_JSON_FILENAME}" if prefix else RESPONSE_JSON_FILENAME
+
+
 def list_project_documents(
     bucket_name: str,
     project_folder: str,
@@ -108,7 +121,7 @@ def list_project_documents(
     Raises:
         ValueError: If no supported documents are found or the limit is exceeded
     """
-    prefix = project_folder.strip('/')
+    prefix = _normalize_project_folder(project_folder)
     if prefix:
         prefix = f"{prefix}/"
 
@@ -121,6 +134,11 @@ def list_project_documents(
     for obj in contents:
         key = obj['Key']
         if key.endswith('/') or obj.get('Size', 0) == 0:
+            continue
+
+        file_name = key.rsplit('/', 1)[-1]
+        if file_name == RESPONSE_JSON_FILENAME:
+            logger.info(f"Skipping cached response file: {key}")
             continue
 
         extension = key.lower().rsplit('.', 1)[-1]
@@ -145,6 +163,48 @@ def list_project_documents(
 
     logger.info(f"Found {len(document_keys)} document(s): {document_keys}")
     return document_keys
+
+
+def save_project_response_json(bucket_name: str, project_folder: str, response_data: dict) -> str:
+    """
+    Save the project overview response as response.json in the project folder.
+
+    Returns:
+        The S3 key where the file was saved
+    """
+    file_key = get_response_json_key(project_folder)
+    body = json.dumps(response_data, indent=2, ensure_ascii=False).encode("utf-8")
+
+    upload_file_to_s3(
+        file_content=body,
+        bucket_name=bucket_name,
+        file_key=file_key,
+        content_type="application/json",
+    )
+    logger.info(f"Cached project overview saved to s3://{bucket_name}/{file_key}")
+    return file_key
+
+
+def get_project_response_json(bucket_name: str, project_folder: str) -> dict | None:
+    """
+    Load a cached project overview from response.json in S3.
+
+    Returns:
+        Parsed JSON dict if found, otherwise None
+    """
+    
+
+    file_key = get_response_json_key(project_folder)
+    try:
+        logger.info(f"📂 Loading cached project overview from s3://{bucket_name}/{file_key}")
+        raw = download_file_from_s3(bucket_name, file_key)
+        logger.info(f"✅ Cached project overview loaded from s3://{bucket_name}/{file_key}")
+        return json.loads(raw.decode("utf-8"))
+    except ClientError as e:
+        if e.response["Error"]["Code"] in ("NoSuchKey", "404"):
+            logger.info(f"📭 No cached project overview found at s3://{bucket_name}/{file_key}")
+            return None
+        raise
 
 
 def read_document_from_s3(bucket_name, file_key):
