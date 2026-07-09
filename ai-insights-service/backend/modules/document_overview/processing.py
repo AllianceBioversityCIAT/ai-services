@@ -1,12 +1,18 @@
 import re
 import json
 import time
+from datetime import datetime, timezone
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ai.models.claude import invoke_model
 from utils.logger.logger_util import get_logger
-from utils.s3.s3_util import read_document_from_s3, list_project_documents
+from utils.s3.s3_util import (
+    read_document_from_s3,
+    list_project_documents,
+    save_project_response_json,
+    get_project_response_json,
+)
 from ai.prompts.prompt_document_overview import DEFAULT_PROMPT_DOCUMENT_OVERVIEW
 from utils.textract.textract_util import extract_text_from_s3, TEXTRACT_SUPPORTED_EXTENSIONS
 from utils.interactions.interaction_client import interaction_client
@@ -62,6 +68,7 @@ def _extract_documents_parallel(bucket_name: str, file_keys: list[str]) -> list[
             text, extraction_method = future.result()
             results.append({
                 "file_key": file_key,
+                "file_name": file_key.rsplit("/", 1)[-1],
                 "text": text,
                 "extraction_method": extraction_method,
                 "character_count": len(text),
@@ -178,6 +185,7 @@ def process_project_overview(
                 "documents_processed": [
                     {
                         "file_key": doc["file_key"],
+                        "file_name": doc["file_name"],
                         "extraction_method": doc["extraction_method"],
                         "character_count": doc["character_count"],
                     }
@@ -219,7 +227,7 @@ def process_project_overview(
         except Exception as tracking_error:
             logger.error(f"Error tracking interaction: {str(tracking_error)}")
 
-    return {
+    result = {
         "overview": overview,
         "time_taken": f"{elapsed_time:.2f}",
         "project_folder": project_folder.strip('/'),
@@ -227,10 +235,31 @@ def process_project_overview(
         "documents_processed": [
             {
                 "file_key": doc["file_key"],
+                "file_name": doc["file_name"],
                 "extraction_method": doc["extraction_method"],
                 "character_count": doc["character_count"],
             }
             for doc in documents
         ],
         "interaction_id": interaction_id,
+        "status": "success",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }
+
+    try:
+        save_project_response_json(bucket_name, project_folder, result)
+    except Exception as cache_error:
+        logger.error(f"Failed to save cached project overview: {str(cache_error)}")
+
+    return result
+
+
+def get_cached_project_overview(bucket_name: str, project_folder: str) -> dict | None:
+    """
+    Retrieve a previously generated project overview from response.json in S3.
+
+    Returns:
+        Cached response dict if found, otherwise None
+    """
+    logger.info(f"🔍 Fetching cached project overview for s3://{bucket_name}/{project_folder}")
+    return get_project_response_json(bucket_name, project_folder)

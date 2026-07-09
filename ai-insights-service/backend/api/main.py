@@ -6,6 +6,7 @@ from api.routes import router
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from utils.logger.logger_util import get_logger
+from utils.config.config_util import is_lambda_runtime
 
 logger = get_logger()
 
@@ -49,13 +50,16 @@ app = FastAPI(
     ]
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Lambda Function URL handles CORS at the edge; adding it here too duplicates headers
+# (e.g. * vs a specific origin) and browsers block the response.
+if not is_lambda_runtime():
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(router)
 
@@ -80,6 +84,7 @@ async def root():
         },
         "endpoints": {
             "POST /api/document-overview": "Generate a structured overview from 1-3 project documents in an S3 folder",
+            "GET /api/document-overview": "Retrieve a cached project overview from response.json in S3",
             "GET /health": "Health check endpoint"
         },
         "technology_stack": ["FastAPI", "AWS Bedrock (Claude)", "Amazon Textract", "Python 3.13"]
