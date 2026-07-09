@@ -6,14 +6,13 @@ from fastapi.security import APIKeyHeader
 from utils.logger.logger_util import get_logger
 from utils.config.config_util import CLARISA_VALIDATE_URL
 from utils.notification.notification_service import notification_service
-from fastapi import APIRouter, HTTPException, status, Request, Depends, Body
+from fastapi import APIRouter, HTTPException, status, Request, Depends, Query
 from modules.document_overview.processing import (
     process_project_overview,
     get_cached_project_overview,
 )
 from api.models import (
     DocumentOverviewRequest,
-    DocumentOverviewGetRequest,
     DocumentOverviewResponse,
     ProcessedDocument,
     ErrorResponse,
@@ -123,21 +122,22 @@ def _build_overview_response(result: dict, cached: bool = False) -> DocumentOver
     },
 )
 async def get_document_overview(
-    request: DocumentOverviewGetRequest = Body(...),
+    bucket_name: str = Query(..., description="S3 bucket containing the project documents"),
+    project_folder: str = Query(..., description="S3 folder prefix for the project"),
 ) -> DocumentOverviewResponse:
     logger.info(
         f"📥 Cached project overview request — "
-        f"s3://{request.bucket_name}/{request.project_folder}"
+        f"s3://{bucket_name}/{project_folder}"
     )
 
     cached_result = get_cached_project_overview(
-        bucket_name=request.bucket_name,
-        project_folder=request.project_folder,
+        bucket_name=bucket_name,
+        project_folder=project_folder,
     )
 
     if not cached_result:
         logger.warning(
-            f"📭 No cached overview found for project folder: {request.project_folder}"
+            f"📭 No cached overview found for project folder: {project_folder}"
         )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -145,13 +145,13 @@ async def get_document_overview(
                 "error": "Overview not found",
                 "status": "error",
                 "details": (
-                    f"No cached overview found for project folder: {request.project_folder}"
+                    f"No cached overview found for project folder: {project_folder}"
                 ),
             },
         )
 
     logger.info(
-        f"✅ Cached project overview returned for: {request.project_folder}"
+        f"✅ Cached project overview returned for: {project_folder}"
     )
     return _build_overview_response(cached_result, cached=True)
 
