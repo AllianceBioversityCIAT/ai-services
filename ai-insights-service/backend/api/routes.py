@@ -70,6 +70,21 @@ def validate_with_clarisa(microservice_name: str):
     return _validate
 
 
+def _build_empty_overview_response(
+    bucket_name: str,
+    project_folder: str,
+) -> DocumentOverviewResponse:
+    return DocumentOverviewResponse(
+        overview={},
+        time_taken="",
+        project_folder=project_folder.strip("/"),
+        bucket_name=bucket_name,
+        documents_processed=[],
+        status="empty",
+        cached=False,
+    )
+
+
 def _build_overview_response(result: dict, cached: bool = False) -> DocumentOverviewResponse:
     documents_processed = []
     for doc in result["documents_processed"]:
@@ -107,17 +122,13 @@ def _build_overview_response(result: dict, cached: bool = False) -> DocumentOver
     STAR should call this endpoint when a user opens a project. If a cached overview
     exists, it is returned immediately without reprocessing documents.
 
-    Returns 404 if no cached overview exists for the project folder.
+    If no cached overview exists, an empty response is returned with status `empty`.
     """,
-    response_description="Cached project overview",
+    response_description="Cached project overview or empty response",
     responses={
         200: {
-            "description": "Cached project overview found",
+            "description": "Cached project overview found, or empty response if none exists",
             "model": DocumentOverviewResponse,
-        },
-        404: {
-            "description": "No cached overview found for this project",
-            "model": ErrorResponse,
         },
     },
 )
@@ -136,19 +147,10 @@ async def get_document_overview(
     )
 
     if not cached_result:
-        logger.warning(
-            f"📭 No cached overview found for project folder: {project_folder}"
+        logger.info(
+            f"📭 No cached overview found for project folder: {project_folder} — returning empty response"
         )
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "error": "Overview not found",
-                "status": "error",
-                "details": (
-                    f"No cached overview found for project folder: {project_folder}"
-                ),
-            },
-        )
+        return _build_empty_overview_response(bucket_name, project_folder)
 
     logger.info(
         f"✅ Cached project overview returned for: {project_folder}"
