@@ -68,7 +68,7 @@ class DocumentOverviewResponse(BaseModel):
     status: str = Field(
         default="success",
         description="Processing status",
-        examples=["success"]
+        examples=["success", "empty"]
     )
     generated_at: Optional[str] = Field(
         default=None,
