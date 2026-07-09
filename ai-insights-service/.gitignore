@@ -190,3 +190,9 @@ faiss/
 
 # Data logs
 backend/data/logs/
+
+# CI/CD — keep in Jenkins job config or locally; contains env-specific AWS/account settings
+Jenkinsfile
+
+# Internal deployment playbook — local/ops only; not for public repo
+backend/LAMBDA_DEPLOYMENT.md
