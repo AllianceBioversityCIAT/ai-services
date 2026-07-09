@@ -24,21 +24,6 @@ class DocumentOverviewRequest(BaseModel):
     )
 
 
-class DocumentOverviewGetRequest(BaseModel):
-    """Request model for retrieving a cached project overview."""
-
-    bucket_name: str = Field(
-        ...,
-        description="Name of the S3 bucket containing the project documents",
-        examples=["ai-services-ibd"]
-    )
-    project_folder: str = Field(
-        ...,
-        description="S3 folder prefix for the project",
-        examples=["star/ai-insights/projects/abc123"]
-    )
-
-
 class ProcessedDocument(BaseModel):
     """Metadata for a document processed during overview generation."""
 
