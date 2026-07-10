@@ -192,8 +192,8 @@ async def get_document_overview(
     )
 
 
-@router.delete(
-    "/api/document-overview/files",
+@router.post(
+    "/api/document-overview/files/delete",
     response_model=DeleteProjectFilesResponse,
     tags=["Document Overview"],
     summary="Delete project documents from S3",

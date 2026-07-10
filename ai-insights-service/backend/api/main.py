@@ -85,7 +85,7 @@ async def root():
         "endpoints": {
             "POST /api/document-overview": "Generate a structured overview from 1-3 project documents in an S3 folder",
             "GET /api/document-overview": "Retrieve a cached project overview and list available files in S3",
-            "DELETE /api/document-overview/files": "Delete project documents from an S3 folder",
+            "POST /api/document-overview/files/delete": "Delete project documents from an S3 folder",
             "GET /health": "Health check endpoint"
         },
         "technology_stack": ["FastAPI", "AWS Bedrock (Claude)", "Amazon Textract", "Python 3.13"]
