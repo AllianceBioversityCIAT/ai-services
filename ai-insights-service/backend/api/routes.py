@@ -6,6 +6,7 @@ from fastapi.security import APIKeyHeader
 from utils.logger.logger_util import get_logger
 from utils.config.config_util import CLARISA_VALIDATE_URL
 from utils.notification.notification_service import notification_service
+from utils.s3.s3_util import list_available_project_files, delete_project_files
 from fastapi import APIRouter, HTTPException, status, Request, Depends, Query
 from modules.document_overview.processing import (
     process_project_overview,
@@ -14,7 +15,11 @@ from modules.document_overview.processing import (
 from api.models import (
     DocumentOverviewRequest,
     DocumentOverviewResponse,
+    GetDocumentOverviewResponse,
     ProcessedDocument,
+    AvailableFile,
+    DeleteProjectFilesRequest,
+    DeleteProjectFilesResponse,
     ErrorResponse,
 )
 
@@ -70,6 +75,11 @@ def validate_with_clarisa(microservice_name: str):
     return _validate
 
 
+def _get_available_files(bucket_name: str, project_folder: str) -> list[AvailableFile]:
+    files = list_available_project_files(bucket_name, project_folder)
+    return [AvailableFile(**file_info) for file_info in files]
+
+
 def _build_empty_overview_response(
     bucket_name: str,
     project_folder: str,
@@ -85,7 +95,10 @@ def _build_empty_overview_response(
     )
 
 
-def _build_overview_response(result: dict, cached: bool = False) -> DocumentOverviewResponse:
+def _build_overview_response(
+    result: dict,
+    cached: bool = False,
+) -> DocumentOverviewResponse:
     documents_processed = []
     for doc in result["documents_processed"]:
         documents_processed.append(
@@ -110,9 +123,19 @@ def _build_overview_response(result: dict, cached: bool = False) -> DocumentOver
     )
 
 
+def _build_get_overview_response(
+    result: DocumentOverviewResponse,
+    available_files: list[AvailableFile],
+) -> GetDocumentOverviewResponse:
+    return GetDocumentOverviewResponse(
+        **result.model_dump(),
+        available_files=available_files,
+    )
+
+
 @router.get(
     "/api/document-overview",
-    response_model=DocumentOverviewResponse,
+    response_model=GetDocumentOverviewResponse,
     tags=["Document Overview"],
     summary="Get a cached project overview",
     description="""
@@ -122,24 +145,29 @@ def _build_overview_response(result: dict, cached: bool = False) -> DocumentOver
     STAR should call this endpoint when a user opens a project. If a cached overview
     exists, it is returned immediately without reprocessing documents.
 
+    Also returns `available_files`: the files currently present in the project folder
+    (excluding `response.json`).
+
     If no cached overview exists, an empty response is returned with status `empty`.
     """,
     response_description="Cached project overview or empty response",
     responses={
         200: {
             "description": "Cached project overview found, or empty response if none exists",
-            "model": DocumentOverviewResponse,
+            "model": GetDocumentOverviewResponse,
         },
     },
 )
 async def get_document_overview(
     bucket_name: str = Query(..., description="S3 bucket containing the project documents"),
     project_folder: str = Query(..., description="S3 folder prefix for the project"),
-) -> DocumentOverviewResponse:
+) -> GetDocumentOverviewResponse:
     logger.info(
         f"📥 Cached project overview request — "
         f"s3://{bucket_name}/{project_folder}"
     )
+
+    available_files = _get_available_files(bucket_name, project_folder)
 
     cached_result = get_cached_project_overview(
         bucket_name=bucket_name,
@@ -150,12 +178,100 @@ async def get_document_overview(
         logger.info(
             f"📭 No cached overview found for project folder: {project_folder} — returning empty response"
         )
-        return _build_empty_overview_response(bucket_name, project_folder)
+        return _build_get_overview_response(
+            _build_empty_overview_response(bucket_name, project_folder),
+            available_files=available_files,
+        )
 
     logger.info(
         f"✅ Cached project overview returned for: {project_folder}"
     )
-    return _build_overview_response(cached_result, cached=True)
+    return _build_get_overview_response(
+        _build_overview_response(cached_result, cached=True),
+        available_files=available_files,
+    )
+
+
+@router.delete(
+    "/api/document-overview/files",
+    response_model=DeleteProjectFilesResponse,
+    tags=["Document Overview"],
+    summary="Delete project documents from S3",
+    description="""
+    Delete one or more documents from a project folder in S3.
+
+    Use this before uploading replacement documents and regenerating the overview,
+    so the previous files are no longer processed.
+
+    - Provide file names only (not full S3 paths)
+    - `response.json` cannot be deleted through this endpoint
+    """,
+    response_description="List of deleted file names",
+    responses={
+        200: {
+            "description": "Files deleted successfully",
+            "model": DeleteProjectFilesResponse,
+        },
+        400: {
+            "description": "Invalid request parameters",
+            "model": ErrorResponse,
+        },
+        500: {
+            "description": "Internal server error",
+            "model": ErrorResponse,
+        },
+    },
+)
+async def delete_document_overview_files(
+    request: DeleteProjectFilesRequest,
+) -> DeleteProjectFilesResponse:
+    try:
+        logger.info(
+            f"🗑️ Delete files request — "
+            f"s3://{request.bucket_name}/{request.project_folder} "
+            f"files={request.file_names}"
+        )
+
+        deleted_files = delete_project_files(
+            bucket_name=request.bucket_name,
+            project_folder=request.project_folder,
+            file_names=request.file_names,
+        )
+
+        logger.info(
+            f"✅ Deleted {len(deleted_files)} file(s) from "
+            f"s3://{request.bucket_name}/{request.project_folder}"
+        )
+
+        return DeleteProjectFilesResponse(
+            bucket_name=request.bucket_name,
+            project_folder=request.project_folder.strip("/"),
+            deleted_files=deleted_files,
+            status="success",
+        )
+
+    except ValueError as e:
+        logger.error(f"Validation error while deleting files: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "Invalid parameters",
+                "status": "error",
+                "details": str(e),
+            }
+        )
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        logger.error(f"Unexpected error while deleting files: {str(e)}\n{tb}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "Internal server error",
+                "status": "error",
+                "details": str(e),
+            }
+        )
 
 
 @router.post(

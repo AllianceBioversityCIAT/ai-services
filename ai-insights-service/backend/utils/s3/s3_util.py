@@ -102,6 +102,45 @@ def get_response_json_key(project_folder: str) -> str:
     return f"{prefix}/{RESPONSE_JSON_FILENAME}" if prefix else RESPONSE_JSON_FILENAME
 
 
+def list_available_project_files(
+    bucket_name: str,
+    project_folder: str,
+) -> list[dict]:
+    """
+    List files currently available in a project folder (excluding response.json).
+
+    Returns:
+        Sorted list of dicts with file_key and file_name. Empty list if none found.
+    """
+    prefix = _normalize_project_folder(project_folder)
+    if prefix:
+        prefix = f"{prefix}/"
+
+    logger.info(f"📂 Listing available files in s3://{bucket_name}/{prefix}")
+
+    response = _get_s3_client().list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+    contents = response.get('Contents', [])
+
+    files = []
+    for obj in contents:
+        key = obj['Key']
+        if key.endswith('/') or obj.get('Size', 0) == 0:
+            continue
+
+        file_name = key.rsplit('/', 1)[-1]
+        if file_name == RESPONSE_JSON_FILENAME:
+            continue
+
+        files.append({
+            "file_key": key,
+            "file_name": file_name,
+        })
+
+    files.sort(key=lambda item: item["file_name"])
+    logger.info(f"📂 Found {len(files)} available file(s) in project folder")
+    return files
+
+
 def list_project_documents(
     bucket_name: str,
     project_folder: str,
@@ -121,34 +160,16 @@ def list_project_documents(
     Raises:
         ValueError: If no supported documents are found or the limit is exceeded
     """
-    prefix = _normalize_project_folder(project_folder)
-    if prefix:
-        prefix = f"{prefix}/"
-
-    logger.info(f"Listing documents in s3://{bucket_name}/{prefix}")
-
-    response = _get_s3_client().list_objects_v2(Bucket=bucket_name, Prefix=prefix)
-    contents = response.get('Contents', [])
+    available_files = list_available_project_files(bucket_name, project_folder)
 
     document_keys = []
-    for obj in contents:
-        key = obj['Key']
-        if key.endswith('/') or obj.get('Size', 0) == 0:
-            continue
-
-        file_name = key.rsplit('/', 1)[-1]
-        if file_name == RESPONSE_JSON_FILENAME:
-            logger.info(f"Skipping cached response file: {key}")
-            continue
-
+    for file_info in available_files:
+        key = file_info["file_key"]
         extension = key.lower().rsplit('.', 1)[-1]
         if extension not in SUPPORTED_DOCUMENT_EXTENSIONS:
             logger.warning(f"Skipping unsupported file: {key}")
             continue
-
         document_keys.append(key)
-
-    document_keys.sort()
 
     if not document_keys:
         raise ValueError(
@@ -163,6 +184,52 @@ def list_project_documents(
 
     logger.info(f"Found {len(document_keys)} document(s): {document_keys}")
     return document_keys
+
+
+def delete_project_files(
+    bucket_name: str,
+    project_folder: str,
+    file_names: list[str],
+) -> list[str]:
+    """
+    Delete one or more files from a project folder in S3.
+
+    Only files inside the given project folder can be deleted.
+    response.json cannot be deleted through this function.
+
+    Args:
+        bucket_name: S3 bucket name
+        project_folder: Folder prefix for the project
+        file_names: File names (not full keys) to delete
+
+    Returns:
+        List of deleted file names
+
+    Raises:
+        ValueError: If file_names is empty or includes invalid names
+    """
+    if not file_names:
+        raise ValueError("At least one file_name is required for deletion")
+
+    prefix = _normalize_project_folder(project_folder)
+    deleted = []
+
+    for file_name in file_names:
+        clean_name = file_name.strip().lstrip('/')
+        if not clean_name or '/' in clean_name:
+            raise ValueError(
+                f"Invalid file_name '{file_name}'. Provide only the file name, not a path."
+            )
+        if clean_name == RESPONSE_JSON_FILENAME:
+            raise ValueError(f"Cannot delete '{RESPONSE_JSON_FILENAME}' through this endpoint")
+
+        file_key = f"{prefix}/{clean_name}" if prefix else clean_name
+        logger.info(f"🗑️ Deleting s3://{bucket_name}/{file_key}")
+        _get_s3_client().delete_object(Bucket=bucket_name, Key=file_key)
+        deleted.append(clean_name)
+        logger.info(f"✅ Deleted s3://{bucket_name}/{file_key}")
+
+    return deleted
 
 
 def save_project_response_json(bucket_name: str, project_folder: str, response_data: dict) -> str:

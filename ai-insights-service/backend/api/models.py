@@ -24,6 +24,13 @@ class DocumentOverviewRequest(BaseModel):
     )
 
 
+class AvailableFile(BaseModel):
+    """A file currently available in the project S3 folder."""
+
+    file_key: str = Field(..., description="Full S3 object key")
+    file_name: str = Field(..., description="File name only")
+
+
 class ProcessedDocument(BaseModel):
     """Metadata for a document processed during overview generation."""
 
@@ -79,6 +86,46 @@ class DocumentOverviewResponse(BaseModel):
         default=False,
         description="True when the response was loaded from a cached response.json file"
     )
+
+
+class GetDocumentOverviewResponse(DocumentOverviewResponse):
+    """GET response: cached overview plus files currently available in S3."""
+
+    available_files: List[AvailableFile] = Field(
+        default_factory=list,
+        description="Files currently available in the project S3 folder (excluding response.json)"
+    )
+
+
+class DeleteProjectFilesRequest(BaseModel):
+    """Request model for deleting files from a project folder in S3."""
+
+    bucket_name: str = Field(
+        ...,
+        description="Name of the S3 bucket containing the project documents",
+        examples=["ai-services-ibd"]
+    )
+    project_folder: str = Field(
+        ...,
+        description="S3 folder prefix for the project",
+        examples=["star/ai-insights/projects/abc123"]
+    )
+    file_names: List[str] = Field(
+        ...,
+        min_length=1,
+        description="File names to delete (file name only, not full path)",
+        examples=[["report.pdf", "proposal.docx"]]
+    )
+
+
+class DeleteProjectFilesResponse(BaseModel):
+    """Response model for file deletion."""
+
+    bucket_name: str = Field(..., description="S3 bucket where files were deleted")
+    project_folder: str = Field(..., description="Project folder prefix")
+    deleted_files: List[str] = Field(..., description="File names that were deleted")
+    status: str = Field(default="success", description="Deletion status")
+
 
 class ErrorResponse(BaseModel):
     """Error response model."""
