@@ -47,6 +47,14 @@ export function useTableFilters(): TableFiltersState & TableFiltersActions {
         return currentTab === 'pending' ? status === 'pending' || status === 'failed' : status === 'complete';
       });
 
+      // Deduplicate by id so reinjected + remined rows never inflate Submitted Results
+      const uniqueById = new Map<string, BulkUploadResult>();
+      for (const result of filtered) {
+        if (result.id == null) continue;
+        uniqueById.set(String(result.id), result);
+      }
+      filtered = Array.from(uniqueById.values());
+
       // Then: apply column filters — uses token intersection for array columns
       if (Object.keys(activeFilters).length > 0) {
         filtered = filtered.filter((result) => {

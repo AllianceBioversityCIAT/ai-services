@@ -4,7 +4,8 @@ import { useCallback, useState } from 'react';
 import type { BulkUploadResult, RecordStatus, StarApiResponse } from '../types';
 import { API_BASE_URL, ENVIRONMENT_URL, FOLDER_PATH, S3_BUCKET, STAR_API_URL } from '../constants';
 import { extractInnerResults, formatResultForSTAR } from '../utils/dataFormatters';
-import { loadRecordStatuses, saveRecordStatus } from './useDynamoDB';
+import { loadRecordStatuses, saveRecordStatusesBatch } from './useDynamoDB';
+import type { RecordStatusSavePayload } from './useDynamoDB';
 import { simplifyS3Path } from '../utils/tableHelpers';
 import { checkCompleteness } from '../utils/completenessChecker';
 
@@ -158,9 +159,12 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
           is_partner_not_applicable: !Array.isArray(r.partners) || r.partners.length === 0,
         }));
 
-        // Re-inject already-submitted records using stored DynamoDB data so they appear in the table
+        // Re-inject already-submitted records using stored DynamoDB data so they appear in the table.
+        // Skip IDs already returned by AI to avoid duplicate rows in Submitted Results.
+        const aiIdSet = new Set(aiResults.map((r) => String(r.id)));
         const injectedResults: BulkUploadResult[] = [];
         for (const id of skipIds) {
+          if (aiIdSet.has(id)) continue;
           const stored = savedStatuses.record_data?.[id];
           injectedResults.push({
             id,
@@ -170,15 +174,22 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
           } as BulkUploadResult);
         }
 
-        const results = [...injectedResults, ...aiResults];
+        // Deduplicate by id (last occurrence wins) in case of any residual overlap
+        const mergedById = new Map<string, BulkUploadResult>();
+        for (const r of [...injectedResults, ...aiResults]) {
+          if (r.id == null) continue;
+          mergedById.set(String(r.id), { ...r, id: String(r.id) });
+        }
+        const results = Array.from(mergedById.values());
 
-        // Build recordStatuses map
+        // Build recordStatuses map — Dynamo is the source of truth for submitted records
         const statuses: Record<string, RecordStatus> = {};
         savedStatuses.complete?.forEach((id) => {
-          const stored = savedStatuses.record_data?.[id];
-          statuses[String(id)] = {
+          const rid = String(id);
+          const stored = savedStatuses.record_data?.[rid] ?? savedStatuses.record_data?.[id];
+          statuses[rid] = {
             status: 'complete',
-            link: savedStatuses.links?.[id] ?? null,
+            link: savedStatuses.links?.[rid] ?? savedStatuses.links?.[id] ?? null,
             submissionType: (stored?.submission_type as 'approved' | 'draft' | undefined) ?? undefined,
           };
         });
@@ -255,15 +266,12 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
 
         const starResponse = (await response.json()) as StarApiResponse;
         setStarSubmissionResponse(starResponse);
-        hideLoading();
 
         // Build map for O(1) lookup (js-index-maps)
         const resultsByTitle = new Map(selectedResults.map((r) => [r.title, r]));
         const completeIdSet = new Set(completeResults.map((r) => String(r.id)));
         const newStatuses: Record<string, RecordStatus> = {};
-
-        // Process successes and failures in parallel-safe sequential loops
-        const saves: Promise<void>[] = [];
+        const dynamoUpdates: RecordStatusSavePayload[] = [];
 
         for (const created of starResponse.data?.results_created ?? []) {
           if (!created.error && created.title) {
@@ -273,13 +281,15 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
               const starLink = `https://allianceindicatorstest.ciat.cgiar.org/result/STAR-${created.result_official_code}`;
               const submissionType = completeIdSet.has(rid) ? 'approved' : 'draft';
               newStatuses[rid] = { status: 'complete', link: starLink, submissionType };
-              saves.push(
-                saveRecordStatus(
-                  currentFileName, rid, 'complete', starLink,
-                  orig.title, orig.contract_code ?? undefined, submissionType,
-                  orig.year != null ? String(orig.year) : undefined,
-                ).catch(console.error),
-              );
+              dynamoUpdates.push({
+                recordId: rid,
+                status: 'complete',
+                link: starLink,
+                title: orig.title,
+                contractCode: orig.contract_code ?? undefined,
+                submissionType,
+                year: orig.year != null ? String(orig.year) : undefined,
+              });
             }
           }
         }
@@ -290,20 +300,54 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
             if (orig?.id) {
               const rid = String(orig.id);
               newStatuses[rid] = { status: 'failed', link: null, errorMessage: err.message_error };
-              saves.push(
-                saveRecordStatus(
-                  currentFileName, rid, 'failed', null,
-                  orig.title, orig.contract_code ?? undefined, undefined,
-                  orig.year != null ? String(orig.year) : undefined,
-                ).catch(console.error),
-              );
+              dynamoUpdates.push({
+                recordId: rid,
+                status: 'failed',
+                link: null,
+                title: orig.title,
+                contractCode: orig.contract_code ?? undefined,
+                year: orig.year != null ? String(orig.year) : undefined,
+              });
             }
           }
         }
 
-        // Fire-and-forget DynamoDB saves (server-after-nonblocking pattern)
-        Promise.all(saves).catch(console.error);
+        // Persist all statuses in one atomic DynamoDB write before updating the UI
+        if (dynamoUpdates.length > 0) {
+          showLoading('Saving submission statuses...');
+          try {
+            const saved = await saveRecordStatusesBatch(currentFileName, dynamoUpdates);
+            const updatedIds = new Set(dynamoUpdates.map((u) => u.recordId));
+            const savedComplete = new Set((saved.complete ?? []).map(String));
+            const savedFailed = new Set((saved.failed ?? []).map(String));
+            // Align only this submission's statuses with what Dynamo persisted
+            for (const rid of updatedIds) {
+              if (savedComplete.has(rid)) {
+                const stored = saved.record_data?.[rid];
+                newStatuses[rid] = {
+                  status: 'complete',
+                  link: saved.links?.[rid] ?? newStatuses[rid]?.link ?? null,
+                  submissionType:
+                    (stored?.submission_type as 'approved' | 'draft' | undefined) ??
+                    newStatuses[rid]?.submissionType,
+                };
+              } else if (savedFailed.has(rid)) {
+                newStatuses[rid] = {
+                  status: 'failed',
+                  link: null,
+                  errorMessage: newStatuses[rid]?.errorMessage,
+                };
+              }
+            }
+          } catch (saveError) {
+            console.error('Failed to persist statuses to DynamoDB:', saveError);
+            showError(
+              `Records were submitted to STAR, but saving statuses failed: ${(saveError as Error).message}. Re-check Submitted Results after refresh.`,
+            );
+          }
+        }
 
+        hideLoading();
         onComplete(new Set(completeResults.map((r) => String(r.id))), newStatuses);
       } catch (error) {
         hideLoading();
