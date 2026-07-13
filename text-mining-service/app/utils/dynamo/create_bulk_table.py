@@ -1,12 +1,12 @@
 import boto3
-from app.utils.config.config_util import AWS
 from app.utils.logger.logger_util import get_logger
+from app.utils.config.config_util import AWS, IS_PROD
 
 logger = get_logger()
 
 
 dynamodb = boto3.resource('dynamodb', region_name=AWS.get('region', 'us-east-1'))
-BULK_UPLOAD_TABLE_NAME = 'bulk_upload_records'
+BULK_UPLOAD_TABLE_NAME = 'bulk_upload_records' if IS_PROD else 'bulk_upload_records_test'
 
 
 def create_bulk_upload_table_if_not_exists():

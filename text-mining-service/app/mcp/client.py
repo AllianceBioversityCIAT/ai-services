@@ -28,7 +28,7 @@ from app.utils.config.config_util import AWS, CLIENT_ID, CLIENT_SECRET, IS_PROD,
 logger = get_logger()
 
 dynamodb = boto3.resource('dynamodb', region_name=AWS.get('region', 'us-east-1'))
-BULK_UPLOAD_TABLE_NAME = 'bulk_upload_records'
+BULK_UPLOAD_TABLE_NAME = 'bulk_upload_records' if IS_PROD else 'bulk_upload_records_test'
 AI_REQUESTS_TABLE_NAME = 'ai-requests-prod' if IS_PROD else 'ai-requests-testing'
 
 server_params = StdioServerParameters(
