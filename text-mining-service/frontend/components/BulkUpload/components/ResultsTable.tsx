@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, memo } from 'react';
 import type { ChangeEvent } from 'react';
 import type { BulkUploadResult, ColumnDef, RecordStatus, TabType } from '../types';
 import { ASSET_IP_OWNER_ID_TO_NAME, RESULTS_TABLE_COLUMNS } from '../constants';
-import { getNestedValue, setNestedValue, getUniqueValues } from '../utils/tableHelpers';
+import { getNestedValue, setNestedValue, getUniqueValues, getColumnLabel } from '../utils/tableHelpers';
 import { usePagination } from '../hooks/usePagination';
 import { FilterPanel } from './FilterPanel';
 import { useState } from 'react';
@@ -615,10 +615,11 @@ export function ResultsTable({
                 .filter((col) => !(currentTab === 'pending' && col.type === 'link'))
                 .filter((col) => currentTab !== 'submitted' || col.showInSubmitted)
                 .map((col) => {
+                const headerLabel = getColumnLabel(col, currentTab);
                 if ((col.readonly && col.type !== 'completeness') || col.type === 'status' || col.type === 'link') {
                   return (
                     <th key={col.key + col.type}>
-                      {col.label}
+                      {headerLabel}
                       {col.riskFlag && <RiskFlagBadge />}
                     </th>
                   );
@@ -629,8 +630,8 @@ export function ResultsTable({
                     <div className="th-content">
                       <span>
                         {col.tooltip
-                          ? <>{col.label.replace(' ⓘ', '')} <span className="col-tooltip-icon" data-tooltip={col.tooltip}>ⓘ</span></>
-                          : col.label}
+                          ? <>{headerLabel.replace(' ⓘ', '')} <span className="col-tooltip-icon" data-tooltip={col.tooltip}>ⓘ</span></>
+                          : headerLabel}
                         {col.riskFlag && <RiskFlagBadge />}
                       </span>
                       <span
