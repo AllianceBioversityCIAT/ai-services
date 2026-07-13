@@ -1,5 +1,11 @@
-import type { BulkUploadResult, RawInstitution, RawUser, RawLanguage, RawCountry, RawEvidence, RecordStatus, TabType } from '../types';
+import type { BulkUploadResult, ColumnDef, RawInstitution, RawUser, RawLanguage, RawCountry, RawEvidence, RecordStatus, TabType } from '../types';
 import { checkCompleteness } from './completenessChecker';
+
+/** Column header label for the active tab (e.g. Completeness vs STAR Status). */
+export function getColumnLabel(col: ColumnDef, tab: TabType): string {
+  if (tab === 'submitted' && col.submittedLabel) return col.submittedLabel;
+  return col.label;
+}
 
 const ASSET_IP_OWNER_ID_TO_NAME: Record<number, string> = {
   1: 'International Center for Tropical Agriculture - CIAT',

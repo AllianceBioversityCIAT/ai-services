@@ -1,8 +1,15 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { BulkUploadResult, RecordStatus, TabType } from '../types';
 import { getColumnFilterTokens } from '../utils/tableHelpers';
+
+type FiltersByTab = Record<TabType, Record<string, string[]>>;
+
+const EMPTY_FILTERS_BY_TAB: FiltersByTab = {
+  pending: {},
+  submitted: {},
+};
 
 export interface TableFiltersState {
   activeFilters: Record<string, string[]>;
@@ -18,23 +25,34 @@ export interface TableFiltersActions {
 }
 
 export function useTableFilters(): TableFiltersState & TableFiltersActions {
-  const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
+  const [filtersByTab, setFiltersByTab] = useState<FiltersByTab>(EMPTY_FILTERS_BY_TAB);
   const [currentTab, setCurrentTab] = useState<TabType>('pending');
 
-  // rerender-functional-setstate: use updater form for safe concurrent state
+  // Filters are scoped to the active tab so Pending and Submitted never conflict
+  const activeFilters = useMemo(
+    () => filtersByTab[currentTab] ?? {},
+    [filtersByTab, currentTab],
+  );
+
   const setFilter = useCallback((columnKey: string, values: string[]) => {
-    setActiveFilters((prev) => ({ ...prev, [columnKey]: values }));
-  }, []);
+    setFiltersByTab((prev) => ({
+      ...prev,
+      [currentTab]: { ...prev[currentTab], [columnKey]: values },
+    }));
+  }, [currentTab]);
 
   const clearFilter = useCallback((columnKey: string) => {
-    setActiveFilters((prev) => {
-      const next = { ...prev };
-      delete next[columnKey];
-      return next;
+    setFiltersByTab((prev) => {
+      const nextForTab = { ...prev[currentTab] };
+      delete nextForTab[columnKey];
+      return { ...prev, [currentTab]: nextForTab };
     });
-  }, []);
+  }, [currentTab]);
 
-  const clearAllFilters = useCallback(() => setActiveFilters({}), []);
+  const clearAllFilters = useCallback(
+    () => setFiltersByTab({ pending: {}, submitted: {} }),
+    [],
+  );
 
   const setTab = useCallback((tab: TabType) => setCurrentTab(tab), []);
 
@@ -55,10 +73,11 @@ export function useTableFilters(): TableFiltersState & TableFiltersActions {
       }
       filtered = Array.from(uniqueById.values());
 
-      // Then: apply column filters — uses token intersection for array columns
-      if (Object.keys(activeFilters).length > 0) {
+      // Then: apply column filters for the active tab only
+      const tabFilters = filtersByTab[currentTab] ?? {};
+      if (Object.keys(tabFilters).length > 0) {
         filtered = filtered.filter((result) => {
-          for (const [columnKey, selectedValues] of Object.entries(activeFilters)) {
+          for (const [columnKey, selectedValues] of Object.entries(tabFilters)) {
             if (selectedValues.length === 0) continue;
             const recordStatus = recordStatuses[String(result.id)];
             const tokens = getColumnFilterTokens(columnKey, result, recordStatus, currentTab);
@@ -71,7 +90,7 @@ export function useTableFilters(): TableFiltersState & TableFiltersActions {
 
       return filtered;
     },
-    [activeFilters, currentTab],
+    [filtersByTab, currentTab],
   );
 
   return { activeFilters, currentTab, setFilter, clearFilter, clearAllFilters, setTab, applyFilters };
