@@ -8,7 +8,7 @@ import boto3
 from botocore.config import Config
 from app.utils.config.config_util import AWS
 from app.utils.logger.logger_util import get_logger
-from app.llm.providers.models import ModelInvocationError, ModelInvocationResult, ModelUsage
+from app.llm.shared.models import ModelInvocationError, ModelInvocationResult, ModelUsage
 
 
 logger = get_logger()
