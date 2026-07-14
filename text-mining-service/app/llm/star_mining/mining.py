@@ -1,120 +1,28 @@
-import re
 import time
 import json
-import boto3
-from botocore.config import Config
 from typing import Dict, Any, Union
+from app.llm.providers import invoke_model
+from app.llm.shared.retrieval import split_text
 from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
-from app.llm.map_fields import map_fields_with_opensearch
 from app.utils.prompt.prompt_star import DEFAULT_PROMPT_STAR
-from app.utils.prompt.prompt_prms import DEFAULT_PROMPT_PRMS
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from app.llm.shared.map_fields import map_fields_with_opensearch
 from app.utils.interactions.interaction_client import interaction_client
-from app.utils.config.config_util import AWS, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, MAPPING_URL
-from app.schemas.mining_schemas import MiningResponse, InnovationDevelopmentResult, PolicyChangeResult, CapacityDevelopmentResult
-from app.llm.reference_cache import get_reference_data, format_reference_for_prompt
-from app.llm.vectorize import (get_embedding,
-                               store_temp_embeddings,
-                               get_relevant_chunk
-                               )
+from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, MAPPING_URL
+from app.llm.shared.json_parser import extract_json_from_markdown, is_valid_json
+from app.llm.shared.reference_cache import get_reference_data, format_reference_for_prompt
+from app.llm.shared.vectorize import get_embedding, store_temp_embeddings, get_relevant_chunk
+from app.schemas.mining_schemas import (
+    MiningResponse,
+    InnovationDevelopmentResult,
+    PolicyChangeResult,
+    CapacityDevelopmentResult,
+    InnovationUseResult,
+    OtherOutputOutcomeResult,
+)
 
 
 logger = get_logger()
-
-bedrock_config = Config(
-    connect_timeout=60,
-    read_timeout=300,
-    retries={'max_attempts': 3, 'mode': 'adaptive'}
-)
-
-bedrock_runtime = boto3.client(
-    service_name='bedrock-runtime',
-    aws_access_key_id=AWS['aws_access_key'],
-    aws_secret_access_key=AWS['aws_secret_key'],
-    region_name='us-east-1',
-    config=bedrock_config
-)
-
-
-def split_text(text):
-    logger.info("✂️  Dividing the text into fragments...")
-    
-    if isinstance(text, dict) and text.get("type") == "excel":
-        logger.info(f"📊 Using Excel rows as chunks: {len(text['chunks'])} rows")
-        return text["chunks"]
-    
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=8000, chunk_overlap=1500)
-    return text_splitter.split_text(text)
-
-
-def invoke_model(prompt, max_tokens=15000):
-    try:
-        logger.info("🚀 Invoking the model...")
-        request_body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": max_tokens,
-            "temperature": 0.1,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": f"{prompt}"}
-                    ]
-                }
-            ]
-        }
-        
-        response = bedrock_runtime.invoke_model(
-            modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-            body=json.dumps(request_body),
-            contentType="application/json",
-            accept="application/json"
-        )
-        
-        response_body = json.loads(response['body'].read())
-        
-        stop_reason = response_body.get('stop_reason', 'unknown')
-        usage = response_body.get('usage', {})
-        input_tokens = usage.get('input_tokens', 0)
-        output_tokens = usage.get('output_tokens', 0)
-        
-        logger.info(f"✅ Model invoked successfully - Stop reason: {stop_reason}")
-        logger.info(f"📊 Token usage - Input: {input_tokens}, Output: {output_tokens}")
-        
-        response_text = response_body['content'][0]['text']
-        logger.info(f"📄 Model response (first 500 chars): {response_text[:500]}...")
-        
-        if stop_reason != 'end_turn':
-            logger.warning(f"⚠️ Model stopped with reason: {stop_reason} (may indicate truncation or max_tokens reached)")
-        
-        return response_text
-
-    except Exception as e:
-        logger.error(f"❌ Error invoking the model: {str(e)}")
-        raise
-
-
-def extract_json_from_markdown(text):
-    """Extract JSON from markdown code blocks if present"""
-    
-    json_pattern = r'```(?:json)?\s*\n?(.*?)\n?```'
-    match = re.search(json_pattern, text, re.DOTALL)
-    
-    if match:
-        return match.group(1).strip()
-    
-    return text.strip()
-
-
-def is_valid_json(text):
-    """Check if the text is a valid JSON string"""
-    try:
-        json.loads(text)
-        return True
-    except json.JSONDecodeError:
-        return False
 
 
 def _clean_organization_fields(mining_result):
@@ -249,6 +157,12 @@ def format_mining_response(raw_response: Union[str, Dict[str, Any]]) -> Dict[str
                 elif indicator == "Innovation Development":
                     innovation_result = InnovationDevelopmentResult(**result)
                     typed_results.append(innovation_result)
+
+                elif indicator == "Innovation Use":
+                    typed_results.append(InnovationUseResult(**result))
+
+                elif indicator == "Other Output / Other Outcome":
+                    typed_results.append(OtherOutputOutcomeResult(**result))
                     
                 else:
                     logger.warning(f"❌ Unknown indicator type: {indicator}")
@@ -320,7 +234,7 @@ DOCUMENT TO ANALYZE:
 
 {prompt}"""
 
-        response_text = invoke_model(query)
+        response_text = invoke_model(query).text
         
         extracted_json = extract_json_from_markdown(response_text)
 
@@ -403,127 +317,4 @@ DOCUMENT TO ANALYZE:
 
     except Exception as e:
         logger.error(f"❌ Error: {str(e)}")
-        raise
-
-
-def process_document_prms(bucket_name, file_key, prompt=DEFAULT_PROMPT_PRMS, user_id: str = None):
-    """Process document for PRMS project - identical functionality to process_document"""
-    start_time = time.time()
-    logger.info(f"PRMS Processing: {prompt}")
-
-    try:
-        reference_file_regions = f"{PRMS_BUCKET_KEY_NAME}/clarisa_regions.xlsx"
-        reference_file_countries = f"{PRMS_BUCKET_KEY_NAME}/clarisa_countries.xlsx"
-        reference_data = get_reference_data(
-            bucket_name, PRMS_BUCKET_KEY_NAME, reference_file_regions, reference_file_countries
-        )
-
-        document_content = read_document_from_s3(bucket_name, file_key)
-        chunks = split_text(document_content)
-
-        logger.info("#️⃣ Generating embeddings for PRMS...")
-        embeddings = [get_embedding(chunk) for chunk in chunks]
-
-        db, temp_table_name, document_name = store_temp_embeddings(chunks, embeddings, file_key)
-
-        relevant_chunks = get_relevant_chunk(prompt, db, temp_table_name, document_name)
-
-        document_text = "\n\n---\n\n".join(relevant_chunks)
-        reference_section = format_reference_for_prompt(reference_data)
-
-        query = f"""{"=" * 80}
-DOCUMENT TO ANALYZE:
-{"=" * 80}
-{document_text}
-
-{"=" * 80}
-{reference_section}
-{"=" * 80}
-
-{prompt}"""
-
-        response_text = invoke_model(query)
-        
-        extracted_json = extract_json_from_markdown(response_text)
-
-        json_content = json.loads(extracted_json) if is_valid_json(extracted_json) else {"text": response_text}
-        
-        if isinstance(json_content, dict) and "results" in json_content:
-            mapped_results = []
-            for result in json_content["results"]:
-                try:
-                    mapped_result = map_fields_with_opensearch(result, MAPPING_URL)
-                    _clean_organization_fields(mapped_result)
-                    mapped_results.append(mapped_result)
-                    logger.info(f"🔗 Fields mapped for result with indicator: {result.get('indicator', 'Unknown')}")
-                except Exception as map_error:
-                    logger.warning(f"⚠️ Field mapping failed for result: {str(map_error)}")
-                    mapped_results.append(result)
-            
-            json_content["results"] = mapped_results
-            logger.info(f"🔗 Field mapping completed for {len(mapped_results)} results")
-
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-
-        formatted_response = format_mining_response(json_content)
-
-        interaction_id = None
-        if user_id:
-            try:
-                user_input = f"Document analysis request for: {file_key}"
-                if isinstance(document_content, dict) and document_content.get("type") == "excel":
-                    user_input += f" (Excel file with {len(document_content.get('chunks', []))} rows)"
-                
-                ai_output = json.dumps(formatted_response, indent=2, ensure_ascii=False)
-                
-                tracking_context = {
-                    "bucket_name": bucket_name,
-                    "file_key": file_key,
-                    "prompt_used": prompt[:500] + "..." if len(prompt) > 500 else prompt,
-                    "prompt_full_length": len(prompt),
-                    "chunks_processed": len(chunks),
-                    "results_count": len(json_content.get("results", [])),
-                    "model_used": "claude-sonnet-4-5",
-                    "processing_steps": ["document_read", "text_splitting", "embedding_generation", "vector_search", "llm_processing", "field_mapping"]
-                }
-                
-                interaction_response = interaction_client.track_interaction(
-                    user_id=user_id,
-                    user_input=user_input,
-                    ai_output=ai_output,
-                    service_name="text-mining",
-                    display_name="PRMS Text Mining Service",
-                    service_description="A service that analyzes documents and extracts insights based on user prompts.",
-                    context=tracking_context,
-                    response_time_seconds=elapsed_time,
-                    platform="PRMS"
-                )
-
-                if interaction_response:
-                    interaction_id = interaction_response.get('interaction_id')
-                    logger.info(f"📊 Interaction tracked with ID: {interaction_id}")
-                else:
-                    logger.warning("⚠️ Failed to track interaction with interaction service")
-
-            except Exception as tracking_error:
-                logger.error(f"❌ Error tracking interaction: {str(tracking_error)}")
-        
-        logger.info(f"✅ Successfully generated PRMS response:\n{json.dumps(formatted_response, indent=2, ensure_ascii=False)}")
-        logger.info(f"⏱️ PRMS Response time: {elapsed_time:.2f} seconds")
-
-        result = {
-            "content": response_text,
-            "time_taken": f"{elapsed_time:.2f}",
-            "json_content": formatted_response,
-            "project": "PRMS"
-        }
-
-        if interaction_id:
-            result["interaction_id"] = interaction_id
-        
-        return result
-
-    except Exception as e:
-        logger.error(f"❌ PRMS Error: {str(e)}")
         raise

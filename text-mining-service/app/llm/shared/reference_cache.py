@@ -2,8 +2,8 @@ import json
 import boto3
 from datetime import datetime, timezone
 from botocore.exceptions import ClientError
-from app.utils.s3.s3_util import read_document_from_s3
 from app.utils.logger.logger_util import get_logger
+from app.utils.s3.s3_util import read_document_from_s3
 
 logger = get_logger()
 

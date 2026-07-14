@@ -208,3 +208,6 @@ interface_2/
 interface/bulk_upload/bulk_upload_embedded.html
 interface/bulk_upload/bulk_upload_embedded.js
 interface/bulk_upload/star_mock.html
+
+# Docs
+docs/bilateral-ai-workflow-spec.md
