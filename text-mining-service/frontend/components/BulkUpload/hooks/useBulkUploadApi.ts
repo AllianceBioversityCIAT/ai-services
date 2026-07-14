@@ -278,7 +278,7 @@ export function useBulkUploadApi(initialToken: string | null = null, userId: str
             const orig = resultsByTitle.get(created.title);
             if (orig?.id) {
               const rid = String(orig.id);
-              const starLink = `https://allianceindicatorstest.ciat.cgiar.org/result/STAR-${created.result_official_code}`;
+              const starLink = `https://star.alliance.cgiar.org/result/STAR-${created.result_official_code}`;
               const submissionType = completeIdSet.has(rid) ? 'approved' : 'draft';
               newStatuses[rid] = { status: 'complete', link: starLink, submissionType };
               dynamoUpdates.push({
