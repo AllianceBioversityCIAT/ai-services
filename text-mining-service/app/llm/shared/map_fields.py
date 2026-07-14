@@ -1,8 +1,9 @@
 import time
 import requests
 import threading
-from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import IS_PROD
+from app.utils.logger.logger_util import get_logger
+
 
 logger = get_logger()
 
