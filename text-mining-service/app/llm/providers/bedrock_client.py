@@ -13,7 +13,7 @@ from app.llm.shared.models import ModelInvocationError, ModelInvocationResult, M
 
 logger = get_logger()
 
-DEFAULT_MODEL_ID = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+DEFAULT_MODEL_ID = "us.anthropic.claude-sonnet-4-6"
 
 _bedrock_config = Config(
     connect_timeout=60,
