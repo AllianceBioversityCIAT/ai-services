@@ -1,6 +1,6 @@
 # Text Mining Microservice
 
-LLM-powered microservice for intelligent document processing. It extracts structured information from documents using semantic chunking, vector search (LanceDB), RAG-style retrieval, and prompt engineering — powered by **AWS Bedrock (Claude Sonnet 4.5)** and CGIAR auth services.
+LLM-powered microservice for intelligent document processing. It extracts structured information from documents using semantic chunking, vector search (LanceDB), RAG-style retrieval, and prompt engineering — powered by **AWS Bedrock (Claude Sonnet 4.6)** and CGIAR auth services.
 
 This service lives inside the CGIAR [`ai-services`](../README.md) monorepo.
 
@@ -13,7 +13,7 @@ For AI coding agents, see [`AGENTS.md`](AGENTS.md) (and [`frontend/AGENTS.md`](f
 | Product | HTTP endpoint | MCP tool | Typical use |
 |---|---|---|---|
 | **STAR** | `POST /star/text-mining` | `process_document` | Single-document mining for STAR results |
-| **PRMS** | `POST /prms/text-mining` | `process_document_prms` | Policy / innovation / CapDev-style extraction for PRMS |
+| **PRMS** | `POST /prms/text-mining` | `process_document_prms` | Multisource PRMS extraction (docs / text / audio; five indicators, KP excluded) |
 | **AICCRA** | `POST /aiccra/text-mining` | `process_document_aiccra` | AICCRA document mining (optional custom prompt) |
 | **STAR Bulk CapDev** | `POST /star/mining-bulk-upload/capdev` | `process_document_capdev` | Excel bulk extraction for Capacity Development |
 
@@ -33,7 +33,7 @@ Related UIs:
 - Semantic chunking + embeddings with LanceDB
 - Structured extraction via Claude Sonnet on AWS Bedrock
 - Multi-product prompts (STAR, PRMS, AICCRA, Bulk CapDev)
-- Auth via STAR/PRMS middleware and CLARISA `X-API-Key` validation (STAR mining + bulk CapDev)
+- Auth via STAR middleware + CLARISA `X-API-Key` (STAR/bulk CapDev); PRMS mining uses CLARISA `X-API-Key` only
 - Sync processing over MCP (FastAPI client → MCP server tools)
 - Slack notifications on success/failure
 - Excel row-level chunking
@@ -118,6 +118,26 @@ AICCRA_BUCKET_KEY_NAME=...
 MAPPING_URL=...
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 AUTH_TOKEN_STAR=...
+
+# PRMS multisource mining (optional overrides)
+PRMS_EXTRACTION_MAX_WORKERS=4
+PRMS_MAX_SOURCES=6
+PRMS_MAX_FILE_BYTES=25000000
+PRMS_MAX_PDF_PAGES=100
+PRMS_MAX_TEXT_CHARS=50000
+PRMS_CONTEXT_TOKEN_BUDGET=300000
+PRMS_FULL_SOURCE_MAX_CHARS=50000
+PRMS_RETRIEVAL_TOP_K_PER_SOURCE=8
+PRMS_FINAL_VALIDATION_ENABLED=false
+
+# Amazon Transcribe for PRMS audio_keys (optional)
+PRMS_AUDIO_TRANSCRIBER=amazon_transcribe
+# PRMS_MAX_AUDIO_SECONDS=600
+# Leave PRMS_TRANSCRIBE_LANGUAGE_CODE empty for auto language identification
+# PRMS_TRANSCRIBE_LANGUAGE_CODE=
+# PRMS_TRANSCRIBE_LANGUAGE_OPTIONS=en-US,es-ES,fr-FR,pt-BR
+# PRMS_TRANSCRIBE_POLL_INTERVAL_SECONDS=2
+# PRMS_TRANSCRIBE_TIMEOUT_SECONDS=300
 
 # Optional Supabase path (legacy / alternate vectorization modules)
 # SUPABASE_USER=...
@@ -209,24 +229,35 @@ OpenAPI at `/docs` is the source of truth. High-level surface:
 | Method | Path | Auth notes |
 |---|---|---|
 | `POST` | `/star/text-mining` | STAR token + `X-API-Key` (CLARISA) |
-| `POST` | `/prms/text-mining` | PRMS token (middleware) |
+| `POST` | `/prms/text-mining` | CLARISA `X-API-Key` only (multisource) |
 | `POST` | `/aiccra/text-mining` | Optional token; supports custom `prompt` |
 | `POST` | `/star/mining-bulk-upload/capdev` | STAR token + roles + `X-API-Key` (CLARISA); optional `skip_ids` |
 
-Common multipart fields for mining endpoints:
+Common multipart fields for STAR/AICCRA mining:
 
 | Field | Type | Description |
 |---|---|---|
 | `bucketName` | string | S3 bucket |
-| `token` | string | Project auth token (required for STAR/PRMS; optional for AICCRA) |
+| `token` | string | Project auth token (required for STAR; optional for AICCRA) |
 | `environmentUrl` | string | Target environment for auth |
 | `key` | string | S3 object key (**or** use `file`) |
 | `file` | file | Upload to process (**or** use `key`) |
 | `user_id` | string | Optional interaction tracking |
 
+PRMS multisource fields (`POST /prms/text-mining`):
+
+| Field | Type | Description |
+|---|---|---|
+| `bucketName` | string | Required when using S3 keys or uploads |
+| `keys` | string[] | Document S3 keys (repeat form field) |
+| `files` | file[] | Direct document uploads |
+| `text` | string | Optional free text |
+| `audio_keys` | string[] | Existing S3 audio keys only (no multipart audio) |
+| `user_id` | string | Optional interaction tracking |
+
 Bulk CapDev extras: `skip_ids` (comma-separated record IDs already submitted), `user_name`.
 
-⚠️ Provide either `key` **or** `file`, not both. Uploaded files are written to S3 under the product bucket prefix before processing.
+⚠️ STAR/AICCRA: provide either `key` **or** `file`, not both. PRMS accepts any non-empty combination of `keys`/`files`, free text, and `audio_keys`.
 
 ### Bulk upload status (DynamoDB)
 
@@ -273,14 +304,16 @@ curl -X POST http://localhost:8000/star/text-mining \
   -F "file=@/path/to/file.pdf"
 ```
 
-### Example: PRMS
+### Example: PRMS (multisource)
 
 ```bash
 curl -X POST http://localhost:8000/prms/text-mining \
+  -H "X-API-Key: YOUR_CLARISA_API_KEY" \
   -F "bucketName=my-bucket" \
-  -F "key=prms/text-mining/files/test/policy.docx" \
-  -F "token=auth-token" \
-  -F "environmentUrl=https://your-prms-env/"
+  -F "keys=prms/text-mining/files/test/policy.docx" \
+  -F "keys=prms/text-mining/files/test/attendance.pdf" \
+  -F "text=Focus on outcomes reported during 2026" \
+  -F "user_id=researcher@cgiar.org"
 ```
 
 ### Example: AICCRA (custom prompt)
@@ -348,8 +381,8 @@ Client
   → FastAPI (app/mcp/client.py)
   → MCP stdio client
   → MCP server (app/mcp/server.py)
-  → Auth (STAR/PRMS middleware and/or CLARISA API key)
-  → LLM pipeline (S3 → chunk → LanceDB embeddings → Bedrock → JSON)
+  → Auth (STAR middleware + CLARISA; PRMS CLARISA X-API-Key only)
+  → LLM pipeline (S3/free text/audio → context selection → Bedrock → JSON)
   → Slack notification + optional interaction tracking
 ```
 
@@ -357,7 +390,7 @@ Per product:
 
 ```
 STAR        → /star/text-mining                 → process_document
-PRMS        → /prms/text-mining                 → process_document_prms
+PRMS        → /prms/text-mining                 → process_document_prms (app/llm/prms_mining)
 AICCRA      → /aiccra/text-mining               → process_document_aiccra
 Bulk CapDev → /star/mining-bulk-upload/capdev   → process_document_capdev
 ```
@@ -383,13 +416,13 @@ text-mining-service/
 │   │   ├── client.py            # FastAPI routes, S3/Dynamo helpers, UIs
 │   │   └── server.py            # MCP tools
 │   ├── llm/
-│   │   ├── mining.py            # STAR / PRMS pipelines
+│   │   ├── providers/           # Shared Bedrock client (all products)
+│   │   ├── shared/              # vectorize, map_fields, json_parser, etc.
+│   │   ├── star_mining/         # STAR pipeline
+│   │   ├── prms_mining/         # PRMS multisource pipeline
 │   │   ├── aiccra_mining/       # AICCRA pipeline
-│   │   ├── bulk_upload/         # CapDev bulk pipeline
-│   │   ├── vectorize.py         # LanceDB embeddings
-│   │   ├── map_fields.py        # OpenSearch / mapping helpers
-│   │   └── reference_cache.py
-│   ├── middleware/              # STAR & PRMS auth
+│   │   └── bulk_upload/         # CapDev bulk pipeline
+│   ├── middleware/              # STAR auth
 │   ├── schemas/                 # Pydantic mining schemas
 │   ├── db/miningdb/             # Temporary LanceDB data
 │   └── utils/
@@ -399,11 +432,11 @@ text-mining-service/
 │       ├── interactions/
 │       ├── logger/
 │       ├── notification/        # Slack
-│       ├── prompt/              # STAR, PRMS, AICCRA, CapDev prompts
+│       ├── prompt/              # STAR, PRMS (modular), AICCRA, CapDev
 │       └── s3/
 ├── frontend/                    # Next.js Bulk Upload (SST / OpenNext)
 ├── interface/                   # Legacy static UIs (AICCRA + bulk upload)
-├── tests/                       # Sample JSON fixtures
+├── tests/                       # Fixtures + PRMS unit/API tests
 ├── data/logs/                   # Runtime logs
 ├── Dockerfile
 ├── pyproject.toml               # Local deps (uv)
