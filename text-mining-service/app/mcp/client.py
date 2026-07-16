@@ -6,11 +6,13 @@ import httpx
 import requests
 import uvicorn
 from io import BytesIO
+from datetime import datetime
 from typing import Optional, Union
 from pydantic import BaseModel, Field
 from mcp.client.stdio import stdio_client
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
+from botocore.exceptions import ClientError
 from fastapi.middleware.cors import CORSMiddleware
 from app.utils.s3.s3_util import upload_file_to_s3
 from app.utils.logger.logger_util import get_logger
@@ -26,7 +28,7 @@ from app.utils.config.config_util import AWS, CLIENT_ID, CLIENT_SECRET, IS_PROD,
 logger = get_logger()
 
 dynamodb = boto3.resource('dynamodb', region_name=AWS.get('region', 'us-east-1'))
-BULK_UPLOAD_TABLE_NAME = 'bulk_upload_records'
+BULK_UPLOAD_TABLE_NAME = 'bulk_upload_records' if IS_PROD else 'bulk_upload_records_test'
 AI_REQUESTS_TABLE_NAME = 'ai-requests-prod' if IS_PROD else 'ai-requests-testing'
 
 server_params = StdioServerParameters(
@@ -73,12 +75,141 @@ class RecordStatusUpdate(BaseModel):
     year: Optional[str] = Field(None, description="Reporting year of the record")
 
 
+class RecordStatusUpdateItem(BaseModel):
+    recordId: str = Field(..., description="ID of the record")
+    status: str = Field(..., description="Status of the record: 'complete' or 'failed'")
+    link: Optional[str] = Field(None, description="Link to the result in STAR (only if status is 'complete')")
+    title: Optional[str] = Field(None, description="Title of the record (stored for re-upload display)")
+    contractCode: Optional[str] = Field(None, description="Contract code of the record (stored for re-upload display)")
+    submissionType: Optional[str] = Field(None, description="Submission type: 'approved' or 'draft'")
+    year: Optional[str] = Field(None, description="Reporting year of the record")
+
+
+class BulkRecordStatusUpdate(BaseModel):
+    fileName: str = Field(..., description="Name of the file")
+    updates: list[RecordStatusUpdateItem] = Field(..., description="List of record status updates to apply atomically")
+
+
 class BulkUploadRecord(BaseModel):
     fileName: str = Field(..., description="Name of the file (Primary Key)")
     complete: list[str] = Field(default_factory=list, description="List of completed record IDs")
     failed: list[str] = Field(default_factory=list, description="List of failed record IDs")
     links: dict[str, str] = Field(default_factory=dict, description="Dictionary of {recordId: starLink}")
     lastUpdated: str = Field(..., description="Timestamp of last update")
+
+
+def _normalize_id_list(values) -> list:
+    """Normalize DynamoDB ID lists to unique strings, preserving order."""
+    seen = set()
+    result = []
+    for value in list(values or []):
+        rid = str(value)
+        if rid not in seen:
+            seen.add(rid)
+            result.append(rid)
+    return result
+
+
+def _normalize_str_dict(mapping) -> dict:
+    """Normalize DynamoDB map keys to strings."""
+    return {str(k): v for k, v in dict(mapping or {}).items()}
+
+
+def _apply_record_status_update(
+    complete_list: list,
+    failed_list: list,
+    links_dict: dict,
+    record_data_dict: dict,
+    record_id: str,
+    status: str,
+    link: Optional[str] = None,
+    title: Optional[str] = None,
+    contract_code: Optional[str] = None,
+    submission_type: Optional[str] = None,
+    year: Optional[str] = None,
+) -> None:
+    """Apply a single record status mutation to in-memory Dynamo fields."""
+    record_id = str(record_id)
+
+    if status == "complete":
+        if record_id not in complete_list:
+            complete_list.append(record_id)
+        if record_id in failed_list:
+            failed_list.remove(record_id)
+        if link:
+            links_dict[record_id] = link
+    elif status == "failed":
+        if record_id not in failed_list:
+            failed_list.append(record_id)
+        if record_id in complete_list:
+            complete_list.remove(record_id)
+        if record_id in links_dict:
+            del links_dict[record_id]
+
+    if title or contract_code or submission_type or year:
+        record_data_dict[record_id] = {
+            'title': title or '',
+            'contract_code': contract_code or '',
+            'submission_type': submission_type or '',
+            'year': year or '',
+        }
+
+
+def _put_bulk_upload_item_with_retry(table, file_name: str, apply_updates) -> dict:
+    """
+    Read-modify-write a bulk upload item with optimistic locking.
+
+    apply_updates(complete_list, failed_list, links_dict, record_data_dict) mutates
+    the working copies in place. Returns the saved item payload.
+    """
+
+    max_attempts = 8
+    for attempt in range(max_attempts):
+        response = table.get_item(Key={'fileName': file_name})
+        existing = response.get('Item')
+        expected_updated = existing.get('lastUpdated') if existing else None
+
+        complete_list = _normalize_id_list(existing.get('complete', []) if existing else [])
+        failed_list = _normalize_id_list(existing.get('failed', []) if existing else [])
+        links_dict = _normalize_str_dict(existing.get('links', {}) if existing else {})
+        record_data_dict = _normalize_str_dict(existing.get('record_data', {}) if existing else {})
+
+        apply_updates(complete_list, failed_list, links_dict, record_data_dict)
+
+        item = {
+            'fileName': file_name,
+            'complete': complete_list,
+            'failed': failed_list,
+            'links': links_dict,
+            'record_data': record_data_dict,
+            'lastUpdated': datetime.now().isoformat(),
+        }
+
+        try:
+            if existing is None:
+                table.put_item(
+                    Item=item,
+                    ConditionExpression='attribute_not_exists(fileName)',
+                )
+            elif expected_updated is not None:
+                table.put_item(
+                    Item=item,
+                    ConditionExpression='lastUpdated = :lu',
+                    ExpressionAttributeValues={':lu': expected_updated},
+                )
+            else:
+                # Legacy item without lastUpdated — write once, then retries use locking
+                table.put_item(Item=item)
+            return item
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'ConditionalCheckFailedException':
+                raise
+            # Concurrent write — retry with fresh read
+            if attempt == max_attempts - 1:
+                raise
+            continue
+
+    raise RuntimeError(f"Failed to update bulk upload record for {file_name} after retries")
 
 
 class FeedbackRequest(BaseModel):
@@ -388,10 +519,10 @@ async def get_record_statuses(file_name: str):
         
         return {
             "fileName": item.get('fileName'),
-            "complete": item.get('complete', []),
-            "failed": item.get('failed', []),
-            "links": item.get('links', {}),
-            "record_data": item.get('record_data', {}),
+            "complete": _normalize_id_list(item.get('complete', [])),
+            "failed": _normalize_id_list(item.get('failed', [])),
+            "links": _normalize_str_dict(item.get('links', {})),
+            "record_data": _normalize_str_dict(item.get('record_data', {})),
             "lastUpdated": item.get('lastUpdated')
         }
     
@@ -419,6 +550,7 @@ async def get_record_statuses(file_name: str):
           - 'complete': Adds record to complete list, removes from failed, stores STAR link
           - 'failed': Adds record to failed list, removes from complete, removes link
           
+          Uses optimistic locking with retries to avoid lost updates under concurrency.
           The endpoint is idempotent - calling it multiple times with the same data is safe.
           """,
           responses={
@@ -444,71 +576,24 @@ async def update_record_status(data: RecordStatusUpdate):
         )
     
     try:
-        from datetime import datetime
-        
         table = dynamodb.Table(BULK_UPLOAD_TABLE_NAME)
-        
-        # Get existing record or create new one
-        response = table.get_item(Key={'fileName': data.fileName})
-        
-        if 'Item' in response:
-            item = response['Item']
-        else:
-            # Create new record
-            item = {
-                'fileName': data.fileName,
-                'complete': [],
-                'failed': [],
-                'links': {}
-            }
-        
-        # Convert to standard Python types
-        complete_list = list(item.get('complete', []))
-        failed_list = list(item.get('failed', []))
-        links_dict = dict(item.get('links', {}))
-        record_data_dict = dict(item.get('record_data', {}))
-        
-        # Update based on status
-        if data.status == "complete":
-            # Add to complete, remove from failed
-            if data.recordId not in complete_list:
-                complete_list.append(data.recordId)
-            if data.recordId in failed_list:
-                failed_list.remove(data.recordId)
-            # Update link
-            if data.link:
-                links_dict[data.recordId] = data.link
-        
-        elif data.status == "failed":
-            # Add to failed, remove from complete
-            if data.recordId not in failed_list:
-                failed_list.append(data.recordId)
-            if data.recordId in complete_list:
-                complete_list.remove(data.recordId)
-            # Remove link if exists
-            if data.recordId in links_dict:
-                del links_dict[data.recordId]
-        
-        # Store title/contractCode/submissionType/year for re-upload display
-        if data.title or data.contractCode or data.submissionType or data.year:
-            record_data_dict[data.recordId] = {
-                'title': data.title or '',
-                'contract_code': data.contractCode or '',
-                'submission_type': data.submissionType or '',
-                'year': data.year or ''
-            }
-        
-        # Save to DynamoDB
-        table.put_item(
-            Item={
-                'fileName': data.fileName,
-                'complete': complete_list,
-                'failed': failed_list,
-                'links': links_dict,
-                'record_data': record_data_dict,
-                'lastUpdated': datetime.now().isoformat()
-            }
-        )
+
+        def apply_updates(complete_list, failed_list, links_dict, record_data_dict):
+            _apply_record_status_update(
+                complete_list,
+                failed_list,
+                links_dict,
+                record_data_dict,
+                data.recordId,
+                data.status,
+                data.link,
+                data.title,
+                data.contractCode,
+                data.submissionType,
+                data.year,
+            )
+
+        _put_bulk_upload_item_with_retry(table, data.fileName, apply_updates)
         
         logger.info(f"✅ Updated status for record {data.recordId} in file {data.fileName}: {data.status}")
         
@@ -525,6 +610,78 @@ async def update_record_status(data: RecordStatusUpdate):
         raise HTTPException(
             status_code=500,
             detail=f"Error updating record status: {str(e)}"
+        )
+
+
+@app.post("/dynamo/bulk-upload-records/batch",
+          summary="Batch Update Record Statuses",
+          description="""
+          Atomically apply multiple record status updates for a single file.
+          
+          All updates are merged into one read-modify-write of the DynamoDB item,
+          avoiding lost updates when many records succeed in the same STAR submission.
+          Uses optimistic locking with retries if another writer updates the same file.
+          """,
+          responses={
+              200: {"description": "Record statuses updated successfully"},
+              400: {"description": "Invalid request"},
+              500: {"description": "Internal server error"}
+          },
+          tags=["Bulk Upload Status"])
+async def batch_update_record_statuses(data: BulkRecordStatusUpdate):
+    """Apply multiple record status updates in a single atomic write."""
+    if not data.updates:
+        raise HTTPException(status_code=400, detail="updates must not be empty")
+
+    for update in data.updates:
+        if update.status not in ["complete", "failed"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status '{update.status}' for record {update.recordId}"
+            )
+
+    try:
+        table = dynamodb.Table(BULK_UPLOAD_TABLE_NAME)
+
+        def apply_updates(complete_list, failed_list, links_dict, record_data_dict):
+            for update in data.updates:
+                _apply_record_status_update(
+                    complete_list,
+                    failed_list,
+                    links_dict,
+                    record_data_dict,
+                    update.recordId,
+                    update.status,
+                    update.link,
+                    update.title,
+                    update.contractCode,
+                    update.submissionType,
+                    update.year,
+                )
+
+        saved = _put_bulk_upload_item_with_retry(table, data.fileName, apply_updates)
+
+        logger.info(
+            f"✅ Batch-updated {len(data.updates)} record(s) in file {data.fileName}"
+        )
+
+        return {
+            "success": True,
+            "fileName": data.fileName,
+            "updatedCount": len(data.updates),
+            "complete": saved.get('complete', []),
+            "failed": saved.get('failed', []),
+            "links": saved.get('links', {}),
+            "record_data": saved.get('record_data', {}),
+            "lastUpdated": saved.get('lastUpdated'),
+            "message": "Record statuses updated successfully"
+        }
+
+    except Exception as e:
+        logger.error(f"Error batch-updating record statuses: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error batch-updating record statuses: {str(e)}"
         )
 
 

@@ -14,6 +14,63 @@ from app.llm.map_fields import map_fields_with_opensearch, clear_mapping_cache, 
 logger = get_logger()
 mapping_service_url = MAPPING_URL
 
+# Excel ID column labels we accept when deciding which rows to skip on reprocess.
+# Intentionally exact-ish (after lower/strip) so "Project ID" is NOT treated as the row id.
+_ID_COLUMN_LABELS = frozenset({
+    '#',
+    'id',
+    'no',
+    'no.',
+    'nº',
+    'n°',
+    'num',
+    'number',
+    'row',
+    'row id',
+    'row_id',
+    'rowid',
+    'record id',
+    'record_id',
+    'recordid',
+    'record #',
+    'record#',
+})
+
+
+def _normalize_row_id_value(raw: str) -> str:
+    """Normalize Excel cell values like '55.0' → '55' for stable ID matching."""
+    value = raw.strip()
+    try:
+        as_float = float(value)
+        if as_float == int(as_float):
+            return str(int(as_float))
+    except (ValueError, OverflowError):
+        pass
+    return value
+
+
+def _extract_row_id_from_chunk(chunk: str):
+    """
+    Extract the row identifier from a structured Excel chunk.
+
+    Chunks look like: "#: 55, Project ID: G228, Title: ...".
+    We only treat known ID-like column labels as the row id (not Project ID, Contract ID, etc.).
+    Prefers the first field (common for # / ID columns), then scans the first few fields.
+    """
+    if not chunk or ':' not in chunk:
+        return None
+
+    parts = [p.strip() for p in chunk.split(',') if p.strip()]
+    for part in parts[:8]:
+        if ':' not in part:
+            continue
+        label, value = part.split(':', 1)
+        label_norm = label.strip().lower()
+        if label_norm in _ID_COLUMN_LABELS:
+            extracted = _normalize_row_id_value(value)
+            return extracted or None
+    return None
+
 
 def process_excel_in_batches(chunks, batch_size=5):
     """
@@ -224,11 +281,33 @@ def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAP
         chunks = split_text(document_content)
 
         # Filter out already-submitted rows so the AI doesn't re-process them
+        rows_actually_skipped = 0
         if skip_ids and isinstance(document_content, dict) and document_content.get("type") == "excel":
-            skip_set = {str(sid) for sid in skip_ids}
+            skip_set = {_normalize_row_id_value(str(sid)) for sid in skip_ids}
             original_count = len(chunks)
-            chunks = [c for c in chunks if not any(f"ID: {sid}" in c for sid in skip_set)]
-            logger.info(f"🔽 Skipped {original_count - len(chunks)} already-submitted rows (skip_ids={list(skip_set)})")
+            kept_chunks = []
+            unmatched_skip_ids = set(skip_set)
+            for chunk in chunks:
+                row_id = _extract_row_id_from_chunk(chunk)
+                if row_id is not None and row_id in skip_set:
+                    unmatched_skip_ids.discard(row_id)
+                    continue
+                kept_chunks.append(chunk)
+            chunks = kept_chunks
+            rows_actually_skipped = original_count - len(chunks)
+            logger.info(
+                f"🔽 Skipped {rows_actually_skipped} already-submitted rows "
+                f"(skip_ids={sorted(skip_set, key=lambda x: (len(x), x))}, kept={len(chunks)})"
+            )
+            if unmatched_skip_ids and rows_actually_skipped == 0:
+                logger.warning(
+                    f"⚠️ None of the skip_ids matched Excel row IDs. "
+                    f"Check the ID column name in the file. unmatched={sorted(unmatched_skip_ids)}"
+                )
+            elif unmatched_skip_ids:
+                logger.warning(
+                    f"⚠️ Some skip_ids were not found in Excel rows: {sorted(unmatched_skip_ids)}"
+                )
 
         if isinstance(document_content, dict) and document_content.get("type") == "excel":
             logger.info(f"📊 Excel file detected with {len(chunks)} rows. Processing in sequential groups...")
@@ -260,7 +339,7 @@ def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAP
             interaction_id = None
             if user_id:
                 try:
-                    skipped_count = len(skip_ids) if skip_ids else 0
+                    skipped_count = rows_actually_skipped
                     tracking_context = {
                         "bucket_name": bucket_name,
                         "file_key": file_key,
@@ -269,6 +348,7 @@ def process_document_capdev(bucket_name, file_key, prompt=PROMPT_BULK_UPLOAD_CAP
                         "prompt_full_length": len(prompt),
                         "chunks_processed": len(chunks),
                         "rows_skipped": skipped_count,
+                        "skip_ids_requested": len(skip_ids) if skip_ids else 0,
                         "batches_processed": len(batches),
                         "results_count": len(final_result.get("results", [])),
                         "model_used": "claude-sonnet-4-5",

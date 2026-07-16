@@ -137,6 +137,8 @@ export interface SummaryRecord {
 export interface ColumnDef {
   key: string;
   label: string;
+  /** Override label when the submitted tab is active (e.g. Completeness → STAR Status). */
+  submittedLabel?: string;
   type: 'checkbox' | 'text' | 'number' | 'textarea' | 'select' | 'status' | 'completeness' | 'link' | 'chips' | 'partners' | 'evidence_desc' | 'evidence_link' | 'training_purpose' | 'date' | 'countries' | 'regions' | 'affiliation' | 'nationality' | 'language' | 'staff';
   readonly?: boolean;
   required?: boolean;
