@@ -118,16 +118,21 @@ Recommended structure:
 ```text
 app/
 |-- llm/
-|   |-- mining.py                         # STAR only after refactor
+|   |-- star_mining/
+|   |   `-- mining.py                    # STAR pipeline orchestration
 |   |-- prms_mining/
 |   |   |-- __init__.py
-|   |   |-- mining.py                    # PRMS pipeline orchestration
+|   |   |-- mining.py                    # PRMS pipeline orchestration + format_mining_response
 |   |   |-- source_extraction.py         # bounded parallel extraction
 |   |   |-- models.py                    # internal source/invocation models
 |   |   `-- prompt_builder.py            # prompt composition
+|   |-- shared/
+|   |   |-- organization_fields.py       # clean_organization_fields (STAR + PRMS post-mapping)
+|   |   `-- ...
 |   `-- ...
 |-- schemas/
-|   `-- mining_schemas.py                # public result schemas, extended
+|   |-- star_mining_schemas.py           # STAR result schemas (CapDev, Policy, Innov Dev)
+|   `-- prms_mining_schemas.py           # PRMS result schemas (5 supported indicators)
 `-- utils/
     `-- prompt/
         |-- prompt_prms.py               # common prompt and composition exports

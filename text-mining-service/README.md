@@ -417,13 +417,13 @@ text-mining-service/
 │   │   └── server.py            # MCP tools
 │   ├── llm/
 │   │   ├── providers/           # Shared Bedrock client (all products)
-│   │   ├── shared/              # vectorize, map_fields, json_parser, etc.
+│   │   ├── shared/              # vectorize, map_fields, json_parser, organization_fields, etc.
 │   │   ├── star_mining/         # STAR pipeline
 │   │   ├── prms_mining/         # PRMS multisource pipeline
 │   │   ├── aiccra_mining/       # AICCRA pipeline
 │   │   └── bulk_upload/         # CapDev bulk pipeline
 │   ├── middleware/              # STAR auth
-│   ├── schemas/                 # Pydantic mining schemas
+│   ├── schemas/                 # Pydantic mining schemas (star_mining_schemas.py, prms_mining_schemas.py)
 │   ├── db/miningdb/             # Temporary LanceDB data
 │   └── utils/
 │       ├── clarisa/
