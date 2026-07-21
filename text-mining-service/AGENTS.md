@@ -42,7 +42,7 @@ text-mining-service/
 │   ├── mcp/                # FastAPI client + MCP server tools
 │   ├── llm/                # star_mining/; prms_mining/; providers/; shared/; AICCRA; CapDev
 │   ├── middleware/         # STAR auth middleware
-│   ├── schemas/            # Pydantic response schemas
+│   ├── schemas/            # Pydantic response schemas (STAR vs PRMS)
 │   ├── db/miningdb/        # LanceDB temp tables (do not commit churn)
 │   └── utils/              # config, S3, CLARISA, Dynamo, prompts, Slack, cron
 ├── frontend/               # Next.js 15 Bulk Upload app (nested AGENTS.md)
@@ -193,7 +193,8 @@ Frontend: `NEXT_PUBLIC_MINING_API_BASE_URL`, `NEXT_PUBLIC_STAR_API_BASE_URL`, `N
 | New MCP tool / mining flow | `app/mcp/server.py` + matching module under `app/llm/` |
 | PRMS multisource mining | `app/llm/prms_mining/` + `app/utils/prompt/prms/` |
 | Shared Bedrock invoke | `app/llm/providers/bedrock_client.py` |
-| Prompt / extraction shape | `app/utils/prompt/` + `app/schemas/mining_schemas.py` |
+| Prompt / extraction shape | `app/utils/prompt/` + `app/schemas/star_mining_schemas.py` (STAR) or `app/schemas/prms_mining_schemas.py` (PRMS) |
+| Organization cleanup after mapping | `app/llm/shared/organization_fields.py` (`clean_organization_fields`) |
 | Auth | STAR: `app/middleware/star_auth_middleware.py`; PRMS/STAR HTTP: CLARISA via `validate_with_clarisa` in `client.py` |
 | Bulk upload status | `app/utils/dynamo/`, Dynamo routes in `client.py` |
 | Next.js Bulk Upload UX | `frontend/components/BulkUpload/` |
