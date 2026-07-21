@@ -1051,11 +1051,73 @@
 }
 
 /* Results Tabs */
+.bulk-upload-container .bulk-results-tabs-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 2rem;
+    border-bottom: 2px solid var(--bulk-gray-200);
+    margin-bottom: 0.5rem;
+}
+
 .bulk-upload-container .bulk-results-tabs {
     display: flex;
     gap: 0;
-    border-bottom: 2px solid var(--bulk-gray-200);
-    margin-bottom: 0.5rem;
+    border-bottom: none;
+    margin-bottom: 0;
+    flex: 1;
+    min-width: 0;
+}
+
+.bulk-upload-container .bulk-sort-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.35rem;
+    padding: 0.45rem 0.875rem;
+    background: var(--bulk-white);
+    border: 1px solid var(--bulk-gray-300);
+    border-radius: 6px;
+    color: var(--bulk-gray-700);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    max-width: min(100%, 240px);
+    transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
+    flex-shrink: 0;
+}
+
+.bulk-upload-container .bulk-sort-btn-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.bulk-upload-container .bulk-sort-btn:hover {
+    border-color: var(--bulk-primary);
+    color: var(--bulk-primary);
+    background: var(--bulk-gray-50);
+}
+
+.bulk-upload-container .bulk-sort-btn-active {
+    border-color: var(--bulk-primary);
+    color: var(--bulk-primary);
+    background: #eef4fb;
+    box-shadow: 0 0 0 1px rgba(24, 63, 111, 0.08);
+}
+
+.bulk-upload-container .bulk-sort-btn-open {
+    border-color: var(--bulk-primary);
+    color: var(--bulk-primary);
+    background: var(--bulk-gray-50);
+}
+
+.bulk-upload-container .bulk-sort-btn-icon {
+    font-size: 14px;
+    line-height: 1;
+    opacity: 0.85;
 }
 
 .bulk-upload-container .bulk-risk-notice {
@@ -1672,6 +1734,101 @@
 
 .filter-btn-apply:hover {
     background: #345B8F;
+}
+
+/* ── Sort Panel ────────────────────────────────── */
+.sort-panel {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+}
+
+.sort-panel-header {
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid #F3F4F6;
+}
+
+.sort-panel-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.sort-panel-body {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.sort-panel-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sort-panel-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6B7280;
+}
+
+.sort-panel-select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 10px;
+    border: 1px solid #D1D5DB;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #111827;
+    background: #F9FAFB;
+}
+
+.sort-panel-select:focus {
+    outline: none;
+    border-color: #3B82F6;
+    background: #fff;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.sort-panel-direction {
+    border: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sort-panel-direction legend {
+    margin-bottom: 2px;
+}
+
+.sort-direction-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    color: #374151;
+    transition: background 0.12s;
+}
+
+.sort-direction-option:hover {
+    background: #F3F4F6;
+}
+
+.sort-direction-option input[type="radio"] {
+    accent-color: #183F6F;
+    cursor: pointer;
+}
+
+.sort-panel-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 8px 10px;
+    border-top: 1px solid #F3F4F6;
 }
 
 .bulk-upload-container .col-tooltip-icon {
@@ -2553,6 +2710,12 @@
         gap: 0.5rem;
     }
 
+    /* Tabs row → wrap on smaller screens */
+    .bulk-upload-container .bulk-results-tabs-row {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
     /* Tabs → allow wrap + smaller padding */
     .bulk-upload-container .bulk-results-tabs {
         flex-wrap: wrap;
@@ -2651,6 +2814,19 @@
     .bulk-upload-container .bulk-btn-process {
         font-size: 14px;
         padding: 0.75rem 1.25rem;
+    }
+
+    /* Tabs row → stack sort control below tabs */
+    .bulk-upload-container .bulk-results-tabs-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+
+    .bulk-upload-container .bulk-sort-btn {
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 0.25rem;
     }
 
     /* Tabs → scrollable row, no wrap */

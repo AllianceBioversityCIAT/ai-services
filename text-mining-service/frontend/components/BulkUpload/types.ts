@@ -123,6 +123,13 @@ export type AppStep = 'upload' | 'unmapped' | 'results' | 'summary';
 
 export type TabType = 'pending' | 'submitted';
 
+export type SortDirection = 'asc' | 'desc';
+
+export interface TableSortConfig {
+  columnKey: string;
+  direction: SortDirection;
+}
+
 export interface SummaryRecord {
   id: string;
   title: string;
