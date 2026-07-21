@@ -7,115 +7,16 @@ from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
 from app.utils.prompt.prompt_star import DEFAULT_PROMPT_STAR
 from app.llm.shared.map_fields import map_fields_with_opensearch
+from app.llm.shared.organization_fields import clean_organization_fields
 from app.utils.interactions.interaction_client import interaction_client
 from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, MAPPING_URL
 from app.llm.shared.json_parser import extract_json_from_markdown, is_valid_json
 from app.llm.shared.reference_cache import get_reference_data, format_reference_for_prompt
 from app.llm.shared.vectorize import get_embedding, store_temp_embeddings, get_relevant_chunk
-from app.schemas.mining_schemas import (
-    MiningResponse,
-    InnovationDevelopmentResult,
-    PolicyChangeResult,
-    CapacityDevelopmentResult,
-    InnovationUseResult,
-    OtherOutputOutcomeResult,
-)
+from app.schemas.star_mining_schemas import MiningResponse, InnovationDevelopmentResult, PolicyChangeResult, CapacityDevelopmentResult
 
 
 logger = get_logger()
-
-
-def _clean_organization_fields(mining_result):
-    """
-    Clean organization fields based on mapping success:
-    - If name + id + similarity > 70 (mapped successfully) → keep ONLY name, id, similarity_score
-    - If name + id but similarity <= 70, and has type → keep ONLY type, sub_type, other_type
-    - If name but no id, and has type → keep ONLY type, sub_type, other_type
-    - If only type (no name) → keep ONLY type, sub_type, other_type
-    - Otherwise → remove organization
-    """
-    if "organizations_detailed" not in mining_result:
-        return
-    
-    organizations = mining_result.get("organizations_detailed", [])
-    cleaned_organizations = []
-    
-    SIMILARITY_THRESHOLD = 70.0
-    
-    for org in organizations:
-        has_name = org.get("institution_name") is not None and org.get("institution_name").strip() != ""
-        has_id = org.get("institution_id") is not None and org.get("institution_id") != ""
-        has_type = org.get("type") is not None and org.get("type").strip() != ""
-        similarity = org.get("similarity_score", 0)
-        
-        # Case 1: Has name AND id AND similarity > threshold
-        if has_name and has_id and similarity > SIMILARITY_THRESHOLD:
-            cleaned_org = {
-                "institution_name": org["institution_name"],
-                "institution_id": org["institution_id"],
-                "similarity_score": similarity
-            }
-            cleaned_organizations.append(cleaned_org)
-            logger.info(f"✅ Organization mapped: '{org['institution_name']}' → ID: {org['institution_id']} (score: {similarity})")
-        
-        # Case 2: Has name AND id BUT similarity <= threshold, fallback to type if available
-        elif has_name and has_id and similarity <= SIMILARITY_THRESHOLD and has_type:
-            cleaned_org = {
-                "type": org["type"]
-            }
-            if org.get("sub_type"):
-                cleaned_org["sub_type"] = org["sub_type"]
-            if org.get("other_type"):
-                cleaned_org["other_type"] = org["other_type"]
-            cleaned_organizations.append(cleaned_org)
-            logger.warning(f"⚠️ Organization '{org['institution_name']}' mapped with low similarity ({similarity}), using type classification: {org['type']}")
-        
-        # Case 3: Has name AND id BUT similarity <= threshold, NO type available → discard
-        elif has_name and has_id and similarity <= SIMILARITY_THRESHOLD and not has_type:
-            logger.warning(f"❌ Organization '{org['institution_name']}' mapped with low similarity ({similarity}) and no type classification - discarding")
-            continue
-        
-        # Case 4: Has name but NOT mapped, but has type classification
-        elif has_name and not has_id and has_type:
-            cleaned_org = {
-                "type": org["type"]
-            }
-            if org.get("sub_type"):
-                cleaned_org["sub_type"] = org["sub_type"]
-            if org.get("other_type"):
-                cleaned_org["other_type"] = org["other_type"]
-            cleaned_organizations.append(cleaned_org)
-            logger.info(f"ℹ️ Organization '{org['institution_name']}' not mapped, using type classification: {org['type']}")
-        
-        # Case 5: Has name but NOT mapped and NO type → discard
-        elif has_name and not has_id and not has_type:
-            logger.warning(f"❌ Organization '{org['institution_name']}' not mapped and no type provided - discarding")
-            continue
-        
-        # Case 6: No name but has type → keep type classification only
-        elif not has_name and has_type:
-            cleaned_org = {
-                "type": org["type"]
-            }
-            if org.get("sub_type"):
-                cleaned_org["sub_type"] = org["sub_type"]
-            if org.get("other_type"):
-                cleaned_org["other_type"] = org["other_type"]
-            cleaned_organizations.append(cleaned_org)
-            logger.info(f"ℹ️ Organization (no name) with type: {org['type']}")
-        
-        # Case 7: Neither name nor type → discard
-        else:
-            logger.warning(f"❌ Organization with neither name nor type - discarding")
-            continue
-    
-    if cleaned_organizations:
-        mining_result["organizations_detailed"] = cleaned_organizations
-        logger.info(f"🧹 Cleaned organizations: {len(organizations)} → {len(cleaned_organizations)}")
-    else:
-        # Remove the field completely if no valid organizations remain
-        mining_result.pop("organizations_detailed", None)
-        logger.info(f"🧹 All organizations removed - no valid data")
 
 
 def format_mining_response(raw_response: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
@@ -157,12 +58,6 @@ def format_mining_response(raw_response: Union[str, Dict[str, Any]]) -> Dict[str
                 elif indicator == "Innovation Development":
                     innovation_result = InnovationDevelopmentResult(**result)
                     typed_results.append(innovation_result)
-
-                elif indicator == "Innovation Use":
-                    typed_results.append(InnovationUseResult(**result))
-
-                elif indicator == "Other Output / Other Outcome":
-                    typed_results.append(OtherOutputOutcomeResult(**result))
                     
                 else:
                     logger.warning(f"❌ Unknown indicator type: {indicator}")
@@ -245,7 +140,7 @@ DOCUMENT TO ANALYZE:
             for result in json_content["results"]:
                 try:
                     mapped_result = map_fields_with_opensearch(result, MAPPING_URL)
-                    _clean_organization_fields(mapped_result)
+                    clean_organization_fields(mapped_result)
                     mapped_results.append(mapped_result)
                     logger.info(f"🔗 Fields mapped for result with indicator: {result.get('indicator', 'Unknown')}")
                 except Exception as map_error:
