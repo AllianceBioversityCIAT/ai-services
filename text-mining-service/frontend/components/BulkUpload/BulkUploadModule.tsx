@@ -341,6 +341,9 @@ export default function BulkUploadModule() {
         {step === 'unmapped' && (
           <UnmappedTable
             institutions={unmappedInstitutions}
+            authToken={userToken}
+            userEmail={userId}
+            userFullName={userFullName}
             onDownloadReport={handleDownloadUnmappedReport}
             onBackToResults={handleNextStep}
             onGoToSummary={() => setStep('summary')}

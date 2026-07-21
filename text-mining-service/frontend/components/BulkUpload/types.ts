@@ -84,6 +84,37 @@ export interface UnmappedInstitution {
   similarity_score: number;
 }
 
+export interface ClarisaCountryOption {
+  isoAlpha2: string;
+  name: string;
+}
+
+export interface ClarisaInstitutionTypeOption {
+  code: number;
+  name: string;
+}
+
+export interface PartnerRequestFormRow {
+  rowKey: string;
+  name: string;
+  acronym: string;
+  institutionTypeCode: number | null;
+  hqCountryIso: string;
+  website: string;
+}
+
+export interface PartnerRequestCreatePayload {
+  name: string;
+  acronym: string;
+  websiteLink: string;
+  hqCountryIso: string;
+  institutionTypeCode: number;
+  externalUserMail: string;
+  externalUserName: string;
+  externalUserComments: string;
+  misAcronym: string;
+}
+
 export interface RecordStatus {
   status: 'pending' | 'complete' | 'failed';
   link: string | null;
