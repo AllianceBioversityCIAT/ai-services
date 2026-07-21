@@ -1,6 +1,5 @@
 import re
-from datetime import datetime
-from typing import List, Optional, Union, Literal
+from typing import Annotated, List, Optional, Union, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
 
@@ -423,7 +422,44 @@ class InnovationDevelopmentResult(BaseResultModel):
         return v
 
 
-ResultModel = Union[CapacityDevelopmentResult, PolicyChangeResult, InnovationDevelopmentResult]
+class InnovationUseResult(BaseResultModel):
+    """Innovation Use — provisional MDS fields from bilateral inventory (P2-3126)."""
+    indicator: Literal["Innovation Use"] = "Innovation Use"
+    innovation_use_type: Optional[str] = Field(None, description="Type/category of innovation use")
+    adoption_stage: Optional[str] = Field(None, description="Adoption/use stage")
+    adoption_scale: Optional[str] = Field(None, description="Scale of adoption/use")
+    beneficiary_count: Optional[int] = Field(None, description="Beneficiary count when stated")
+
+    @field_validator('beneficiary_count', mode='before')
+    @classmethod
+    def validate_beneficiary_count(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str) and v.isdigit():
+            v = int(v)
+        if isinstance(v, int) and v >= 0:
+            return v
+        return None
+
+
+class OtherOutputOutcomeResult(BaseResultModel):
+    """Other Output / Other Outcome — provisional MDS fields from bilateral inventory (P2-3125)."""
+    indicator: Literal["Other Output / Other Outcome"] = "Other Output / Other Outcome"
+    output_type: Optional[str] = Field(None, description="Output/outcome type classification")
+    outcome_description: Optional[str] = Field(None, description="Outcome description")
+    contribution_evidence: Optional[str] = Field(None, description="Contribution evidence summary")
+
+
+ResultModel = Annotated[
+    Union[
+        CapacityDevelopmentResult,
+        PolicyChangeResult,
+        InnovationDevelopmentResult,
+        InnovationUseResult,
+        OtherOutputOutcomeResult,
+    ],
+    Field(discriminator="indicator"),
+]
 
 
 class MiningResponse(BaseModel):

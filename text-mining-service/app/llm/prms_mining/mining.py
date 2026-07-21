@@ -5,14 +5,15 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from typing import Dict, Any, Union
 from app.llm.shared.models import ModelUsage
 from app.utils.logger.logger_util import get_logger
 from app.llm.providers import DEFAULT_MODEL_ID, invoke_model
 from app.llm.shared.map_fields import map_fields_with_opensearch
+from app.llm.shared.organization_fields import clean_organization_fields
 from app.utils.interactions.interaction_client import interaction_client
-from app.llm.shared.json_parser import extract_json_from_markdown, is_valid_json
-from app.llm.star_mining.mining import _clean_organization_fields, format_mining_response
 from app.llm.prms_mining.corpus import build_context_excerpts, estimate_tokens
+from app.llm.shared.json_parser import extract_json_from_markdown, is_valid_json
 from app.llm.shared.reference_cache import format_reference_for_prompt, get_reference_data
 from app.utils.prompt.prompt_prms import EXTRACTION_PROMPT_VERSION, VALIDATION_PROMPT_VERSION
 from app.utils.config.config_util import (
@@ -41,6 +42,15 @@ from app.llm.prms_mining.prompt_builder import (
 from app.llm.prms_mining.source_extraction import (
     build_sources_from_request,
     extract_sources,
+)
+
+from app.schemas.prms_mining_schemas import (
+    MiningResponse,
+    InnovationDevelopmentResult,
+    PolicyChangeResult,
+    CapacityDevelopmentResult,
+    InnovationUseResult,
+    OtherOutputOutcomeResult
 )
 
 
@@ -99,6 +109,88 @@ def _summarize_user_input(extracted: list[ExtractedPrmsSource], counts: SourceCo
         f"audio={counts.audio}, free_text={counts.free_text}; "
         f"sources={', '.join(names)}"
     )
+
+
+def format_mining_response(raw_response: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Format the mining response to ensure consistent structure with indicator-specific fields
+    Accepts either raw JSON string or already parsed dict (after field mapping)
+    """
+    try:
+        # If already a dict, use it directly (post field mapping)
+        if isinstance(raw_response, dict):
+            parsed_response = raw_response
+        elif is_valid_json(raw_response):
+            parsed_response = json.loads(raw_response)
+        else:
+            logger.warning(f"Invalid JSON received from LLM: {raw_response[:200]}...")
+            return {
+                "content": raw_response,
+                "status": "partial_success", 
+                "error": "LLM returned invalid JSON"
+            }
+
+        results = parsed_response.get("results", [])
+        if not isinstance(results, list):
+            results = []
+        
+        typed_results = []
+        for result in results:
+            indicator = result.get("indicator", "")
+            
+            try:
+                if indicator == "Capacity Sharing for Development":
+                    capacity_result = CapacityDevelopmentResult(**result)
+                    typed_results.append(capacity_result)
+                    
+                elif indicator == "Policy Change":
+                    policy_result = PolicyChangeResult(**result)
+                    typed_results.append(policy_result)
+                    
+                elif indicator == "Innovation Development":
+                    innovation_result = InnovationDevelopmentResult(**result)
+                    typed_results.append(innovation_result)
+
+                elif indicator == "Innovation Use":
+                    typed_results.append(InnovationUseResult(**result))
+
+                elif indicator == "Other Output / Other Outcome":
+                    typed_results.append(OtherOutputOutcomeResult(**result))
+                    
+                else:
+                    logger.warning(f"❌ Unknown indicator type: {indicator}")
+                    continue
+                    
+            except Exception as e:
+                logger.error(f"Error processing result with indicator '{indicator}': {str(e)}")
+                continue
+        
+        total_count = len(results)
+        valid_count = len(typed_results)
+        failed_count = total_count - valid_count
+        
+        if failed_count > 0:
+            logger.warning(f"⚠️ {failed_count} of {total_count} results failed validation and will NOT be returned to PRMS")
+        
+        if valid_count > 0:
+            logger.info(f"✅ {valid_count} of {total_count} results validated successfully")
+        elif total_count > 0:
+            logger.error(f"❌ All {total_count} results failed validation - returning empty results")
+        
+        mining_response = MiningResponse(
+            results=typed_results
+        )
+        
+        return mining_response.model_dump(exclude_none=True)
+        
+    except Exception as e:
+        logger.error(f"❌ Critical error formatting mining response: {str(e)}")
+        
+        return {
+            "results": [],
+            "status": "error",
+            "error": f"Critical formatting error: {str(e)}"
+        }
 
 
 def process_document_prms(
@@ -220,7 +312,7 @@ def process_document_prms(
             for result in json_content["results"]:
                 try:
                     mapped_result = map_fields_with_opensearch(result, MAPPING_URL)
-                    _clean_organization_fields(mapped_result)
+                    clean_organization_fields(mapped_result)
                     mapped_results.append(mapped_result)
                 except Exception as map_error:
                     logger.warning("⚠️ Field mapping failed for result: %s", str(map_error))

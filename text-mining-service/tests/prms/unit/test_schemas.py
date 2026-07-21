@@ -1,5 +1,5 @@
-from app.llm.star_mining.mining import format_mining_response
-from app.schemas.mining_schemas import (
+from app.llm.prms_mining.mining import format_mining_response
+from app.schemas.prms_mining_schemas import (
     InnovationUseResult,
     MiningResponse,
     OtherOutputOutcomeResult,
