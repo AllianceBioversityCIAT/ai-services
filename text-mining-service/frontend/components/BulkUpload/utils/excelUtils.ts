@@ -46,15 +46,56 @@ function serialize(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function isBlankParticipantValue(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'string' && value.trim() === '') return true;
+  return false;
+}
+
+/**
+ * Excel-only defaults for individual training rows (does not mutate source data).
+ * Total = 1; male/female = 1 when trainee gender matches and the cell would be blank.
+ */
+function applyIndividualTrainingExcelDefaults(data: Record<string, unknown>): Record<string, unknown> {
+  const trainingType = String(data.training_type ?? '').trim().toLowerCase();
+  if (trainingType !== 'individual training') return data;
+
+  const patched = { ...data };
+
+  if (isBlankParticipantValue(patched.total_participants)) {
+    patched.total_participants = 1;
+  }
+
+  const gender = String(patched.trainee_gender ?? '').trim().toLowerCase();
+  if (gender === 'male' && isBlankParticipantValue(patched.male_participants)) {
+    patched.male_participants = 1;
+  }
+  if (gender === 'female' && isBlankParticipantValue(patched.female_participants)) {
+    patched.female_participants = 1;
+  }
+
+  return patched;
+}
+
 /** Build a row of metadata values from a SummaryRecord's rawData. */
 function buildMetadataRow(r: SummaryRecord, cols: { key: string; label: string }[]): string[] {
-  const data = r.rawData as Record<string, unknown> | undefined;
-  return cols.map((col) => {
-    if (!data) return '';
-    const val = data[col.key];
-    if (ARRAY_KEYS.has(col.key)) return serialize(val);
-    return serialize(val);
-  });
+  const raw = r.rawData as Record<string, unknown> | undefined;
+  if (!raw) return cols.map(() => '');
+
+  try {
+    const data = applyIndividualTrainingExcelDefaults(raw);
+    return cols.map((col) => {
+      const val = data[col.key];
+      if (ARRAY_KEYS.has(col.key)) return serialize(val);
+      return serialize(val);
+    });
+  } catch {
+    return cols.map((col) => {
+      const val = raw[col.key];
+      if (ARRAY_KEYS.has(col.key)) return serialize(val);
+      return serialize(val);
+    });
+  }
 }
 
 function applyHeaderStyle(ws: XLSX.WorkSheet, numCols: number): void {
