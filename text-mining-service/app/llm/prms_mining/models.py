@@ -135,8 +135,8 @@ class StageDurations(BaseModel):
 RETRIEVAL_QUERY_VERSION = "prms-retrieval-v1"
 RETRIEVAL_QUERY = (
     "CGIAR PRMS bilateral results: Capacity Sharing for Development, Policy Change, "
-    "Innovation Development, Innovation Use, Other Output or Other Outcome. "
-    "Extract training, policy, innovation, adoption, and outcome evidence."
+    "Innovation Development, Innovation Use, Other Output, Other Outcome. "
+    "Extract training, policy, innovation, adoption, output, and outcome evidence."
 )
 
 SUPPORTED_INDICATORS = [
@@ -144,5 +144,6 @@ SUPPORTED_INDICATORS = [
     "Policy Change",
     "Innovation Development",
     "Innovation Use",
-    "Other Output / Other Outcome",
+    "Other Output",
+    "Other Outcome",
 ]
