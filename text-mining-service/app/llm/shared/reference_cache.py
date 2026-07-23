@@ -142,6 +142,8 @@ def format_reference_for_prompt(reference_data: dict) -> str:
     """
     Format the reference data into the section that is appended to every
     model prompt so Claude can look up official CLARISA codes.
+
+    Shared by STAR, AICCRA, and bulk upload (geoscope_level / regions / countries).
     """
     regions_text = "\n".join(reference_data.get("regions", []))
     countries_text = "\n".join(reference_data.get("countries", []))

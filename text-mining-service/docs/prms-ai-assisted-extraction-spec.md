@@ -612,16 +612,13 @@ Its baseline responsibilities are:
 - Preserve valid candidates unchanged where possible.
 - Return the same `{"results": [...]}` shape.
 
-Detailed business validation rules will be added later. They must be maintained in `final_validation.py` with an explicit version constant and corresponding fixtures.
+Detailed business validation rules will be added later. They must be maintained in `final_validation.py` with corresponding fixtures.
 
-### 10.4 Prompt versioning
+### 10.4 Model invocation metadata
 
-Every model invocation must record:
+Every model invocation should record:
 
-- `prompt_name`
-- `prompt_version`
 - `model_id`
-- `schema_version`
 - input tokens
 - output tokens
 - stop reason
@@ -760,8 +757,6 @@ Update tracking context to include:
   "results_count": 0,
   "supported_indicators": [],
   "model_used": "...",
-  "extraction_prompt_version": "...",
-  "validation_prompt_version": "...",
   "extraction_input_tokens": 0,
   "extraction_output_tokens": 0,
   "validation_input_tokens": 0,
@@ -811,7 +806,6 @@ Add configuration through `app/utils/config/config_util.py` and environment vari
 | `PRMS_MAX_PDF_PAGES` | Per-PDF page limit | AI team decision required |
 | `PRMS_MAX_TEXT_CHARS` | Free-text limit | AI team decision required |
 | `PRMS_MAX_AUDIO_SECONDS` | Audio-duration limit | Provider/product decision required |
-| `PRMS_EXTRACTION_PROMPT_VERSION` | Optional deployment override only if existing config patterns require it | Prefer code constant |
 | `PRMS_FINAL_VALIDATION_ENABLED` | Feature flag for the second model stage until rules are approved | `false` before rule approval |
 | `PRMS_AUDIO_TRANSCRIBER` | Configured transcription adapter | No default until selected |
 

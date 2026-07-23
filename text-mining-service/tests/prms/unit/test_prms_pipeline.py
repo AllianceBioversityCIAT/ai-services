@@ -19,7 +19,13 @@ def test_process_document_prms_text_only_happy_path():
         )
     ]
     invocation = ModelInvocationResult(
-        text='{"results":[{"indicator":"Capacity Sharing for Development","title":"Extension agent training","description":"Short-term group training","keywords":["training","extension"],"geoscope_level":"National","training_type":"Group training","female_participants":20}]}',
+        text=(
+            '{"results":[{"indicator":"Capacity Sharing for Development",'
+            '"title":"Extension agent training","description":"Short-term group training",'
+            '"geo_focus":{"scope_code":4,"scope_label":"National","countries":[{"iso_alpha_2":"KE"}]},'
+            '"capacity_sharing":{"number_people_trained":{"women":20},'
+            '"length_training":"Short-term","delivery_method":"In person"}}]}'
+        ),
         usage=ModelUsage(input_tokens=10, output_tokens=20),
         stop_reason="end_turn",
         model_id="test-model",
@@ -43,13 +49,12 @@ def test_process_document_prms_text_only_happy_path():
         ),
         patch(
             "app.llm.prms_mining.mining.invoke_model",
-            return_value=invocation,
+            side_effect=[invocation, invocation],
         ),
         patch(
             "app.llm.prms_mining.mining.map_fields_with_opensearch",
             side_effect=lambda result, *_args, **_kwargs: result,
         ),
-        patch("app.llm.prms_mining.mining.PRMS_FINAL_VALIDATION_ENABLED", False),
     ):
         from app.llm.prms_mining.mining import process_document_prms
 
@@ -57,5 +62,5 @@ def test_process_document_prms_text_only_happy_path():
 
     assert result["project"] == "PRMS"
     assert result["json_content"]["results"]
-    assert result["json_content"]["results"][0]["indicator"] == "Capacity Sharing for Development"
+    assert result["json_content"]["results"][0]["capacity_sharing"]["number_people_trained"]["women"] == 20
     assert result["source_counts"]["free_text"] == 1
