@@ -128,7 +128,6 @@ PRMS_MAX_TEXT_CHARS=50000
 PRMS_CONTEXT_TOKEN_BUDGET=300000
 PRMS_FULL_SOURCE_MAX_CHARS=50000
 PRMS_RETRIEVAL_TOP_K_PER_SOURCE=8
-PRMS_FINAL_VALIDATION_ENABLED=false
 
 # Amazon Transcribe for PRMS audio_keys (optional)
 PRMS_AUDIO_TRANSCRIBER=amazon_transcribe
@@ -248,16 +247,15 @@ PRMS multisource fields (`POST /prms/text-mining`):
 
 | Field | Type | Description |
 |---|---|---|
-| `bucketName` | string | Required when using S3 keys or uploads |
+| `bucketName` | string | Required when using S3 keys |
 | `keys` | string[] | Document S3 keys (repeat form field) |
-| `files` | file[] | Direct document uploads |
 | `text` | string | Optional free text |
 | `audio_keys` | string[] | Existing S3 audio keys only (no multipart audio) |
 | `user_id` | string | Optional interaction tracking |
 
 Bulk CapDev extras: `skip_ids` (comma-separated record IDs already submitted), `user_name`.
 
-⚠️ STAR/AICCRA: provide either `key` **or** `file`, not both. PRMS accepts any non-empty combination of `keys`/`files`, free text, and `audio_keys`.
+⚠️ STAR/AICCRA: provide either `key` **or** `file`, not both. PRMS accepts any non-empty combination of `keys`, free text, and `audio_keys` (documents and audio must already exist in S3).
 
 ### Bulk upload status (DynamoDB)
 

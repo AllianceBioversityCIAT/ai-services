@@ -18,7 +18,6 @@ def test_normalize_keys_and_audio():
         keys=["k1", "k1", "k2"],
         audio_keys=["a1"],
         text="  hello  ",
-        file_count=0,
     )
     assert keys == ["k1", "k2"]
     assert audio == ["a1"]
@@ -31,7 +30,6 @@ def test_normalize_json_array_form_value_from_swagger():
         keys=['["prms/text-mining/files/test/report.pdf"]'],
         audio_keys=['["prms/text-mining/audio/note.m4a"]'],
         text=None,
-        file_count=0,
     )
     assert keys == ["prms/text-mining/files/test/report.pdf"]
     assert audio == ["prms/text-mining/audio/note.m4a"]
@@ -43,7 +41,6 @@ def test_normalize_json_array_form_value_from_swagger():
 def test_normalize_json_array_with_multiple_keys():
     keys, audio, _ = normalize_prms_sources(
         keys=['["a.pdf", "b.docx"]'],
-        file_count=0,
     )
     assert keys == ["a.pdf", "b.docx"]
     assert audio == []
@@ -51,11 +48,11 @@ def test_normalize_json_array_with_multiple_keys():
 
 def test_normalize_empty_raises():
     with pytest.raises(EmptySourceSetError):
-        normalize_prms_sources(keys=None, audio_keys=None, text="   ", file_count=0)
+        normalize_prms_sources(keys=None, audio_keys=None, text="   ")
 
 
 def test_free_text_only_ok():
-    keys, audio, text = normalize_prms_sources(text="context only", file_count=0)
+    keys, audio, text = normalize_prms_sources(text="context only")
     assert keys == []
     assert audio == []
     assert text == "context only"

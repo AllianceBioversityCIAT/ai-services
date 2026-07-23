@@ -22,8 +22,8 @@ from fastapi.responses import FileResponse, StreamingResponse
 from app.utils.prompt.prompt_aiccra import DEFAULT_PROMPT_AICCRA
 from app.utils.dynamo.create_bulk_table import create_bulk_upload_table_if_not_exists
 from fastapi import FastAPI, HTTPException, Body, UploadFile, File, Form, Depends, Request, status
+from app.llm.prms_mining.request_normalization import assert_audio_extension, assert_document_extension, normalize_prms_sources
 from app.llm.prms_mining.models import EmptySourceSetError, PrmsMiningError, SourceLimitExceededError, UnsupportedSourceTypeError
-from app.llm.prms_mining.request_normalization import assert_audio_extension, assert_document_extension, normalize_prms_sources, dedupe_preserve_order
 from app.utils.config.config_util import AWS, CLIENT_ID, CLIENT_SECRET, IS_PROD, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, AICCRA_BUCKET_KEY_NAME, CLARISA_VALIDATE_URL, PRMS_MAX_FILE_BYTES
 
 
@@ -854,7 +854,7 @@ async def process_document_endpoint(
           description="""
           Analyze one or more PRMS sources (documents, free text, and/or S3 audio keys)
           and extract candidate results for CapDev, Policy Change, Innovation Development,
-          Innovation Use, and Other Output / Other Outcome (Knowledge Product excluded).
+          Innovation Use, Other Output, and Other Outcome (Knowledge Product excluded).
 
           Source groups are independently optional; at least one non-empty source is required.
           Authenticate with the CLARISA `X-API-Key` header only.
@@ -875,16 +875,12 @@ async def process_document_prms_endpoint(
     request: Request,
     bucketName: Optional[str] = Form(
         None,
-        description="S3 bucket for document/audio keys and direct uploads. Required when using S3 or file uploads.",
+        description="S3 bucket for document and audio keys. Required when using keys or audio_keys.",
         examples=["prms-policy-documents"],
     ),
     keys: Optional[List[str]] = Form(
         None,
         description="Existing S3 object keys for documents. Repeat the field for multiple values.",
-    ),
-    files: Optional[List[UploadFile]] = File(
-        None,
-        description="Documents uploaded directly. Each file is stored in S3 and appended to keys.",
     ),
     text: Optional[str] = Form(
         None,
@@ -902,26 +898,21 @@ async def process_document_prms_endpoint(
     mis: str = Depends(validate_with_clarisa("AI Text Mining - PRMS")),
 ):
     """Multisource PRMS mining endpoint (CLARISA X-API-Key only)."""
-    
-    upload_files: list[UploadFile] = []
-    if files:
-        upload_files.extend([f for f in files if f is not None and not isinstance(f, str)])
 
     try:
         document_keys, normalized_audio_keys, normalized_text = normalize_prms_sources(
             keys=keys,
             audio_keys=audio_keys,
             text=text,
-            file_count=len(upload_files),
         )
     except EmptySourceSetError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    needs_bucket = bool(document_keys or normalized_audio_keys or upload_files)
+    needs_bucket = bool(document_keys or normalized_audio_keys)
     if needs_bucket and not bucketName:
         raise HTTPException(
             status_code=400,
-            detail="bucketName is required when document keys, audio keys, or files are provided",
+            detail="bucketName is required when document keys or audio keys are provided",
         )
 
     for audio_key in normalized_audio_keys:
@@ -930,43 +921,11 @@ async def process_document_prms_endpoint(
         except UnsupportedSourceTypeError as exc:
             raise HTTPException(status_code=415, detail=str(exc)) from exc
 
-    for upload in upload_files:
-        filename = upload.filename or "upload.bin"
+    for document_key in document_keys:
         try:
-            assert_document_extension(filename)
+            assert_document_extension(document_key)
         except UnsupportedSourceTypeError as exc:
             raise HTTPException(status_code=415, detail=str(exc)) from exc
-
-        try:
-            file_content = await upload.read()
-            if len(file_content) > PRMS_MAX_FILE_BYTES:
-                raise HTTPException(
-                    status_code=413,
-                    detail=(
-                        f"The file '{filename}' is too large to process. "
-                        f"Maximum allowed size is {_format_mb(PRMS_MAX_FILE_BYTES)}; "
-                        f"this file is {_format_mb(len(file_content))}."
-                    ),
-                )
-            object_key = f"{PRMS_BUCKET_KEY_NAME}/{filename}"
-            upload_file_to_s3(
-                file_content=file_content,
-                bucket_name=bucketName,
-                file_key=object_key,
-                content_type=upload.content_type,
-            )
-            document_keys.append(object_key)
-            logger.info("✅ PRMS upload stored at %s/%s", bucketName, object_key)
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error("❌ Error uploading file for PRMS: %s", str(e))
-            raise HTTPException(
-                status_code=500, detail=f"Error uploading file for PRMS: {str(e)}"
-            ) from e
-
-    # Dedupe again after uploads (uploaded names are distinct sources; only exact key dupes)
-    document_keys = dedupe_preserve_order(document_keys)
 
     logger.info(
         "Processing PRMS request docs=%s audio=%s free_text=%s bucket=%s",
