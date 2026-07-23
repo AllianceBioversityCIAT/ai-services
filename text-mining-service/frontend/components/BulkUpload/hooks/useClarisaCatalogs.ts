@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CLARISA_COUNTRIES_URL, CLARISA_INSTITUTION_TYPES_URL } from '../constants';
+import { CLARISA_COUNTRIES_BFF_URL, CLARISA_INSTITUTION_TYPES_BFF_URL } from '../constants';
 import type { ClarisaCountryOption, ClarisaInstitutionTypeOption } from '../types';
 
 interface ClarisaCatalogsState {
@@ -20,7 +20,7 @@ let institutionTypesPromise: Promise<ClarisaInstitutionTypeOption[]> | null = nu
 async function fetchCountriesCatalog(): Promise<ClarisaCountryOption[]> {
   if (cachedCountries) return cachedCountries;
   if (!countriesPromise) {
-    countriesPromise = fetch(CLARISA_COUNTRIES_URL)
+    countriesPromise = fetch(CLARISA_COUNTRIES_BFF_URL)
       .then((res) => {
         if (!res.ok) throw new Error(`Countries catalog error (${res.status})`);
         return res.json() as Promise<ClarisaCountryOption[]>;
@@ -40,7 +40,7 @@ async function fetchCountriesCatalog(): Promise<ClarisaCountryOption[]> {
 async function fetchInstitutionTypesCatalog(): Promise<ClarisaInstitutionTypeOption[]> {
   if (cachedInstitutionTypes) return cachedInstitutionTypes;
   if (!institutionTypesPromise) {
-    institutionTypesPromise = fetch(CLARISA_INSTITUTION_TYPES_URL)
+    institutionTypesPromise = fetch(CLARISA_INSTITUTION_TYPES_BFF_URL)
       .then((res) => {
         if (!res.ok) throw new Error(`Institution types catalog error (${res.status})`);
         return res.json() as Promise<ClarisaInstitutionTypeOption[]>;

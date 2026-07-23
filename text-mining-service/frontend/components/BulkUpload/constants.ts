@@ -8,6 +8,9 @@ export const MANAGEMENT_BASE_URL = process.env.NEXT_PUBLIC_MANAGEMENT_API_BASE_U
 export const CLARISA_BASE_URL = process.env.NEXT_PUBLIC_CLARISA_API_BASE_URL;
 export const CLARISA_COUNTRIES_URL = `${CLARISA_BASE_URL}/countries`;
 export const CLARISA_INSTITUTION_TYPES_URL = `${CLARISA_BASE_URL}/institution-types`;
+/** Same-origin BFF proxies (avoids CLARISA CORS in deployed bulk upload). */
+export const CLARISA_COUNTRIES_BFF_URL = '/api/clarisa/countries';
+export const CLARISA_INSTITUTION_TYPES_BFF_URL = '/api/clarisa/institution-types';
 export const CLARISA_PARTNER_REQUEST_CREATE_URL = `${CLARISA_BASE_URL}/partner-requests/create`;
 export const PARTNER_REQUEST_MIS_ACRONYM = 'STAR';
 export const ENVIRONMENT_URL = `${MANAGEMENT_BASE_URL}/`;
