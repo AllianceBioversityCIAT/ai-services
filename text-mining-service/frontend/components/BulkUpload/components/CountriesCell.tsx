@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { RawCountry } from '../types';
-import { STAR_BASE_URL, CLARISA_COUNTRIES_BFF_URL } from '../constants';
+import { STAR_BASE_URL, CLARISA_BASE_URL } from '../constants';
 
-const CLARISA_COUNTRIES_URL = CLARISA_COUNTRIES_BFF_URL;
+const CLARISA_COUNTRIES_URL = `${CLARISA_BASE_URL}/countries`;
 const SUBNATIONAL_URL = (iso: string) =>
   `${STAR_BASE_URL}/tools/clarisa/sub-nationals/country/${iso}`;
 

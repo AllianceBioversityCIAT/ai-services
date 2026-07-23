@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { CLARISA_COUNTRIES_BFF_URL } from '../constants';
+import { CLARISA_BASE_URL } from '../constants';
 
-const CLARISA_COUNTRIES_URL = CLARISA_COUNTRIES_BFF_URL;
+const CLARISA_COUNTRIES_URL = `${CLARISA_BASE_URL}/countries`;
 
 interface ClarisaCountry {
   isoAlpha2: string;
