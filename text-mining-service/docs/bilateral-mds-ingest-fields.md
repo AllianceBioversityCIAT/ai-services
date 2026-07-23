@@ -160,8 +160,8 @@ Al menos **uno** de: `scope_code` | `scope_label`.
 
 | Campo | Tipo | MDS |
 |---|---|---|
-| `scope_code` | `number` | ⚙️ (`1`\|`2`\|`3`\|`4`\|`5`\|`50`) |
-| `scope_label` | `string` | ⚙️ (`Global`\|`Regional`\|`Multi-national`\|`National`\|`Sub-national`\|`This is yet to be determined`) |
+| `scope_code` | `number` | ⚙️ (`1`\|`2`\|`4`\|`5`\|`50`) |
+| `scope_label` | `string` | ⚙️ (`Global`\|`Regional`\|`National`\|`Sub-national`\|`This is yet to be determined`) |
 | `regions` | `array[object]` | Condicional — ver tabla abajo |
 | `countries` | `array[object]` | Condicional — ver tabla abajo |
 | `subnational_areas` | `array[object]` | Condicional — ver tabla abajo |
@@ -172,7 +172,6 @@ Al menos **uno** de: `scope_code` | `scope_label`.
 |---|---|---|
 | `1` | Global | **No** enviar `regions`, `countries` ni `subnational_areas` |
 | `2` | Regional | `regions` ✅ `min 1` |
-| `3` | Multi-national | `countries` ✅ `min 2` |
 | `4` | National | `countries` ✅ `min 1` |
 | `5` | Sub-national | `countries` ✅ `min 1` **y** `subnational_areas` ✅ `min 1` |
 | `50` | TBD | Sin geo adicional |
