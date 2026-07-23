@@ -29,7 +29,7 @@ Related surfaces:
 
 **Request rules:**
 - STAR/AICCRA mining: provide either `key` (+ `bucketName`) **or** `file`, not both.
-- PRMS mining: multisource — any combination of `keys`/`files`, `text`, and `audio_keys` (at least one required). Auth is CLARISA `X-API-Key` only (no `token` / `environmentUrl`).
+- PRMS mining: multisource — any combination of `keys`, `text`, and `audio_keys` (at least one required). Documents and audio must already exist in S3. Auth is CLARISA `X-API-Key` only (no `token` / `environmentUrl`).
 
 ---
 

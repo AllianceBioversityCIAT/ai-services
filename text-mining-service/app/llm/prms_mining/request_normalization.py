@@ -75,7 +75,6 @@ def normalize_prms_sources(
     keys: list[str] | None = None,
     audio_keys: list[str] | None = None,
     text: str | None = None,
-    file_count: int = 0,
 ) -> tuple[list[str], list[str], str | None]:
     """
     Normalize and dedupe PRMS source fields.
@@ -85,9 +84,9 @@ def normalize_prms_sources(
     audio = dedupe_preserve_order(coerce_form_string_list(audio_keys))
     normalized_text = (text or "").strip() or None
 
-    if not document_keys and file_count == 0 and not audio and not normalized_text:
+    if not document_keys and not audio and not normalized_text:
         raise EmptySourceSetError(
-            "Please provide at least one source to process: a document, an audio file, or free text."
+            "Please provide at least one source to process: document keys, audio keys, or free text."
         )
 
     return document_keys, audio, normalized_text

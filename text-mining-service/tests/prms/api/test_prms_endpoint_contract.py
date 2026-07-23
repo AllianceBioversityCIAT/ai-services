@@ -47,14 +47,10 @@ def prms_client(monkeypatch):
 def test_openapi_has_no_token_or_environment_url(prms_client):
     schema = prms_client.get("/openapi.json").json()
     prms = schema["paths"]["/prms/text-mining"]["post"]
-    # multipart request body properties
-    content = prms["requestBody"]["content"]["multipart/form-data"]["schema"]
-    props = content.get("properties", {})
-    assert "token" not in props
-    assert "environmentUrl" not in props
-    assert "audio_keys" in props or True  # may be under encoding-only schemas
-    # security for API key
-    assert "X-API-Key" not in str(props)
+    prms_schema = str(prms)
+    assert "token" not in prms_schema
+    assert "environmentUrl" not in prms_schema
+    assert "files" not in prms_schema
 
 
 def test_openapi_includes_multisource_fields(prms_client):
@@ -64,6 +60,7 @@ def test_openapi_includes_multisource_fields(prms_client):
     assert "keys" in request_body or "keys" in str(prms)
     assert "text" in request_body or "text" in str(prms)
     assert "audio_keys" in request_body or "audio_keys" in str(prms)
+    assert "files" not in request_body
     assert "token" not in request_body
     assert "environmentUrl" not in request_body
 
