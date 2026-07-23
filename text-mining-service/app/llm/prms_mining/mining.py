@@ -9,19 +9,18 @@ from typing import Dict, Any, Union
 from app.llm.shared.models import ModelUsage
 from app.utils.logger.logger_util import get_logger
 from app.llm.providers import DEFAULT_MODEL_ID, invoke_model
+from app.llm.shared.reference_cache import get_reference_data
 from app.llm.shared.map_fields import map_fields_with_opensearch
-from app.llm.shared.organization_fields import clean_organization_fields
 from app.utils.interactions.interaction_client import interaction_client
+from app.llm.shared.cgiar_centers import format_cgiar_centers_for_prompt
+from app.llm.shared.organization_fields import clean_prms_institution_fields
 from app.llm.prms_mining.corpus import build_context_excerpts, estimate_tokens
 from app.llm.shared.json_parser import extract_json_from_markdown, is_valid_json
-from app.llm.shared.reference_cache import format_reference_for_prompt, get_reference_data
-from app.utils.prompt.prompt_prms import EXTRACTION_PROMPT_VERSION, VALIDATION_PROMPT_VERSION
 from app.utils.config.config_util import (
     MAPPING_URL,
     PRMS_BUCKET_KEY_NAME,
     PRMS_CONTEXT_TOKEN_BUDGET,
     PRMS_EXTRACTION_MAX_WORKERS,
-    PRMS_FINAL_VALIDATION_ENABLED,
 )
 
 from app.llm.prms_mining.models import (
@@ -37,7 +36,7 @@ from app.llm.prms_mining.models import (
 from app.llm.prms_mining.prompt_builder import (
     build_extraction_prompt,
     build_final_validation_prompt,
-    prompt_versions,
+    format_prms_geo_reference_for_prompt,
 )
 from app.llm.prms_mining.source_extraction import (
     build_sources_from_request,
@@ -48,9 +47,10 @@ from app.schemas.prms_mining_schemas import (
     MiningResponse,
     InnovationDevelopmentResult,
     PolicyChangeResult,
-    CapacityDevelopmentResult,
+    CapacitySharingResult,
     InnovationUseResult,
-    OtherOutputOutcomeResult
+    OtherOutputResult,
+    OtherOutcomeResult,
 )
 
 
@@ -140,8 +140,7 @@ def format_mining_response(raw_response: Union[str, Dict[str, Any]]) -> Dict[str
             
             try:
                 if indicator == "Capacity Sharing for Development":
-                    capacity_result = CapacityDevelopmentResult(**result)
-                    typed_results.append(capacity_result)
+                    typed_results.append(CapacitySharingResult(**result))
                     
                 elif indicator == "Policy Change":
                     policy_result = PolicyChangeResult(**result)
@@ -154,8 +153,11 @@ def format_mining_response(raw_response: Union[str, Dict[str, Any]]) -> Dict[str
                 elif indicator == "Innovation Use":
                     typed_results.append(InnovationUseResult(**result))
 
-                elif indicator == "Other Output / Other Outcome":
-                    typed_results.append(OtherOutputOutcomeResult(**result))
+                elif indicator == "Other Output":
+                    typed_results.append(OtherOutputResult(**result))
+
+                elif indicator == "Other Outcome":
+                    typed_results.append(OtherOutcomeResult(**result))
                     
                 else:
                     logger.warning(f"❌ Unknown indicator type: {indicator}")
@@ -248,13 +250,15 @@ def process_document_prms(
                     reference_file_regions,
                     reference_file_countries,
                 )
-                reference_section = format_reference_for_prompt(reference_data)
+                reference_section = format_prms_geo_reference_for_prompt(reference_data)
                 processing_steps.append("reference_catalogs")
             except Exception as ref_exc:
                 logger.warning("⚠️ PRMS reference catalog load failed: %s", ref_exc)
 
         context_start = time.time()
-        reference_for_prompt = reference_section or "REFERENCE CATALOGS: (none loaded)"
+        reference_parts = [reference_section] if reference_section else []
+        reference_parts.append(format_cgiar_centers_for_prompt())
+        reference_for_prompt = "\n\n".join(part for part in reference_parts if part)
         prompt_overhead = estimate_tokens(
             build_extraction_prompt(excerpts="", reference_section=reference_for_prompt)
         )
@@ -291,20 +295,16 @@ def process_document_prms(
 
         json_content = _preliminary_discriminator_check(_parse_model_json(response_text))
 
-        if PRMS_FINAL_VALIDATION_ENABLED:
-            validation_prompt = build_final_validation_prompt(
-                candidates=json_content,
-                supporting_excerpts=excerpts,
-            )
-            val_start = time.time()
-            validation_result = invoke_model(validation_prompt)
-            stages.final_validation = time.time() - val_start
-            validation_usage = validation_result.usage
-            response_text = validation_result.text
-            json_content = _parse_model_json(response_text)
-            processing_steps.append("final_validation")
-        else:
-            processing_steps.append("final_validation_skipped")
+        validation_prompt = build_final_validation_prompt(
+            candidates=json_content,
+        )
+        val_start = time.time()
+        validation_result = invoke_model(validation_prompt)
+        stages.final_validation = time.time() - val_start
+        validation_usage = validation_result.usage
+        response_text = validation_result.text
+        json_content = _parse_model_json(response_text)
+        processing_steps.append("final_validation")
 
         map_start = time.time()
         if isinstance(json_content, dict) and "results" in json_content:
@@ -312,7 +312,7 @@ def process_document_prms(
             for result in json_content["results"]:
                 try:
                     mapped_result = map_fields_with_opensearch(result, MAPPING_URL)
-                    clean_organization_fields(mapped_result)
+                    clean_prms_institution_fields(mapped_result)
                     mapped_results.append(mapped_result)
                 except Exception as map_error:
                     logger.warning("⚠️ Field mapping failed for result: %s", str(map_error))
@@ -331,7 +331,6 @@ def process_document_prms(
         interaction_id = None
         if user_id:
             try:
-                versions = prompt_versions()
                 tracking_context = {
                     "source_counts": counts.model_dump(),
                     "chunks_processed": context_result.chunks_processed,
@@ -341,15 +340,12 @@ def process_document_prms(
                     "results_count": results_count,
                     "supported_indicators": SUPPORTED_INDICATORS,
                     "model_used": DEFAULT_MODEL_ID,
-                    "extraction_prompt_version": versions["extraction_prompt_version"],
-                    "validation_prompt_version": versions["validation_prompt_version"],
                     "extraction_input_tokens": extraction_usage.input_tokens,
                     "extraction_output_tokens": extraction_usage.output_tokens,
                     "validation_input_tokens": validation_usage.input_tokens,
                     "validation_output_tokens": validation_usage.output_tokens,
                     "stage_durations_seconds": stages.model_dump(),
                     "processing_steps": processing_steps,
-                    "final_validation_enabled": PRMS_FINAL_VALIDATION_ENABLED,
                 }
                 interaction_response = interaction_client.track_interaction(
                     user_id=user_id,
@@ -373,7 +369,7 @@ def process_document_prms(
         logger.info(
             "✅ PRMS mining complete results_count=%s sources=%s duration=%.2fs "
             "extraction_tokens=%s/%s validation_tokens=%s/%s estimated_prompt_tokens=%s "
-            "context_trimmed=%s prompt=%s validation=%s",
+            "context_trimmed=%s",
             results_count,
             counts.model_dump(),
             elapsed_time,
@@ -383,8 +379,6 @@ def process_document_prms(
             validation_usage.output_tokens,
             prompt_estimated_tokens,
             context_result.trimmed,
-            EXTRACTION_PROMPT_VERSION,
-            VALIDATION_PROMPT_VERSION,
         )
 
         result = {

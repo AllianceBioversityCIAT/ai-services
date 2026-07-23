@@ -1,10 +1,106 @@
 """Post-mapping cleanup for organization fields on mining results."""
 
+from __future__ import annotations
+
+from typing import Any
+
 from app.utils.logger.logger_util import get_logger
 
 logger = get_logger()
 
 SIMILARITY_THRESHOLD = 70.0
+PRMS_INSTITUTION_SIMILARITY_THRESHOLD = 80.0
+
+
+def normalize_similarity_score(score: Any) -> float:
+    """Normalize mapping scores to a 0–100 percentage scale."""
+    if score is None:
+        return 0.0
+    try:
+        value = float(score)
+    except (TypeError, ValueError):
+        return 0.0
+    if 0.0 <= value <= 1.0:
+        value *= 100.0
+    return value
+
+
+def _finalize_mds_institution(
+    item: dict[str, Any],
+    *,
+    id_key: str,
+    name_key: str,
+    acronym_key: str,
+) -> dict[str, Any] | None:
+    score = normalize_similarity_score(item.get("similarity_score", 0))
+    extraction_name = item.pop("_extraction_name", None)
+    extraction_acronym = item.pop("_extraction_acronym", None)
+    item.pop("_lookup_label", None)
+    item.pop("similarity_score", None)
+
+    mapped_id = item.get(id_key)
+    if mapped_id is not None and score >= PRMS_INSTITUTION_SIMILARITY_THRESHOLD:
+        result: dict[str, Any] = {id_key: int(mapped_id)}
+        if acronym := item.get(acronym_key):
+            result[acronym_key] = acronym
+        if name := item.get(name_key):
+            result[name_key] = name
+        return result
+
+    result = {}
+    if extraction_name:
+        result[name_key] = extraction_name
+    if extraction_acronym:
+        result[acronym_key] = extraction_acronym
+    return result or None
+
+
+def clean_prms_institution_fields(mining_result: dict[str, Any]) -> None:
+    """
+    Finalize PRMS partner / implementing-organization items after OpenSearch mapping.
+
+    Mapped (score >= 80%): id + canonical acronym + name.
+    Unmapped: only the extracted name or acronym — no id, no similarity_score.
+    """
+    partners = mining_result.get("contributing_partners")
+    if isinstance(partners, list):
+        cleaned_partners = []
+        for item in partners:
+            if not isinstance(item, dict):
+                continue
+            finalized = _finalize_mds_institution(
+                dict(item),
+                id_key="institution_id",
+                name_key="name",
+                acronym_key="acronym",
+            )
+            if finalized:
+                cleaned_partners.append(finalized)
+        if cleaned_partners:
+            mining_result["contributing_partners"] = cleaned_partners
+        else:
+            mining_result.pop("contributing_partners", None)
+
+    policy_change = mining_result.get("policy_change")
+    if isinstance(policy_change, dict):
+        organizations = policy_change.get("implementing_organization")
+        if isinstance(organizations, list):
+            cleaned_orgs = []
+            for item in organizations:
+                if not isinstance(item, dict):
+                    continue
+                finalized = _finalize_mds_institution(
+                    dict(item),
+                    id_key="institutions_id",
+                    name_key="institutions_name",
+                    acronym_key="institutions_acronym",
+                )
+                if finalized:
+                    cleaned_orgs.append(finalized)
+            if cleaned_orgs:
+                policy_change["implementing_organization"] = cleaned_orgs
+            else:
+                policy_change.pop("implementing_organization", None)
 
 
 def clean_organization_fields(mining_result: dict) -> None:
