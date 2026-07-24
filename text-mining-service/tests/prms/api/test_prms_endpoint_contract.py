@@ -83,13 +83,13 @@ def test_empty_sources_400(prms_client):
 
 
 def test_star_process_document_still_importable():
-    from app.llm.star_mining.mining import process_document
+    from app.text_mining.star_mining.mining import process_document
 
     assert callable(process_document)
 
 
 def test_prms_removed_from_mining_module():
-    import app.llm.star_mining.mining as mining
+    import app.text_mining.star_mining.mining as mining
 
     assert not hasattr(mining, "process_document_prms")
 

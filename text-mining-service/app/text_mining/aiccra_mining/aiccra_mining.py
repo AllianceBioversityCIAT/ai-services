@@ -1,16 +1,16 @@
 import time
 import json
 from typing import Dict, Any
-from app.llm.providers import invoke_model
-from app.llm.shared.retrieval import split_text
+from app.text_mining.providers import invoke_model
+from app.text_mining.shared.retrieval import split_text
 from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
 from app.utils.config.config_util import AICCRA_BUCKET_KEY_NAME
 from app.utils.prompt.prompt_aiccra import DEFAULT_PROMPT_AICCRA
 from app.utils.interactions.interaction_client import interaction_client
-from app.llm.shared.json_parser import extract_json_from_markdown, is_valid_json
-from app.llm.shared.reference_cache import get_reference_data, format_reference_for_prompt
-from app.llm.shared.vectorize import get_embedding, store_temp_embeddings, get_relevant_chunk
+from app.text_mining.shared.json_parser import extract_json_from_markdown, is_valid_json
+from app.text_mining.shared.reference_cache import get_reference_data, format_reference_for_prompt
+from app.text_mining.shared.vectorize import get_embedding, store_temp_embeddings, get_relevant_chunk
 
 logger = get_logger()
 

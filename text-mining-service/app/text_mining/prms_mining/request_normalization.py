@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ast
 import json
-from app.llm.prms_mining.models import EmptySourceSetError
+from app.text_mining.prms_mining.models import EmptySourceSetError
 from app.utils.config.config_util import PRMS_SUPPORTED_AUDIO_EXTENSIONS, PRMS_SUPPORTED_DOCUMENT_EXTENSIONS
 
 
@@ -99,7 +99,7 @@ def extension_of(name: str) -> str:
 
 
 def assert_document_extension(filename: str) -> None:
-    from app.llm.prms_mining.models import UnsupportedSourceTypeError
+    from app.text_mining.prms_mining.models import UnsupportedSourceTypeError
 
     ext = extension_of(filename)
     if ext == "doc":
@@ -115,7 +115,7 @@ def assert_document_extension(filename: str) -> None:
 
 
 def assert_audio_extension(key: str) -> None:
-    from app.llm.prms_mining.models import UnsupportedSourceTypeError
+    from app.text_mining.prms_mining.models import UnsupportedSourceTypeError
 
     ext = extension_of(key)
     if ext not in PRMS_SUPPORTED_AUDIO_EXTENSIONS:

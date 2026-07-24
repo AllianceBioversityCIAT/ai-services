@@ -19,8 +19,8 @@ Refactor the existing PRMS mining flow so one request can analyze documents, aud
 The implementation must:
 
 - Keep the existing `POST /prms/text-mining` endpoint.
-- Move PRMS mining out of `app/llm/mining.py` into a dedicated PRMS module.
-- Preserve STAR behavior in `app/llm/mining.py`.
+- Move PRMS mining out of `app/text_mining/mining.py` into a dedicated PRMS module.
+- Preserve STAR behavior in `app/text_mining/mining.py`.
 - Authenticate the PRMS HTTP endpoint only through CLARISA using the `X-API-Key` header.
 - Remove PRMS token and `environmentUrl` authentication from both HTTP and MCP contracts.
 - Preserve Slack success/failure notifications.
@@ -96,7 +96,7 @@ The implementation starts from these current behaviors:
 - `POST /prms/text-mining` accepts one S3 `key` or one uploaded `file`.
 - It requires form fields `token` and `environmentUrl`.
 - The MCP tool authenticates those fields through `PrmsAuthMiddleware`.
-- `process_document_prms` lives in `app/llm/mining.py` alongside STAR mining.
+- `process_document_prms` lives in `app/text_mining/mining.py` alongside STAR mining.
 - Document parsing supports PDF, DOCX, TXT, XLS/XLSX, and PPTX, but not legacy DOC.
 - PRMS uses one monolithic prompt covering three result types.
 - `MiningResponse` accepts a union of three Pydantic result models.
@@ -111,13 +111,13 @@ The refactor must not alter the `process_document` STAR path or its authenticati
 
 ### D1. Dedicated PRMS package
 
-Remove `process_document_prms` from `app/llm/mining.py`. Place all new PRMS orchestration in a dedicated package, following the existing product-specific AICCRA and bulk-upload patterns.
+Remove `process_document_prms` from `app/text_mining/mining.py`. Place all new PRMS orchestration in a dedicated package, following the existing product-specific AICCRA and bulk-upload patterns.
 
 Recommended structure:
 
 ```text
 app/
-|-- llm/
+|-- text_mining/
 |   |-- star_mining/
 |   |   `-- mining.py                    # STAR pipeline orchestration
 |   |-- prms_mining/
@@ -910,7 +910,7 @@ Evaluation must compare typed fields rather than exact generated prose. Final qu
 
 ### 18.4 Regression tests
 
-- STAR `process_document` continues importing from `app/llm/mining.py`.
+- STAR `process_document` continues importing from `app/text_mining/mining.py`.
 - STAR HTTP and MCP authentication remain unchanged.
 - AICCRA and bulk CapDev imports remain valid.
 - Existing PRMS one-key requests work through the deprecated singular alias.
@@ -922,10 +922,10 @@ Evaluation must compare typed fields rather than exact generated prose. Final qu
 
 ### Phase 1: Separation and authentication
 
-1. Create the dedicated `app/llm/prms_mining/` package.
+1. Create the dedicated `app/text_mining/prms_mining/` package.
 2. Move PRMS pipeline behavior without functional changes.
 3. Update `app/mcp/server.py` imports.
-4. Remove `process_document_prms` from `app/llm/mining.py`.
+4. Remove `process_document_prms` from `app/text_mining/mining.py`.
 5. Add CLARISA dependency to the PRMS HTTP endpoint.
 6. Remove PRMS `token` and `environmentUrl` from HTTP and MCP.
 7. Add regression tests for STAR and current single-key PRMS behavior.
@@ -980,7 +980,7 @@ Evaluation must compare typed fields rather than exact generated prose. Final qu
 
 ### Separation and maintainability
 
-- `app/llm/mining.py` contains no PRMS pipeline function or PRMS prompt import.
+- `app/text_mining/mining.py` contains no PRMS pipeline function or PRMS prompt import.
 - PRMS pipeline orchestration lives in its dedicated package.
 - Source extraction, prompt composition, and orchestration are independently testable.
 - Prompt rules are modular by result type even though runtime extraction uses one model call.

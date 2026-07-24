@@ -10,9 +10,9 @@ from botocore.exceptions import ClientError
 from app.utils.logger.logger_util import get_logger
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.utils.s3.s3_util import _process_file_content, s3_client
-from app.llm.prms_mining.audio_transcriber import get_audio_transcriber
+from app.text_mining.prms_mining.audio_transcriber import get_audio_transcriber
 
-from app.llm.prms_mining.models import (
+from app.text_mining.prms_mining.models import (
     AudioTranscriptionUnavailableError,
     ExtractedPrmsSource,
     PrmsSource,

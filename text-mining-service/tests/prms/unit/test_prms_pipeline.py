@@ -1,8 +1,8 @@
 from unittest.mock import patch
 
-from app.llm.prms_mining.corpus import ContextBuildResult
-from app.llm.prms_mining.models import ExtractedPrmsSource, PrmsSourceType
-from app.llm.shared.models import ModelInvocationResult, ModelUsage
+from app.text_mining.prms_mining.corpus import ContextBuildResult
+from app.text_mining.prms_mining.models import ExtractedPrmsSource, PrmsSourceType
+from app.text_mining.shared.models import ModelInvocationResult, ModelUsage
 
 
 def test_process_document_prms_text_only_happy_path():
@@ -34,11 +34,11 @@ def test_process_document_prms_text_only_happy_path():
 
     with (
         patch(
-            "app.llm.prms_mining.mining.extract_sources",
+            "app.text_mining.prms_mining.mining.extract_sources",
             return_value=extracted,
         ),
         patch(
-            "app.llm.prms_mining.mining.build_context_excerpts",
+            "app.text_mining.prms_mining.mining.build_context_excerpts",
             return_value=ContextBuildResult(
                 excerpts="chunk text",
                 retrieval_version="prms-retrieval-v1",
@@ -48,15 +48,15 @@ def test_process_document_prms_text_only_happy_path():
             ),
         ),
         patch(
-            "app.llm.prms_mining.mining.invoke_model",
+            "app.text_mining.prms_mining.mining.invoke_model",
             side_effect=[invocation, invocation],
         ),
         patch(
-            "app.llm.prms_mining.mining.map_fields_with_opensearch",
+            "app.text_mining.prms_mining.mining.map_fields_with_opensearch",
             side_effect=lambda result, *_args, **_kwargs: result,
         ),
     ):
-        from app.llm.prms_mining.mining import process_document_prms
+        from app.text_mining.prms_mining.mining import process_document_prms
 
         result = process_document_prms(text="Group training for 20 female extension agents in Kenya.")
 

@@ -1,5 +1,5 @@
-from app.llm.prms_mining.prompt_builder import build_extraction_prompt
-from app.llm.shared.cgiar_centers import (
+from app.text_mining.prms_mining.prompt_builder import build_extraction_prompt
+from app.text_mining.shared.cgiar_centers import (
     format_cgiar_centers_for_prompt,
     normalize_cgiar_center_ref,
     resolve_cgiar_center,
@@ -43,7 +43,7 @@ def test_extraction_prompt_includes_cgiar_centers_catalog():
 
 
 def test_prms_geo_reference_uses_geo_focus_not_geoscope():
-    from app.llm.prms_mining.prompt_builder import format_prms_geo_reference_for_prompt
+    from app.text_mining.prms_mining.prompt_builder import format_prms_geo_reference_for_prompt
 
     section = format_prms_geo_reference_for_prompt(
         {"regions": ["UN49 Code: 2, Name: Africa"], "countries": ["ISO Alpha2: KE, Name: Kenya"]}

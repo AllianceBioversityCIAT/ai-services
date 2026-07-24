@@ -2,7 +2,7 @@ import re
 from typing import Annotated, Any, List, Optional, Union, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
-from app.llm.shared.cgiar_centers import normalize_cgiar_center_ref
+from app.text_mining.shared.cgiar_centers import normalize_cgiar_center_ref
 from app.schemas.prms_innovation_reference import (
     normalize_innovation_typology_ref,
     normalize_innovation_readiness_level_ref,

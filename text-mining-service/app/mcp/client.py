@@ -22,8 +22,8 @@ from fastapi.responses import FileResponse, StreamingResponse
 from app.utils.prompt.prompt_aiccra import DEFAULT_PROMPT_AICCRA
 from app.utils.dynamo.create_bulk_table import create_bulk_upload_table_if_not_exists
 from fastapi import FastAPI, HTTPException, Body, UploadFile, File, Form, Depends, Request, status
-from app.llm.prms_mining.request_normalization import assert_audio_extension, assert_document_extension, normalize_prms_sources
-from app.llm.prms_mining.models import EmptySourceSetError, PrmsMiningError, SourceLimitExceededError, UnsupportedSourceTypeError
+from app.text_mining.prms_mining.request_normalization import assert_audio_extension, assert_document_extension, normalize_prms_sources
+from app.text_mining.prms_mining.models import EmptySourceSetError, PrmsMiningError, SourceLimitExceededError, UnsupportedSourceTypeError
 from app.utils.config.config_util import AWS, CLIENT_ID, CLIENT_SECRET, IS_PROD, STAR_BUCKET_KEY_NAME, PRMS_BUCKET_KEY_NAME, AICCRA_BUCKET_KEY_NAME, CLARISA_VALIDATE_URL, PRMS_MAX_FILE_BYTES
 
 

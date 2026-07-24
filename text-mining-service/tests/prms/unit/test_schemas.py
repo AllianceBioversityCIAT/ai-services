@@ -1,4 +1,4 @@
-from app.llm.prms_mining.mining import format_mining_response
+from app.text_mining.prms_mining.mining import format_mining_response
 from app.schemas.prms_mining_schemas import (
     CapacitySharingResult,
     InnovationUseResult,
