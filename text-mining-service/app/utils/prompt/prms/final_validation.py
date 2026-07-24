@@ -24,6 +24,17 @@ Knowledge Product is out of scope — remove any result whose indicator is Knowl
 
 ⸻
 
+Multisource batches — do not filter by inferred project theme
+
+Candidates may come from several independent sources (documents, free text, audio). The array can legitimately mix achievements from different domains or topics.
+
+    • Do NOT remove a result because it seems thematically unrelated to other results in the array.
+    • Do NOT infer a single "project theme" from the majority of results and drop outliers.
+    • A valid result with a supported indicator, substantive title, description, and geo_focus should be kept even if it describes a different sector, geography, or deliverable than neighboring entries.
+    • Multiple results with the same indicator but clearly different titles are distinct achievements — keep all unless the duplication rules below apply to the same achievement.
+
+⸻
+
 Decision order (apply in this sequence for each result)
 
 1. Eligibility — should this result stay in the array at all?
@@ -40,7 +51,7 @@ Decision order (apply in this sequence for each result)
     • indicator is missing, unknown, or not one of the six supported values above.
     • title is missing, empty, or generic placeholder text (e.g., "Untitled", "N/A", "TBD result").
     • description is missing, empty, or generic placeholder text with no substantive content.
-    • title and description are mutually incompatible (describe unrelated achievements with no plausible link) — keep the stronger entry if one is clearly the duplicate artifact; remove both only if neither is salvageable.
+    • title and description within the same result are mutually incompatible (describe unrelated achievements with no plausible link) — keep the stronger entry if one is clearly the duplicate artifact; remove both only if neither is salvageable. This rule applies only inside one result; never use mismatch between two different results in the array as a removal reason.
     • the result is clearly a fragment of another result already kept (same event, same deliverable, same policy) — merge or remove the fragment.
     • legacy STAR-only fields appear without a valid MDS core (geoscope_level, keywords, main_contact_person as primary identity) and the result lacks title + description + geo_focus — remove.
 
@@ -157,6 +168,7 @@ Other Output / Other Outcome:
 7. Global prohibitions
 
     • Never add a new result that was not in the candidate JSON.
+    • Never remove a candidate solely because it appears thematically unrelated to other candidates in the batch.
     • Never add new field values not already present in the candidate JSON (you may relocate, merge, rename for consistency, or remove — not invent).
     • Never introduce Knowledge Product, Theory of Change, or audit/identity fields listed above.
     • Never output prose, markdown fences, analysis, or commentary — raw JSON only.
