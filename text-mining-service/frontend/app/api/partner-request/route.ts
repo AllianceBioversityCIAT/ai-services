@@ -24,6 +24,19 @@ async function readClarisaErrorBody(response: Response): Promise<unknown> {
   }
 }
 
+/** Strip accidental "Bearer " prefix; CLARISA expects Authorization: Bearer <raw-jwt>. */
+function normalizeBearerToken(raw: string): string {
+  const trimmed = raw.trim();
+  if (/^bearer\s+/i.test(trimmed)) {
+    return trimmed.replace(/^bearer\s+/i, '').trim();
+  }
+  return trimmed;
+}
+
+function buildAuthorizationHeader(token: string): string {
+  return `Bearer ${token}`;
+}
+
 export async function POST(request: NextRequest) {
   const createUrl = resolveCreateUrl();
   if (!createUrl) {
@@ -34,7 +47,7 @@ export async function POST(request: NextRequest) {
   let payload: PartnerRequestCreatePayload;
   try {
     const body = (await request.json()) as { token?: string; payload?: PartnerRequestCreatePayload };
-    token = body.token ?? '';
+    token = normalizeBearerToken(body.token ?? '');
     payload = body.payload as PartnerRequestCreatePayload;
   } catch {
     return NextResponse.json({ error: 'service' }, { status: 400 });
@@ -49,10 +62,20 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const authorization = buildAuthorizationHeader(token);
+
+    console.log('[partner-request] CLARISA create request', {
+      createUrl,
+      partnerName: payload.name,
+      authorizationHeader: `${authorization.slice(0, 13)}...${authorization.slice(-8)}`,
+      authorizationFormat: authorization.startsWith('Bearer eyJ') ? 'Bearer + JWT' : 'unexpected format',
+      tokenLength: token.length,
+    });
+
     const response = await fetch(createUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: authorization,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
