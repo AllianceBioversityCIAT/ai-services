@@ -248,9 +248,9 @@ PRMS multisource fields (`POST /prms/text-mining`):
 | Field | Type | Description |
 |---|---|---|
 | `bucketName` | string | Required when using S3 keys |
-| `keys` | string[] | Document S3 keys (repeat form field) |
+| `keys` | string[] | Document S3 keys |
 | `text` | string | Optional free text |
-| `audio_keys` | string[] | Existing S3 audio keys only (no multipart audio) |
+| `audio_keys` | string[] | Existing S3 audio keys only |
 | `user_id` | string | Optional interaction tracking |
 
 Bulk CapDev extras: `skip_ids` (comma-separated record IDs already submitted), `user_name`.
@@ -306,12 +306,17 @@ curl -X POST http://localhost:8000/star/text-mining \
 
 ```bash
 curl -X POST http://localhost:8000/prms/text-mining \
+  -H "Content-Type: application/json" \
   -H "X-API-Key: YOUR_CLARISA_API_KEY" \
-  -F "bucketName=my-bucket" \
-  -F "keys=prms/text-mining/files/test/policy.docx" \
-  -F "keys=prms/text-mining/files/test/attendance.pdf" \
-  -F "text=Focus on outcomes reported during 2026" \
-  -F "user_id=researcher@cgiar.org"
+  -d '{
+    "bucketName": "my-bucket",
+    "keys": [
+      "prms/text-mining/files/test/policy.docx",
+      "prms/text-mining/files/test/attendance.pdf"
+    ],
+    "text": "Focus on outcomes reported during 2026",
+    "user_id": "researcher@cgiar.org"
+  }'
 ```
 
 ### Example: AICCRA (custom prompt)

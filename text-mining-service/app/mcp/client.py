@@ -7,12 +7,12 @@ import requests
 import uvicorn
 from io import BytesIO
 from datetime import datetime
-from pydantic import BaseModel, Field
 from typing import List, Optional, Union
 from mcp.client.stdio import stdio_client
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from botocore.exceptions import ClientError
+from pydantic import BaseModel, ConfigDict, Field
 from fastapi.middleware.cors import CORSMiddleware
 from app.utils.s3.s3_util import upload_file_to_s3
 from app.utils.logger.logger_util import get_logger
@@ -91,6 +91,36 @@ class TextMiningRequest(BaseModel):
         ..., description="Environment for the service (e.g., production, test)")
     user_id: Optional[str] = Field(
         None, description="User identifier for interaction tracking", examples=["user@example.com", "researcher@cgiar.org"])
+
+
+class PrmsTextMiningRequest(BaseModel):
+    """JSON body for POST /prms/text-mining."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bucketName: Optional[str] = Field(
+        None,
+        description="S3 bucket for document and audio keys. Required when using keys or audio_keys.",
+        examples=["prms-policy-documents"],
+    )
+    keys: Optional[list[str]] = Field(
+        None,
+        description="Existing S3 object keys for documents.",
+    )
+    text: Optional[str] = Field(
+        None,
+        description="Optional free-text context. Blank values are ignored.",
+    )
+    audio_keys: Optional[list[str]] = Field(
+        None,
+        description="Existing S3 object keys for audio sources.",
+    )
+    user_id: Optional[str] = Field(
+        None,
+        description="User identifier for interaction tracking",
+        examples=["user@example.com", "researcher@cgiar.org"],
+    )
+
 
 class UploadResponse(BaseModel):
     bucket: str = Field(..., description="S3 bucket where the file was uploaded")
@@ -859,7 +889,7 @@ async def process_document_endpoint(
           Source groups are independently optional; at least one non-empty source is required.
           Authenticate with the CLARISA `X-API-Key` header only.
 
-          Audio is accepted only via existing S3 `audio_keys` (no multipart audio upload).
+          Request body must be JSON (`application/json`). Audio is accepted only via existing S3 `audio_keys`.
           """,
           responses={
               200: {"description": "Sources processed successfully for PRMS"},
@@ -872,44 +902,22 @@ async def process_document_endpoint(
           },
           tags=["PRMS Project"])
 async def process_document_prms_endpoint(
-    request: Request,
-    bucketName: Optional[str] = Form(
-        None,
-        description="S3 bucket for document and audio keys. Required when using keys or audio_keys.",
-        examples=["prms-policy-documents"],
-    ),
-    keys: Optional[List[str]] = Form(
-        None,
-        description="Existing S3 object keys for documents. Repeat the field for multiple values.",
-    ),
-    text: Optional[str] = Form(
-        None,
-        description="Optional free-text context. Blank values are ignored.",
-    ),
-    audio_keys: Optional[List[str]] = Form(
-        None,
-        description="Existing S3 object keys for audio sources. Audio binaries are not accepted via multipart.",
-    ),
-    user_id: Optional[str] = Form(
-        None,
-        description="User identifier for interaction tracking",
-        examples=["user@example.com", "researcher@cgiar.org"],
-    ),
+    body: PrmsTextMiningRequest,
     mis: str = Depends(validate_with_clarisa("AI Text Mining - PRMS")),
 ):
     """Multisource PRMS mining endpoint (CLARISA X-API-Key only)."""
 
     try:
         document_keys, normalized_audio_keys, normalized_text = normalize_prms_sources(
-            keys=keys,
-            audio_keys=audio_keys,
-            text=text,
+            keys=body.keys,
+            audio_keys=body.audio_keys,
+            text=body.text,
         )
     except EmptySourceSetError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     needs_bucket = bool(document_keys or normalized_audio_keys)
-    if needs_bucket and not bucketName:
+    if needs_bucket and not body.bucketName:
         raise HTTPException(
             status_code=400,
             detail="bucketName is required when document keys or audio keys are provided",
@@ -932,7 +940,7 @@ async def process_document_prms_endpoint(
         len(document_keys),
         len(normalized_audio_keys),
         bool(normalized_text),
-        bucketName,
+        body.bucketName,
     )
 
     try:
@@ -941,13 +949,13 @@ async def process_document_prms_endpoint(
                 await session.initialize()
 
                 mcp_arguments = {
-                    "bucket": bucketName,
+                    "bucket": body.bucketName,
                     "keys": document_keys or None,
                     "text": normalized_text,
                     "audio_keys": normalized_audio_keys or None,
                 }
-                if user_id:
-                    mcp_arguments["user_id"] = user_id
+                if body.user_id:
+                    mcp_arguments["user_id"] = body.user_id
 
                 result = await session.call_tool(
                     "process_document_prms",
