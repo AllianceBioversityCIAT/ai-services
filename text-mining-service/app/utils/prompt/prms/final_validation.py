@@ -159,13 +159,14 @@ Other Output / Other Outcome:
     • Never add a new result that was not in the candidate JSON.
     • Never add new field values not already present in the candidate JSON (you may relocate, merge, rename for consistency, or remove — not invent).
     • Never introduce Knowledge Product, Theory of Change, or audit/identity fields listed above.
-    • Never output prose, markdown fences, or commentary — raw JSON only.
+    • Never output prose, markdown fences, analysis, or commentary — raw JSON only.
     • Omit null values and empty optional structures.
 
 ⸻
 
-Output
+Output (strict JSON only):
 
+Do not write any text before or after the JSON object.
 Return exactly one JSON object:
 {
   "results": [ ... ]
