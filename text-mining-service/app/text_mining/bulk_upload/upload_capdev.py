@@ -1,17 +1,17 @@
 import time
 import json
-from app.llm.providers import invoke_model
-from app.llm.shared.retrieval import split_text
+from app.text_mining.providers import invoke_model
+from app.text_mining.shared.retrieval import split_text
 from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.utils.interactions.interaction_client import interaction_client
 from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, MAPPING_URL
-from app.llm.shared.json_parser import extract_json_from_markdown, is_valid_json
+from app.text_mining.shared.json_parser import extract_json_from_markdown, is_valid_json
 from app.utils.prompt.bulk_upload_capdev_prompt import PROMPT_BULK_UPLOAD_CAPDEV
-from app.llm.shared.reference_cache import get_reference_data, format_reference_for_prompt
-from app.llm.shared.vectorize import get_embedding, store_temp_embeddings, get_relevant_chunk
-from app.llm.shared.map_fields import map_fields_with_opensearch, clear_mapping_cache, get_cache_stats
+from app.text_mining.shared.reference_cache import get_reference_data, format_reference_for_prompt
+from app.text_mining.shared.vectorize import get_embedding, store_temp_embeddings, get_relevant_chunk
+from app.text_mining.shared.map_fields import map_fields_with_opensearch, clear_mapping_cache, get_cache_stats
 
 logger = get_logger()
 mapping_service_url = MAPPING_URL

@@ -2,14 +2,14 @@ from unittest.mock import patch
 
 import pytest
 
-from app.llm.prms_mining.models import (
+from app.text_mining.prms_mining.models import (
     AudioTranscriptionUnavailableError,
     ExtractedPrmsSource,
     PrmsSource,
     PrmsSourceType,
     SourceExtractionError,
 )
-from app.llm.prms_mining.source_extraction import (
+from app.text_mining.prms_mining.source_extraction import (
     build_sources_from_request,
     extract_free_text_source,
     extract_sources,
@@ -69,7 +69,7 @@ def test_worker_ordering_despite_out_of_order_completion():
     ]
 
     with patch(
-        "app.llm.prms_mining.source_extraction.extract_document_source",
+        "app.text_mining.prms_mining.source_extraction.extract_document_source",
         side_effect=fake_document,
     ):
         results = extract_sources(sources, max_workers=3)
@@ -111,7 +111,7 @@ def test_worker_failure_fails_request():
         )
 
     with patch(
-        "app.llm.prms_mining.source_extraction.extract_document_source",
+        "app.text_mining.prms_mining.source_extraction.extract_document_source",
         side_effect=boom,
     ):
         with pytest.raises(SourceExtractionError):
@@ -119,7 +119,7 @@ def test_worker_failure_fails_request():
 
 
 def test_audio_unavailable():
-    from app.llm.prms_mining.audio_transcriber import UnavailableAudioTranscriber
+    from app.text_mining.prms_mining.audio_transcriber import UnavailableAudioTranscriber
 
     with pytest.raises(AudioTranscriptionUnavailableError):
         UnavailableAudioTranscriber().transcribe(b"abc", file_name="a.m4a")

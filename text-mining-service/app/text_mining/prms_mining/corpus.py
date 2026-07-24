@@ -6,11 +6,11 @@ import lancedb
 from typing import Any
 from datetime import datetime
 from dataclasses import dataclass
-from app.llm.shared.retrieval import split_text
+from app.text_mining.shared.retrieval import split_text
 from app.utils.logger.logger_util import get_logger
-from app.llm.prms_mining.prompt_builder import build_corpus_text, format_source_block
-from app.llm.shared.vectorize import DB_PATH, TEMP_TABLE_NAME, get_embedding, normalize_filename
-from app.llm.prms_mining.models import ExtractedPrmsSource, PrmsSourceType, RETRIEVAL_QUERY, RETRIEVAL_QUERY_VERSION
+from app.text_mining.prms_mining.prompt_builder import build_corpus_text, format_source_block
+from app.text_mining.shared.vectorize import DB_PATH, TEMP_TABLE_NAME, get_embedding, normalize_filename
+from app.text_mining.prms_mining.models import ExtractedPrmsSource, PrmsSourceType, RETRIEVAL_QUERY, RETRIEVAL_QUERY_VERSION
 from app.utils.config.config_util import PRMS_CONTEXT_TOKEN_BUDGET, PRMS_FULL_SOURCE_MAX_CHARS, PRMS_RETRIEVAL_TOP_K_PER_SOURCE
 
 

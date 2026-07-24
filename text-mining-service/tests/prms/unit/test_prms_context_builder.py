@@ -1,11 +1,11 @@
 from unittest.mock import patch
 
-from app.llm.prms_mining.corpus import (
+from app.text_mining.prms_mining.corpus import (
     build_context_excerpts,
     estimate_tokens,
     fit_blocks_to_token_budget,
 )
-from app.llm.prms_mining.models import ExtractedPrmsSource, PrmsSourceType
+from app.text_mining.prms_mining.models import ExtractedPrmsSource, PrmsSourceType
 
 
 def _source(
@@ -34,7 +34,7 @@ def test_build_context_includes_text_audio_and_small_docs_without_retrieval():
         _source("doc", PrmsSourceType.DOCUMENT, "short document evidence", 2),
     ]
 
-    with patch("app.llm.prms_mining.corpus.store_and_retrieve_chunks") as mock_retrieve:
+    with patch("app.text_mining.prms_mining.corpus.store_and_retrieve_chunks") as mock_retrieve:
         result = build_context_excerpts(sources, request_id="req", token_budget=10_000)
 
     assert "user supplied evidence" in result.excerpts
@@ -52,9 +52,9 @@ def test_build_context_retrieves_large_documents_per_source():
     ]
 
     with (
-        patch("app.llm.prms_mining.corpus.PRMS_FULL_SOURCE_MAX_CHARS", 10),
+        patch("app.text_mining.prms_mining.corpus.PRMS_FULL_SOURCE_MAX_CHARS", 10),
         patch(
-            "app.llm.prms_mining.corpus.store_and_retrieve_chunks",
+            "app.text_mining.prms_mining.corpus.store_and_retrieve_chunks",
             side_effect=[
                 (["retrieved from doc 1"], "prms-retrieval-v1"),
                 (["retrieved from doc 2"], "prms-retrieval-v1"),

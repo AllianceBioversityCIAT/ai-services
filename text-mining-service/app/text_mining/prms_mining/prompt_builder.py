@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from app.llm.prms_mining.models import ExtractedPrmsSource
+from app.text_mining.prms_mining.models import ExtractedPrmsSource
 from app.utils.prompt.prompt_prms import DEFAULT_PROMPT_PRMS, FINAL_VALIDATION_RULES
 
 

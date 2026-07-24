@@ -388,7 +388,7 @@ Per product:
 
 ```
 STAR        → /star/text-mining                 → process_document
-PRMS        → /prms/text-mining                 → process_document_prms (app/llm/prms_mining)
+PRMS        → /prms/text-mining                 → process_document_prms (app/text_mining/prms_mining)
 AICCRA      → /aiccra/text-mining               → process_document_aiccra
 Bulk CapDev → /star/mining-bulk-upload/capdev   → process_document_capdev
 ```
@@ -413,7 +413,7 @@ text-mining-service/
 │   ├── mcp/
 │   │   ├── client.py            # FastAPI routes, S3/Dynamo helpers, UIs
 │   │   └── server.py            # MCP tools
-│   ├── llm/
+│   ├── text_mining/
 │   │   ├── providers/           # Shared Bedrock client (all products)
 │   │   ├── shared/              # vectorize, map_fields, json_parser, organization_fields, etc.
 │   │   ├── star_mining/         # STAR pipeline

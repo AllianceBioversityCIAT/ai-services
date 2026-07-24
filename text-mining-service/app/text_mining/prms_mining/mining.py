@@ -6,16 +6,16 @@ import json
 import time
 import uuid
 from typing import Dict, Any, Union
-from app.llm.shared.models import ModelUsage
+from app.text_mining.shared.models import ModelUsage
 from app.utils.logger.logger_util import get_logger
-from app.llm.providers import DEFAULT_MODEL_ID, invoke_model
-from app.llm.shared.reference_cache import get_reference_data
-from app.llm.shared.map_fields import map_fields_with_opensearch
+from app.text_mining.providers import DEFAULT_MODEL_ID, invoke_model
+from app.text_mining.shared.reference_cache import get_reference_data
+from app.text_mining.shared.map_fields import map_fields_with_opensearch
 from app.utils.interactions.interaction_client import interaction_client
-from app.llm.shared.cgiar_centers import format_cgiar_centers_for_prompt
-from app.llm.shared.organization_fields import clean_prms_institution_fields
-from app.llm.prms_mining.corpus import build_context_excerpts, estimate_tokens
-from app.llm.shared.json_parser import extract_json_from_markdown, is_valid_json
+from app.text_mining.shared.cgiar_centers import format_cgiar_centers_for_prompt
+from app.text_mining.shared.organization_fields import clean_prms_institution_fields
+from app.text_mining.prms_mining.corpus import build_context_excerpts, estimate_tokens
+from app.text_mining.shared.json_parser import extract_json_from_markdown, is_valid_json
 from app.utils.config.config_util import (
     MAPPING_URL,
     PRMS_BUCKET_KEY_NAME,
@@ -23,7 +23,7 @@ from app.utils.config.config_util import (
     PRMS_EXTRACTION_MAX_WORKERS,
 )
 
-from app.llm.prms_mining.models import (
+from app.text_mining.prms_mining.models import (
     EmptySourceSetError,
     ExtractedPrmsSource,
     ModelOutputValidationError,
@@ -33,12 +33,12 @@ from app.llm.prms_mining.models import (
     StageDurations,
     SUPPORTED_INDICATORS,
 )
-from app.llm.prms_mining.prompt_builder import (
+from app.text_mining.prms_mining.prompt_builder import (
     build_extraction_prompt,
     build_final_validation_prompt,
     format_prms_geo_reference_for_prompt,
 )
-from app.llm.prms_mining.source_extraction import (
+from app.text_mining.prms_mining.source_extraction import (
     build_sources_from_request,
     extract_sources,
 )

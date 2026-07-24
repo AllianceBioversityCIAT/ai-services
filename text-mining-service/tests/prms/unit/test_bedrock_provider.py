@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from app.llm.providers.bedrock_client import DEFAULT_MODEL_ID, invoke_model
-from app.llm.shared.models import ModelInvocationError, ModelInvocationResult
+from app.text_mining.providers.bedrock_client import DEFAULT_MODEL_ID, invoke_model
+from app.text_mining.shared.models import ModelInvocationError, ModelInvocationResult
 
 
 def test_invoke_model_returns_usage_and_text():
@@ -14,7 +14,7 @@ def test_invoke_model_returns_usage_and_text():
     fake_client = MagicMock()
     fake_client.invoke_model.return_value = {"body": fake_body}
 
-    with patch("app.llm.providers.bedrock_client._bedrock_runtime", fake_client):
+    with patch("app.text_mining.providers.bedrock_client._bedrock_runtime", fake_client):
         result = invoke_model("prompt", max_tokens=100)
 
     assert isinstance(result, ModelInvocationResult)
@@ -30,6 +30,6 @@ def test_invoke_model_wraps_errors():
     fake_client = MagicMock()
     fake_client.invoke_model.side_effect = RuntimeError("boom")
 
-    with patch("app.llm.providers.bedrock_client._bedrock_runtime", fake_client):
+    with patch("app.text_mining.providers.bedrock_client._bedrock_runtime", fake_client):
         with pytest.raises(ModelInvocationError, match="boom"):
             invoke_model("prompt")

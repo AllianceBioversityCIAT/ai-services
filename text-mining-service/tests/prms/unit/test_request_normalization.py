@@ -1,7 +1,7 @@
 import pytest
 
-from app.llm.prms_mining.models import EmptySourceSetError, UnsupportedSourceTypeError
-from app.llm.prms_mining.request_normalization import (
+from app.text_mining.prms_mining.models import EmptySourceSetError, UnsupportedSourceTypeError
+from app.text_mining.prms_mining.request_normalization import (
     assert_audio_extension,
     assert_document_extension,
     dedupe_preserve_order,

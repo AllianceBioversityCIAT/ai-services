@@ -1,21 +1,21 @@
 import json
 import pytest
 from unittest.mock import MagicMock, patch
-from app.llm.prms_mining.audio_transcriber import AmazonTranscribeTranscriber, UnavailableAudioTranscriber, get_audio_transcriber
-from app.llm.prms_mining.models import AudioTranscriptionUnavailableError, SourceExtractionError, SourceLimitExceededError
+from app.text_mining.prms_mining.audio_transcriber import AmazonTranscribeTranscriber, UnavailableAudioTranscriber, get_audio_transcriber
+from app.text_mining.prms_mining.models import AudioTranscriptionUnavailableError, SourceExtractionError, SourceLimitExceededError
 
 
 def test_get_audio_transcriber_unset():
-    with patch("app.llm.prms_mining.audio_transcriber.PRMS_AUDIO_TRANSCRIBER", ""):
+    with patch("app.text_mining.prms_mining.audio_transcriber.PRMS_AUDIO_TRANSCRIBER", ""):
         assert isinstance(get_audio_transcriber(), UnavailableAudioTranscriber)
 
 
 def test_get_audio_transcriber_amazon():
     with patch(
-        "app.llm.prms_mining.audio_transcriber.PRMS_AUDIO_TRANSCRIBER",
+        "app.text_mining.prms_mining.audio_transcriber.PRMS_AUDIO_TRANSCRIBER",
         "amazon_transcribe",
     ):
-        with patch("app.llm.prms_mining.audio_transcriber.get_transcribe_client") as mock_factory:
+        with patch("app.text_mining.prms_mining.audio_transcriber.get_transcribe_client") as mock_factory:
             mock_factory.return_value = MagicMock()
             transcriber = get_audio_transcriber()
     assert isinstance(transcriber, AmazonTranscribeTranscriber)
@@ -40,10 +40,10 @@ def test_amazon_transcribe_success():
     transcriber = AmazonTranscribeTranscriber(transcribe_client=client)
     with (
         patch(
-            "app.llm.prms_mining.audio_transcriber.urlopen"
+            "app.text_mining.prms_mining.audio_transcriber.urlopen"
         ) as mock_urlopen,
-        patch("app.llm.prms_mining.audio_transcriber.PRMS_MAX_AUDIO_SECONDS", 600),
-        patch("app.llm.prms_mining.audio_transcriber.PRMS_TRANSCRIBE_LANGUAGE_CODE", ""),
+        patch("app.text_mining.prms_mining.audio_transcriber.PRMS_MAX_AUDIO_SECONDS", 600),
+        patch("app.text_mining.prms_mining.audio_transcriber.PRMS_TRANSCRIBE_LANGUAGE_CODE", ""),
     ):
         mock_resp = MagicMock()
         mock_resp.read.return_value = json.dumps(payload).encode("utf-8")
@@ -106,8 +106,8 @@ def test_amazon_transcribe_duration_limit():
     }
     transcriber = AmazonTranscribeTranscriber(transcribe_client=client)
     with (
-        patch("app.llm.prms_mining.audio_transcriber.urlopen") as mock_urlopen,
-        patch("app.llm.prms_mining.audio_transcriber.PRMS_MAX_AUDIO_SECONDS", 60),
+        patch("app.text_mining.prms_mining.audio_transcriber.urlopen") as mock_urlopen,
+        patch("app.text_mining.prms_mining.audio_transcriber.PRMS_MAX_AUDIO_SECONDS", 60),
     ):
         mock_resp = MagicMock()
         mock_resp.read.return_value = json.dumps(payload).encode("utf-8")

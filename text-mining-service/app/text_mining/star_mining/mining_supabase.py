@@ -1,13 +1,13 @@
 import time
 import json
-from app.llm.providers import invoke_model
-from app.llm.shared.retrieval import split_text
+from app.text_mining.providers import invoke_model
+from app.text_mining.shared.retrieval import split_text
 from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
 from app.utils.prompt.prompt_star import DEFAULT_PROMPT_STAR
 from app.utils.config.config_util import STAR_BUCKET_KEY_NAME
-from app.llm.shared.json_parser import extract_json_from_markdown, is_valid_json
-from app.llm.star_mining.vectorize_supabase import (get_embedding,
+from app.text_mining.shared.json_parser import extract_json_from_markdown, is_valid_json
+from app.text_mining.star_mining.vectorize_supabase import (get_embedding,
                                store_reference_embeddings,
                                store_temp_embeddings,
                                get_all_reference_data,

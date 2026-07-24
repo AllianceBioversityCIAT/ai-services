@@ -11,8 +11,8 @@ from typing import Any
 from urllib.request import urlopen
 from abc import ABC, abstractmethod
 from app.utils.logger.logger_util import get_logger
-from app.llm.providers.transcribe_client import get_transcribe_client
-from app.llm.prms_mining.models import AudioTranscriptionUnavailableError, SourceExtractionError, SourceLimitExceededError
+from app.text_mining.providers.transcribe_client import get_transcribe_client
+from app.text_mining.prms_mining.models import AudioTranscriptionUnavailableError, SourceExtractionError, SourceLimitExceededError
 from app.utils.config.config_util import PRMS_AUDIO_TRANSCRIBER, PRMS_MAX_AUDIO_SECONDS, PRMS_TRANSCRIBE_LANGUAGE_CODE, PRMS_TRANSCRIBE_LANGUAGE_OPTIONS, PRMS_TRANSCRIBE_POLL_INTERVAL_SECONDS, PRMS_TRANSCRIBE_TIMEOUT_SECONDS
 
 

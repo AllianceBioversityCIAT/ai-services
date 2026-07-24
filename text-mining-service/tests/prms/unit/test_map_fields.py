@@ -1,13 +1,13 @@
 from unittest.mock import patch
 
-from app.llm.shared.map_fields import clear_mapping_cache, map_fields_with_opensearch
-from app.llm.shared.organization_fields import clean_prms_institution_fields
+from app.text_mining.shared.map_fields import clear_mapping_cache, map_fields_with_opensearch
+from app.text_mining.shared.organization_fields import clean_prms_institution_fields
 
 
 def _map_and_clean(mining_result: dict, entries: list[dict]) -> dict:
     clear_mapping_cache()
     payload = {key: value for key, value in mining_result.items() if not key.startswith("_")}
-    with patch("app.llm.shared.map_fields.requests.post") as mock_post:
+    with patch("app.text_mining.shared.map_fields.requests.post") as mock_post:
         mock_post.return_value.raise_for_status = lambda: None
         mock_post.return_value.json.return_value = {
             "results": [

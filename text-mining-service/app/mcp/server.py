@@ -7,11 +7,11 @@ from typing import Any, Optional
 from mcp.server.fastmcp import FastMCP
 from app.utils.logger.logger_util import get_logger
 from app.utils.notification.notification_service import NotificationService
-from app.llm.star_mining.mining import process_document as process_with_llm
-from app.llm.prms_mining import process_document_prms as process_with_llm_prms
+from app.text_mining.star_mining.mining import process_document as process_with_llm
+from app.text_mining.prms_mining import process_document_prms as process_with_llm_prms
 from app.middleware.star_auth_middleware import AuthMiddleware as StarAuthMiddleware
-from app.llm.bulk_upload.upload_capdev import process_document_capdev as process_bulk_capdev
-from app.llm.aiccra_mining.aiccra_mining import process_document_aiccra as process_with_llm_aiccra
+from app.text_mining.bulk_upload.upload_capdev import process_document_capdev as process_bulk_capdev
+from app.text_mining.aiccra_mining.aiccra_mining import process_document_aiccra as process_with_llm_aiccra
 
 load_dotenv()
 logger = get_logger()

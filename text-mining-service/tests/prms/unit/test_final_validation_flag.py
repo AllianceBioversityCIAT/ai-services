@@ -1,4 +1,4 @@
-from app.llm.prms_mining.prompt_builder import build_final_validation_prompt
+from app.text_mining.prms_mining.prompt_builder import build_final_validation_prompt
 
 
 def test_final_validation_prompt_shape():
