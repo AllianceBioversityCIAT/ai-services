@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from app.text_mining.prms_mining.corpus import (
     build_context_excerpts,
+    build_single_source_excerpts,
     estimate_tokens,
     fit_blocks_to_token_budget,
 )
@@ -25,6 +26,19 @@ def _source(
         file_name=f"{source_id}.txt",
         eligible_as_formal_evidence=source_type == PrmsSourceType.DOCUMENT,
     )
+
+
+def test_build_single_source_excerpts_uses_full_small_document():
+    source = _source("doc", PrmsSourceType.DOCUMENT, "short document evidence", 0)
+
+    with patch("app.text_mining.prms_mining.corpus.store_and_retrieve_chunks") as mock_retrieve:
+        result = build_single_source_excerpts(source, request_id="req", token_budget=10_000)
+
+    assert "short document evidence" in result.excerpts
+    assert '<source id="doc"' in result.excerpts
+    assert result.chunks_processed == 0
+    assert result.trimmed is False
+    mock_retrieve.assert_not_called()
 
 
 def test_build_context_includes_text_audio_and_small_docs_without_retrieval():

@@ -180,6 +180,72 @@ def _should_include_full_source(source: ExtractedPrmsSource) -> bool:
     return len(source.content or "") <= PRMS_FULL_SOURCE_MAX_CHARS
 
 
+def build_single_source_excerpts(
+    source: ExtractedPrmsSource,
+    request_id: str,
+    *,
+    token_budget: int = PRMS_CONTEXT_TOKEN_BUDGET,
+    top_k_per_source: int = PRMS_RETRIEVAL_TOP_K_PER_SOURCE,
+) -> ContextBuildResult:
+    """
+    Build prompt excerpts for one source.
+
+    Free text, audio transcripts, and small documents are passed through in full.
+    Large documents fall back to per-source retrieval; excerpts are trimmed only
+    when they still exceed the per-call token budget.
+    """
+    blocks: list[str] = []
+    chunks_processed = 0
+    retrieval_version = RETRIEVAL_QUERY_VERSION
+
+    if _should_include_full_source(source):
+        logger.info(
+            "📄 PRMS using full source content source_id=%s type=%s chars=%s",
+            source.source_id,
+            source.source_type.value,
+            len(source.content or ""),
+        )
+        blocks.append(format_source_block(source))
+    else:
+        source_chunks = chunk_extracted_sources([source])
+        chunks_processed = len(source_chunks)
+        logger.info(
+            "🔎 PRMS large source — running retrieval source_id=%s chunks=%s top_k=%s",
+            source.source_id,
+            chunks_processed,
+            top_k_per_source,
+        )
+        if source_chunks:
+            retrieved, retrieval_version = store_and_retrieve_chunks(
+                source_chunks,
+                request_id=f"{request_id}_{source.source_id}",
+                top_k=top_k_per_source,
+            )
+            logger.info(
+                "🔎 PRMS retrieval complete source_id=%s retrieved_chunks=%s version=%s",
+                source.source_id,
+                len(retrieved),
+                retrieval_version,
+            )
+            blocks.extend(retrieved)
+
+    blocks, trimmed = fit_blocks_to_token_budget(blocks, token_budget)
+    if trimmed:
+        logger.warning(
+            "✂️ PRMS source excerpts trimmed to fit budget source_id=%s budget_tokens=%s",
+            source.source_id,
+            token_budget,
+        )
+    excerpts = "\n\n---\n\n".join(blocks) if blocks else ""
+    return ContextBuildResult(
+        excerpts=excerpts,
+        retrieval_version=retrieval_version,
+        chunks_processed=chunks_processed,
+        estimated_tokens=estimate_tokens(excerpts),
+        trimmed=trimmed,
+    )
+
+
 def build_context_excerpts(
     sources: list[ExtractedPrmsSource],
     request_id: str,
@@ -188,32 +254,28 @@ def build_context_excerpts(
     top_k_per_source: int = PRMS_RETRIEVAL_TOP_K_PER_SOURCE,
 ) -> ContextBuildResult:
     """
-    Build PRMS prompt context with guaranteed direct evidence for small/user sources.
+    Build a combined excerpt string from multiple sources (legacy helper).
 
-    Free text, audio transcripts, and small documents are passed through in full.
-    Large documents use per-source retrieval so one long document cannot dominate.
+    The PRMS pipeline uses build_single_source_excerpts per source instead.
     """
     blocks: list[str] = []
     chunks_processed = 0
     retrieval_version = RETRIEVAL_QUERY_VERSION
+    trimmed = False
 
     for source in sorted(sources, key=lambda item: item.source_index):
-        if _should_include_full_source(source):
-            blocks.append(format_source_block(source))
-            continue
-
-        source_chunks = chunk_extracted_sources([source])
-        chunks_processed += len(source_chunks)
-        if not source_chunks:
-            continue
-        retrieved, retrieval_version = store_and_retrieve_chunks(
-            source_chunks,
-            request_id=f"{request_id}_{source.source_id}",
-            top_k=top_k_per_source,
+        source_result = build_single_source_excerpts(
+            source,
+            request_id=request_id,
+            token_budget=token_budget,
+            top_k_per_source=top_k_per_source,
         )
-        blocks.extend(retrieved)
+        chunks_processed += source_result.chunks_processed
+        retrieval_version = source_result.retrieval_version
+        trimmed = trimmed or source_result.trimmed
+        if source_result.excerpts:
+            blocks.append(source_result.excerpts)
 
-    blocks, trimmed = fit_blocks_to_token_budget(blocks, token_budget)
     excerpts = "\n\n---\n\n".join(blocks)
     return ContextBuildResult(
         excerpts=excerpts,

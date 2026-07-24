@@ -318,7 +318,7 @@ def extract_sources(
             raise ValueError("max_workers must be > 0")
         pool_size = min(configured, len(worker_sources))
         logger.info(
-            "PRMS source extraction: %s worker source(s), max_workers=%s",
+            "📥 PRMS source extraction: %s worker source(s), max_workers=%s",
             len(worker_sources),
             pool_size,
         )
@@ -342,7 +342,7 @@ def extract_sources(
     combined = free_text_results + worker_results
     combined.sort(key=lambda item: item.source_index)
     logger.info(
-        "PRMS source extraction complete: %s source(s)",
+        "📥 PRMS source extraction complete: %s source(s)",
         len(combined),
     )
     return combined

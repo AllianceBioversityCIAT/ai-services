@@ -52,7 +52,7 @@ def build_extraction_prompt(
 ) -> str:
     rules = extraction_rules if extraction_rules is not None else DEFAULT_PROMPT_PRMS
     return f"""{"=" * 80}
-COMBINED SOURCE EXCERPTS:
+SOURCE EXCERPTS (single source — extract results supported by this source only):
 {"=" * 80}
 {excerpts}
 
