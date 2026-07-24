@@ -20,3 +20,5 @@ def test_final_validation_prompt_shape():
     assert "Decision order" in prompt
     assert "Duplication — merge or remove" in prompt
     assert "Never add a new result" in prompt
+    assert "Do NOT remove a result because it seems thematically unrelated" in prompt
+    assert "Never remove a candidate solely because it appears thematically unrelated" in prompt
