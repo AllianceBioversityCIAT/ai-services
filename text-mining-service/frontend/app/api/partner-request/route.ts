@@ -14,6 +14,16 @@ function errorTypeForStatus(status: number): 'auth' | 'service' {
   return status === 401 || status === 403 ? 'auth' : 'service';
 }
 
+async function readClarisaErrorBody(response: Response): Promise<unknown> {
+  const text = await response.text().catch(() => '');
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
 export async function POST(request: NextRequest) {
   const createUrl = resolveCreateUrl();
   if (!createUrl) {
@@ -49,7 +59,25 @@ export async function POST(request: NextRequest) {
     });
 
     if (!response.ok) {
-      return NextResponse.json({ error: errorTypeForStatus(response.status) }, { status: response.status });
+      const clarisaError = await readClarisaErrorBody(response);
+      const errorType = errorTypeForStatus(response.status);
+
+      console.error('[partner-request] CLARISA create failed', {
+        errorType,
+        httpStatus: response.status,
+        createUrl,
+        partnerName: payload.name,
+        clarisaError,
+      });
+
+      return NextResponse.json(
+        {
+          error: errorType,
+          httpStatus: response.status,
+          clarisaError,
+        },
+        { status: response.status },
+      );
     }
 
     const data: unknown = await response.json().catch(() => null);
