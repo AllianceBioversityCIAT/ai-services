@@ -56,20 +56,27 @@ def test_openapi_has_no_token_or_environment_url(prms_client):
 def test_openapi_includes_multisource_fields(prms_client):
     schema = prms_client.get("/openapi.json").json()
     prms = schema["paths"]["/prms/text-mining"]["post"]
-    request_body = str(prms.get("requestBody", {}))
-    assert "keys" in request_body or "keys" in str(prms)
-    assert "text" in request_body or "text" in str(prms)
-    assert "audio_keys" in request_body or "audio_keys" in str(prms)
-    assert "files" not in request_body
-    assert "token" not in request_body
-    assert "environmentUrl" not in request_body
+    request_body = prms.get("requestBody", {})
+    content = request_body.get("content", {})
+    assert "application/json" in content
+    assert "multipart/form-data" not in content
+
+    prms_request_schema = schema["components"]["schemas"]["PrmsTextMiningRequest"]
+    json_schema = str(prms_request_schema)
+    assert "keys" in json_schema
+    assert "text" in json_schema
+    assert "audio_keys" in json_schema
+    assert "bucketName" in json_schema
+    assert "files" not in json_schema
+    assert "token" not in json_schema
+    assert "environmentUrl" not in json_schema
 
 
 def test_missing_api_key_rejected():
     from app.mcp.client import app
 
     client = TestClient(app)
-    response = client.post("/prms/text-mining", data={"text": "hello"})
+    response = client.post("/prms/text-mining", json={"text": "hello"})
     assert response.status_code in (401, 403, 422)
 
 
@@ -77,9 +84,45 @@ def test_empty_sources_400(prms_client):
     response = prms_client.post(
         "/prms/text-mining",
         headers={"X-API-Key": "test-key"},
-        data={"text": "   "},
+        json={"text": "   "},
     )
     assert response.status_code == 400
+
+
+def test_json_body_with_keys_and_bucket(prms_client):
+    with patch("app.mcp.client.stdio_client") as mock_stdio:
+        read = AsyncMock()
+        write = AsyncMock()
+        mock_stdio.return_value.__aenter__.return_value = (read, write)
+
+        session = AsyncMock()
+        session.initialize = AsyncMock()
+        session.call_tool = AsyncMock(
+            return_value=SimpleNamespace(
+                isError=False,
+                content=[SimpleNamespace(text='{"project": "PRMS", "results": []}')],
+            )
+        )
+
+        with patch("app.mcp.client.ClientSession") as mock_session_cls:
+            mock_session_cls.return_value.__aenter__.return_value = session
+            response = prms_client.post(
+                "/prms/text-mining",
+                headers={"X-API-Key": "test-key"},
+                json={
+                    "bucketName": "ai-services-ibd",
+                    "keys": ["prms/text-mining/files/test/report.pdf"],
+                    "text": "optional context",
+                    "user_id": "user@example.com",
+                },
+            )
+
+    assert response.status_code == 200
+    session.call_tool.assert_awaited_once()
+    assert session.call_tool.await_args.kwargs["arguments"]["bucket"] == "ai-services-ibd"
+    assert session.call_tool.await_args.kwargs["arguments"]["keys"] == [
+        "prms/text-mining/files/test/report.pdf"
+    ]
 
 
 def test_star_process_document_still_importable():
