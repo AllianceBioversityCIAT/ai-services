@@ -45,7 +45,13 @@ export function buildPartnerRequestPayload(
   row: PartnerRequestFormRow,
   externalUserMail: string,
   externalUserName: string,
+  starUserId: string,
 ): PartnerRequestCreatePayload {
+  const userId = Number(starUserId);
+  if (!Number.isFinite(userId)) {
+    throw new Error('Invalid STAR user id for partner request');
+  }
+
   return {
     name: row.name.trim(),
     acronym: row.acronym.trim(),
@@ -56,5 +62,6 @@ export function buildPartnerRequestPayload(
     externalUserName,
     externalUserComments: '',
     misAcronym: PARTNER_REQUEST_MIS_ACRONYM,
+    userId,
   };
 }
