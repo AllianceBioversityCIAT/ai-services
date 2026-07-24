@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { PartnerRequestCreatePayload } from '../../../components/BulkUpload/types';
+import {
+  PARTNER_REQUEST_BFF_PATH,
+  resolveClarisaValidateUrl,
+  resolvePartnerRequestMicroserviceName,
+  validateClarisaApiKey,
+} from '../../../lib/clarisaApiKeyAuth';
+
+const CLARISA_API_KEY = process.env.CLARISA_API_KEY ?? '';
+
+const PARTNER_REQUEST_MICROSERVICE_NAME = resolvePartnerRequestMicroserviceName();
 
 function resolveCreateUrl(): string | null {
   const explicit = process.env.CLARISA_PARTNER_REQUEST_CREATE_URL;
@@ -24,58 +34,79 @@ async function readClarisaErrorBody(response: Response): Promise<unknown> {
   }
 }
 
-/** Strip accidental "Bearer " prefix; CLARISA expects Authorization: Bearer <raw-jwt>. */
-function normalizeBearerToken(raw: string): string {
-  const trimmed = raw.trim();
-  if (/^bearer\s+/i.test(trimmed)) {
-    return trimmed.replace(/^bearer\s+/i, '').trim();
-  }
-  return trimmed;
-}
-
-function buildAuthorizationHeader(token: string): string {
-  return `Bearer ${token}`;
-}
-
 export async function POST(request: NextRequest) {
   const createUrl = resolveCreateUrl();
-  if (!createUrl) {
-    return NextResponse.json({ error: 'service' }, { status: 503 });
+  const validateUrl = resolveClarisaValidateUrl();
+
+  if (!createUrl || !CLARISA_API_KEY || !validateUrl) {
+    console.error('[partner-request] misconfigured', {
+      hasCreateUrl: Boolean(createUrl),
+      hasApiKey: Boolean(CLARISA_API_KEY),
+      hasValidateUrl: Boolean(validateUrl),
+    });
+    return NextResponse.json(
+      { error: 'service', detail: 'Partner request API is not configured on the server' },
+      { status: 503 },
+    );
   }
 
-  let token = '';
   let payload: PartnerRequestCreatePayload;
   try {
-    const body = (await request.json()) as { token?: string; payload?: PartnerRequestCreatePayload };
-    token = normalizeBearerToken(body.token ?? '');
+    const body = (await request.json()) as { payload?: PartnerRequestCreatePayload };
     payload = body.payload as PartnerRequestCreatePayload;
   } catch {
-    return NextResponse.json({ error: 'service' }, { status: 400 });
+    return NextResponse.json({ error: 'service', detail: 'Invalid request body' }, { status: 400 });
   }
 
-  if (!token) {
-    return NextResponse.json({ error: 'auth' }, { status: 401 });
+  if (!payload?.name?.trim() || !payload.hqCountryIso || payload.institutionTypeCode == null || payload.userId == null) {
+    return NextResponse.json({ error: 'service', detail: 'Missing required partner fields' }, { status: 400 });
   }
 
-  if (!payload?.name?.trim() || !payload.hqCountryIso || payload.institutionTypeCode == null) {
-    return NextResponse.json({ error: 'service' }, { status: 400 });
+  const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? request.headers.get('x-real-ip')
+    ?? '0.0.0.0';
+
+  const keyValidation = await validateClarisaApiKey({
+    apiKey: CLARISA_API_KEY,
+    microserviceName: PARTNER_REQUEST_MICROSERVICE_NAME,
+    validateUrl,
+    endpointAccessed: PARTNER_REQUEST_BFF_PATH,
+    ipAddress: clientIp,
+  });
+
+  if (!keyValidation.valid) {
+    console.error('[partner-request] CLARISA API key validation failed', {
+      microserviceName: PARTNER_REQUEST_MICROSERVICE_NAME,
+      endpointAccessed: PARTNER_REQUEST_BFF_PATH,
+      validateUrl,
+      clarisaError: keyValidation.error,
+    });
+
+    return NextResponse.json(
+      {
+        error: 'auth',
+        httpStatus: 401,
+        clarisaError: keyValidation.error,
+        detail: 'CLARISA API key validation failed',
+      },
+      { status: 401 },
+    );
   }
 
   try {
-    const authorization = buildAuthorizationHeader(token);
-
     console.log('[partner-request] CLARISA create request', {
       createUrl,
       partnerName: payload.name,
-      authorizationHeader: `${authorization.slice(0, 13)}...${authorization.slice(-8)}`,
-      authorizationFormat: authorization.startsWith('Bearer eyJ') ? 'Bearer + JWT' : 'unexpected format',
-      tokenLength: token.length,
+      auth: 'X-API-Key',
+      microserviceName: PARTNER_REQUEST_MICROSERVICE_NAME,
+      endpointAccessed: PARTNER_REQUEST_BFF_PATH,
+      mis: keyValidation.mis ?? null,
     });
 
     const response = await fetch(createUrl, {
       method: 'POST',
       headers: {
-        Authorization: authorization,
+        'X-API-Key': CLARISA_API_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
@@ -90,6 +121,7 @@ export async function POST(request: NextRequest) {
         httpStatus: response.status,
         createUrl,
         partnerName: payload.name,
+        microserviceName: PARTNER_REQUEST_MICROSERVICE_NAME,
         clarisaError,
       });
 
@@ -98,6 +130,7 @@ export async function POST(request: NextRequest) {
           error: errorType,
           httpStatus: response.status,
           clarisaError,
+          detail: `CLARISA create returned HTTP ${response.status}`,
         },
         { status: response.status },
       );
@@ -105,7 +138,11 @@ export async function POST(request: NextRequest) {
 
     const data: unknown = await response.json().catch(() => null);
     return NextResponse.json({ ok: true, data }, { status: 200 });
-  } catch {
-    return NextResponse.json({ error: 'service' }, { status: 502 });
+  } catch (error) {
+    console.error('[partner-request] CLARISA create network error', error);
+    return NextResponse.json(
+      { error: 'service', detail: 'Could not reach CLARISA partner request API' },
+      { status: 502 },
+    );
   }
 }

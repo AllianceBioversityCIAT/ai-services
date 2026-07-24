@@ -113,6 +113,7 @@ export interface PartnerRequestCreatePayload {
   externalUserName: string;
   externalUserComments: string;
   misAcronym: string;
+  userId: number;
 }
 
 export interface RecordStatus {

@@ -17,6 +17,7 @@ interface PartnerRequestModalProps {
   institutions: UnmappedInstitution[];
   authToken: string | null;
   userEmail: string | null;
+  starUserId: string | null;
   userFullName: string | null;
   onClose: () => void;
 }
@@ -26,6 +27,7 @@ export function PartnerRequestModal({
   institutions,
   authToken,
   userEmail,
+  starUserId,
   userFullName,
   onClose,
 }: PartnerRequestModalProps) {
@@ -59,7 +61,7 @@ export function PartnerRequestModal({
       setGlobalError(PARTNER_REQUEST_AUTH_ERROR);
       return;
     }
-    if (!userEmail || !userFullName) {
+    if (!userEmail || !userFullName || !starUserId) {
       setGlobalError(PARTNER_REQUEST_AUTH_ERROR);
       return;
     }
@@ -85,24 +87,36 @@ export function PartnerRequestModal({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            token: authToken,
-            payload: buildPartnerRequestPayload(row, userEmail, userFullName),
+            payload: buildPartnerRequestPayload(row, userEmail, userFullName, starUserId),
           }),
         });
 
-        const data = (await response.json().catch(() => ({}))) as {
+        const responseText = await response.text();
+        let data: {
           error?: string;
           httpStatus?: number;
           clarisaError?: unknown;
-        };
+          detail?: string;
+        } = {};
+        try {
+          data = responseText ? JSON.parse(responseText) as typeof data : {};
+        } catch {
+          data = { detail: responseText.slice(0, 500) };
+        }
+
         if (!response.ok) {
-          console.error('[partner-request] submit failed', {
+          const logPayload = {
             partnerName: row.name,
             responseStatus: response.status,
-            errorType: data.error,
+            errorType: data.error ?? 'unknown',
             httpStatus: data.httpStatus ?? response.status,
-            clarisaError: data.clarisaError,
-          });
+            detail: data.detail ?? null,
+            clarisaError: data.clarisaError ?? null,
+            rawBody: responseText.slice(0, 500),
+          };
+          console.error(
+            `[partner-request] submit failed (HTTP ${response.status}): ${JSON.stringify(logPayload)}`,
+          );
 
           setGlobalError(
             isPartnerRequestAuthError(response.status, data.error)
@@ -129,7 +143,7 @@ export function PartnerRequestModal({
       `${submittedCount} partner request${submittedCount !== 1 ? 's' : ''} submitted successfully.`,
     );
     setSubmitting(false);
-  }, [authToken, invalidCount, rows, userEmail, userFullName]);
+  }, [authToken, invalidCount, rows, starUserId, userEmail, userFullName]);
 
   if (!open) return null;
 

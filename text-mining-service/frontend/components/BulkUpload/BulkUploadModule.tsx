@@ -29,6 +29,7 @@ export default function BulkUploadModule() {
   const [userToken, setUserToken] = useState<string | null>(null);
   const [userName, setUserName] = useState<{ firstName: string; lastName: string } | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [starUserId, setStarUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userFullName, setUserFullName] = useState<string | null>(null);
 
@@ -54,6 +55,7 @@ export default function BulkUploadModule() {
           setUserToken(token);
           setUserName({ firstName: data.firstName ?? '', lastName: data.lastName ?? '' });
           setUserEmail(data.email ?? null);
+          setStarUserId(data.userId ?? null);
           // Prefer email as the user identifier for interaction tracking, fall back to userId
           setUserId(data.email ?? data.userId ?? null);
           setUserFullName([data.firstName, data.lastName].filter(Boolean).join(' ') || null);
@@ -345,6 +347,7 @@ export default function BulkUploadModule() {
             institutions={unmappedInstitutions}
             authToken={userToken}
             userEmail={userEmail}
+            starUserId={starUserId}
             userFullName={userFullName}
             onDownloadReport={handleDownloadUnmappedReport}
             onBackToResults={handleNextStep}

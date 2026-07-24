@@ -23,6 +23,7 @@ interface UnmappedTableProps {
   institutions: UnmappedInstitution[];
   authToken: string | null;
   userEmail: string | null;
+  starUserId: string | null;
   userFullName: string | null;
   onDownloadReport: () => void;
   onBackToResults: () => void;
@@ -40,6 +41,7 @@ export function UnmappedTable({
   institutions,
   authToken,
   userEmail,
+  starUserId,
   userFullName,
   onDownloadReport,
   onBackToResults,
@@ -205,6 +207,7 @@ export function UnmappedTable({
         institutions={institutions}
         authToken={authToken}
         userEmail={userEmail}
+        starUserId={starUserId}
         userFullName={userFullName}
         onClose={() => setPartnerRequestOpen(false)}
       />
