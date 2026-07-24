@@ -90,8 +90,20 @@ export function PartnerRequestModal({
           }),
         });
 
-        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          httpStatus?: number;
+          clarisaError?: unknown;
+        };
         if (!response.ok) {
+          console.error('[partner-request] submit failed', {
+            partnerName: row.name,
+            responseStatus: response.status,
+            errorType: data.error,
+            httpStatus: data.httpStatus ?? response.status,
+            clarisaError: data.clarisaError,
+          });
+
           setGlobalError(
             isPartnerRequestAuthError(response.status, data.error)
               ? PARTNER_REQUEST_AUTH_ERROR
@@ -102,7 +114,11 @@ export function PartnerRequestModal({
         }
 
         submittedCount += 1;
-      } catch {
+      } catch (err) {
+        console.error('[partner-request] submit failed (network or parse error)', {
+          partnerName: row.name,
+          error: err,
+        });
         setGlobalError(PARTNER_REQUEST_SERVICE_ERROR);
         setSubmitting(false);
         return;
