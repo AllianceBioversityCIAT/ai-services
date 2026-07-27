@@ -3,7 +3,7 @@ from typing import Any
 from botocore.exceptions import ClientError
 from app.utils.config.config_util import S3_VECTORS
 from app.utils.logger.logger_util import get_logger
-from app.vector_store.schemas import NON_FILTERABLE_METADATA_KEYS, chunk_from_vector_metadata
+from app.s3_vectors.schemas import NON_FILTERABLE_METADATA_KEYS, chunk_from_vector_metadata
 
 logger = get_logger()
 

@@ -1,6 +1,6 @@
 import json
 
-from app.vector_store.schemas import build_filterable_metadata, build_vector_record, chunk_from_vector_metadata
+from app.s3_vectors.schemas import build_filterable_metadata, build_vector_record, chunk_from_vector_metadata
 
 
 def test_build_filterable_metadata_sets_has_doi():

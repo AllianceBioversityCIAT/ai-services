@@ -100,7 +100,7 @@ SQL Server (Lakehouse)
 | REST API | `app/api/` | FastAPI routes, validation, web static files |
 | Mid-year pipeline | `app/llm/vectorize.py` | Ingest + mid-year report generation |
 | Annual pipeline | `app/llm/vectorize_annual.py` | Annual reports, tables, challenges |
-| Vector store | `app/vector_store/` | S3 Vectors client, ingestion, schemas |
+| Vector store | `app/s3_vectors/` | S3 Vectors client, ingestion, schemas |
 | Retrieval | `app/retrieval/` | Semantic search, SQL retrieval, post-filters |
 | LLM | `app/llm/invoke_llm.py` | Bedrock embeddings and Claude invocation |
 | Data layer | `db_conn/sql_connection.py` | `load_data()` / `load_full_data()` from SQL Server |
@@ -526,7 +526,7 @@ ar-generator-service/
 │   │   ├── vectorize.py       # Mid-year pipeline (S3 Vectors)
 │   │   ├── vectorize_annual.py# Annual pipeline (S3 Vectors)
 │   │   └── invoke_llm.py      # Bedrock embeddings + Claude
-│   ├── vector_store/          # S3 Vectors client, ingestion, schemas
+│   ├── s3_vectors/          # S3 Vectors client, ingestion, schemas
 │   ├── retrieval/             # Semantic search, SQL retrieval, filters
 │   └── utils/                 # Config, prompts, S3, jobs, logging, notifications
 ├── db_conn/
@@ -571,5 +571,5 @@ Logs are written to `data/logs/app.log` (API calls, ingestion, retrieval, schedu
 
 ## Version history
 
-- **Current (production)**: S3 Vectors migration — active pipelines are `vectorize.py` and `vectorize_annual.py` with `app/vector_store/` and `app/retrieval/`
+- **Current (production)**: S3 Vectors migration — active pipelines are `vectorize.py` and `vectorize_annual.py` with `app/s3_vectors/` and `app/retrieval/`
 - **Previous**: OpenSearch-based retrieval (removed from active code paths)

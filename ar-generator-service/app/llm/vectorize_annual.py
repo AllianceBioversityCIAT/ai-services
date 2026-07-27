@@ -7,8 +7,8 @@ from concurrent.futures import ThreadPoolExecutor
 from db_conn.sql_connection import load_data
 from app.utils.logger.logger_util import get_logger
 from app.llm.invoke_llm import invoke_model
-from app.vector_store.client import get_vector_store_client
-from app.vector_store.ingestion import ANNUAL_INGEST_TABLES, ingest_tables
+from app.s3_vectors.client import get_vector_store_client
+from app.s3_vectors.ingestion import ANNUAL_INGEST_TABLES, ingest_tables
 from app.retrieval.semantic_search import semantic_search
 from app.retrieval.sql_retrieval import fetch_challenges_chunks, fetch_questions_chunks
 from app.retrieval.post_filters import filter_annual_knn_chunks, filter_questions_chunks

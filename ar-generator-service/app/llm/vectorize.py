@@ -5,8 +5,8 @@ import json
 from app.utils.logger.logger_util import get_logger
 from app.utils.prompts.report_prompt import generate_report_prompt
 from app.llm.invoke_llm import invoke_model
-from app.vector_store.client import get_vector_store_client
-from app.vector_store.ingestion import MIDYEAR_INGEST_TABLES, ingest_tables
+from app.s3_vectors.client import get_vector_store_client
+from app.s3_vectors.ingestion import MIDYEAR_INGEST_TABLES, ingest_tables
 from app.retrieval.semantic_search import semantic_search
 from app.retrieval.sql_retrieval import fetch_doi_chunks
 from app.retrieval.context_merger import merge_knn_and_doi
