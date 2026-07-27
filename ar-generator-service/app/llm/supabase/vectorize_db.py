@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from db_conn.mysql_connection import load_data
 from app.utils.logger.logger_util import get_logger
-from app.utils.config.config_util import BR, SUPABASE
+from app.utils.config.config_util import AWS, SUPABASE
 from app.utils.prompts.kb_generation_prompt import DEFAULT_PROMPT
 from app.utils.prompts.report_generation_prompt import generate_report_prompt
 
@@ -14,8 +14,8 @@ logger = get_logger()
 
 bedrock_runtime = boto3.client(
     service_name='bedrock-runtime',
-    aws_access_key_id=BR['aws_access_key'],
-    aws_secret_access_key=BR['aws_secret_key'],
+    aws_access_key_id=AWS['aws_access_key'],
+    aws_secret_access_key=AWS['aws_secret_key'],
     region_name='us-east-1' 
 )
 

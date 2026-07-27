@@ -1,20 +1,20 @@
 import json
 import boto3
-from app.utils.config.config_util import BR
+from app.utils.config.config_util import AWS
 from app.utils.logger.logger_util import get_logger
 
 logger = get_logger()
 
-if not BR.get('aws_access_key'):
-    raise ValueError("AWS_ACCESS_KEY_ID_BR environment variable is required. Please configure it in Lambda environment variables.")
-if not BR.get('aws_secret_key'):
-    raise ValueError("AWS_SECRET_ACCESS_KEY_BR environment variable is required. Please configure it in Lambda environment variables.")
+if not AWS.get('aws_access_key'):
+    raise ValueError("AWS_ACCESS_KEY_ID_OS environment variable is required. Please configure it in Lambda environment variables.")
+if not AWS.get('aws_secret_key'):
+    raise ValueError("AWS_SECRET_ACCESS_KEY_OS environment variable is required. Please configure it in Lambda environment variables.")
 
 bedrock_runtime = boto3.client(
     service_name='bedrock-runtime',
-    aws_access_key_id=BR['aws_access_key'],
-    aws_secret_access_key=BR['aws_secret_key'],
-    region_name=BR.get('region', 'us-east-1')
+    aws_access_key_id=AWS['aws_access_key'],
+    aws_secret_access_key=AWS['aws_secret_key'],
+    region_name=AWS.get('region', 'us-east-1')
 )
 
 
