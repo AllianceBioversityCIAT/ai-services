@@ -1,511 +1,362 @@
 # AICCRA Annual Report Generator Service
 
-An AI-powered service for generating comprehensive annual reports for AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa). This service combines web and API interfaces with automated report generation capabilities, leveraging vector databases and Large Language Models to produce high-quality, data-driven narratives.
+AI-powered service for generating AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa) mid-year and annual reports. Combines structured data from MySQL (or local CSV), semantic retrieval via **Amazon S3 Vectors**, and **AWS Bedrock** (Titan embeddings + Claude) to produce data-driven narratives.
 
 ---
 
-## 🌟 Features
+## Features
 
-- **📊 Automated Report Generation**: AI-generated reports for various performance indicators
-- **�️ Web User Interface**: User-friendly web interface accessible at `/web/`
-- **�🔍 Vector Search**: Integration with AWS Bedrock Knowledge Base and OpenSearch
-- **📈 Multi-Indicator Support**: Handles both IPI (Intermediate Performance Indicators) and PDO (Project Development Objective) indicators
-- **💾 Database Integration**: MySQL or SQL Server connectivity for retrieving structured data
-- **📋 Multiple Report Types**: Annual reports, summary tables, and challenges analysis
-- **📄 Export Capabilities**: Download reports in DOCX and Excel formats
-
----
-
-## 🚀 Quick Start
-
-### Using the Web Interface
-1. Start the server: `python api_server.py`
-2. Open your browser and go to: `http://localhost:8000/web/`
-3. Select your report type, indicator, and year
-4. Generate and download your reports
-
-### Using the API
-Access the interactive API documentation at: `http://localhost:8000/docs`
+- **Automated report generation** for IPI and PDO indicators
+- **Web UI** at `/web/` for interactive report generation and exports
+- **Semantic retrieval** with Amazon S3 Vectors (replaces OpenSearch in production pipelines)
+- **Hybrid retrieval**: vector search for semantic context + SQL/CSV for filter-only queries (DOI, questions, challenges)
+- **Multi-report types**: mid-year, annual, summary tables, challenges & lessons learned
+- **Data refresh** via `insert_data=true` (full index rebuild, same behavior as the former OpenSearch flow)
+- **Local development** on Mac using CSV fixtures (`USE_CSV_DATA=true`) without MySQL or SQL Server
 
 ---
 
-## 🏗️ Architecture
+## Quick Start
 
-The service consists of three main components:
+### Web UI
 
-### 1. Web User Interface (`web/`)
-- Modern, responsive HTML/CSS/JavaScript interface
-- Three main sections: Annual Reports, Summary Tables, Challenges & Lessons Learned
-- Automatic API URL detection for development and production environments
-
-### 2. REST API Service (`app/api/`)
-- FastAPI-based REST API with OpenAPI documentation
-- HTTP endpoints for programmatic access
-- Request/response validation with Pydantic models
-- Comprehensive error handling and logging
-- CORS support for web applications
-- Static file serving for web UI
-
-### 3. Core Processing Engine
-- **Vector Database Options** (choose one):
-  - `app/llm/knowledge_base.py` - AWS Bedrock Knowledge Base integration
-  - `app/llm/vectorize_os.py` - OpenSearch vector processing
-  - `app/llm/vectorize_db.py` - Supabase vector processing
-- **Prompt Engineering**: Custom prompts for report generation
-- **Database Connectivity**: MySQL or SQL Server integration for data retrieval
-
----
-
-## 🛠️ Technology Stack
-
-- **Frontend**: HTML5, CSS3, JavaScript ES6+, Font Awesome, Google Fonts
-- **REST API**: FastAPI, Uvicorn, Pydantic
-- **AI/ML**: AWS Bedrock (Claude 3 Sonnet)
-- **Vector Database**: OpenSearch, Supabase
-- **Traditional Database**: MySQL, SQL Server
-- **Cloud Services**: AWS S3, AWS Bedrock Knowledge Base
-- **Data Processing**: Pandas, NumPy
-- **Authentication**: AWS4Auth
-- **Package Management**: uv
-
----
-
-## 📋 Prerequisites
-
-- Python 3.13+
-- [uv](https://github.com/astral-sh/uv) package manager
-- AWS account with Bedrock access
-- MySQL database or direct connection to the Lakehouse (SQL Server)
-- OpenSearch or Supabase instance
-
----
-
-## 🚀 Installation
-
-### 1. Install uv package manager
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+python dev_server.py --reload
+# Open http://localhost:8000/web/
 ```
 
-### 2. Set up virtual environment
+### API docs
+
+```bash
+# Interactive docs
+open http://localhost:8000/docs
+```
+
+---
+
+## Architecture
+
+```text
+MySQL / CSV  ──►  load_data()  ──►  Bedrock Titan (embeddings)
+                        │                    │
+                        │                    ▼
+                        │            S3 Vectors (PutVectors / QueryVectors)
+                        │
+                        └──►  SQL retrieval (DOI, questions, challenges)
+                                      │
+                                      ▼
+                              Post-filters (Python business rules)
+                                      │
+                                      ▼
+                              Bedrock Claude (report generation)
+```
+
+### Main components
+
+| Component | Path | Role |
+|---|---|---|
+| REST API | `app/api/` | FastAPI routes, validation, web static files |
+| Mid-year pipeline | `app/llm/vectorize.py` | Ingest + mid-year report generation |
+| Annual pipeline | `app/llm/vectorize_annual.py` | Annual reports, tables, challenges |
+| Vector store | `app/vector_store/` | S3 Vectors client, ingestion, schemas |
+| Retrieval | `app/retrieval/` | Semantic search, SQL retrieval, post-filters |
+| LLM | `app/llm/invoke_llm.py` | Bedrock embeddings and Claude invocation |
+| Data layer | `db_conn/mysql_connection.py` | MySQL or CSV loading |
+| Knowledge Base (optional) | `app/llm/knowledge_base.py` | Bedrock KB integration (separate path) |
+
+### Legacy / alternate backends (not used by default)
+
+| Path | Description |
+|---|---|
+| `app/llm/opensearch/` | Original OpenSearch pipelines (`vectorize_os.py`, `vectorize_os_annual.py`) kept for reference or rollback |
+| `app/llm/supabase/` | Supabase vector pipeline (`vectorize_db.py`) kept for reference |
+
+Production pipelines import **`vectorize.py`** and **`vectorize_annual.py`**, not the legacy modules.
+
+---
+
+## Technology Stack
+
+- **API**: FastAPI, Uvicorn, Mangum (Lambda)
+- **AI**: AWS Bedrock — Titan Text Embeddings v2 (1024d), Claude Sonnet
+- **Vector database**: Amazon S3 Vectors (`boto3` client `s3vectors`)
+- **Structured data**: MySQL (SQLAlchemy) or local CSV for development
+- **Object storage**: AWS S3 (report/chatbot file exports)
+- **Frontend**: HTML/CSS/JavaScript (`web/`)
+- **Package management**: `uv` + `pyproject.toml`; Lambda Docker build uses `requirements.txt`
+
+---
+
+## Prerequisites
+
+- Python 3.13+
+- [uv](https://github.com/astral-sh/uv) (recommended for local dev)
+- AWS account with:
+  - Bedrock access (embeddings + Claude)
+  - S3 Vectors vector bucket + index in `us-east-1` (or your target region)
+  - IAM permissions for `s3vectors:*` on the Lambda role / your user
+- MySQL database with AICCRA views (production), **or** local CSV files (development)
+
+---
+
+## Installation
+
 ```bash
 cd ar-generator-service
 uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-```
-
-### 3. Install dependencies
-```bash
+source .venv/bin/activate
 uv pip install -r pyproject.toml
 ```
 
----
-
-## ⚙️ Configuration
-
-Create a `.env` file in the service root directory with the following variables:
+For Lambda-compatible installs (Docker):
 
 ```bash
-# AWS Bedrock Configuration
-AWS_ACCESS_KEY_ID_BR=your_aws_access_key
-AWS_SECRET_ACCESS_KEY_BR=your_aws_secret_key
+pip install -r requirements.txt
+```
+
+---
+
+## Configuration
+
+Copy `.env.example` to `.env` and fill in values.
+
+### Required for S3 Vectors pipelines
+
+```bash
 AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID_BR=...
+AWS_SECRET_ACCESS_KEY_BR=...
 
-# AWS S3 Configuration
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-BUCKET_NAME=bucket_name
+S3_VECTORS_BUCKET_NAME=ar-generator-vectors
+S3_VECTORS_INDEX_NAME=aiccra-chunks
+```
 
-# AWS Bedrock Knowledge Base
-KNOWLEDGE_BASE_ID=your_knowledge_base_id
+S3 Vectors uses the **default AWS credential chain** for the `s3vectors` client (typically `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` from the environment or Lambda execution role).
 
-# OpenSearch Configuration
-OPENSEARCH_HOST=your_opensearch_host
-OPENSEARCH_INDEX_NAME=index_name
-AWS_ACCESS_KEY_ID_OS=your_opensearch_access_key
-AWS_SECRET_ACCESS_KEY_OS=your_opensearch_secret_key
+### Structured data (production)
 
-# MySQL Configuration
-MYSQL_DATABASE_URL=your_mysql_connection_url
+```bash
+MYSQL_DATABASE_URL=mysql+mysqlconnector://user:pass@host:3306/dbname
+```
 
-# SqlServer Configuration
-CLIENT_ID=your_client_id
-CLIENT_SECRET=your_client_secret_key
-SERVER=your_server_url
-DATABASE=lakehouse_name
+Optional SQL Server / Fabric vars remain in config for other integrations:
 
-# Supabase Configuration (if using)
-SUPABASE_URL=your_supabase_url
-COLLECTION_NAME=collection_name
+```bash
+SERVER=...
+DATABASE=...
+CLIENT_ID=...
+CLIENT_SECRET=...
+```
+
+### S3 file exports
+
+```bash
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+BUCKET_NAME=...
+```
+
+### Local development with CSV (Mac / no MySQL)
+
+```bash
+USE_CSV_DATA=true
+# Optional: directory containing vw_ai_*_ar.csv (default: app/)
+# CSV_DATA_DIR=/path/to/ar-generator-service/app
+```
+
+Place CSV fixtures in `app/` (default lookup path):
+
+- `vw_ai_project_contribution_ar.csv`
+- `vw_ai_questions_ar.csv`
+- `vw_ai_deliverables_ar.csv`
+- `vw_ai_oicrs_ar.csv`
+- `vw_ai_innovations_ar.csv`
+- `vw_ai_challenges_ar.csv`
+
+These files are pre-processed exports (include `table_type`). When `USE_CSV_DATA=true`, no MySQL connection is attempted.
+
+### Legacy OpenSearch (reference only)
+
+Only needed if running code under `app/llm/opensearch/`:
+
+```bash
+OPENSEARCH_HOST=...
+OPENSEARCH_INDEX_NAME=...
+AWS_ACCESS_KEY_ID_OS=...
+AWS_SECRET_ACCESS_KEY_OS=...
+```
+
+### Legacy Supabase (reference only)
+
+Only needed if running `app/llm/supabase/vectorize_db.py`:
+
+```bash
+SUPABASE_URL=...
+COLLECTION_NAME=...
 ```
 
 ---
 
-## 🎯 Usage
+## Usage
 
-### 1. Start the API Server
+### Start the server (local)
 
 ```bash
-python3 api_server.py
+python dev_server.py --reload
+# Options: --host, --port, --reload, --log-level
 ```
 
-The server will start on `http://localhost:8000` by default.
+### Deploy (Lambda)
 
-### 2. Access API Documentation
+Production uses `main.py` as the Mangum handler (`handler = Mangum(app)`), not a separate `api_server.py`.
 
-Visit `http://localhost:8000/docs` for interactive API documentation.
+### Data refresh (`insert_data=true`)
 
-### 3. Test the API
+When `insert_data` is `true`, the service performs a **full rebuild** of the S3 Vectors index (same pattern as the old OpenSearch flow):
+
+1. Delete index `S3_VECTORS_INDEX_NAME` (if exists)
+2. Create index (1024 dims, cosine, non-filterable metadata key `chunk_json`)
+3. Re-ingest all tables from MySQL/CSV with fresh embeddings
+
+Mid-year ingests 5 tables; annual ingests 6 (includes `vw_ai_challenges`).
+
+**Warning:** Lambda timeout is 15 minutes max. Full rebuilds may require a dedicated job if they exceed that window.
+
+---
+
+## API Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/web/` | Web UI |
+| `GET` | `/docs` | Swagger UI |
+| `GET` | `/health` | Health check |
+| `POST` | `/api/generate` | Mid-year report |
+| `POST` | `/api/generate-annual` | Annual report |
+| `POST` | `/api/generate-annual-tables` | Summary tables by indicator group |
+| `POST` | `/api/generate-challenges` | Challenges & lessons learned |
+
+### Example: mid-year report
 
 ```bash
 curl -X POST http://localhost:8000/api/generate \
   -H "Content-Type: application/json" \
-  -d '{"indicator": "IPI 1.1", "year": 2025}'
+  -d '{"indicator": "IPI 1.3", "year": 2025, "insert_data": false}'
 ```
 
----
-
-## API Endpoints & Web UI
-
-### Web User Interface
-- **`GET /web/`** - Main web interface for generating reports
-- **`GET /`** - API information and available endpoints
-- **`GET /docs`** - Interactive Swagger API documentation
-- **`GET /health`** - Service health check
-
-### `POST /api/generate`
-
-Generate an AICCRA Mid-Year Progress Report for the specified indicator and year.
-
-**Request Body:**
-```json
-{
-  "indicator": "IPI 1.1",
-  "year": 2025,
-  "insert_data": false
-}
-```
-
-**Parameters:**
-- `indicator` (string, required): Indicator name (e.g., "IPI 1.1", "PDO Indicator 1")
-- `year` (integer, required): Year for report generation
-- `insert_data` (boolean, optional): Whether to refresh data in vector database (default: false)
-
-**Response (200 OK):**
-```json
-{
-  "indicator": "IPI 1.1",
-  "year": 2025,
-  "content": "Generated mid-year progress report content...",
-  "status": "success"
-}
-```
-
-### `POST /api/generate-annual`
-
-Generate a comprehensive AICCRA Annual Report for the specified indicator and year.
-
-**Request Body:**
-```json
-{
-  "indicator": "PDO Indicator 1",
-  "year": 2024,
-  "insert_data": false
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "indicator": "PDO Indicator 1",
-  "year": 2024,
-  "content": "Comprehensive annual report with impact analysis...",
-  "status": "success"
-}
-```
-
-### `POST /api/generate-annual-tables`
-
-Generate summary tables for all indicators grouped by type (PDO, IPI 1.x, IPI 2.x, IPI 3.x).
-
-**Request Body:**
-```json
-{
-  "year": 2025,
-  "indicator": "PDO Indicator 1",
-  "insert_data": false
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "year": 2025,
-  "tables": {
-    "PDO": [...],
-    "IPI 1.x": [...],
-    "IPI 2.x": [...],
-    "IPI 3.x": [...]
-  },
-  "status": "success"
-}
-```
-
-### `POST /api/generate-challenges`
-
-Generate a cross-cluster Challenges and Lessons Learned report.
-
-**Request Body:**
-```json
-{
-  "year": 2024,
-  "indicator": "PDO Indicator 1",
-  "insert_data": false
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "year": 2024,
-  "content": "Cross-cluster challenges analysis and lessons learned...",
-  "status": "success"
-}
-```
-
-**Error Response (400/500):**
-```json
-{
-  "error": "Error message",
-  "status": "error",
-  "details": "Additional error details"
-}
-```
-
-### `GET /`
-
-Root endpoint providing API information.
-
-### `GET /health`
-
-Health check endpoint.
-
-## Server Configuration
-
-The API server can be configured with command-line arguments:
+### Example: rebuild vectors + report
 
 ```bash
-python3 api_server.py --help
+curl -X POST http://localhost:8000/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{"indicator": "IPI 1.3", "year": 2025, "insert_data": true}'
 ```
 
-Options:
-- `--host`: Host to bind to (default: 0.0.0.0)
-- `--port`: Port to bind to (default: 8000)
-- `--reload`: Enable auto-reload for development
-- `--log-level`: Set log level (debug, info, warning, error, critical)
+### Request body
+
+```json
+{
+  "indicator": "IPI 1.1",
+  "year": 2025,
+  "insert_data": false
+}
+```
+
+- `insert_data=false` — query existing S3 Vectors index (fast)
+- `insert_data=true` — delete/recreate index and reload all vectors (slow)
 
 ---
 
-## Examples
+## Project Structure
 
-### Python Example
-
-```python
-import requests
-
-# Make API request
-response = requests.post(
-    "http://localhost:8000/api/generate",
-    json={"indicator": "IPI 1.1", "year": 2024}
-)
-
-if response.status_code == 200:
-    data = response.json()
-    print(f"Report for {data['indicator']} ({data['year']}):")
-    print(data['content'])
-else:
-    print(f"Error: {response.json()}")
-```
-
-### JavaScript Example
-
-```javascript
-fetch('http://localhost:8000/api/generate', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-        indicator: 'IPI 1.1',
-        year: 2024
-    })
-})
-.then(response => response.json())
-.then(data => {
-    if (data.status === 'success') {
-        console.log(`Report: ${data.content}`);
-    } else {
-        console.error(`Error: ${data.error}`);
-    }
-});
-```
-
----
-
-## 📊 Supported Indicators
-
-### Intermediate Performance Indicators (IPI)
-- **IPI 1.1**: Climate information services
-- **IPI 1.2**: Weather/climate data access
-- **IPI 1.3**: Early warning systems
-- **IPI 1.4**: Climate risk assessments
-- **IPI 2.1**: Agricultural technologies
-- **IPI 2.2**: Farming practices adoption
-- **IPI 2.3**: Productivity improvements
-- **IPI 3.1**: Institutional capacity
-- **IPI 3.2**: Policy development
-- **IPI 3.3**: Knowledge sharing
-- **IPI 3.4**: Partnership building
-
-### Project Development Objective (PDO) Indicators
-- **PDO 1-5**: Various project outcome metrics
-
----
-
-## 🗂️ Project Structure
-
-```
+```text
 ar-generator-service/
-├── chatbot_app.py                 # Main Streamlit application
-├── main.py                        # CLI entry point
-├── api_server.py                  # REST API server entry point
-├── pyproject.toml                 # Project dependencies
-├── uv.lock                        # Dependency lock file
-├── API_README.md                  # REST API documentation
-├── .env.example                   # Environment variables template
-├── *.jsonl                        # Training/reference data files
+├── main.py                    # Lambda handler (Mangum)
+├── dev_server.py              # Local development server (uvicorn)
+├── main.py                    # CLI entry point
+├── pyproject.toml             # Local dependencies (uv)
+├── requirements.txt           # Lambda Docker dependencies
+├── .env.example
+├── tests/
+│   ├── test_retrieval.py
+│   └── test_vector_store_schemas.py
 ├── app/
-│   ├── api/                       # REST API modules
-│   │   ├── __init__.py            # API package initialization
-│   │   ├── main.py                # FastAPI application
-│   │   ├── models.py              # Pydantic request/response models
-│   │   └── routes.py              # API endpoint routes
-│   ├── llm/                       # LLM processing modules
-│   │   ├── knowledge_base.py      # AWS Bedrock KB integration
-│   │   ├── vectorize_db.py        # Supabase vector operations
-│   │   └── vectorize_os.py        # OpenSearch vector operations
-│   └── utils/                     # Utility modules
-│       ├── config/                # Configuration management
-│       ├── logger/                # Logging utilities
-│       ├── prompts/               # Prompt templates
-│       └── s3/                    # S3 integration
-├── data/logs/                     # Application logs
-├── db_conn/                       # Database connections
-└── lakehouse_integration/         # Data warehouse integration
+│   ├── api/                   # FastAPI routes and models
+│   ├── llm/
+│   │   ├── vectorize.py       # Mid-year pipeline (S3 Vectors) ← active
+│   │   ├── vectorize_annual.py# Annual pipeline (S3 Vectors) ← active
+│   │   ├── invoke_llm.py      # Bedrock embeddings + Claude
+│   │   ├── knowledge_base.py  # Bedrock KB (optional)
+│   │   ├── opensearch/        # Legacy OpenSearch pipelines (backup)
+│   │   └── supabase/          # Legacy Supabase pipeline (backup)
+│   ├── vector_store/          # S3 Vectors client, ingestion, schemas
+│   ├── retrieval/             # Semantic search, SQL retrieval, filters
+│   ├── utils/                 # Config, prompts, S3, jobs, logging
+│   └── vw_ai_*_ar.csv         # Local CSV fixtures (dev)
+├── db_conn/
+│   └── mysql_connection.py    # load_data() — MySQL or CSV
+├── web/                       # Web UI
+├── lakehouse_integration/     # Fabric / lakehouse utilities
+└── test/streamlit/            # Streamlit test UI
 ```
 
 ---
 
-## Error Handling
+## Retrieval design (S3 Vectors migration)
 
-The API returns appropriate HTTP status codes:
-- `200`: Success
-- `400`: Bad Request (validation errors)
-- `403`: Forbidden (access denied)
-- `422`: Unprocessable Entity (validation errors)
-- `500`: Internal Server Error
-
----
-
-## 🔧 Development
-
-### Key Components
-
-1. **Vector Processing** (`app/llm/`):
-   - Handles embedding generation and vector search
-   - Integrates with multiple vector databases
-   - Supports hybrid search capabilities
-
-2. **Prompt Engineering** (`app/utils/prompts/`):
-   - Custom prompts for report generation
-   - Knowledge base query optimization
-   - Context-aware response generation
-
-3. **Database Integration** (`db_conn/`):
-   - MySQL or SQL Server connectivity for structured data
-   - Data loading and preprocessing utilities
-
-### Customizing Prompts
-
-Edit the prompt template in `app/utils/prompts/`:
-- `report_generation_prompt.py`: Report generation template
+| Query type | Engine | Notes |
+|---|---|---|
+| Semantic k-NN + indicator/year/table filters | S3 Vectors `QueryVectors` | Replaces OpenSearch k-NN |
+| DOI lookup (mid-year) | MySQL / CSV via `sql_retrieval` | Filter-only, not vector search |
+| Questions (annual) | MySQL / CSV | Filter-only |
+| Challenges | MySQL / CSV | Filter-only |
+| Business rules (Shared, Cancelled, AWPB, etc.) | Python `post_filters.py` | Unchanged from OpenSearch era |
 
 ---
 
-## 📝 Logging
+## AWS setup (S3 Vectors)
 
-Logs are automatically generated in `data/logs/app.log` with information about:
-- Application startup and shutdown
-- Database connections
-- API calls to AWS services
-- Error handling and debugging information
+Before first run in AWS:
 
----
+1. Create a **vector bucket** in your region
+2. Configure Lambda env vars: `S3_VECTORS_BUCKET_NAME`, `S3_VECTORS_INDEX_NAME`
+3. Attach IAM policy with `s3vectors:CreateIndex`, `DeleteIndex`, `PutVectors`, `QueryVectors`, `GetVectors`, etc.
+4. Run once with `insert_data=true` to populate the index
 
-## 🔒 Security
-
-- AWS credentials are managed through environment variables
-- Database connections use secure authentication
-- API keys are never logged or exposed
-- Follow AWS IAM best practices for service permissions
+The application creates the **index** automatically on rebuild; it does **not** create the vector bucket.
 
 ---
 
-## 🐛 Troubleshooting
+## Logging
 
-### Common Issues
-
-1. **AWS Bedrock Access Denied**
-   - Verify AWS credentials and region
-   - Ensure Bedrock service is enabled in your AWS account
-   - Check IAM permissions for Bedrock and Knowledge Base access
-
-2. **Database Connection Errors**
-   - Verify MySQL credentials and host accessibility
-   - Check network connectivity and firewall settings
-   - Ensure database exists and user has appropriate permissions
-
-3. **Vector Database Issues**
-   - Confirm OpenSearch/Supabase endpoints and credentials
-   - Verify index exists and is properly configured
-   - Check vector dimensions and embedding model compatibility
+Logs are written to `data/logs/app.log` (API calls, ingestion, retrieval, errors).
 
 ---
 
-## 📈 Performance Optimization
+## Troubleshooting
 
-- **Caching**: Implement caching for frequent queries
-- **Batch Processing**: Process multiple indicators in batches
-- **Connection Pooling**: Use database connection pooling
-- **Vector Index Optimization**: Tune vector search parameters
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/new-indicator`)
-3. Make your changes
-4. Add tests if applicable
-5. Commit your changes (`git commit -m 'Add new indicator support'`)
-6. Push to the branch (`git push origin feature/new-indicator`)
-7. Create a Pull Request
+| Issue | Check |
+|---|---|
+| `S3_VECTORS_BUCKET_NAME environment variable is required` | Set S3 Vectors env vars in `.env` or Lambda |
+| `AccessDenied` on `s3vectors:*` | IAM policy on user/role |
+| `Unknown service: s3vectors` | Upgrade `boto3` (≥ 1.43 recommended) and AWS CLI |
+| Empty or poor reports with `insert_data=false` | Index empty — run `insert_data=true` first |
+| MySQL errors on Mac | Use `USE_CSV_DATA=true` and CSV files in `app/` |
+| `CSV file not found` | Set `CSV_DATA_DIR` or copy `vw_ai_*_ar.csv` into default `app/` |
+| Lambda timeout on rebuild | Increase timeout to 15 min or run ingest as a separate job |
 
 ---
 
-## 🔄 Version History
+## Security
 
-- **v0.1.0**: Initial release with basic chatbot and report generation
-- Features in development: Enhanced analytics, multi-language support, advanced visualization
+- Store credentials in `.env` locally; use Lambda environment variables and IAM roles in AWS
+- Never commit `.env` or CSV exports with sensitive data
+- Apply least-privilege IAM for `s3vectors`, Bedrock, and S3
 
 ---
+
+## Version History
+
+- **Current**: S3 Vectors migration — `vectorize.py` / `vectorize_annual.py`, `app/vector_store/`, `app/retrieval/`
+- **Legacy**: OpenSearch pipelines preserved under `app/llm/opensearch/`
+- **Legacy**: Supabase pipeline preserved under `app/llm/supabase/`

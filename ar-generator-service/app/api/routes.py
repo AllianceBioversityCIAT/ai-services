@@ -13,13 +13,13 @@ logger = get_logger()
 router = APIRouter()
 
 
-def _run_pipeline_opensearch():
-    """Lazy import of opensearch function to avoid initialization issues."""
+def _run_pipeline_midyear():
+    """Lazy import of mid-year pipeline to avoid initialization issues."""
     try:
-        from app.llm.vectorize_os import run_pipeline
+        from app.llm.vectorize import run_pipeline
         return run_pipeline
     except Exception as e:
-        logger.error(f"Failed to import opensearch: {e}")
+        logger.error(f"Failed to import mid-year pipeline: {e}")
         raise HTTPException(
             status_code=500,
             detail={
@@ -30,13 +30,13 @@ def _run_pipeline_opensearch():
         )
 
 
-def _run_pipeline_opensearch_annual():
-    """Lazy import of annual opensearch function to avoid initialization issues."""
+def _run_pipeline_annual():
+    """Lazy import of annual pipeline to avoid initialization issues."""
     try:
-        from app.llm.vectorize_os_annual import run_pipeline
+        from app.llm.vectorize_annual import run_pipeline
         return run_pipeline
     except Exception as e:
-        logger.error(f"Failed to import annual opensearch: {e}")
+        logger.error(f"Failed to import annual pipeline: {e}")
         raise HTTPException(
             status_code=500,
             detail={
@@ -50,7 +50,7 @@ def _run_pipeline_opensearch_annual():
 def _generate_indicator_tables():
     """Lazy import of indicator tables function to avoid initialization issues."""
     try:
-        from app.llm.vectorize_os_annual import generate_indicator_tables
+        from app.llm.vectorize_annual import generate_indicator_tables
         return generate_indicator_tables
     except Exception as e:
         logger.error(f"Failed to import indicator tables: {e}")
@@ -67,7 +67,7 @@ def _generate_indicator_tables():
 def _generate_challenges_report():
     """Lazy import of challenges report function to avoid initialization issues."""
     try:
-        from app.llm.vectorize_os_annual import generate_challenges_report
+        from app.llm.vectorize_annual import generate_challenges_report
         return generate_challenges_report
     except Exception as e:
         logger.error(f"Failed to import challenges report: {e}")
@@ -198,7 +198,7 @@ async def generate_report(request: ChatRequest) -> ChatResponse:
     
     - indicator: The indicator to generate a report for (e.g., "IPI 1.1", "PDO Indicator 1")
     - year: The year for the report (must be between 2021 and 2025)
-    - insert_data: Optional flag to insert fresh data into OpenSearch (default is False)
+    - insert_data: Optional flag to refresh the S3 Vectors index (default is False)
     
     Returns the generated mid-year report content.
     """
@@ -207,12 +207,10 @@ async def generate_report(request: ChatRequest) -> ChatResponse:
     try:
         logger.info(f"🚀 Starting mid-year report generation for indicator: {request.indicator}, year: {request.year}")
         
-        # Lazy import the opensearch function
-        query_opensearch = _run_pipeline_opensearch()
-        
-        # Call the existing opensearch function for mid-year reports
+        run_pipeline = _run_pipeline_midyear()
+
         logger.info("🔍 Executing mid-year report generation pipeline...")
-        response_stream = query_opensearch(request.indicator, request.year, insert_data=request.insert_data)
+        response_stream = run_pipeline(request.indicator, request.year, insert_data=request.insert_data)
         
         # Collect the streaming response into a single string
         full_response = ""
@@ -381,7 +379,7 @@ async def generate_annual_report(request: ChatRequest) -> ChatResponse:
     
     - indicator: The indicator to generate a report for (e.g., "IPI 1.1", "PDO Indicator 1")
     - year: The year for the report (must be between 2021 and 2025)
-    - insert_data: Optional flag to insert fresh data into OpenSearch (default is False)
+    - insert_data: Optional flag to refresh the S3 Vectors index (default is False)
     
     Returns the generated comprehensive annual report content.
     """
@@ -390,12 +388,10 @@ async def generate_annual_report(request: ChatRequest) -> ChatResponse:
     try:
         logger.info(f"🚀 Starting annual report generation for indicator: {request.indicator}, year: {request.year}")
         
-        # Lazy import the annual opensearch function
-        query_opensearch_annual = _run_pipeline_opensearch_annual()
-        
-        # Call the annual opensearch function for comprehensive reports
+        run_pipeline = _run_pipeline_annual()
+
         logger.info("🔍 Executing comprehensive annual report generation pipeline...")
-        full_response = query_opensearch_annual(request.indicator, request.year, insert_data=request.insert_data)
+        full_response = run_pipeline(request.indicator, request.year, insert_data=request.insert_data)
         
         # Calculate processing time
         processing_time = round(time.time() - start_time, 2)
