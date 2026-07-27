@@ -1,6 +1,6 @@
 from app.llm.invoke_llm import get_bedrock_embeddings
 from app.utils.logger.logger_util import get_logger
-from app.vector_store.client import S3VectorsClient, get_vector_store_client
+from app.s3_vectors.client import S3VectorsClient, get_vector_store_client
 
 logger = get_logger()
 

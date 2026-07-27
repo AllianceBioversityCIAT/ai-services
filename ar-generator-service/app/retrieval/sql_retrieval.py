@@ -1,7 +1,7 @@
 import pandas as pd
 
 from app.utils.logger.logger_util import get_logger
-from app.vector_store.schemas import rows_to_chunks
+from app.s3_vectors.schemas import rows_to_chunks
 from db_conn.mysql_connection import load_data
 
 logger = get_logger()

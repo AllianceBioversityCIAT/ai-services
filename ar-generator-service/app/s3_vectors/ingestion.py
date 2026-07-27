@@ -3,8 +3,8 @@ import pandas as pd
 from db_conn.mysql_connection import load_data
 from app.utils.logger.logger_util import get_logger
 from app.llm.invoke_llm import get_bedrock_embeddings
-from app.vector_store.schemas import build_vector_record, rows_to_chunks
-from app.vector_store.client import S3VectorsClient, get_vector_store_client
+from app.s3_vectors.schemas import build_vector_record, rows_to_chunks
+from app.s3_vectors.client import S3VectorsClient, get_vector_store_client
 
 
 logger = get_logger()

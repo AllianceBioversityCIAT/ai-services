@@ -58,7 +58,7 @@ MySQL / CSV  ──►  load_data()  ──►  Bedrock Titan (embeddings)
 | REST API | `app/api/` | FastAPI routes, validation, web static files |
 | Mid-year pipeline | `app/llm/vectorize.py` | Ingest + mid-year report generation |
 | Annual pipeline | `app/llm/vectorize_annual.py` | Annual reports, tables, challenges |
-| Vector store | `app/vector_store/` | S3 Vectors client, ingestion, schemas |
+| Vector store | `app/s3_vectors/` | S3 Vectors client, ingestion, schemas |
 | Retrieval | `app/retrieval/` | Semantic search, SQL retrieval, post-filters |
 | LLM | `app/llm/invoke_llm.py` | Bedrock embeddings and Claude invocation |
 | Data layer | `db_conn/mysql_connection.py` | MySQL or CSV loading |
@@ -289,7 +289,7 @@ ar-generator-service/
 │   │   ├── knowledge_base.py  # Bedrock KB (optional)
 │   │   ├── opensearch/        # Legacy OpenSearch pipelines (backup)
 │   │   └── supabase/          # Legacy Supabase pipeline (backup)
-│   ├── vector_store/          # S3 Vectors client, ingestion, schemas
+│   ├── s3_vectors/          # S3 Vectors client, ingestion, schemas
 │   ├── retrieval/             # Semantic search, SQL retrieval, filters
 │   ├── utils/                 # Config, prompts, S3, jobs, logging
 │   └── vw_ai_*_ar.csv         # Local CSV fixtures (dev)
@@ -357,6 +357,6 @@ Logs are written to `data/logs/app.log` (API calls, ingestion, retrieval, errors
 
 ## Version History
 
-- **Current**: S3 Vectors migration — `vectorize.py` / `vectorize_annual.py`, `app/vector_store/`, `app/retrieval/`
+- **Current**: S3 Vectors migration — `vectorize.py` / `vectorize_annual.py`, `app/s3_vectors/`, `app/retrieval/`
 - **Legacy**: OpenSearch pipelines preserved under `app/llm/opensearch/`
 - **Legacy**: Supabase pipeline preserved under `app/llm/supabase/`
