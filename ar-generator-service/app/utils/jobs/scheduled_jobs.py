@@ -16,7 +16,7 @@ from typing import Dict, Any
 from app.llm.vectorize_annual import run_pipeline
 from db_conn.sql_connection import load_full_data
 from app.utils.logger.logger_util import get_logger
-from app.utils.config.config_util import KNOWLEDGE_BASE, BR
+from app.utils.config.config_util import KNOWLEDGE_BASE, AWS
 from app.utils.notification.notification_service import NotificationService
 
 logger = get_logger()
@@ -269,14 +269,14 @@ async def execute_sync_knowledge_base() -> Dict[str, Any]:
         try:
             bedrock_agent = boto3.client(
                 service_name='bedrock-agent',
-                region_name=BR.get('region', 'us-east-1')
+                region_name=AWS.get('region', 'us-east-1')
             )
         except Exception:
             bedrock_agent = boto3.client(
                 service_name='bedrock-agent',
-                aws_access_key_id=BR.get('aws_access_key'),
-                aws_secret_access_key=BR.get('aws_secret_key'),
-                region_name=BR.get('region', 'us-east-1')
+                aws_access_key_id=AWS.get('aws_access_key'),
+                aws_secret_access_key=AWS.get('aws_secret_key'),
+                region_name=AWS.get('region', 'us-east-1')
             )
         
         logger.info(f"🔄 Starting Knowledge Base synchronization: {kb_id}")

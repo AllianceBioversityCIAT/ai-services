@@ -1,16 +1,16 @@
 import boto3
 from botocore.exceptions import ClientError
-from app.utils.config.config_util import S3
+from app.utils.config.config_util import AWS
 from app.utils.logger.logger_util import get_logger
 
 logger = get_logger()
 
 s3_client = boto3.client(
     's3',
-    region_name=S3.get('aws_region', 'us-east-1')
+    region_name=AWS.get('region', 'us-east-1')
 )
 
-bucket_name = S3['bucket_name']
+bucket_name = AWS['bucket_name']
 
 
 def s3_file_exists(file_key):
