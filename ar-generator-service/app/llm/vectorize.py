@@ -11,7 +11,7 @@ from app.retrieval.semantic_search import semantic_search
 from app.retrieval.sql_retrieval import fetch_doi_chunks
 from app.retrieval.context_merger import merge_knn_and_doi
 from app.retrieval.post_filters import filter_midyear_chunks
-from db_conn.mysql_connection import load_data
+from db_conn.sql_connection import load_data
 
 logger = get_logger()
 
@@ -93,7 +93,6 @@ def run_pipeline(indicator, year, insert_data=False):
         total_expected, total_achieved, progress = calculate_summary(indicator, year)
         prompt = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
         context = retrieve_context(prompt, indicator, year)
-        save_context_to_file(context, "context", indicator, year)
 
         try:
             query = f"""

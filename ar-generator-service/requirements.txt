@@ -1,9 +1,8 @@
 pandas
-boto3
+boto3>=1.35.0
 python-dotenv
 openpyxl
 requests-aws4auth
-opensearch-py
 fastapi
 uvicorn
 pyodbc

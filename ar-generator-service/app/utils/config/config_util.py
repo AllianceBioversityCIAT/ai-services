@@ -19,8 +19,6 @@ SUPABASE = {
     "collection": os.getenv("COLLECTION_NAME")
 }
 
-MYSQL_DATABASE_URL = os.getenv('MYSQL_DATABASE_URL')
-
 SQL_SERVER = {
     "server": os.getenv("SERVER"),
     "database": os.getenv("DATABASE"),

@@ -4,7 +4,7 @@ import json
 import pandas as pd
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from db_conn.mysql_connection import load_data
+from db_conn.sql_connection import load_data
 from app.utils.logger.logger_util import get_logger
 from app.llm.invoke_llm import invoke_model
 from app.vector_store.client import get_vector_store_client
@@ -280,7 +280,6 @@ def run_pipeline(indicator, year, insert_data=False):
         search_query = generate_search_prompt(indicator, year)
 
         context, questions = retrieve_context(search_query, indicator, year)
-        save_context_to_file(context, "context", indicator, year)
 
         grouped_context = group_context_by_cluster(context)
         clusters = sorted(grouped_context.keys())
