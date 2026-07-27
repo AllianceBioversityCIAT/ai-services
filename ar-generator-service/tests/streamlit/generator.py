@@ -3,8 +3,8 @@ import docx
 import requests
 import pandas as pd
 import streamlit as st
-from app.llm.vectorize_os_annual import run_pipeline
-from app.llm.vectorize_os_annual import generate_challenges_report, generate_indicator_tables
+from app.llm.vectorize_annual import run_pipeline
+from app.llm.vectorize_annual import generate_challenges_report, generate_indicator_tables
 
 st.set_page_config(page_title="AICCRA generator", page_icon="📄")
 

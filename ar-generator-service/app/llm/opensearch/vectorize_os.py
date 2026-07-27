@@ -1,0 +1,341 @@
+"""Main pipeline for generating Mid-Year Progress Reports using OpenSearch and LLMs."""
+
+import re
+import json
+import boto3
+import numpy as np
+import pandas as pd
+from requests_aws4auth import AWS4Auth
+from db_conn.mysql_connection import load_data
+from app.utils.logger.logger_util import get_logger
+from app.utils.config.config_util import OPENSEARCH
+from opensearchpy import OpenSearch, RequestsHttpConnection
+from app.utils.prompts.report_prompt import generate_report_prompt
+from app.llm.invoke_llm import invoke_model, get_bedrock_embeddings
+
+logger = get_logger()
+
+
+if not OPENSEARCH.get('host'):
+    raise ValueError("OPENSEARCH_HOST environment variable is required. Please configure it in Lambda environment variables.")
+if not OPENSEARCH.get('index'):
+    raise ValueError("OPENSEARCH_INDEX_NAME environment variable is required. Please configure it in Lambda environment variables.")
+if not OPENSEARCH.get('aws_access_key'):
+    raise ValueError("AWS_ACCESS_KEY_ID_OS environment variable is required. Please configure it in Lambda environment variables.")
+if not OPENSEARCH.get('aws_secret_key'):
+    raise ValueError("AWS_SECRET_ACCESS_KEY_OS environment variable is required. Please configure it in Lambda environment variables.")
+
+
+credentials = boto3.Session(
+    aws_access_key_id=OPENSEARCH['aws_access_key'],
+    aws_secret_access_key=OPENSEARCH['aws_secret_key'],
+    region_name=OPENSEARCH.get('region', 'us-east-1')
+).get_credentials()
+
+
+region = OPENSEARCH.get('region', 'us-east-1')
+
+awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, 'es', session_token=credentials.token)
+
+opensearch = OpenSearch(
+    hosts=[{'host': OPENSEARCH['host'], 'port': 443}],
+    http_auth=awsauth,
+    use_ssl=True,
+    verify_certs=True,
+    connection_class=RequestsHttpConnection
+)
+
+INDEX_NAME = OPENSEARCH['index']
+INDEX_NAME_CHATBOT = OPENSEARCH['index_chatbot']
+
+
+def get_opensearch_client():
+    """Get OpenSearch client (maintained for backward compatibility)."""
+    return opensearch
+
+
+def create_index_if_not_exists(dimension=1024):
+    try:
+        if not opensearch.indices.exists(index=INDEX_NAME):
+            logger.info(f"📦 Creating OpenSearch index: {INDEX_NAME}")
+            index_body = {
+                "settings": {
+                    "index": {
+                        "knn": True
+                    }
+                },
+                "mappings": {
+                    "properties": {
+                        "embedding": {
+                            "type": "knn_vector",
+                            "dimension": dimension,
+                            "method": {
+                                "name": "hnsw",
+                                "space_type": "cosinesimil",
+                                "engine": "nmslib"
+                            }
+                        },
+                        "chunk": {"type": "object"},
+                        "source_table": {"type": "keyword"},
+                        "indicator_acronym": {"type": "keyword"},
+                        "year": {"type": "keyword"}
+                    }
+                }
+            }
+            opensearch.indices.create(index=INDEX_NAME, body=index_body)
+            return True
+        
+        logger.info(f"📦 Index {INDEX_NAME} already exists. Skipping creation.")
+        return False
+
+    except Exception as e:
+        logger.error(f"❌ Error creating index: {e}")
+        return False
+
+
+def insert_into_opensearch(table_name: str):
+    try:
+        logger.info(f"🔍 Processing table: {table_name}")
+
+        df = load_data(table_name)
+        
+        rows = df.to_dict(orient="records")
+
+        chunks = []
+        for row in rows:
+            chunk = {
+                k: v for k, v in row.items()
+                if pd.notnull(v) and v != ""
+            }
+            chunks.append(chunk)
+
+        logger.info(f"🔢 Generating embeddings for {len(chunks)} rows...")
+        texts = [json.dumps(chunk, ensure_ascii=False) for chunk in chunks]
+        embeddings = get_bedrock_embeddings(texts)
+
+        logger.info("📥 Indexing documents in OpenSearch...")
+        for i, (row, embedding, chunk) in enumerate(zip(rows, embeddings, chunks)):
+            doc = {
+                "embedding": embedding,
+                "chunk": chunk,
+                "source_table": table_name,
+                "indicator_acronym": row.get("indicator_acronym"),
+                "year": row.get("year")
+            }
+            opensearch.index(index=INDEX_NAME, id=f"{table_name}-{i}", body=doc)
+
+        logger.info(f"✅ Vectorization completed for {len(chunks)} rows of {table_name}")
+    
+    except Exception as e:
+        logger.error(f"❌ Error inserting into OpenSearch for {table_name}: {e}")
+
+
+def retrieve_context(query, indicator, year, top_k=10000):
+    try:
+        logger.info("📚 Retrieving relevant context from OpenSearch...")
+        embedding = get_bedrock_embeddings([query])[0]
+        
+        ## VECTOR SEARCH
+        knn_query = {
+            "size": top_k,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"term": {"indicator_acronym": indicator}},
+                        {"term": {"year": year}},
+                        {
+                            "bool": {
+                                "should": [
+                                    {"term": {"source_table": "vw_ai_deliverables"}},
+                                    {"term": {"source_table": "vw_ai_project_contribution"}},
+                                    {"term": {"source_table": "vw_ai_oicrs"}},
+                                    {"term": {"source_table": "vw_ai_innovations"}}
+                                ],
+                                "minimum_should_match": 1
+                            }
+                        }
+                    ],
+                    "must": [
+                        {
+                            "knn": {
+                                "embedding": {
+                                    "vector": embedding,
+                                    "k": top_k
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+
+        knn_response = opensearch.search(index=INDEX_NAME, body=knn_query)
+        knn_chunks = [hit["_source"]["chunk"] for hit in knn_response["hits"]["hits"]]
+
+        ## DOI SEARCH
+        doi_query = {
+            "size": 10000,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"term": {"indicator_acronym": indicator}},
+                        {"term": {"year": year}},
+                        {"exists": {"field": "chunk.doi"}},
+                        {"term": {"source_table": "vw_ai_deliverables"}}
+                    ]
+                }
+            }
+        }
+
+        doi_response = opensearch.search(index=INDEX_NAME, body=doi_query)
+        doi_chunks = [hit["_source"]["chunk"] for hit in doi_response["hits"]["hits"]]
+
+        ## COMBINE KNN AND DOI CHUNKS
+        seen_keys = set()
+        combined_chunks = []
+
+        for chunk in knn_chunks + doi_chunks:
+            doi = chunk.get("doi")
+            cluster = chunk.get("cluster_acronym")
+            indicator_code = chunk.get("indicator_acronym")
+
+            if doi:
+                key = (doi, cluster, indicator_code)
+                if key not in seen_keys:
+                    seen_keys.add(key)
+                    combined_chunks.append(chunk)
+            else:
+                combined_chunks.append(chunk)
+
+        ## FILTER KNN CHUNKS
+        filtered_knn_chunks = [
+            chunk for chunk in combined_chunks
+            if not (
+                (chunk.get("table_type") == "deliverables" and chunk.get("cluster_role") == "Shared")
+                or
+                (chunk.get("table_type") == "innovations" and chunk.get("cluster_role") == "Shared")
+            )
+        ]
+
+        return filtered_knn_chunks
+    
+    except Exception as e:
+        logger.error(f"❌ Error retrieving context: {e}")
+        return []
+
+
+def calculate_summary(indicator, year):
+    df_contributions = load_data("vw_ai_project_contribution")
+    df_filtered = df_contributions[
+        (df_contributions["indicator_acronym"] == indicator) &
+        (df_contributions["year"] == year)
+    ]
+    total_expected = df_filtered["Milestone expected value"].sum()
+    total_achieved = df_filtered["Milestone reported value"].sum()
+    progress = round((total_achieved / total_expected) * 100, 2) if total_expected > 0 else 0
+
+    def clean_number(n):
+        return int(n) if float(n).is_integer() else round(n, 2)
+
+    return clean_number(total_expected), clean_number(total_achieved), clean_number(progress)
+
+
+def save_context_to_file(context, filename, indicator, year):
+    try:
+        output_path = f"{filename}_{indicator}_{year}.json"
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(context, f, indent=2, ensure_ascii=False)
+        logger.info(f"📝 Context saved to {output_path}")
+    except Exception as e:
+        logger.error(f"❌ Error saving context to file: {e}")
+
+
+def _filter_chunks_for_contingency(chunks, level):
+    """Apply contingency filters to reduce chunk size when input is too long."""
+    if level == 0:
+        return chunks
+
+    filtered = [
+        c for c in chunks
+        if not (
+            c.get("table_type") == "deliverables" and (
+                c.get("already_disseminated") == "No"
+                or not c.get("dissemination_URL")
+                or c.get("status") != "Completed"
+            )
+        )
+    ]
+
+    if level >= 2:
+        deliverables = [c for c in filtered if c.get("table_type") == "deliverables"][:200]
+        contributions = [c for c in filtered if c.get("table_type") == "contributions"][:1000]
+        filtered = deliverables + contributions
+
+    return filtered
+
+
+def run_pipeline(indicator, year, insert_data=False):
+    try:
+        if insert_data:
+            if opensearch.indices.exists(index=INDEX_NAME):
+                logger.info(f"🗑️ Deleting existing index: {INDEX_NAME}")
+                opensearch.indices.delete(index=INDEX_NAME)
+            create_index_if_not_exists()
+            insert_into_opensearch("vw_ai_deliverables")
+            insert_into_opensearch("vw_ai_project_contribution")
+            insert_into_opensearch("vw_ai_questions")
+            insert_into_opensearch("vw_ai_oicrs")
+            insert_into_opensearch("vw_ai_innovations")
+
+            logger.info("✅ Data insertion completed successfully.")
+
+        total_expected, total_achieved, progress = calculate_summary(indicator, year)
+
+        PROMPT = generate_report_prompt(indicator, year, total_expected, total_achieved, progress)
+        
+        context = retrieve_context(PROMPT, indicator, year)
+        save_context_to_file(context, "context", indicator, year)
+
+        try:
+            query = f"""
+                Using this information:\n{context}\n\n
+                Do the following:\n{PROMPT}
+                """
+            final_report = invoke_model(query)
+        except Exception as e:
+            if "Input is too long" in str(e):
+                logger.warning(f"⚠️ Input is too long for {indicator}. Applying Level 1 contingency...")
+                try:
+                    filtered_context = _filter_chunks_for_contingency(context, level=1)
+                    query = f"""
+                        Using this information:\n{filtered_context}\n\n
+                        Do the following:\n{PROMPT}
+                        """
+                    final_report = invoke_model(query)
+                    logger.info(f"✅ Report generated for {indicator} with Level 1 contingency.")
+                except Exception as e2:
+                    if "Input is too long" in str(e2):
+                        logger.warning(f"⚠️ Still too long for {indicator}. Applying Level 2 contingency...")
+                        filtered_context = _filter_chunks_for_contingency(context, level=2)
+                        query = f"""
+                            Using this information:\n{filtered_context}\n\n
+                            Do the following:\n{PROMPT}
+                            """
+                        final_report = invoke_model(query)
+                        logger.info(f"✅ Report generated for {indicator} with Level 2 contingency.")
+                    else:
+                        raise e2
+            else:
+                raise
+
+        logger.info("✅ Report generation completed successfully.")
+        return final_report
+
+    except Exception as e:
+        logger.error(f"❌ Error in pipeline execution: {e}")
+
+        if "Input is too long" in str(e):
+            logger.error("❌ Input is still too long even after applying contingency filters.")
+            return f"# Report Generation Error\n\nThe input context for indicator {indicator} in year {year} is too long for the model, even after applying data reduction filters."
+        
+        return None
