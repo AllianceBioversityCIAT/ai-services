@@ -58,6 +58,9 @@ def _extract_document_text(bucket_name: str, file_key: str) -> tuple[str, str]:
 
 def _extract_documents_parallel(bucket_name: str, file_keys: list[str]) -> list[dict]:
     """Extract text from multiple documents in parallel."""
+    if not file_keys:
+        return []
+
     results = []
 
     with ThreadPoolExecutor(max_workers=len(file_keys)) as executor:
@@ -114,7 +117,8 @@ def _build_query(
         source_descriptions.append("Structured project information from STAR (description, donor, unit, SDGs)")
     if results_context:
         source_descriptions.append("Metadata about the project's reported results in STAR")
-    source_descriptions.append("Text extracted from one or more documents uploaded as project evidence")
+    if document_count > 0:
+        source_descriptions.append("Text extracted from one or more documents uploaded as project evidence")
 
     numbered_sources = "\n".join(
         f"{index}. {description}" for index, description in enumerate(source_descriptions, start=1)
@@ -146,11 +150,19 @@ def _build_query(
             f"{results_context}"
         )
 
-    sections.append(
-        f"\n-------\n\n"
-        f"### UPLOADED PROJECT EVIDENCE ({document_count} file(s)):\n\n"
-        f"{combined_text}"
-    )
+    if document_count > 0:
+        sections.append(
+            f"\n-------\n\n"
+            f"### UPLOADED PROJECT EVIDENCE ({document_count} file(s)):\n\n"
+            f"{combined_text}"
+        )
+    else:
+        sections.append(
+            f"\n-------\n\n"
+            f"### UPLOADED PROJECT EVIDENCE:\n\n"
+            f"No documents were uploaded for this project. Base the overview entirely on the "
+            f"STAR project information and results metadata above."
+        )
 
     return (
         f"{chr(10).join(sections)}\n\n"
@@ -195,6 +207,19 @@ def process_project_overview(
     project_context, results_context = fetch_star_context(contract_id, token=token)
 
     file_keys = list_project_documents(bucket_name, project_folder)
+
+    if not file_keys and not (project_context or results_context):
+        raise ValueError(
+            f"No supported documents found in s3://{bucket_name}/{project_folder}, "
+            f"and no STAR context is available for contract {contract_id}"
+        )
+
+    if not file_keys:
+        logger.info(
+            f"📭 No documents found in s3://{bucket_name}/{project_folder} — "
+            f"generating overview from STAR context only"
+        )
+
     documents = _extract_documents_parallel(bucket_name, file_keys)
 
     total_chars = sum(doc["character_count"] for doc in documents)
@@ -237,9 +262,13 @@ def process_project_overview(
     if user_id:
         try:
             file_names = [doc["file_key"].rsplit("/", 1)[-1] for doc in documents]
+            documents_summary = (
+                f"{len(documents)} document(s): {', '.join(file_names)}"
+                if documents else "no documents (STAR context only)"
+            )
             user_input = (
                 f"Project overview request for: {project_folder.strip('/')} "
-                f"({len(documents)} document(s): {', '.join(file_names)})"
+                f"({documents_summary})"
             )
 
             ai_output = json.dumps(overview, indent=2, ensure_ascii=False)

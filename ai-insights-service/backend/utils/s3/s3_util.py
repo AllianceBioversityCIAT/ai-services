@@ -162,10 +162,10 @@ def list_project_documents(
         max_documents: Maximum number of documents allowed (default: 3)
 
     Returns:
-        Sorted list of S3 object keys
+        Sorted list of S3 object keys (empty list if none found)
 
     Raises:
-        ValueError: If no supported documents are found or the limit is exceeded
+        ValueError: If the number of supported documents exceeds the limit
     """
     available_files = list_available_project_files(bucket_name, project_folder)
 
@@ -177,11 +177,6 @@ def list_project_documents(
             logger.warning(f"Skipping unsupported file: {key}")
             continue
         document_keys.append(key)
-
-    if not document_keys:
-        raise ValueError(
-            f"No supported documents found in s3://{bucket_name}/{project_folder}"
-        )
 
     if len(document_keys) > max_documents:
         raise ValueError(

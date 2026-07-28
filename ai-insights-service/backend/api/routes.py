@@ -302,6 +302,10 @@ async def delete_document_overview_files(
 
     STAR API calls require a valid access token, provided in the request body
     (`token`) or via the `STAR_API_TOKEN` environment variable.
+
+    Documents are optional evidence: if the project folder has none, the overview
+    is generated from STAR project and results metadata alone. A request fails only
+    when there are neither documents nor STAR context available.
     """,
     response_description="Structured project overview",
     responses={
@@ -317,7 +321,7 @@ async def delete_document_overview_files(
                     "example": {
                         "error": "Invalid parameters",
                         "status": "error",
-                        "details": "No supported documents found in s3://bucket/project-folder"
+                        "details": "No supported documents found in s3://bucket/project-folder, and no STAR context is available for contract project-folder"
                     }
                 }
             }
