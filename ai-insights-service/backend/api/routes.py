@@ -296,6 +296,12 @@ async def delete_document_overview_files(
     - **JPEG, PNG, TIFF** — Images via Amazon Textract
 
     The extraction method is selected automatically based on each file extension.
+
+    The `project_folder` value is also used as the STAR contract ID to fetch
+    project and results metadata for AI context enrichment.
+
+    STAR API calls require a valid access token, provided in the request body
+    (`token`) or via the `STAR_API_TOKEN` environment variable.
     """,
     response_description="Structured project overview",
     responses={
@@ -336,20 +342,22 @@ async def document_overview(request: DocumentOverviewRequest, mis: str = Depends
     Generate a structured project overview from documents in an S3 folder.
 
     - **bucket_name**: S3 bucket containing the project documents
-    - **project_folder**: S3 folder prefix for the project (1-3 documents)
+    - **project_folder**: S3 folder prefix for the project (1-3 documents). Also used as STAR contract ID.
+    - **token**: STAR access token for authenticated STAR API calls
     - **user_id**: Optional user ID for interaction tracking
     """
     try:
         logger.info(
-            f"Project overview request — "
+            f"🚀 Project overview request — "
             f"s3://{request.bucket_name}/{request.project_folder} "
-            f"(user={request.user_id})"
+            f"(user={request.user_id}, star_token={'yes' if request.token else 'no'})"
         )
 
         result = process_project_overview(
             bucket_name=request.bucket_name,
             project_folder=request.project_folder,
             user_id=request.user_id,
+            token=request.token,
         )
 
         await notification_service.send_slack_notification(

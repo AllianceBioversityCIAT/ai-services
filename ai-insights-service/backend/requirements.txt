@@ -14,5 +14,6 @@ python-multipart
 mangum
 pydantic
 mammoth
+html2text
 python-pptx
 httpx
