@@ -14,13 +14,17 @@ class DocumentOverviewRequest(BaseModel):
     )
     project_folder: str = Field(
         ...,
-        description="S3 folder prefix for the project (1-3 documents)",
-        examples=["star/ai-insights/projects/abc123"]
+        description="S3 folder prefix for the project (1-3 documents). Also used as the STAR contract ID.",
+        examples=["a1578"]
     )
     user_id: Optional[str] = Field(
         default=None,
         description="Optional user identifier for interaction tracking",
         examples=["user123"]
+    )
+    token: Optional[str] = Field(
+        default=None,
+        description="STAR access token used to authenticate calls to STAR APIs",
     )
 
 

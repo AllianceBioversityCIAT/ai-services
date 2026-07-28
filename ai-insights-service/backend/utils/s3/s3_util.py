@@ -1,6 +1,7 @@
 import json
 import boto3
 import mammoth
+import html2text
 import pandas as pd
 from io import BytesIO
 from pptx import Presentation
@@ -9,6 +10,11 @@ from utils.logger.logger_util import get_logger
 from utils.config.config_util import get_boto3_client_kwargs
 
 logger = get_logger()
+
+_html_to_text = html2text.HTML2Text()
+_html_to_text.body_width = 0
+_html_to_text.ignore_links = True
+_html_to_text.ignore_images = True
 
 SUPPORTED_DOCUMENT_EXTENSIONS = {
     'pdf', 'jpg', 'jpeg', 'png', 'tiff', 'tif',
@@ -30,13 +36,14 @@ def _get_s3_client():
 
 def _process_file_content(file_extension, file_content):
     if file_extension == 'docx':
-        logger.info("Processing DOCX file with Mammoth...")
+        logger.info("📄 Processing DOCX file with Mammoth...")
         result = mammoth.convert_to_html(BytesIO(file_content))
         for message in result.messages:
             logger.warning(f"Mammoth conversion warning: {message}")
         html = result.value.strip()
-        logger.info(f"DOCX converted to HTML — {len(html)} characters extracted")
-        return html
+        text = _html_to_text.handle(html).strip()
+        logger.info(f"✅ DOCX converted to plain text — {len(text)} characters extracted")
+        return text
     elif file_extension == 'txt':
         logger.info("📄 Processing TXT file...")
         return file_content.decode('utf-8')
@@ -155,10 +162,10 @@ def list_project_documents(
         max_documents: Maximum number of documents allowed (default: 3)
 
     Returns:
-        Sorted list of S3 object keys
+        Sorted list of S3 object keys (empty list if none found)
 
     Raises:
-        ValueError: If no supported documents are found or the limit is exceeded
+        ValueError: If the number of supported documents exceeds the limit
     """
     available_files = list_available_project_files(bucket_name, project_folder)
 
@@ -171,18 +178,13 @@ def list_project_documents(
             continue
         document_keys.append(key)
 
-    if not document_keys:
-        raise ValueError(
-            f"No supported documents found in s3://{bucket_name}/{project_folder}"
-        )
-
     if len(document_keys) > max_documents:
         raise ValueError(
             f"Found {len(document_keys)} documents in project folder "
             f"(maximum allowed: {max_documents})"
         )
 
-    logger.info(f"Found {len(document_keys)} document(s): {document_keys}")
+    logger.info(f"📄 Found {len(document_keys)} document(s): {document_keys}")
     return document_keys
 
 
@@ -248,7 +250,7 @@ def save_project_response_json(bucket_name: str, project_folder: str, response_d
         file_key=file_key,
         content_type="application/json",
     )
-    logger.info(f"Cached project overview saved to s3://{bucket_name}/{file_key}")
+    logger.info(f"💾 Cached project overview saved to s3://{bucket_name}/{file_key}")
     return file_key
 
 
@@ -277,7 +279,7 @@ def get_project_response_json(bucket_name: str, project_folder: str) -> dict | N
 def read_document_from_s3(bucket_name, file_key):
     try:
         logger.info(
-            f"📂 Downloading the {file_key} file from the bucket {bucket_name}...")
+            f"📥 Downloading the {file_key} file from the bucket {bucket_name}...")
         response = _get_s3_client().get_object(Bucket=bucket_name, Key=file_key)
         file_content = response['Body'].read()
         file_extension = file_key.lower().split('.')[-1]
@@ -306,10 +308,10 @@ def download_file_from_s3(bucket_name: str, file_key: str) -> bytes:
         Exception: If the download fails
     """
     try:
-        logger.info(f"Downloading raw file {file_key} from bucket {bucket_name}...")
+        logger.info(f"📥 Downloading raw file {file_key} from bucket {bucket_name}...")
         response = _get_s3_client().get_object(Bucket=bucket_name, Key=file_key)
         file_content = response['Body'].read()
-        logger.info(f"Successfully downloaded {file_key} ({len(file_content)} bytes)")
+        logger.info(f"✅ Successfully downloaded {file_key} ({len(file_content)} bytes)")
         return file_content
     except Exception as e:
         logger.error(f"Error downloading {file_key} from bucket {bucket_name}: {str(e)}")

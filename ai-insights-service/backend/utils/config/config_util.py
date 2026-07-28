@@ -34,6 +34,10 @@ CLARISA_VALIDATE_URL = os.getenv("CLARISA_VALIDATE_URL")
 
 INTERACTION_SERVICE_URL = os.getenv("INTERACTION_SERVICE_URL")
 
+STAR_API_BASE_URL = os.getenv("STAR_API_BASE_URL")
+
+STAR_API_TOKEN = os.getenv("STAR_API_TOKEN")
+
 
 def get_boto3_client_kwargs() -> dict:
     """Extra kwargs for boto3.client(). Empty in Lambda → IAM execution role."""
