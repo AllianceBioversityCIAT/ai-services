@@ -31,6 +31,13 @@ AI_DISCLAIMER_TEXT = (
 )
 
 
+def _parse_email_list(value: Optional[str]) -> list:
+    """Split a comma-separated env var (e.g. PRMS_ADMIN_NOTIFICATION_EMAIL) into individual addresses."""
+    if not value:
+        return []
+    return [addr.strip() for addr in value.split(",") if addr.strip()]
+
+
 def _requester_pending_review_email(partner_name: str, requester_name: Optional[str], review_reason: str) -> str:
     greeting = f"Hello {requester_name}," if requester_name else "Hello,"
     return (
@@ -95,14 +102,14 @@ def notify_manual_review_pending(
         logger.warning(f"⚠️  No requester email provided for '{partner_name}' — skipping requester notification")
         requester_result = {"sent": False, "simulated": False, "error": "no requester email provided"}
 
-    resolved_admin_email = admin_email or os.getenv("PRMS_ADMIN_NOTIFICATION_EMAIL")
-    if not resolved_admin_email:
+    resolved_admin_emails = _parse_email_list(admin_email) or _parse_email_list(os.getenv("PRMS_ADMIN_NOTIFICATION_EMAIL"))
+    if not resolved_admin_emails:
         logger.warning("⚠️  PRMS_ADMIN_NOTIFICATION_EMAIL not configured — skipping admin notification")
         admin_result = {"sent": False, "simulated": True, "error": "no admin email configured"}
     else:
         admin_result = email_service.send_email(
             subject=f"⚠️ Manual review required: partner request '{partner_name}'",
-            to=[resolved_admin_email],
+            to=resolved_admin_emails,
             text=_admin_pending_review_email(partner_name, request_id, requester_email, requester_name, review_reason)
         )
 
