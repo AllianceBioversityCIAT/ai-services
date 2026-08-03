@@ -16,11 +16,12 @@ from typing import List, Dict, Optional
 from logger.logger_util import get_logger
 from botocore.exceptions import ClientError
 from fastapi.middleware.cors import CORSMiddleware
+from src.notifications import notify_manual_review_pending
 from fastapi.responses import JSONResponse, StreamingResponse
 from src.populate_clarisa_db import sync_clarisa_institutions
 from fastapi import FastAPI, File, UploadFile, HTTPException, Body, Form
-from src.web_search import search_institution_online, search_institution_auto_decision
 from src.mapping_clarisa_comparison import process_partners_to_json, search_institution_for_excel
+from src.web_search import search_institution_online, search_institution_auto_decision, check_same_institution
 from src.supabase_client import get_cached_results_by_name, cache_results_batch, count_institutions, check_supabase_connection, clear_all_cache
 
 
@@ -145,6 +146,7 @@ class AutoPartnerRequest(BaseModel):
     website: Optional[str] = None
     acronym: Optional[str] = None
     institution_type: Optional[str] = None
+    institution_subtype: Optional[str] = None
     # Fields for responding to an existing CLARISA request
     request_id: Optional[int] = None
     auth_token: Optional[str] = None
@@ -159,15 +161,49 @@ class AutoPartnerRequest(BaseModel):
 
 
 class AutoPartnerResponse(BaseModel):
-    decision: str
+    decision: str  # "ACCEPT" | "REJECT" | "MANUAL_REVIEW"
     confidence: str
     reason: str
-    match_quality: str
+    match_quality: str  # "excellent" | "very_good" | "good" | "fair" | "no_match"
     clarisa_match: Optional[Dict] = None
     web_search_performed: bool
     web_search_result: Optional[Dict] = None
     auto_responded_to_clarisa: bool = False
     clarisa_response: Optional[Dict] = None
+    duplicate_check_performed: bool = False
+    duplicate_check_result: Optional[Dict] = None
+    fields_complete: Optional[bool] = None
+    missing_fields: Optional[List[str]] = None
+    notifications: Optional[Dict] = None
+
+
+# Auto-decision match-quality thresholds — scoped ONLY to /api/auto-partner-request.
+# Independent from mapping_clarisa_comparison.py's own excellent/good/fair/no_match
+# thresholds, which the manual-review frontend flow relies on and which are NOT changed.
+AUTO_EXCELLENT_MIN = 0.95   # score > this            -> excellent
+AUTO_VERY_GOOD_MIN = 0.85   # 0.85 <= score <= 0.95   -> very_good
+AUTO_GOOD_MIN = 0.70        # 0.70 <= score < 0.85    -> good
+# fair      = 0.60 <= score < 0.70 (exactly what search_institution_for_excel already
+#             returns as best_match, since its own THRESHOLD_FINAL == 0.60)
+# no_match  = search_result["best_match"] is None (score < 0.60)
+
+
+def _check_completeness(body: "AutoPartnerRequest"):
+    """
+    Field-completeness gate for auto-approval (Reglas_Aprobacion_Partners_CLARISA
+    V1.1, 6.4), applied to every branch that can result in an auto-approval:
+    Name, Type, Subtype, Country (HQ) and Website are required; Acronym is the
+    one field allowed to be missing.
+    """
+    required = {
+        "partner_name": body.partner_name,
+        "institution_type": body.institution_type,
+        "institution_subtype": body.institution_subtype,
+        "country": body.country,
+        "website": body.website,
+    }
+    missing = [field for field, value in required.items() if not (value and str(value).strip())]
+    return (len(missing) == 0, missing)
 
 
 @app.get("/", tags=["Health"])
@@ -1748,16 +1784,38 @@ async def auto_partner_request(body: AutoPartnerRequest):
 
     ## Decision Logic
 
-    | CLARISA match quality | Web search triggered | Decision |
-    |---|---|---|
-    | Excellent (≥ 0.85) | No | REJECT (institution already exists in CLARISA) |
-    | Good (≥ 0.70) | No | REJECT (probable duplicate in CLARISA) |
-    | Fair (≥ 0.60) | Yes — Claude decides | ACCEPT (new valid institution) or REJECT |
-    | No match | Yes — Claude decides | ACCEPT (new valid institution) or REJECT |
+    | CLARISA match quality | Duplicate check | Web search + rules | Decision |
+    |---|---|---|---|
+    | Excellent (> 0.95) | No | No | REJECT (near-certain duplicate, no further checks) |
+    | Very Good (0.85 – 0.95) | Yes — small/fast model | If not confirmed as duplicate | REJECT (confirmed duplicate) or fall through |
+    | Good (0.70 – 0.85) | Yes — small/fast model | If not confirmed as duplicate | REJECT (confirmed duplicate) or fall through |
+    | Fair (0.60 – 0.70) | No (skipped — score too low) | Yes | ACCEPT or MANUAL_REVIEW |
+    | No match (< 0.60) | No (skipped) | Yes | ACCEPT or MANUAL_REVIEW |
 
-    When web search is triggered, Claude evaluates CGIAR eligibility criteria:
-    legal entity status, institution type, and research mandate.
-    If the institution is valid and not a duplicate → ACCEPT. Otherwise → REJECT.
+    Two-step AI logic:
+    1. **Duplicate check** (Very Good / Good only): a smaller/faster model compares the
+       requester's submitted metadata against the CLARISA candidate. If confirmed as the
+       same institution → REJECT. Otherwise, falls through to step 2 (this is NOT itself
+       a rejection).
+    2. **Rules validation** (Fair, No match, and Very Good/Good falling through from
+       step 1): a web search + larger model evaluates CGIAR eligibility criteria (legal
+       entity status, institution type, research mandate). If the rules validation
+       passes → ACCEPT. Otherwise → **MANUAL_REVIEW** (not a rejection — the AI was
+       not confident enough to auto-approve, so a human makes the final call). This
+       decision is based solely on the rules validation outcome — a request with every
+       field filled in gets the exact same review as one with missing fields; field
+       completeness (`fields_complete`/`missing_fields` in the response) is tracked only
+       as informational metadata for whoever ends up handling the manual review, and
+       never gates ACCEPT on its own.
+
+    `decision` is one of `"ACCEPT"`, `"REJECT"`, or `"MANUAL_REVIEW"`. ACCEPT/REJECT
+    are submitted to CLARISA's own respond endpoint (which already notifies the
+    requester, same as the manual flow). Only `MANUAL_REVIEW` triggers a notification
+    from this service (see `backend/src/notifications.py`) — it makes no CLARISA call
+    at all (the request is left in `Pending` status for the existing manual
+    `/api/respond-partner-request` endpoint), so without it the case would otherwise
+    go silent. That notification goes to both the requester and the PRMS admin, and
+    carries a mandatory AI disclaimer.
 
     ## Request Body
 
@@ -1989,6 +2047,11 @@ async def auto_partner_request(body: AutoPartnerRequest):
         reason = ""
         web_search_performed = False
         web_search_result = None
+        duplicate_check_performed = False
+        duplicate_check_result = None
+        fields_complete = None
+        missing_fields = None
+        best_match = None
 
         if search_result and search_result.get("best_match"):
             best_match = search_result["best_match"]
@@ -2010,30 +2073,71 @@ async def auto_partner_request(body: AutoPartnerRequest):
                 }
             }
 
-            if score >= 0.85:
+            if score > AUTO_EXCELLENT_MIN:
                 match_quality = "excellent"
-                decision = "REJECT"
-                confidence = "high"
-                reason = (
-                    f"Institution already exists in CLARISA: '{best_match['name']}' "
-                    f"(score: {score:.2f}). Duplicate partner requests are not accepted. "
-                    f"Use the existing CLARISA entry (ID: {best_match['clarisa_id']})."
-                )
-            elif score >= 0.70:
+            elif score >= AUTO_VERY_GOOD_MIN:
+                match_quality = "very_good"
+            elif score >= AUTO_GOOD_MIN:
                 match_quality = "good"
-                decision = "REJECT"
-                confidence = "medium"
-                reason = (
-                    f"Institution likely already exists in CLARISA: '{best_match['name']}' "
-                    f"(score: {score:.2f}). Probable duplicate — use the existing CLARISA entry "
-                    f"(ID: {best_match['clarisa_id']})."
-                )
             else:
-                # Fair match — uncertain, escalate to web search for verification
                 match_quality = "fair"
 
         # ------------------------------------------------------------------
-        # STEP 2 — AI web search (triggered for fair matches and no-match)
+        # STEP 2 — Decision by match-quality tier
+        # ------------------------------------------------------------------
+        if match_quality == "excellent":
+            # Near-certain duplicate — auto-reject with no further checks.
+            decision = "REJECT"
+            confidence = "high"
+            reason = (
+                f"Institution already exists in CLARISA: '{best_match['name']}' "
+                f"(score: {best_match['final_score']:.2f}). Duplicate partner requests are not accepted. "
+                f"Use the existing CLARISA entry (ID: {best_match['clarisa_id']})."
+            )
+
+        elif match_quality in ("very_good", "good"):
+            # High-probability match — confirm with a smaller/faster model before
+            # rejecting outright. If it's NOT confirmed as the same institution,
+            # fall through to STEP 3 rather than rejecting.
+            duplicate_check_performed = True
+            logger.info(f"   Running same-institution check: '{partner_name}' vs '{best_match['name']}'")
+            dup = check_same_institution(
+                requester_metadata={
+                    "name": partner_name,
+                    "acronym": body.acronym,
+                    "website": body.website,
+                    "institution_type": body.institution_type,
+                    "country": body.country,
+                },
+                candidate_metadata=best_match
+            )
+            duplicate_check_result = dup
+
+            if dup.get("success") and dup.get("same_institution"):
+                decision = "REJECT"
+                confidence = dup.get("confidence", "medium")
+                reason = (
+                    f"AI confirmed this is the same institution as the existing CLARISA entry "
+                    f"'{best_match['name']}' (ID: {best_match['clarisa_id']}): {dup.get('reason', '')}"
+                )
+            # else: not confirmed as a duplicate — decision stays None, falls through to STEP 3
+
+        # match_quality in ("fair", "no_match"): skip the duplicate check entirely
+        # (score too low for a meaningful comparison) and fall straight through to STEP 3.
+
+        # ------------------------------------------------------------------
+        # STEP 3 — Web search + rules validation
+        # Entered for: fair, no_match, and very_good/good where the duplicate
+        # check did NOT confirm a match. Outcome is ACCEPT or MANUAL_REVIEW —
+        # never a direct REJECT from this step (only a confirmed duplicate,
+        # handled above, can produce REJECT).
+        #
+        # Decision is based SOLELY on the web search + rules validation outcome.
+        # Field completeness is NOT a gate here — a request with every field
+        # filled in still goes through this exact same review as one with
+        # missing fields, and can still land in MANUAL_REVIEW if the rules
+        # validation isn't confident. completeness is only tracked below as
+        # informational metadata for whoever handles the manual review.
         # ------------------------------------------------------------------
         if decision is None:
             web_search_performed = True
@@ -2056,26 +2160,58 @@ async def auto_partner_request(body: AutoPartnerRequest):
                 "summary": ws.get("summary", "")
             }
 
-            if ws.get("success") and ws.get("approved") is not None:
-                decision = "ACCEPT" if ws["approved"] else "REJECT"
+            fields_complete, missing_fields = _check_completeness(body)
+            rules_passed = bool(ws.get("success") and ws.get("approved"))
+
+            if rules_passed:
+                decision = "ACCEPT"
                 confidence = ws.get("confidence", "low")
-                reason = ws.get("reason", "")
-                if not reason:
-                    reason = f"Web search {'confirmed' if ws['approved'] else 'could not confirm'} the institution meets CGIAR eligibility criteria."
+                reason = ws.get("reason") or "Web search confirmed the institution meets CGIAR eligibility criteria."
             else:
-                decision = "REJECT"
+                decision = "MANUAL_REVIEW"
                 confidence = "low"
-                reason = ws.get("reason") or ws.get("error") or "Web search did not return a conclusive result. Manual review recommended."
+                reason = (
+                    ws.get("reason") or ws.get("error")
+                    or "AI could not confirm the institution meets CGIAR eligibility criteria."
+                )
 
         logger.info(f"🤖 Decision: {decision} ({confidence}) — {partner_name}")
 
         # ------------------------------------------------------------------
-        # STEP 3 — Optional: auto-respond to CLARISA
+        # STEP 4 — Notifications (never blocks the response on failure)
+        # Only MANUAL_REVIEW notifies from here: ACCEPT/REJECT both go through
+        # CLARISA's own respond endpoint below (STEP 5), which already handles
+        # notifying the requester. MANUAL_REVIEW makes no CLARISA call at all,
+        # so without this it would otherwise go silent.
+        # ------------------------------------------------------------------
+        notifications_result = None
+        if decision == "MANUAL_REVIEW":
+            try:
+                notifications_result = notify_manual_review_pending(
+                    partner_name=partner_name,
+                    requester_email=body.external_user_mail,
+                    requester_name=body.external_user_name,
+                    request_id=created_request_id,
+                    review_reason=reason
+                )
+            except Exception as e:
+                logger.warning(f"⚠️  Notification dispatch failed (non-blocking) for '{partner_name}': {e}")
+
+        # ------------------------------------------------------------------
+        # STEP 5 — Optional: auto-respond to CLARISA (skipped for MANUAL_REVIEW —
+        # the request is left "Pending" in CLARISA for a human to resolve via
+        # the existing manual /api/respond-partner-request endpoint)
         # ------------------------------------------------------------------
         auto_responded = False
         clarisa_response_data = None
 
-        if body.auto_respond or body.create_in_clarisa:
+        if decision == "MANUAL_REVIEW":
+            logger.info(f"⏸️  Decision is MANUAL_REVIEW for '{partner_name}' — leaving CLARISA request pending for human review.")
+            clarisa_response_data = {
+                "skipped": True,
+                "reason": "Routed to manual review; awaiting human decision via the existing manual review workflow."
+            }
+        elif body.auto_respond or body.create_in_clarisa:
             effective_request_id = created_request_id
             if not effective_request_id or not body.auth_token or not body.user_id:
                 if body.create_in_clarisa and not effective_request_id:
@@ -2161,7 +2297,12 @@ async def auto_partner_request(body: AutoPartnerRequest):
             web_search_performed=web_search_performed,
             web_search_result=web_search_result,
             auto_responded_to_clarisa=auto_responded,
-            clarisa_response=clarisa_response_data
+            clarisa_response=clarisa_response_data,
+            duplicate_check_performed=duplicate_check_performed,
+            duplicate_check_result=duplicate_check_result,
+            fields_complete=fields_complete,
+            missing_fields=missing_fields,
+            notifications=notifications_result
         )
 
     except HTTPException:
