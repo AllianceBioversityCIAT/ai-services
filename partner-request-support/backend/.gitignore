@@ -68,4 +68,4 @@ secrets.py
 .agent/
 .agents/
 
-backend/test/test_auto.py
+test/test_auto.py
