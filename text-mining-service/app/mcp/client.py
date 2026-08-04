@@ -96,7 +96,7 @@ class TextMiningRequest(BaseModel):
 class PrmsTextMiningRequest(BaseModel):
     """JSON body for POST /prms/text-mining."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     bucketName: Optional[str] = Field(
         None,
