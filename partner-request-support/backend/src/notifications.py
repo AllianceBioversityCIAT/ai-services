@@ -47,7 +47,7 @@ def _requester_pending_review_email(partner_name: str, requester_name: Optional[
         f"The automated review could not confirm with enough confidence that the "
         f"institution meets all CGIAR eligibility criteria. Because of this, your "
         f"request has NOT been rejected — it is now going to manual review by the "
-        f"PRMS team, who will make the final decision.\n\n"
+        f"support team, who will make the final decision.\n\n"
         f"Reason flagged by the automated review: {review_reason}\n\n"
         f"{AI_DISCLAIMER_TEXT}\n\n"
         f"You will be notified once a final decision is made.\n\n"
