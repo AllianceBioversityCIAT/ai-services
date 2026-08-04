@@ -283,9 +283,9 @@ async def delete_document_overview_files(
     Generate a comprehensive, structured overview of a project based on documents
     stored in an Amazon S3 folder.
 
-    The service lists all supported documents in the project folder (1 to 3 files),
-    extracts their text in parallel, and uses an LLM (Claude via AWS Bedrock) to
-    produce a single synthesized project overview.
+    The service lists all supported documents in the project folder (up to 3 files,
+    or up to 2 if `text` is provided), extracts their text in parallel, and uses an
+    LLM (Claude via AWS Bedrock) to produce a single synthesized project overview.
 
     **Supported document formats:**
     - **PDF** — via Amazon Textract
@@ -306,6 +306,8 @@ async def delete_document_overview_files(
     Documents are optional evidence: if the project folder has none, the overview
     is generated from STAR project and results metadata alone. A request fails only
     when there are neither documents nor STAR context available.
+
+    The maximum allowed documents drops from 3 to 2 when `text` is also provided.
     """,
     response_description="Structured project overview",
     responses={
@@ -349,12 +351,14 @@ async def document_overview(request: DocumentOverviewRequest, mis: str = Depends
     - **project_folder**: S3 folder prefix for the project (1-3 documents). Also used as STAR contract ID.
     - **token**: STAR access token for authenticated STAR API calls
     - **user_id**: Optional user ID for interaction tracking
+    - **text**: Optional free-text input from the user, included in the AI context
     """
     try:
         logger.info(
             f"🚀 Project overview request — "
             f"s3://{request.bucket_name}/{request.project_folder} "
-            f"(user={request.user_id}, star_token={'yes' if request.token else 'no'})"
+            f"(user={request.user_id}, star_token={'yes' if request.token else 'no'}, "
+            f"text={'yes' if request.text else 'no'})"
         )
 
         result = process_project_overview(
@@ -362,6 +366,7 @@ async def document_overview(request: DocumentOverviewRequest, mis: str = Depends
             project_folder=request.project_folder,
             user_id=request.user_id,
             token=request.token,
+            text=request.text,
         )
 
         await notification_service.send_slack_notification(

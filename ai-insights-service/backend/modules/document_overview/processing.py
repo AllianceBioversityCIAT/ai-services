@@ -13,6 +13,7 @@ from utils.s3.s3_util import (
     list_project_documents,
     save_project_response_json,
     get_project_response_json,
+    MAX_PROJECT_DOCUMENTS,
 )
 from ai.prompts.prompt_document_overview import DEFAULT_PROMPT_DOCUMENT_OVERVIEW
 from utils.star.star_client import fetch_star_context, contract_id_from_project_folder
@@ -25,6 +26,9 @@ MODEL_ID = "claude-sonnet-4-6"
 
 # Rough safety guard (~750K tokens at ~4 chars/token)
 MAX_COMBINED_CHARS = 3_000_000
+
+# Lower document limit when free-text user input is also part of the context
+MAX_PROJECT_DOCUMENTS_WITH_TEXT = 2
 
 
 def _extract_document_text(bucket_name: str, file_key: str) -> tuple[str, str]:
@@ -109,6 +113,7 @@ def _build_query(
     document_count: int,
     project_context: Optional[str] = None,
     results_context: Optional[str] = None,
+    text: Optional[str] = None,
 ) -> str:
     separator = "=" * 80
 
@@ -119,6 +124,8 @@ def _build_query(
         source_descriptions.append("Metadata about the project's reported results in STAR")
     if document_count > 0:
         source_descriptions.append("Text extracted from one or more documents uploaded as project evidence")
+    if text:
+        source_descriptions.append("Free-text input provided by the user")
 
     numbered_sources = "\n".join(
         f"{index}. {description}" for index, description in enumerate(source_descriptions, start=1)
@@ -164,6 +171,13 @@ def _build_query(
             f"STAR project information and results metadata above."
         )
 
+    if text:
+        sections.append(
+            f"\n-------\n\n"
+            f"### USER INPUT:\n\n"
+            f"{text}"
+        )
+
     return (
         f"{chr(10).join(sections)}\n\n"
         f"{separator}\n"
@@ -177,12 +191,13 @@ def process_project_overview(
     prompt: str = DEFAULT_PROMPT_DOCUMENT_OVERVIEW,
     user_id: Optional[str] = None,
     token: Optional[str] = None,
+    text: Optional[str] = None,
 ) -> dict:
     """
     Generate a structured project overview from documents in an S3 folder.
 
     Steps:
-      1. List supported documents in the project folder (1-3 files)
+      1. List supported documents in the project folder (0-3 files, or 0-2 if `text` is provided)
       2. Extract text from all documents in parallel
       3. Combine extracted text and invoke the LLM
       4. Parse and return the structured project overview
@@ -193,6 +208,7 @@ def process_project_overview(
         prompt: Override the default project overview prompt
         user_id: Optional user ID for future interaction tracking
         token: STAR access token for authenticated STAR API calls
+        text: Optional free-text input from the user, included in the AI context
 
     Returns:
         dict with overview, time_taken, project_folder, bucket_name, documents_processed
@@ -206,7 +222,8 @@ def process_project_overview(
 
     project_context, results_context = fetch_star_context(contract_id, token=token)
 
-    file_keys = list_project_documents(bucket_name, project_folder)
+    max_documents = MAX_PROJECT_DOCUMENTS_WITH_TEXT if text else MAX_PROJECT_DOCUMENTS
+    file_keys = list_project_documents(bucket_name, project_folder, max_documents=max_documents)
 
     if not file_keys and not (project_context or results_context):
         raise ValueError(
@@ -241,6 +258,7 @@ def process_project_overview(
         len(documents),
         project_context=project_context,
         results_context=results_context,
+        text=text,
     )
 
     logger.info(f"📝 Full prompt sent to model:\n{query}")
@@ -280,6 +298,7 @@ def process_project_overview(
                 "star_project_context_included": project_context is not None,
                 "star_results_context_included": results_context is not None,
                 "star_token_provided": bool(token),
+                "user_text_provided": bool(text),
                 "documents_processed": [
                     {
                         "file_key": doc["file_key"],
