@@ -22,10 +22,6 @@ class DocumentOverviewRequest(BaseModel):
         description="Optional user identifier for interaction tracking",
         examples=["user123"]
     )
-    token: Optional[str] = Field(
-        default=None,
-        description="STAR access token used to authenticate calls to STAR APIs",
-    )
     text: Optional[str] = Field(
         default=None,
         description="Optional free-text input from the user, included in the AI context as additional user-provided information",
