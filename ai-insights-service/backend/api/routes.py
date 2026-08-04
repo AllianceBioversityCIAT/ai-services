@@ -7,7 +7,7 @@ from utils.logger.logger_util import get_logger
 from utils.config.config_util import CLARISA_VALIDATE_URL
 from utils.notification.notification_service import notification_service
 from utils.s3.s3_util import list_available_project_files, delete_project_files
-from fastapi import APIRouter, HTTPException, status, Request, Depends, Query
+from fastapi import APIRouter, HTTPException, status, Request, Depends, Query, Header
 from modules.document_overview.processing import (
     process_project_overview,
     get_cached_project_overview,
@@ -300,8 +300,8 @@ async def delete_document_overview_files(
     The `project_folder` value is also used as the STAR contract ID to fetch
     project and results metadata for AI context enrichment.
 
-    STAR API calls require a valid access token, provided in the request body
-    (`token`) or via the `STAR_API_TOKEN` environment variable.
+    STAR API calls require a valid access token, provided via the `Access-Token`
+    request header or via the `STAR_API_TOKEN` environment variable.
 
     Documents are optional evidence: if the project folder has none, the overview
     is generated from STAR project and results metadata alone. A request fails only
@@ -343,13 +343,17 @@ async def delete_document_overview_files(
         }
     }
 )
-async def document_overview(request: DocumentOverviewRequest, mis: str = Depends(validate_with_clarisa("AI Insights Service - STAR"))) -> DocumentOverviewResponse:
+async def document_overview(
+    request: DocumentOverviewRequest,
+    access_token: str = Header(default=None, alias="Access-Token", description="STAR access token for authenticated STAR API calls"),
+    mis: str = Depends(validate_with_clarisa("AI Insights Service - STAR")),
+) -> DocumentOverviewResponse:
     """
     Generate a structured project overview from documents in an S3 folder.
 
     - **bucket_name**: S3 bucket containing the project documents
     - **project_folder**: S3 folder prefix for the project (1-3 documents). Also used as STAR contract ID.
-    - **token**: STAR access token for authenticated STAR API calls
+    - **Access-Token** (header): STAR access token for authenticated STAR API calls
     - **user_id**: Optional user ID for interaction tracking
     - **text**: Optional free-text input from the user, included in the AI context
     """
@@ -357,7 +361,7 @@ async def document_overview(request: DocumentOverviewRequest, mis: str = Depends
         logger.info(
             f"🚀 Project overview request — "
             f"s3://{request.bucket_name}/{request.project_folder} "
-            f"(user={request.user_id}, star_token={'yes' if request.token else 'no'}, "
+            f"(user={request.user_id}, star_token={'yes' if access_token else 'no'}, "
             f"text={'yes' if request.text else 'no'})"
         )
 
@@ -365,7 +369,7 @@ async def document_overview(request: DocumentOverviewRequest, mis: str = Depends
             bucket_name=request.bucket_name,
             project_folder=request.project_folder,
             user_id=request.user_id,
-            token=request.token,
+            token=access_token,
             text=request.text,
         )
 
