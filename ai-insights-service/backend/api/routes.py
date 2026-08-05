@@ -90,6 +90,7 @@ def _build_empty_overview_response(
         project_folder=project_folder.strip("/"),
         bucket_name=bucket_name,
         documents_processed=[],
+        text="",
         status="empty",
         cached=False,
     )
@@ -116,6 +117,7 @@ def _build_overview_response(
         project_folder=result["project_folder"],
         bucket_name=result["bucket_name"],
         documents_processed=documents_processed,
+        text=result.get("text") or "",
         interaction_id=result.get("interaction_id"),
         status=result.get("status", "success"),
         generated_at=result.get("generated_at"),

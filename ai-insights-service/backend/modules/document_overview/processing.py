@@ -350,6 +350,7 @@ def process_project_overview(
         "time_taken": f"{elapsed_time:.2f}",
         "project_folder": project_folder.strip('/'),
         "bucket_name": bucket_name,
+        "text": text or "",
         "documents_processed": [
             {
                 "file_key": doc["file_key"],
