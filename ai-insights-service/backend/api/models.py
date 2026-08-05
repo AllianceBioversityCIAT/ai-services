@@ -73,6 +73,10 @@ class DocumentOverviewResponse(BaseModel):
         ...,
         description="List of documents extracted and analyzed"
     )
+    text: str = Field(
+        default="",
+        description="Free-text user input received for this overview. Empty string means no text was provided."
+    )
     interaction_id: Optional[str] = Field(
         default=None,
         description="Interaction tracking ID if user_id was provided"
