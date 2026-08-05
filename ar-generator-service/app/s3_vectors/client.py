@@ -1,8 +1,8 @@
 import boto3
 from typing import Any
 from botocore.exceptions import ClientError
-from app.utils.config.config_util import S3_VECTORS
 from app.utils.logger.logger_util import get_logger
+from app.utils.config.config_util import S3_VECTORS, AWS
 from app.s3_vectors.schemas import NON_FILTERABLE_METADATA_KEYS, chunk_from_vector_metadata
 
 logger = get_logger()
@@ -15,7 +15,12 @@ class S3VectorsClient:
         self.bucket = bucket
         self.index = index
         self.region = region
-        self._client = boto3.client("s3vectors", region_name=region)
+        self._client = boto3.client(
+            "s3vectors",
+            aws_access_key_id=AWS['aws_access_key'],
+            aws_secret_access_key=AWS['aws_secret_key'],
+            region_name=region
+        )
 
     def get_index(self) -> dict | None:
         try:

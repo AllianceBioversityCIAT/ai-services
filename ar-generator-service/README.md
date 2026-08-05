@@ -189,7 +189,7 @@ S3_VECTORS_BUCKET_NAME=your_vector_bucket_name
 S3_VECTORS_INDEX_NAME=aiccra-chunks
 ```
 
-S3 Vectors uses the **default AWS credential chain** (Lambda execution role in production).
+The `s3vectors` client uses the same explicit credentials as the rest of the service (`AWS_ACCESS_KEY_ID_OS` / `AWS_SECRET_ACCESS_KEY_OS`). It does **not** fall back to the Lambda execution role: `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` are reserved names in Lambda and cannot be set as function environment variables.
 
 ### SQL Server / AICCRA Lakehouse (required in production)
 
