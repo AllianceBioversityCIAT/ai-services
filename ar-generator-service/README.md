@@ -94,7 +94,7 @@ Production pipelines import **`vectorize.py`** and **`vectorize_annual.py`**, no
 - AWS account with:
   - Bedrock access (embeddings + Claude)
   - S3 Vectors vector bucket + index in `us-east-1` (or your target region)
-  - IAM permissions for `s3vectors:*` on the Lambda role / your user
+  - IAM permissions for `s3vectors:*` on the IAM user behind `AWS_ACCESS_KEY_ID_OS`
 - MySQL database with AICCRA views (production), **or** local CSV files (development)
 
 ---
@@ -131,7 +131,7 @@ S3_VECTORS_BUCKET_NAME=ar-generator-vectors
 S3_VECTORS_INDEX_NAME=aiccra-chunks
 ```
 
-S3 Vectors uses the **default AWS credential chain** for the `s3vectors` client (typically `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` from the environment or Lambda execution role).
+The `s3vectors` client uses the same explicit credentials as the rest of the service (`AWS_ACCESS_KEY_ID_OS` / `AWS_SECRET_ACCESS_KEY_OS`). It does **not** fall back to the Lambda execution role: `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` are reserved names in Lambda and cannot be set as function environment variables.
 
 ### Structured data (production)
 
