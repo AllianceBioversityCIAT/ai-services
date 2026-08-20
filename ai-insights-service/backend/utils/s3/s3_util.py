@@ -7,7 +7,11 @@ from io import BytesIO
 from pptx import Presentation
 from botocore.exceptions import ClientError
 from utils.logger.logger_util import get_logger
-from utils.config.config_util import get_boto3_client_kwargs
+from utils.config.config_util import (
+    get_boto3_client_kwargs,
+    PROMPTS_BUCKET_NAME,
+    PROMPTS_PREFIX,
+)
 
 logger = get_logger()
 
@@ -359,3 +363,51 @@ def upload_file_to_s3(file_content, bucket_name, file_key, content_type=None):
         logger.error(
             f"❌ Error uploading file to {bucket_name}/{file_key}: {str(e)}")
         raise
+
+
+def get_prompt_key(prompt_id: str) -> str:
+    """Build the S3 key holding a prompt record (one JSON object per prompt ID)."""
+    return f"{PROMPTS_PREFIX}/{prompt_id}.json" if PROMPTS_PREFIX else f"{prompt_id}.json"
+
+
+def save_prompt_json(prompt_id: str, record: dict) -> str:
+    """
+    Persist a prompt record to the prompts bucket.
+
+    Returns:
+        The S3 key where the record was saved
+    """
+    file_key = get_prompt_key(prompt_id)
+    body = json.dumps(record, indent=2, ensure_ascii=False).encode("utf-8")
+
+    upload_file_to_s3(
+        file_content=body,
+        bucket_name=PROMPTS_BUCKET_NAME,
+        file_key=file_key,
+        content_type="application/json",
+    )
+    logger.info(f"💾 Prompt '{prompt_id}' saved to s3://{PROMPTS_BUCKET_NAME}/{file_key}")
+    return file_key
+
+
+def get_prompt_json(prompt_id: str) -> dict | None:
+    """
+    Load a stored prompt record from the prompts bucket.
+
+    Returns:
+        Parsed JSON dict if found, otherwise None
+    """
+    file_key = get_prompt_key(prompt_id)
+    try:
+        logger.info(f"📂 Loading prompt '{prompt_id}' from s3://{PROMPTS_BUCKET_NAME}/{file_key}")
+        raw = download_file_from_s3(PROMPTS_BUCKET_NAME, file_key)
+        return json.loads(raw.decode("utf-8"))
+    except ClientError as e:
+        if e.response["Error"]["Code"] in ("NoSuchKey", "404"):
+            logger.info(f"📭 No stored prompt found at s3://{PROMPTS_BUCKET_NAME}/{file_key}")
+            return None
+        raise
+    except json.JSONDecodeError as e:
+        # A corrupted object must not break generation — callers fall back to code defaults.
+        logger.error(f"❌ Stored prompt '{prompt_id}' is not valid JSON: {str(e)}")
+        return None
