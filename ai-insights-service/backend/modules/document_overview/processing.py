@@ -15,7 +15,12 @@ from utils.s3.s3_util import (
     get_project_response_json,
     MAX_PROJECT_DOCUMENTS,
 )
-from ai.prompts.prompt_document_overview import DEFAULT_PROMPT_DOCUMENT_OVERVIEW
+from modules.prompts.processing import get_active_sections, render_sections
+from ai.prompts.registry import (
+    PROJECT_OVERVIEW_PROMPT_ID,
+    PROMPT_SECTIONS,
+    get_default_sections,
+)
 from utils.star.star_client import fetch_star_context, contract_id_from_project_folder
 from utils.textract.textract_util import extract_text_from_s3, TEXTRACT_SUPPORTED_EXTENSIONS
 
@@ -107,16 +112,19 @@ def _build_combined_document_text(documents: list[dict]) -> str:
     return "\n\n".join(sections)
 
 
-def _build_query(
+def _build_context_variables(
     combined_text: str,
-    prompt: str,
     document_count: int,
     project_context: Optional[str] = None,
     results_context: Optional[str] = None,
     text: Optional[str] = None,
-) -> str:
-    separator = "=" * 80
+) -> dict[str, str]:
+    """
+    Build the replacement value for every `{variable}` in the prompt template.
 
+    An absent source gets an explicit "not available" sentence rather than an empty
+    string: a bare heading with nothing under it invites the model to invent content.
+    """
     source_descriptions = []
     if project_context:
         source_descriptions.append("Structured project information from STAR (description, donor, unit, SDGs)")
@@ -131,64 +139,48 @@ def _build_query(
         f"{index}. {description}" for index, description in enumerate(source_descriptions, start=1)
     )
 
-    preamble = (
-        f"## ROLE:\n"
-        f"You are an expert analyst specializing in research, development, and policy projects.\n\n"
-        f"{separator}\n\n"
-        f"## CONTEXT YOU WILL RECEIVE:\n"
-        f"You will receive context from the following source(s), all belonging to the SAME project:\n"
-        f"{numbered_sources}\n\n"
-        f"Review all of the following context, then follow the task instructions at the end of this prompt.\n"
-    )
-
-    sections = [preamble]
-
-    if project_context:
-        sections.append(
-            f"-------\n\n"
-            f"### PROJECT INFORMATION:\n\n"
-            f"{project_context}"
-        )
-
-    if results_context:
-        sections.append(
-            f"\n-------\n\n"
-            f"### PROJECT RESULTS:\n\n"
-            f"{results_context}"
-        )
-
     if document_count > 0:
-        sections.append(
-            f"\n-------\n\n"
-            f"### UPLOADED PROJECT EVIDENCE ({document_count} file(s)):\n\n"
-            f"{combined_text}"
-        )
+        uploaded_evidence = f"{document_count} file(s) were uploaded:\n\n{combined_text}"
     else:
-        sections.append(
-            f"\n-------\n\n"
-            f"### UPLOADED PROJECT EVIDENCE:\n\n"
-            f"No documents were uploaded for this project. Base the overview entirely on the "
-            f"STAR project information and results metadata above."
+        # Kept source-agnostic on purpose: naming STAR here would point the model at
+        # metadata that may itself be absent (e.g. when only user text was provided).
+        uploaded_evidence = (
+            "No documents were uploaded for this project. Base the overview entirely on the "
+            "other context provided above."
         )
 
-    if text:
-        sections.append(
-            f"\n-------\n\n"
-            f"### USER INPUT:\n\n"
-            f"{text}"
-        )
+    return {
+        "available_context_sources": numbered_sources,
+        "project_information": project_context or "No STAR project information is available for this project.",
+        "project_results": results_context or "No STAR results metadata is available for this project.",
+        "uploaded_evidence": uploaded_evidence,
+        "user_input": text or "No additional user input was provided.",
+    }
 
-    return (
-        f"{chr(10).join(sections)}\n\n"
-        f"{separator}\n"
-        f"{prompt}"
+
+def _build_query(
+    combined_text: str,
+    sections: dict[str, str],
+    document_count: int,
+    project_context: Optional[str] = None,
+    results_context: Optional[str] = None,
+    text: Optional[str] = None,
+) -> str:
+    """Assemble the four prompt sections and substitute the context variables."""
+    values = _build_context_variables(
+        combined_text,
+        document_count,
+        project_context=project_context,
+        results_context=results_context,
+        text=text,
     )
+    return render_sections(sections, values)
 
 
 def process_project_overview(
     bucket_name: str,
     project_folder: str,
-    prompt: str = DEFAULT_PROMPT_DOCUMENT_OVERVIEW,
+    sections: Optional[dict[str, str]] = None,
     user_id: Optional[str] = None,
     token: Optional[str] = None,
     text: Optional[str] = None,
@@ -197,15 +189,17 @@ def process_project_overview(
     Generate a structured project overview from documents in an S3 folder.
 
     Steps:
-      1. List supported documents in the project folder (0-3 files, or 0-2 if `text` is provided)
-      2. Extract text from all documents in parallel
-      3. Combine extracted text and invoke the LLM
-      4. Parse and return the structured project overview
+      1. Resolve the prompt sections managed through the STAR Prompt Manager
+      2. List supported documents in the project folder (0-3 files, or 0-2 if `text` is provided)
+      3. Extract text from all documents in parallel
+      4. Combine extracted text and invoke the LLM
+      5. Parse and return the structured project overview
 
     Args:
         bucket_name: S3 bucket containing the project documents
         project_folder: S3 folder prefix for the project
-        prompt: Override the default project overview prompt
+        sections: Override the prompt sections; defaults to the stored user version,
+            falling back to the code-defined defaults
         user_id: Optional user ID for future interaction tracking
         token: STAR access token for authenticated STAR API calls
         text: Optional free-text input from the user, included in the AI context
@@ -214,6 +208,9 @@ def process_project_overview(
         dict with overview, time_taken, project_folder, bucket_name, documents_processed
     """
     start_time = time.time()
+
+    if sections is None:
+        sections = get_active_sections(PROJECT_OVERVIEW_PROMPT_ID)
     contract_id = contract_id_from_project_folder(project_folder)
     logger.info(
         f"🚀 Starting project overview for s3://{bucket_name}/{project_folder} "
@@ -225,16 +222,24 @@ def process_project_overview(
     max_documents = MAX_PROJECT_DOCUMENTS_WITH_TEXT if text else MAX_PROJECT_DOCUMENTS
     file_keys = list_project_documents(bucket_name, project_folder, max_documents=max_documents)
 
-    if not file_keys and not (project_context or results_context):
+    # Free-text input counts as a source on its own: a request only fails when there is
+    # nothing at all to work from.
+    if not file_keys and not (project_context or results_context) and not text:
         raise ValueError(
             f"No supported documents found in s3://{bucket_name}/{project_folder}, "
-            f"and no STAR context is available for contract {contract_id}"
+            f"no STAR context is available for contract {contract_id}, "
+            f"and no text input was provided"
         )
 
     if not file_keys:
+        remaining_sources = []
+        if project_context or results_context:
+            remaining_sources.append("STAR context")
+        if text:
+            remaining_sources.append("user text input")
         logger.info(
             f"📭 No documents found in s3://{bucket_name}/{project_folder} — "
-            f"generating overview from STAR context only"
+            f"generating overview from {' and '.join(remaining_sources)} only"
         )
 
     documents = _extract_documents_parallel(bucket_name, file_keys)
@@ -254,7 +259,7 @@ def process_project_overview(
     combined_text = _build_combined_document_text(documents)
     query = _build_query(
         combined_text,
-        prompt,
+        sections,
         len(documents),
         project_context=project_context,
         results_context=results_context,
@@ -279,6 +284,7 @@ def process_project_overview(
     interaction_id = None
     if user_id:
         try:
+            prompt_template = "\n\n".join(sections[section] for section in PROMPT_SECTIONS)
             file_names = [doc["file_key"].rsplit("/", 1)[-1] for doc in documents]
             documents_summary = (
                 f"{len(documents)} document(s): {', '.join(file_names)}"
@@ -310,8 +316,10 @@ def process_project_overview(
                 ],
                 "document_count": len(documents),
                 "total_characters": total_chars,
-                "prompt_used": prompt[:500] + "..." if len(prompt) > 500 else prompt,
-                "prompt_full_length": len(prompt),
+                "prompt_id": PROJECT_OVERVIEW_PROMPT_ID,
+                "prompt_used": prompt_template[:500] + "..." if len(prompt_template) > 500 else prompt_template,
+                "prompt_full_length": len(prompt_template),
+                "prompt_is_modified": sections != get_default_sections(PROJECT_OVERVIEW_PROMPT_ID),
                 "model_used": MODEL_ID,
                 "processing_steps": [
                     "star_metadata_fetch",
