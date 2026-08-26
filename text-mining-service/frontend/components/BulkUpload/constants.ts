@@ -6,6 +6,10 @@ export const FOLDER_PATH = 'star/text-mining/files/prod/bulk_upload/';
 export const STAR_BASE_URL = process.env.NEXT_PUBLIC_STAR_API_BASE_URL;
 export const MANAGEMENT_BASE_URL = process.env.NEXT_PUBLIC_MANAGEMENT_API_BASE_URL;
 export const CLARISA_BASE_URL = process.env.NEXT_PUBLIC_CLARISA_API_BASE_URL;
+export const CLARISA_COUNTRIES_URL = `${CLARISA_BASE_URL}/countries`;
+export const CLARISA_INSTITUTION_TYPES_URL = `${CLARISA_BASE_URL}/institution-types`;
+export const CLARISA_PARTNER_REQUEST_CREATE_URL = `${CLARISA_BASE_URL}/partner-requests/create`;
+export const PARTNER_REQUEST_MIS_ACRONYM = 'STAR';
 export const ENVIRONMENT_URL = `${MANAGEMENT_BASE_URL}/`;
 export const STAR_API_URL = `${STAR_BASE_URL}/results/ai/formalize/bulk`;
 

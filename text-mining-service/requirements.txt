@@ -19,3 +19,5 @@ mangum
 python-pptx
 python-multipart
 pylance
+pytest
+httpx

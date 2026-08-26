@@ -1,14 +1,87 @@
 import time
 import requests
 import threading
-from app.utils.logger.logger_util import get_logger
 from app.utils.config.config_util import IS_PROD
+from app.utils.logger.logger_util import get_logger
+
 
 logger = get_logger()
 
 # Global cache for mapped fields (thread-safe)
 _mapping_cache = {}
 _cache_lock = threading.Lock()
+
+
+def _mds_institution_label(item: dict) -> str | None:
+    """Prefer name, then acronym, for OpenSearch institution mapping."""
+    if not isinstance(item, dict):
+        return None
+    for key in ("name", "acronym", "institutions_name", "institutions_acronym"):
+        value = item.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _mds_institution_refs(mining_result: dict) -> list[str]:
+    """PRMS external institutions — centers use the CGIAR controlled catalog, not OpenSearch."""
+    labels: list[str] = []
+    seen: set[str] = set()
+
+    def add(item: dict) -> None:
+        if label := _mds_institution_label(item):
+            if label not in seen:
+                seen.add(label)
+                labels.append(label)
+
+    for item in mining_result.get("contributing_partners") or []:
+        if isinstance(item, dict):
+            add(item)
+
+    policy_change = mining_result.get("policy_change")
+    if isinstance(policy_change, dict):
+        for item in policy_change.get("implementing_organization") or []:
+            if isinstance(item, dict):
+                add(item)
+
+    return labels
+
+
+def _apply_mds_institution_mapping(
+    target: dict,
+    mapped_dict: dict,
+    *,
+    id_key: str = "institution_id",
+    name_key: str = "name",
+    acronym_key: str = "acronym",
+) -> None:
+    label = _mds_institution_label(target)
+    if not label:
+        return
+
+    extraction_name = (target.get(name_key) or target.get("name") or "").strip() or None
+    extraction_acronym = (target.get(acronym_key) or target.get("acronym") or "").strip() or None
+    target["_extraction_name"] = extraction_name
+    target["_extraction_acronym"] = extraction_acronym
+    target["_lookup_label"] = label
+
+    key = (label, "institution")
+    if key not in mapped_dict:
+        return
+
+    mapped = mapped_dict[key]
+    target["similarity_score"] = mapped.get("score", 0)
+    mapped_id = mapped.get("mapped_id")
+    if mapped_id is not None:
+        try:
+            target[id_key] = int(mapped_id)
+        except (TypeError, ValueError):
+            target[id_key] = mapped_id
+    if mapped_name := mapped.get("mapped_name"):
+        target[name_key] = mapped_name
+    if mapped_acronym := mapped.get("mapped_acronym"):
+        target[acronym_key] = mapped_acronym
+
 
 def clear_mapping_cache():
     """Clear the mapping cache (useful between different file processing)"""
@@ -40,6 +113,9 @@ def map_fields_with_opensearch(mining_result, mapping_service_url, max_retries=1
     for partner in mining_result.get("partners", []):
         if partner_name := partner.get("institution_name"):
             entries.append({"value": partner_name, "type": "institution"})
+
+    for institution_ref in _mds_institution_refs(mining_result):
+        entries.append({"value": institution_ref, "type": "institution"})
 
     for trainee in mining_result.get("trainees_description", []):
         if trainee_name := trainee.get("institution_name"):
@@ -188,6 +264,22 @@ def _apply_mapped_results(mining_result, mapped_dict):
                 org["mapped_institution_name"] = m.get("mapped_name")
                 org["mapped_institution_acronym"] = m.get("mapped_acronym")
                 org["similarity_score"] = m.get("score", 0)
+
+    for item in mining_result.get("contributing_partners") or []:
+        if isinstance(item, dict):
+            _apply_mds_institution_mapping(item, mapped_dict)
+
+    policy_change = mining_result.get("policy_change")
+    if isinstance(policy_change, dict):
+        for item in policy_change.get("implementing_organization") or []:
+            if isinstance(item, dict):
+                _apply_mds_institution_mapping(
+                    item,
+                    mapped_dict,
+                    id_key="institutions_id",
+                    name_key="institutions_name",
+                    acronym_key="institutions_acronym",
+                )
 
 
 def _apply_default_values(mining_result):

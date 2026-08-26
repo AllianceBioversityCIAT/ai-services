@@ -1,5 +1,8 @@
-import type { BulkUploadResult, ColumnDef, RawInstitution, RawUser, RawLanguage, RawCountry, RawEvidence, RecordStatus, TabType } from '../types';
+import type { BulkUploadResult, ColumnDef, RawInstitution, RawUser, RawLanguage, RawCountry, RawEvidence, RecordStatus, TabType, SortDirection, TableSortConfig } from '../types';
+import { NUMERIC_FIELDS, RESULTS_TABLE_COLUMNS } from '../constants';
 import { checkCompleteness } from './completenessChecker';
+
+const NON_SORTABLE_COLUMN_TYPES = new Set<ColumnDef['type']>(['checkbox', 'status', 'link']);
 
 /** Column header label for the active tab (e.g. Completeness vs STAR Status). */
 export function getColumnLabel(col: ColumnDef, tab: TabType): string {
@@ -173,4 +176,146 @@ export function formatCellValueForFilter(value: unknown): string {
 /** Simplifies an S3 full path to a readable label (filename only). */
 export function simplifyS3Path(fullPath: string): string {
   return fullPath.split('/').pop() ?? fullPath;
+}
+
+/** Stable key for sort config (evidence columns share `key` but differ by type). */
+export function getSortColumnKey(col: ColumnDef): string {
+  if (col.key === 'evidences') return `evidences:${col.type}`;
+  return col.key;
+}
+
+export function findColumnBySortKey(sortKey: string, tab: TabType): ColumnDef | undefined {
+  return getSortableColumns(tab).find((col) => getSortColumnKey(col) === sortKey);
+}
+
+export function getSortableColumns(tab: TabType): ColumnDef[] {
+  return RESULTS_TABLE_COLUMNS.slice(1)
+    .filter((col) => !NON_SORTABLE_COLUMN_TYPES.has(col.type))
+    .filter((col) => !(tab === 'pending' && col.type === 'link'))
+    .filter((col) => tab !== 'submitted' || col.showInSubmitted);
+}
+
+export function isNumericSortColumn(columnKey: string, colType?: ColumnDef['type']): boolean {
+  if (NUMERIC_FIELDS.includes(columnKey)) return true;
+  if (columnKey === 'id' || columnKey === 'year') return true;
+  return colType === 'number';
+}
+
+export function isDateSortColumn(colType?: ColumnDef['type']): boolean {
+  return colType === 'date';
+}
+
+export function getSortDirectionLabels(
+  columnKey: string,
+  colType?: ColumnDef['type'],
+): { asc: string; desc: string } {
+  if (isNumericSortColumn(columnKey, colType)) {
+    return { asc: 'Low → High', desc: 'High → Low' };
+  }
+  if (isDateSortColumn(colType)) {
+    return { asc: 'Oldest → Newest', desc: 'Newest → Oldest' };
+  }
+  return { asc: 'A → Z', desc: 'Z → A' };
+}
+
+function isEmptySortValue(value: number | string): boolean {
+  if (value === '' || value === -Infinity) return true;
+  if (typeof value === 'number' && !Number.isFinite(value)) return true;
+  return false;
+}
+
+/** Comparable value for a column (numeric, timestamp, or normalized text). */
+export function getColumnSortValue(
+  columnKey: string,
+  result: BulkUploadResult,
+  recordStatus?: RecordStatus,
+  tab: TabType = 'pending',
+  colType?: ColumnDef['type'],
+): number | string {
+  if (columnKey.startsWith('evidences:')) {
+    const variant = columnKey.split(':')[1];
+    const arr = result.evidences ?? [];
+    if (variant === 'evidence_link') {
+      return arr.map((e) => e.evidence_link).filter(Boolean).join(', ').toLowerCase();
+    }
+    return arr.map((e) => e.evidence_description).filter(Boolean).join(', ').toLowerCase();
+  }
+
+  if (columnKey === 'completeness') {
+    const tokens = getColumnFilterTokens('completeness', result, recordStatus, tab);
+    return (tokens[0] ?? '').toLowerCase();
+  }
+
+  const raw = getNestedValue(result, columnKey);
+
+  if (isNumericSortColumn(columnKey, colType)) {
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : -Infinity;
+  }
+
+  if (isDateSortColumn(colType)) {
+    const s = String(raw ?? '');
+    if (!s) return -Infinity;
+    const t = Date.parse(s);
+    return Number.isFinite(t) ? t : -Infinity;
+  }
+
+  const tokens = getColumnFilterTokens(columnKey, result, recordStatus, tab);
+  if (tokens.length === 1 && tokens[0] === '(Empty)') return '';
+  return tokens.join(', ').toLowerCase();
+}
+
+function compareSortValues(
+  aVal: number | string,
+  bVal: number | string,
+  direction: SortDirection,
+  isNumeric: boolean,
+): number {
+  const aEmpty = isEmptySortValue(aVal);
+  const bEmpty = isEmptySortValue(bVal);
+  if (aEmpty && bEmpty) return 0;
+  if (aEmpty) return 1;
+  if (bEmpty) return -1;
+
+  let cmp: number;
+  if (isNumeric && typeof aVal === 'number' && typeof bVal === 'number') {
+    cmp = aVal - bVal;
+  } else {
+    cmp = String(aVal).localeCompare(String(bVal), undefined, { sensitivity: 'base', numeric: true });
+  }
+  return direction === 'asc' ? cmp : -cmp;
+}
+
+export function applyTableSort(
+  results: BulkUploadResult[],
+  sort: TableSortConfig | null,
+  recordStatuses: Record<string, RecordStatus>,
+  tab: TabType,
+): BulkUploadResult[] {
+  if (!sort) return results;
+
+  const col = findColumnBySortKey(sort.columnKey, tab);
+  const isNumeric = isNumericSortColumn(sort.columnKey, col?.type) || isDateSortColumn(col?.type);
+
+  return results
+    .map((result, index) => ({ result, index }))
+    .sort((a, b) => {
+      const aVal = getColumnSortValue(
+        sort.columnKey,
+        a.result,
+        recordStatuses[String(a.result.id)],
+        tab,
+        col?.type,
+      );
+      const bVal = getColumnSortValue(
+        sort.columnKey,
+        b.result,
+        recordStatuses[String(b.result.id)],
+        tab,
+        col?.type,
+      );
+      const cmp = compareSortValues(aVal, bVal, sort.direction, isNumeric);
+      return cmp !== 0 ? cmp : a.index - b.index;
+    })
+    .map(({ result }) => result);
 }

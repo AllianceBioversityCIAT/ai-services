@@ -2,8 +2,8 @@ import json
 import boto3
 from datetime import datetime, timezone
 from botocore.exceptions import ClientError
-from app.utils.s3.s3_util import read_document_from_s3
 from app.utils.logger.logger_util import get_logger
+from app.utils.s3.s3_util import read_document_from_s3
 
 logger = get_logger()
 
@@ -142,6 +142,8 @@ def format_reference_for_prompt(reference_data: dict) -> str:
     """
     Format the reference data into the section that is appended to every
     model prompt so Claude can look up official CLARISA codes.
+
+    Shared by STAR, AICCRA, and bulk upload (geoscope_level / regions / countries).
     """
     regions_text = "\n".join(reference_data.get("regions", []))
     countries_text = "\n".join(reference_data.get("countries", []))

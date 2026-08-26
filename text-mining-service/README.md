@@ -1,30 +1,69 @@
 # Text Mining Microservice
 
-This project is a microservice for intelligent document processing using LLMs (Large Language Models). It extracts structured information from documents using techniques like vector search, RAG, and prompt engineering — all powered by AWS Bedrock and other AI services.
+LLM-powered microservice for intelligent document processing. It extracts structured information from documents using semantic chunking, vector search (LanceDB), RAG-style retrieval, and prompt engineering — powered by **AWS Bedrock (Claude Sonnet 4.6)** and CGIAR auth services.
 
-The service supports multiple projects:
-- **STAR**: Uses the `/star/text-mining` endpoint
-- **PRMS**: Uses the `/prms/text-mining` endpoint
+This service lives inside the CGIAR [`ai-services`](../README.md) monorepo.
 
----
-
-## 🚀 Features
-
-- ✅ Document ingestion from S3
-- 🔍 Semantic chunking + vector embedding with LanceDB
-- 🤖 Answer generation using LLM (Claude 4.5 Sonnet via Bedrock)
-- 🔒 Auth via CLARISA credentials
-- 📦 Sync processing via MCP
-- 📤 Slack notifications on success/failure
-- 🏢 Multi-project support (STAR and PRMS)
-- 📊 Excel processing with row-level chunking
+For AI coding agents, see [`AGENTS.md`](AGENTS.md) (and [`frontend/AGENTS.md`](frontend/AGENTS.md) for the Next.js app).
 
 ---
 
-## 🛠️ Setup Instructions
+## Supported products
 
-### 1. Install [uv](https://github.com/astral-sh/uv)
-You can install `uv` using `curl` or `wget`:
+| Product | HTTP endpoint | MCP tool | Typical use |
+|---|---|---|---|
+| **STAR** | `POST /star/text-mining` | `process_document` | Single-document mining for STAR results |
+| **PRMS** | `POST /prms/text-mining` | `process_document_prms` | Multisource PRMS extraction (docs / text / audio; five indicators, KP excluded) |
+| **AICCRA** | `POST /aiccra/text-mining` | `process_document_aiccra` | AICCRA document mining (optional custom prompt) |
+| **STAR Bulk CapDev** | `POST /star/mining-bulk-upload/capdev` | `process_document_capdev` | Excel bulk extraction for Capacity Development |
+
+Related UIs:
+
+| UI | Location | How to open |
+|---|---|---|
+| AICCRA static UI | `interface/aiccra_mining/` | `GET /ui` (assets under `/static/...`) |
+| Bulk Upload (legacy) | `interface/bulk_upload/` | `GET /bulk-upload` |
+| Bulk Upload (Next.js) | `frontend/` | `npm run dev` in `frontend/` (SST / OpenNext in AWS) |
+
+---
+
+## Features
+
+- Document ingestion from S3 or multipart file upload
+- Semantic chunking + embeddings with LanceDB
+- Structured extraction via Claude Sonnet on AWS Bedrock
+- Multi-product prompts (STAR, PRMS, AICCRA, Bulk CapDev)
+- Auth via STAR middleware + CLARISA `X-API-Key` (STAR/bulk CapDev); PRMS mining uses CLARISA `X-API-Key` only
+- Sync processing over MCP (FastAPI client → MCP server tools)
+- Slack notifications on success/failure
+- Excel row-level chunking
+- DynamoDB tracking of bulk-upload record statuses (`complete` / `failed` / STAR links)
+- Feedback & interaction tracking endpoints
+- Lambda deployment via Mangum (`main.handler`)
+
+---
+
+## Prerequisites
+
+- Python **3.13+**
+- [`uv`](https://github.com/astral-sh/uv) — recommended for **local** install and development
+- AWS credentials with Bedrock, S3, and DynamoDB access as required by your environment
+- Node.js 20+ (only if working on `frontend/`)
+
+### Dependency tooling: local vs Lambda
+
+| Context | Tooling | Dependency source |
+|---|---|---|
+| **Local development / testing** | [`uv`](https://github.com/astral-sh/uv) (`uv venv`, `uv pip` / `uv run`) | `pyproject.toml` (lockfile: `uv.lock`) |
+| **Lambda / Docker packaging** | Standard Python venv + `pip` | `requirements.txt` (used by the `Dockerfile`) |
+
+Keep both files in sync when adding or upgrading Python packages.
+
+---
+
+## Setup (backend — local with uv)
+
+### 1. Install uv
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -32,243 +71,301 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 wget -qO- https://astral.sh/uv/install.sh | sh
 ```
 
-To install a specific version (e.g., v0.6.14):
+### 2. Create and activate a virtual environment
 
 ```bash
-curl -LsSf https://astral.sh/uv/0.6.14/install.sh | sh
-```
-
-### 2. Initialize a virtual environment
-
-```bash
+cd text-mining-service
 uv venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 ```
 
-### 3. Activate the virtual environment
-
-```bash
-source .venv/bin/activate
-```
-
-### 4. Install dependencies
+### 3. Install dependencies
 
 ```bash
 uv pip install -r pyproject.toml
 ```
 
----
+### 4. Configure environment
 
-## ▶️ Run the Microservice
-
-You can start the microservice using:
-
-```bash
-uv run python main.py
-```
-
-This will launch the MCP server and expose the LLM-powered tools (e.g., `process_document`) via a local MCP endpoint.
-
----
-
-## 🧹 Setting Up Database Cleanup Cronjob
-
-The service includes a database cleaning utility that removes temporary LanceDB tables to prevent excessive storage usage. You can set up a cronjob to run this cleaner automatically.
-
-### Installing the Cronjob
-
-```bash
-python app/utils/cronjob/setup_db_cleaner_cron.py install
-```
-
-This will install a cronjob that runs daily at 7:00 PM to clean up temporary database files.
-
-
----
-
-## 🧪 Example Usage via MCP Tool
-
-You can now test the service using **multipart/form-data** requests for both projects.
-
-### For STAR Project
-Below is an example of the expected fields when calling the `/star/text-mining` endpoint:
-
-| Field       | Type   | Description                     |
-|-------------|--------|---------------------------------|
-| `key`       | string | The name of the document        |
-| `bucketName`| string | The S3 bucket where it resides  |
-| `token`     | string | JWT or token for authentication |
-| `file`      | file   | File to upload                  |
-
-### For PRMS Project
-Below is an example of the expected fields when calling the `/prms/text-mining` endpoint:
-
-| Field       | Type   | Description                     |
-|-------------|--------|---------------------------------|
-| `key`       | string | The name of the document        |
-| `bucketName`| string | The S3 bucket where it resides  |
-| `token`     | string | JWT or token for authentication |
-| `file`      | file   | File to upload                  |
-
-⚠️ Important:
-You must provide either *key* or *file*, but **not both**.
-* If using a file upload, the document will be processed directly.
-* If using a key, the document will be retrieved from S3 using the bucketName.
-
----
-
-## ⚙️ Environment Variables
-
-Create a `.env` file in the root directory with the following:
+Create a `.env` file in the service root (never commit secrets):
 
 ```env
 # AWS
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
-AWS_ACCESS_KEY_ID_BR=...
-AWS_SECRET_ACCESS_KEY_BR=...
 
-# CLARISA Auth
+# CLARISA
 CLARISA_HOST=https://api.clarisa.cgiar.org
 CLARISA_LOGIN=...
 CLARISA_PASSWORD=...
 CLARISA_MIS=MINING
 CLARISA_MIS_ENV=TEST
+CLARISA_VALIDATE_URL=...
 
-# API Configuration
-API_USERNAME=...
-API_PASSWORD=...
-
-# Slack
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
-
-# Microservices Configuration
+# App / auth helpers
 MS_NAME=AI Mining Microservice
+CLIENT_ID=...
+CLIENT_SECRET=...
+IS_PROD=false
 
-# STAR Endpoint Configuration
-STAR_ENDPOINT=...
+# Bucket key prefixes (S3 paths per product)
+STAR_BUCKET_KEY_NAME=...
+PRMS_BUCKET_KEY_NAME=...
+AICCRA_BUCKET_KEY_NAME=...
+
+# Optional integrations
+MAPPING_URL=...
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+AUTH_TOKEN_STAR=...
+
+# PRMS multisource mining (optional overrides)
+PRMS_EXTRACTION_MAX_WORKERS=4
+PRMS_MAX_SOURCES=6
+PRMS_MAX_FILE_BYTES=25000000
+PRMS_MAX_PDF_PAGES=100
+PRMS_MAX_TEXT_CHARS=50000
+PRMS_CONTEXT_TOKEN_BUDGET=300000
+PRMS_FULL_SOURCE_MAX_CHARS=50000
+PRMS_RETRIEVAL_TOP_K_PER_SOURCE=8
+
+# Amazon Transcribe for PRMS audio_keys (optional)
+PRMS_AUDIO_TRANSCRIBER=amazon_transcribe
+# PRMS_MAX_AUDIO_SECONDS=600
+# Leave PRMS_TRANSCRIBE_LANGUAGE_CODE empty for auto language identification
+# PRMS_TRANSCRIBE_LANGUAGE_CODE=
+# PRMS_TRANSCRIBE_LANGUAGE_OPTIONS=en-US,es-ES,fr-FR,pt-BR
+# PRMS_TRANSCRIBE_POLL_INTERVAL_SECONDS=2
+# PRMS_TRANSCRIBE_TIMEOUT_SECONDS=300
+
+# Optional Supabase path (legacy / alternate vectorization modules)
+# SUPABASE_USER=...
+# SUPABASE_PASSWORD=...
+# SUPABASE_HOST=...
+# SUPABASE_PORT=...
+# SUPABASE_DB=...
 ```
 
 ---
 
-## 🧪 Running Tests
+## Run locally (backend)
 
-First, start the text mining service locally:
+Start the FastAPI app (this also spawns the MCP server over stdio):
 
 ```bash
 uv run python -m app.mcp.client
 ```
 
-This will launch the FastAPI server at `http://localhost:8000` with interactive documentation available at `/docs`. Then, you can test the `/star/text-mining` endpoint directly uploading files or specifying S3 keys. You will find more information in the following section.
+- API: [http://localhost:8000](http://localhost:8000)
+- Interactive docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+- ReDoc: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-You can also add unit tests using `pytest`.
+> **Note:** `main.py` is the **AWS Lambda** entrypoint (`Mangum`). Prefer `uv run python -m app.mcp.client` for local development.
 
 ---
 
-## 🔌 Consuming the Text Mining Endpoints
+## Lambda / packaging (standard venv + `requirements.txt`)
 
-### REST API Endpoints
+For AWS Lambda (and the Docker image), dependencies are installed from **`requirements.txt`** with a normal Python environment — not `uv`:
 
-The service exposes two REST API endpoints:
+```bash
+cd text-mining-service
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-#### For STAR Project
+The `Dockerfile` does the equivalent for the Lambda image:
+
+```dockerfile
+RUN pip install --no-cache-dir -r requirements.txt -t "${LAMBDA_TASK_ROOT}"
+```
+
+Runtime entrypoint: `main.handler` (Mangum wrapping the FastAPI app).
+
+---
+
+## Frontend (Bulk Upload — Next.js)
+
+The modern Bulk Upload UI lives in `frontend/` (Next.js 15, React 19, SST + OpenNext).
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Useful scripts:
+
+| Script | Purpose |
+|---|---|
+| `npm run dev` | Local Next.js with HMR |
+| `npm run lint` | ESLint |
+| `npm run sst:dev` / `sst:deploy` | SST lifecycle |
+| `npm run build:open-next` | Production OpenNext build (CI / deploy) |
+
+Typical frontend env vars (see `frontend/sst.config.ts`):
+
+```env
+NEXT_PUBLIC_MINING_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_STAR_API_BASE_URL=...
+NEXT_PUBLIC_MANAGEMENT_API_BASE_URL=...
+NEXT_PUBLIC_CLARISA_API_BASE_URL=...
+MINING_API_BASE_URL=http://localhost:8000
+BULK_UPLOAD_API_KEY=...
+```
+
+Same-origin BFF routes under `frontend/app/api/` proxy to the mining service (e.g. `POST /api/bulk-upload` → `/star/mining-bulk-upload/capdev` with `X-API-Key`).
+
+---
+
+## API overview
+
+OpenAPI at `/docs` is the source of truth. High-level surface:
+
+### Document mining
+
+| Method | Path | Auth notes |
+|---|---|---|
+| `POST` | `/star/text-mining` | STAR token + `X-API-Key` (CLARISA) |
+| `POST` | `/prms/text-mining` | CLARISA `X-API-Key` only (multisource) |
+| `POST` | `/aiccra/text-mining` | Optional token; supports custom `prompt` |
+| `POST` | `/star/mining-bulk-upload/capdev` | STAR token + roles + `X-API-Key` (CLARISA); optional `skip_ids` |
+
+Common multipart fields for STAR/AICCRA mining:
+
+| Field | Type | Description |
+|---|---|---|
+| `bucketName` | string | S3 bucket |
+| `token` | string | Project auth token (required for STAR; optional for AICCRA) |
+| `environmentUrl` | string | Target environment for auth |
+| `key` | string | S3 object key (**or** use `file`) |
+| `file` | file | Upload to process (**or** use `key`) |
+| `user_id` | string | Optional interaction tracking |
+
+PRMS multisource fields (`POST /prms/text-mining`):
+
+| Field | Type | Description |
+|---|---|---|
+| `bucketName` | string | Required when using S3 keys |
+| `keys` | string[] | Document S3 keys |
+| `text` | string | Optional free text |
+| `audio_keys` | string[] | Existing S3 audio keys only |
+| `user_id` | string | Optional interaction tracking |
+
+Bulk CapDev extras: `skip_ids` (comma-separated record IDs already submitted), `user_name`.
+
+⚠️ STAR/AICCRA: provide either `key` **or** `file`, not both. PRMS accepts any non-empty combination of `keys`, free text, and `audio_keys` (documents and audio must already exist in S3).
+
+### Bulk upload status (DynamoDB)
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/dynamo/bulk-upload-records/{file_name}` | Read complete / failed / links |
+| `POST` | `/dynamo/bulk-upload-records` | Update one record status |
+| `POST` | `/dynamo/bulk-upload-records/batch` | Atomic batch status updates |
+
+Tables: `bulk_upload_records` when `IS_PROD=true`, otherwise `bulk_upload_records_test`. More detail in `app/utils/dynamo/docs/`.
+
+### Other useful routes
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/auth/token` | Issue encoded client credentials token for UIs |
+| `GET` | `/ui` | AICCRA static interface |
+| `GET` | `/bulk-upload` | Legacy bulk-upload HTML UI |
+| `GET` | `/aiccra/prompt` | Default AICCRA prompt |
+| `GET` / `POST` | `/s3/list`, `/list-s3-objects`, `/s3/download-template` | S3 helpers for UIs |
+| `POST` | `/feedback` | Submit feedback |
+| `GET` | `/feedback/{interaction_id}` | Lookup feedback / interaction record |
+
+### Example: STAR (S3 key)
+
 ```bash
 curl -X POST http://localhost:8000/star/text-mining \
-  -F "key=my-document.pdf" \
+  -H "X-API-Key: YOUR_CLARISA_API_KEY" \
   -F "bucketName=my-bucket" \
+  -F "key=star/text-mining/files/test/report.pdf" \
   -F "token=auth-token" \
-  -F "file=@/path/to/file.pdf" \
-  -F "environmentUrl=test"
+  -F "environmentUrl=https://your-star-env/" \
+  -F "user_id=researcher@cgiar.org"
 ```
 
-#### For PRMS Project
+### Example: STAR (file upload)
+
+```bash
+curl -X POST http://localhost:8000/star/text-mining \
+  -H "X-API-Key: YOUR_CLARISA_API_KEY" \
+  -F "bucketName=my-bucket" \
+  -F "token=auth-token" \
+  -F "environmentUrl=https://your-star-env/" \
+  -F "file=@/path/to/file.pdf"
+```
+
+### Example: PRMS (multisource)
+
 ```bash
 curl -X POST http://localhost:8000/prms/text-mining \
-  -F "key=my-document.pdf" \
-  -F "bucketName=my-bucket" \
-  -F "token=auth-token" \
-  -F "file=@/path/to/file.pdf" \
-  -F "environmentUrl=test"
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_CLARISA_API_KEY" \
+  -d '{
+    "bucketName": "my-bucket",
+    "keys": [
+      "prms/text-mining/files/test/policy.docx",
+      "prms/text-mining/files/test/attendance.pdf"
+    ],
+    "text": "Focus on outcomes reported during 2026",
+    "user_id": "researcher@cgiar.org"
+  }'
 ```
 
-### Python Client Example
+### Example: AICCRA (custom prompt)
+
+```bash
+curl -X POST http://localhost:8000/aiccra/text-mining \
+  -F "bucketName=my-bucket" \
+  -F "key=path/to/document.pdf" \
+  -F "prompt=Extract climate adaptation strategies by sector"
+```
+
+### Example: Bulk CapDev
+
+```bash
+curl -X POST http://localhost:8000/star/mining-bulk-upload/capdev \
+  -H "X-API-Key: YOUR_CLARISA_API_KEY" \
+  -F "bucketName=my-bucket" \
+  -F "key=star/text-mining/files/test/bulk_upload/capdev.xlsx" \
+  -F "token=auth-token" \
+  -F "environmentUrl=https://your-star-env/" \
+  -F "skip_ids=1,2,5" \
+  -F "user_id=user@cgiar.org" \
+  -F "user_name=Jane Doe"
+```
+
+### Python client sketch
 
 ```python
+import json
 import requests
 
-# For STAR Project
-star_url = "http://localhost:8000/star/text-mining"
-
-# For PRMS Project  
-prms_url = "http://localhost:8000/prms/text-mining"
-
-# Option 1: Using an S3 key instead of uploading a file
+url = "http://localhost:8000/star/text-mining"
+headers = {"X-API-Key": "YOUR_CLARISA_API_KEY"}
 data = {
     "bucketName": "my-bucket",
     "key": "documents/my-document.pdf",
     "token": "your-auth-token",
-    "environmentUrl": "test"
+    "environmentUrl": "https://your-star-env/",
 }
 
-# Process with STAR
-star_response = requests.post(star_url, data=data)
-
-# Process with PRMS
-prms_response = requests.post(prms_url, data=data)
-
-# Option 2: Using a file upload
-with open("path/to/your/file.pdf", "rb") as f:
-    files = {"file": f}
-    data = {
-        "bucketName": "my-bucket",
-        "token": "your-auth-token",
-        "environmentUrl": "test"
-    }
-
-    # Process with STAR
-    star_response = requests.post(star_url, data=data, files=files)
-    
-    # Process with PRMS  
-    prms_response = requests.post(prms_url, data=data, files=files)
-
-if star_response.ok:
-    result = star_response.json()
-    print("STAR Result:", json.dumps(result, indent=2))
-
-if prms_response.ok:
-    result = prms_response.json()
-    print("PRMS Result:", json.dumps(result, indent=2))
+response = requests.post(url, data=data, headers=headers)
+print(json.dumps(response.json(), indent=2))
 ```
 
-### Response Format
+### Response shape
 
-Both endpoints return the same structured information extracted from the document, with an additional `project` field indicating which system processed it:
+Successful responses return **product-specific structured JSON** produced by the LLM prompts/schemas (e.g. innovation, policy change, capacity development fields for STAR/PRMS; CapDev row arrays for bulk upload). Many flows also return or associate an `interaction_id` for analytics/feedback.
 
-```json
-{
-  "title": "Extracted document title",
-  "summary": "Brief summary of the document content", 
-  "key_points": [
-    "Important point 1",
-    "Important point 2"
-  ],
-  "entities": {
-    "people": ["Person 1", "Person 2"],
-    "organizations": ["Organization 1", "Organization 2"],
-    "locations": ["Location 1", "Location 2"]
-  },
-  "metadata": {
-    "processing_time": "3.5s",
-    "document_type": "PDF",
-    "page_count": 10,
-    "project": "STAR" // or "PRMS"
-  }
-}
-```
-
-### Error Handling
-
-If an error occurs during processing, both endpoints return an HTTP error status code with details:
+On failure, expect HTTP 4xx/5xx with a `detail` message, for example:
 
 ```json
 {
@@ -276,94 +373,110 @@ If an error occurs during processing, both endpoints return an HTTP error status
 }
 ```
 
-Or:
+---
 
-```json
-{
-  "detail": "Error processing document: File not found in bucket",
-  "project": "PRMS"
-}
+## Architecture
+
+### MCP flow
+
+```
+Client
+  → FastAPI (app/mcp/client.py)
+  → MCP stdio client
+  → MCP server (app/mcp/server.py)
+  → Auth (STAR middleware + CLARISA; PRMS CLARISA X-API-Key only)
+  → LLM pipeline (S3/free text/audio → context selection → Bedrock → JSON)
+  → Slack notification + optional interaction tracking
+```
+
+Per product:
+
+```
+STAR        → /star/text-mining                 → process_document
+PRMS        → /prms/text-mining                 → process_document_prms (app/text_mining/prms_mining)
+AICCRA      → /aiccra/text-mining               → process_document_aiccra
+Bulk CapDev → /star/mining-bulk-upload/capdev   → process_document_capdev
+```
+
+### Excel processing
+
+For Excel (`.xlsx`, `.xls`):
+
+1. Empty rows/columns are cleaned
+2. Each row becomes a structured chunk (`column: value, …`)
+3. Rows are embedded/retrieved individually where applicable
+4. Other formats (PDF, DOCX, TXT, PPTX) use recursive text splitting
+
+---
+
+## Project structure
+
+```
+text-mining-service/
+├── main.py                      # Lambda handler (Mangum → FastAPI)
+├── app/
+│   ├── mcp/
+│   │   ├── client.py            # FastAPI routes, S3/Dynamo helpers, UIs
+│   │   └── server.py            # MCP tools
+│   ├── text_mining/
+│   │   ├── providers/           # Shared Bedrock client (all products)
+│   │   ├── shared/              # vectorize, map_fields, json_parser, organization_fields, etc.
+│   │   ├── star_mining/         # STAR pipeline
+│   │   ├── prms_mining/         # PRMS multisource pipeline
+│   │   ├── aiccra_mining/       # AICCRA pipeline
+│   │   └── bulk_upload/         # CapDev bulk pipeline
+│   ├── middleware/              # STAR auth
+│   ├── schemas/                 # Pydantic mining schemas (star_mining_schemas.py, prms_mining_schemas.py)
+│   ├── db/miningdb/             # Temporary LanceDB data
+│   └── utils/
+│       ├── clarisa/
+│       ├── config/
+│       ├── dynamo/              # Bulk status table + docs
+│       ├── interactions/
+│       ├── logger/
+│       ├── notification/        # Slack
+│       ├── prompt/              # STAR, PRMS (modular), AICCRA, CapDev
+│       └── s3/
+├── frontend/                    # Next.js Bulk Upload (SST / OpenNext)
+├── interface/                   # Legacy static UIs (AICCRA + bulk upload)
+├── tests/                       # Fixtures + PRMS unit/API tests
+├── data/logs/                   # Runtime logs
+├── Dockerfile
+├── pyproject.toml               # Local deps (uv)
+├── requirements.txt             # Lambda / Docker deps (pip)
+├── uv.lock
+├── AGENTS.md
+└── README.md
 ```
 
 ---
 
-## 📂 Project Structure
+## Deployment & CI
 
-```
-└── 📁text-mining-service
-    └── 📁app
-        └── 📁db
-            └── 📁miningdb
-        └── 📁llm
-            └── mining.py
-            └── vectorize.py
-        └── 📁mcp
-            └── client.py
-            └── server.py
-        └── 📁middleware
-            └── auth_middleware.py
-        └── 📁utils
-            └── 📁clarisa
-                └── clarisa_connection.py
-                └── clarisa_service.py
-                └── 📁dto
-                    └── clarisa_connection_dto.py
-            └── 📁config
-                └── config_util.py
-            └── 📁cronjob
-                └── db_cleaner.py
-                └── setup_db_cleaner_cron.py
-            └── 📁logger
-                └── logger_util.py
-            └── 📁notification
-                └── notification_service.py
-            └── 📁prompt
-                └── default_prompt.py
-            └── 📁s3
-                └── s3_util.py
-    └── 📁data
-        └── 📁logs
-            └── app.log
-    └── .env
-    └── .venv
-    └── .gitignore
-    └── .python-version
-    └── main.py
-    └── pyproject.toml
-    └── requirements.txt
-    └── Dockerfile
-    └── README.md
-    └── uv.lock
-```
+- **Docker / Lambda:** `Dockerfile` installs from `requirements.txt` with `pip` into a Python 3.13 Lambda image and runs `main.handler`. Local packaging/testing for that path should use `python -m venv` + `pip install -r requirements.txt` (see [Lambda / packaging](#lambda--packaging-standard-venv--requirementstxt)).
+- **Local API work** continues to use `uv` + `pyproject.toml`.
+- **GitHub Actions** (monorepo `.github/workflows/`) trigger Jenkins jobs on branch pushes, for example:
+  - `dev-text-mining` → text-mining service (dev)
+  - `dev-lambda` → text-mining service (Lambda job)
+  - Bulk Upload frontend workflows for dev / prod
+- **Frontend:** SST (`frontend/sst.config.ts`) + OpenNext; CloudFormation templates under `frontend/infrastructure/`.
 
 ---
 
-## 🔄 How MCP Works in This Project
+## Testing
 
-### Model Context Protocol (MCP)
+1. Start the API: `uv run python -m app.mcp.client`
+2. Exercise endpoints via `/docs` or curl
+3. Use sample fixtures under `tests/` when useful
+4. Frontend: `cd frontend && npm run lint` (and manual wizard checks against a running mining API)
 
-MCP is a protocol that enables seamless integration between the service and LLM models. In this project, we use MCP to:
-
-1. **Handle document processing requests**: The MCP server exposes both `process_document` (for STAR) and `process_document_prms` (for PRMS) tools that receive parameters like bucket name, document key, and authentication credentials.
-2. **Authenticate users**: All requests are authenticated through the CLARISA service before processing.
-3. **Process documents with LLMs**: Once authenticated, documents are retrieved from S3, processed using LLMs (Claude 4.5 Sonnet via Bedrock), and the results are returned.
-4. **Notify stakeholders**: The service sends notifications via Slack upon successful processing or failures, with project-specific messaging.
-
-### MCP Architecture
-
-```
-STAR Client Request → FastAPI /star/text-mining → MCP Client → MCP Server → process_document → LLM Processing → Response
-PRMS Client Request → FastAPI /prms/text-mining → MCP Client → MCP Server → process_document_prms → LLM Processing → Response
-```
-
-The MCP server runs as a separate process and communicates with the main application through a standardized protocol, supporting both STAR and PRMS workflows.
-
-### Excel File Processing
-
-For Excel files (.xlsx, .xls), the service:
-1. Cleans the data by removing empty rows and columns
-2. Converts each row into a structured format: `column_name: value, column_name2: value2`
-3. Treats each row as an individual chunk for processing
-4. Maintains compatibility with other document formats (PDF, DOCX, TXT, PPTX)
+There is no full automated pytest suite in-tree yet; treat `/docs` and logs in `data/logs/` as the primary verification path unless you add tests for your change.
 
 ---
+
+## Security
+
+- Keep `.env` and API keys out of git
+- Prefer `X-API-Key` for CLARISA-protected STAR routes; do not expose keys in `NEXT_PUBLIC_*` frontend variables
+- Avoid logging raw tokens, client secrets, or API keys
+- Treat LanceDB under `app/db/miningdb/` as ephemeral processing state

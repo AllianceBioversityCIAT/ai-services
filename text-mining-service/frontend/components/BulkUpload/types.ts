@@ -84,6 +84,38 @@ export interface UnmappedInstitution {
   similarity_score: number;
 }
 
+export interface ClarisaCountryOption {
+  isoAlpha2: string;
+  name: string;
+}
+
+export interface ClarisaInstitutionTypeOption {
+  code: number;
+  name: string;
+}
+
+export interface PartnerRequestFormRow {
+  rowKey: string;
+  name: string;
+  acronym: string;
+  institutionTypeCode: number | null;
+  hqCountryIso: string;
+  website: string;
+}
+
+export interface PartnerRequestCreatePayload {
+  name: string;
+  acronym: string;
+  websiteLink: string;
+  hqCountryIso: string;
+  institutionTypeCode: number;
+  externalUserMail: string;
+  externalUserName: string;
+  externalUserComments: string;
+  misAcronym: string;
+  userId: number;
+}
+
 export interface RecordStatus {
   status: 'pending' | 'complete' | 'failed';
   link: string | null;
@@ -122,6 +154,13 @@ export type DocSource = 'upload' | 's3';
 export type AppStep = 'upload' | 'unmapped' | 'results' | 'summary';
 
 export type TabType = 'pending' | 'submitted';
+
+export type SortDirection = 'asc' | 'desc';
+
+export interface TableSortConfig {
+  columnKey: string;
+  direction: SortDirection;
+}
 
 export interface SummaryRecord {
   id: string;

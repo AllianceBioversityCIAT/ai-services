@@ -1,15 +1,17 @@
 import time
 import json
+from app.text_mining.providers import invoke_model
+from app.text_mining.shared.retrieval import split_text
 from app.utils.logger.logger_util import get_logger
 from app.utils.s3.s3_util import read_document_from_s3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.utils.interactions.interaction_client import interaction_client
 from app.utils.config.config_util import STAR_BUCKET_KEY_NAME, MAPPING_URL
+from app.text_mining.shared.json_parser import extract_json_from_markdown, is_valid_json
 from app.utils.prompt.bulk_upload_capdev_prompt import PROMPT_BULK_UPLOAD_CAPDEV
-from app.llm.reference_cache import get_reference_data, format_reference_for_prompt
-from app.llm.vectorize import get_embedding, store_temp_embeddings, get_relevant_chunk
-from app.llm.mining import split_text, invoke_model, is_valid_json, extract_json_from_markdown
-from app.llm.map_fields import map_fields_with_opensearch, clear_mapping_cache, get_cache_stats
+from app.text_mining.shared.reference_cache import get_reference_data, format_reference_for_prompt
+from app.text_mining.shared.vectorize import get_embedding, store_temp_embeddings, get_relevant_chunk
+from app.text_mining.shared.map_fields import map_fields_with_opensearch, clear_mapping_cache, get_cache_stats
 
 logger = get_logger()
 mapping_service_url = MAPPING_URL
@@ -104,7 +106,7 @@ BATCH DATA TO PROCESS:
 
 {prompt}"""
 
-        response_text = invoke_model(query, max_tokens=8000)
+        response_text = invoke_model(query, max_tokens=8000).text
         
         logger.info(f"✅ [Thread-{batch_number}] Batch {batch_number} processed successfully")
         
@@ -410,7 +412,7 @@ DOCUMENT TO ANALYZE:
 
 {prompt}"""
 
-            response_text = invoke_model(query, max_tokens=15000)
+            response_text = invoke_model(query, max_tokens=15000).text
             extracted_json = extract_json_from_markdown(response_text)
 
             end_time = time.time()

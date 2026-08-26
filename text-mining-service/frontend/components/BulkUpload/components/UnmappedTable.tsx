@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { UnmappedInstitution } from '../types';
 import { usePagination } from '../hooks/usePagination';
+import { PartnerRequestModal } from './PartnerRequestModal';
 
 // Hoisted SVG (rendering-hoist-jsx)
 const DownloadSvg = (
@@ -20,6 +21,10 @@ const NextArrowSvg = (
 
 interface UnmappedTableProps {
   institutions: UnmappedInstitution[];
+  authToken: string | null;
+  userEmail: string | null;
+  starUserId: string | null;
+  userFullName: string | null;
   onDownloadReport: () => void;
   onBackToResults: () => void;
   onGoToSummary: () => void;
@@ -32,9 +37,19 @@ const SOURCE_FIELD_LABELS: Record<string, string> = {
   trainees_description: 'Trainees Organizations',
 };
 
-export function UnmappedTable({ institutions, onDownloadReport, onBackToResults, onGoToSummary }: UnmappedTableProps) {
+export function UnmappedTable({
+  institutions,
+  authToken,
+  userEmail,
+  starUserId,
+  userFullName,
+  onDownloadReport,
+  onBackToResults,
+  onGoToSummary,
+}: UnmappedTableProps) {
   const pagination = usePagination(5);
   const { setTotalItems } = pagination;
+  const [partnerRequestOpen, setPartnerRequestOpen] = useState(false);
 
   // Sync totalItems via effect to avoid setState-during-render
   useEffect(() => {
@@ -63,10 +78,20 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
           <span className="bulk-unmapped-info">
             INSTITUTION MAPPING REPORT
           </span>
-          <button className="bulk-download-unmapped-btn" type="button" onClick={onDownloadReport}>
-            {DownloadSvg}
-            Download unmapped institutions report
-          </button>
+          <div className="bulk-unmapped-header-actions">
+            <button className="bulk-download-unmapped-btn" type="button" onClick={onDownloadReport}>
+              {DownloadSvg}
+              Download unmapped institutions report
+            </button>
+            <button
+              className="bulk-download-unmapped-btn bulk-partner-request-open-btn"
+              type="button"
+              disabled={institutions.length === 0}
+              onClick={() => setPartnerRequestOpen(true)}
+            >
+              Submit Partner Request
+            </button>
+          </div>
         </div>
 
         <div className="bulk-risk-notice" style={{ marginBottom: '1rem' }}>
@@ -176,6 +201,16 @@ export function UnmappedTable({ institutions, onDownloadReport, onBackToResults,
           </button>
         </div>
       </div>
+
+      <PartnerRequestModal
+        open={partnerRequestOpen}
+        institutions={institutions}
+        authToken={authToken}
+        userEmail={userEmail}
+        starUserId={starUserId}
+        userFullName={userFullName}
+        onClose={() => setPartnerRequestOpen(false)}
+      />
     </div>
   );
 }
