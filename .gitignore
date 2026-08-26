@@ -182,6 +182,8 @@ lancedb/
 .lancedb/
 vector_store/
 .vector_store/
+!ar-generator-service/app/vector_store/
+!ar-generator-service/app/vector_store/**
 chroma/
 .chroma/
 faiss/

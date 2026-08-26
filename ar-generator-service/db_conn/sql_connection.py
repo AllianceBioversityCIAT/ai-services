@@ -2,8 +2,8 @@ import os
 import pyodbc
 import pandas as pd
 from app.utils.logger.logger_util import get_logger
-from app.utils.config.config_util import SQL_SERVER
 from app.utils.s3.upload_file_to_s3 import upload_file_to_s3
+from app.utils.config.config_util import SQL_SERVER, LOCAL_DATA
 from app.utils.s3.divide_jsonl_files import split_jsonl_to_individual_csv_files
 
 logger = get_logger()
@@ -12,6 +12,32 @@ server = SQL_SERVER['server']
 database = SQL_SERVER['database']
 client_id = SQL_SERVER['client_id']
 client_secret = SQL_SERVER['client_secret']
+
+
+TABLE_CSV_FILES = {
+    "vw_ai_project_contribution": "vw_ai_project_contribution_ar.csv",
+    "vw_ai_questions": "vw_ai_questions_ar.csv",
+    "vw_ai_deliverables": "vw_ai_deliverables_ar.csv",
+    "vw_ai_oicrs": "vw_ai_oicrs_ar.csv",
+    "vw_ai_innovations": "vw_ai_innovations_ar.csv",
+    "vw_ai_challenges": "vw_ai_challenges_ar.csv",
+}
+
+
+def _load_data_from_csv(table_name: str) -> pd.DataFrame:
+    csv_filename = TABLE_CSV_FILES.get(table_name, f"{table_name}_ar.csv")
+    csv_path = os.path.join(LOCAL_DATA["csv_data_dir"], csv_filename)
+
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(
+            f"CSV file not found for {table_name}: {csv_path}. "
+            f"Set CSV_DATA_DIR or place {csv_filename} in the service root."
+        )
+
+    df = pd.read_csv(csv_path)
+    logger.info(f"📂 Loaded {len(df)} rows from CSV: {csv_path}")
+    logger.info(f"Columns in {table_name}: {df.columns.tolist()}")
+    return df
 
 
 CREATE_VIEW_QUERIES = {
@@ -64,6 +90,9 @@ CREATE_VIEW_QUERIES = {
 def load_data(table_name):
     try:
         logger.info("📂 Loading data...")
+        if LOCAL_DATA["use_csv_data"]:
+            logger.info(f"📂 Loading data from CSV (USE_CSV_DATA=true)...")
+            return _load_data_from_csv(table_name)
 
         ## SQL Server
         conn_str = (
