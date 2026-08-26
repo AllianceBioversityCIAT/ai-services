@@ -42,14 +42,14 @@ def extract_text_sync(bucket_name: str, file_key: str) -> str:
     Returns:
         Extracted text as a string
     """
-    logger.info(f"Starting synchronous Textract extraction for s3://{bucket_name}/{file_key}...")
+    logger.info(f"🔍 Starting synchronous Textract extraction for s3://{bucket_name}/{file_key}...")
 
     response = _get_textract_client().detect_document_text(
         Document={'S3Object': {'Bucket': bucket_name, 'Name': file_key}}
     )
 
     text = _blocks_to_text(response.get('Blocks', []))
-    logger.info(f"Synchronous Textract extraction complete — {len(text)} characters extracted from {file_key}")
+    logger.info(f"✅ Synchronous Textract extraction complete — {len(text)} characters extracted from {file_key}")
     return text
 
 
@@ -71,20 +71,20 @@ def extract_text_async(bucket_name: str, file_key: str) -> str:
         RuntimeError: If the Textract job fails
         TimeoutError: If the job does not complete within the allowed time
     """
-    logger.info(f"Starting asynchronous Textract extraction for s3://{bucket_name}/{file_key}...")
+    logger.info(f"🔍 Starting asynchronous Textract extraction for s3://{bucket_name}/{file_key}...")
 
     start_response = _get_textract_client().start_document_text_detection(
         DocumentLocation={'S3Object': {'Bucket': bucket_name, 'Name': file_key}}
     )
     job_id = start_response['JobId']
-    logger.info(f"Textract job started — Job ID: {job_id}")
+    logger.info(f"🚀 Textract job started — Job ID: {job_id}")
 
     for attempt in range(1, MAX_POLL_ATTEMPTS + 1):
         time.sleep(POLL_INTERVAL_SECONDS)
 
         result = _get_textract_client().get_document_text_detection(JobId=job_id)
         status = result['JobStatus']
-        logger.info(f"Textract job status (attempt {attempt}/{MAX_POLL_ATTEMPTS}): {status}")
+        logger.info(f"⏳ Textract job status (attempt {attempt}/{MAX_POLL_ATTEMPTS}): {status}")
 
         if status == 'SUCCEEDED':
             blocks = result.get('Blocks', [])
@@ -99,7 +99,7 @@ def extract_text_async(bucket_name: str, file_key: str) -> str:
 
             text = _blocks_to_text(blocks)
             logger.info(
-                f"Async Textract extraction complete — {len(text)} characters extracted from {file_key}"
+                f"✅ Async Textract extraction complete — {len(text)} characters extracted from {file_key}"
             )
             return text
 
