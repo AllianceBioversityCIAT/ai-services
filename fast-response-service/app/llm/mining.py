@@ -1,15 +1,24 @@
 import json
 import boto3
+from botocore.config import Config
 from app.utils.config.config_util import BR
 from app.utils.logger.logger_util import get_logger
 
 logger = get_logger()
 
+
+bedrock_config = Config(
+    connect_timeout=60,
+    read_timeout=300,
+    retries={'max_attempts': 3, 'mode': 'adaptive'}
+)
+
 bedrock_runtime = boto3.client(
     service_name='bedrock-runtime',
     aws_access_key_id=BR['aws_access_key'],
     aws_secret_access_key=BR['aws_secret_key'],
-    region_name='us-east-1'
+    region_name='us-east-1',
+    config= bedrock_config
 )
 
 def invoke_model(prompt):
@@ -19,9 +28,6 @@ def invoke_model(prompt):
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": 4000,
             "temperature": 0.1,
-            "top_k": 250,
-            "top_p": 0.999,
-            "stop_sequences": [],
             "messages": [
                 {
                     "role": "user",
@@ -32,12 +38,28 @@ def invoke_model(prompt):
             ]
         }
         response = bedrock_runtime.invoke_model(
-            modelId="us.anthropic.claude-sonnet-4-20250514-v1:0",
+            modelId="us.anthropic.claude-sonnet-4-6",
             body=json.dumps(request_body),
             contentType="application/json",
             accept="application/json"
         )
-        return json.loads(response['body'].read())['content'][0]['text']
+
+        response_body = json.loads(response['body'].read())
+                
+        stop_reason = response_body.get('stop_reason', 'unknown')
+        usage = response_body.get('usage', {})
+        input_tokens = usage.get('input_tokens', 0)
+        output_tokens = usage.get('output_tokens', 0)
+        
+        logger.info(f"✅ Model invoked successfully - Stop reason: {stop_reason}")
+        logger.info(f"📊 Token usage - Input: {input_tokens}, Output: {output_tokens}")
+        
+        response_text = response_body['content'][0]['text']
+        
+        if stop_reason != 'end_turn':
+            logger.warning(f"⚠️ Model stopped with reason: {stop_reason} (may indicate truncation or max_tokens reached)")
+        
+        return response_text
 
     except Exception as e:
         logger.error(f"❌ Error invoking the model: {str(e)}")
