@@ -1,14 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useRef, memo } from 'react';
+import { useCallback, useEffect, useRef, memo, useMemo } from 'react';
 import type { ChangeEvent } from 'react';
 import type { BulkUploadResult, ColumnDef, RecordStatus, TabType } from '../types';
 import { ASSET_IP_OWNER_ID_TO_NAME, RESULTS_TABLE_COLUMNS } from '../constants';
-import { getNestedValue, setNestedValue, getUniqueValues, getColumnLabel } from '../utils/tableHelpers';
+import { getNestedValue, setNestedValue, getUniqueValues, getColumnLabel, getSortableColumns, findColumnBySortKey } from '../utils/tableHelpers';
 import { usePagination } from '../hooks/usePagination';
 import { FilterPanel } from './FilterPanel';
+import { SortPanel } from './SortPanel';
 import { useState } from 'react';
-import type { RawInstitution, RawCountry } from '../types';
+import type { RawInstitution, RawCountry, TableSortConfig } from '../types';
 import { PartnersCell } from './PartnersCell';
 import { TrainingPurposeCell } from './TrainingPurposeCell';
 import { RegionsCell } from './RegionsCell';
@@ -431,6 +432,7 @@ interface ResultsTableProps {
   editedData: BulkUploadResult[];
   recordStatuses: Record<string, RecordStatus>;
   activeFilters: Record<string, string[]>;
+  activeSort: TableSortConfig | null;
   currentTab: TabType;
   filteredResults: BulkUploadResult[];
   selectedIndices: Set<number>;
@@ -438,6 +440,8 @@ interface ResultsTableProps {
   onSelectionChange: React.Dispatch<React.SetStateAction<Set<number>>>;
   onFilterApply: (columnKey: string, values: string[]) => void;
   onFilterClear: (columnKey: string) => void;
+  onSortApply: (config: TableSortConfig) => void;
+  onSortClear: () => void;
   onTabChange: (tab: TabType) => void;
   onSubmitToStar: () => void;
   onClearSelections: () => void;
@@ -451,6 +455,7 @@ export function ResultsTable({
   editedData,
   recordStatuses,
   activeFilters,
+  activeSort,
   currentTab,
   filteredResults,
   selectedIndices,
@@ -458,6 +463,8 @@ export function ResultsTable({
   onSelectionChange,
   onFilterApply,
   onFilterClear,
+  onSortApply,
+  onSortClear,
   onTabChange,
   onSubmitToStar,
   onClearSelections,
@@ -473,10 +480,17 @@ export function ResultsTable({
     setTotalItems(filteredResults.length);
   }, [filteredResults.length, setTotalItems]);
 
+  useEffect(() => {
+    setSortPanelOpen(false);
+  }, [currentTab]);
+
   const { currentPage, perPage, totalPages, startIndex, endIndex } = pagination;
 
   const [openFilter, setOpenFilter] = useState<{ key: string; rect: DOMRect } | null>(null);
+  const [sortPanelOpen, setSortPanelOpen] = useState(false);
+  const sortButtonRef = useRef<HTMLButtonElement>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const sortableColumns = getSortableColumns(currentTab);
 
   const handleSubmitClick = useCallback(() => setShowConfirmModal(true), []);
 
@@ -534,6 +548,31 @@ export function ResultsTable({
 
   const closeFilter = useCallback(() => setOpenFilter(null), []);
 
+  const openSortPanel = useCallback(() => {
+    setSortPanelOpen((prev) => !prev);
+    setOpenFilter(null);
+  }, []);
+
+  const closeSort = useCallback(() => setSortPanelOpen(false), []);
+
+  const handleSortApply = useCallback((config: TableSortConfig) => {
+    pagination.reset();
+    onSortApply(config);
+  }, [onSortApply, pagination]);
+
+  const handleSortClear = useCallback(() => {
+    pagination.reset();
+    onSortClear();
+  }, [onSortClear, pagination]);
+
+  const sortButtonLabel = useMemo(() => {
+    if (!activeSort) return 'Sort by';
+    const col = findColumnBySortKey(activeSort.columnKey, currentTab);
+    const label = col ? getColumnLabel(col, currentTab) : activeSort.columnKey;
+    const arrow = activeSort.direction === 'asc' ? '↑' : '↓';
+    return `Sort: ${label} ${arrow}`;
+  }, [activeSort, currentTab]);
+
   const pageAllSelected = paginatedResults.every((_, i) => selectedIndices.has(globalIndexMap(i)));
 
   return (
@@ -564,20 +603,33 @@ export function ResultsTable({
         )}
       </div>
 
-      <div className="bulk-results-tabs">
+      <div className="bulk-results-tabs-row">
+        <div className="bulk-results-tabs">
+          <button
+            className={`bulk-tab-btn${currentTab === 'pending' ? ' active' : ''}`}
+            type="button"
+            onClick={() => { pagination.reset(); onTabChange('pending'); }}
+          >
+            Pending Results
+          </button>
+          <button
+            className={`bulk-tab-btn${currentTab === 'submitted' ? ' active' : ''}`}
+            type="button"
+            onClick={() => { pagination.reset(); onTabChange('submitted'); }}
+          >
+            Submitted Results
+          </button>
+        </div>
         <button
-          className={`bulk-tab-btn${currentTab === 'pending' ? ' active' : ''}`}
+          ref={sortButtonRef}
+          className={`bulk-sort-btn${activeSort ? ' bulk-sort-btn-active' : ''}${sortPanelOpen ? ' bulk-sort-btn-open' : ''}`}
           type="button"
-          onClick={() => { pagination.reset(); onTabChange('pending'); }}
+          title="Sort results"
+          aria-expanded={sortPanelOpen}
+          onClick={openSortPanel}
         >
-          Pending Results
-        </button>
-        <button
-          className={`bulk-tab-btn${currentTab === 'submitted' ? ' active' : ''}`}
-          type="button"
-          onClick={() => { pagination.reset(); onTabChange('submitted'); }}
-        >
-          Submitted Results
+          <span className="bulk-sort-btn-icon" aria-hidden="true">⇅</span>
+          <span className="bulk-sort-btn-label">{sortButtonLabel}</span>
         </button>
       </div>
 
@@ -766,6 +818,18 @@ export function ResultsTable({
           onApply={onFilterApply}
           onClear={onFilterClear}
           onClose={closeFilter}
+        />
+      )}
+
+      {sortPanelOpen && sortableColumns.length > 0 && (
+        <SortPanel
+          columns={sortableColumns}
+          currentTab={currentTab}
+          currentSort={activeSort}
+          anchorRef={sortButtonRef}
+          onApply={handleSortApply}
+          onClear={handleSortClear}
+          onClose={closeSort}
         />
       )}
     </div>

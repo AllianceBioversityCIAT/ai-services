@@ -45,9 +45,9 @@ class ChatRequest(BaseModel):
     insert_data: Optional[bool] = Field(
         default=False,
         description="""
-        Data refresh flag - whether to reload fresh data into OpenSearch vector database.
+        Data refresh flag - whether to reload fresh data into the S3 Vectors index.
         
-        - True: Refresh the vector database with latest data from SQL Server (slower)
+        - True: Refresh the vector index with latest data from SQL Server (slower)
         - False: Use existing vectorized data (faster)
 
         Recommendation: Use True when you need the most recent data updates.

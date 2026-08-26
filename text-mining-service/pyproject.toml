@@ -24,5 +24,14 @@ dependencies = [
     "python-crontab",
     "python-pptx",
     "python-multipart",
-    "mangum"
+    "mangum",
+    "psycopg2",
+    "streamlit",
+    "pytest",
+    "httpx",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = ["ignore::DeprecationWarning"]

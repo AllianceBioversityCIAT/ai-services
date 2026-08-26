@@ -7,11 +7,12 @@ from utils.logger.logger_util import get_logger
 from utils.config.config_util import CLARISA_VALIDATE_URL
 from utils.notification.notification_service import notification_service
 from utils.s3.s3_util import list_available_project_files, delete_project_files
-from fastapi import APIRouter, HTTPException, status, Request, Depends, Query
+from fastapi import APIRouter, HTTPException, status, Request, Depends, Query, Header
 from modules.document_overview.processing import (
     process_project_overview,
     get_cached_project_overview,
 )
+from modules.prompts.processing import get_all_prompts, update_prompt
 from api.models import (
     DocumentOverviewRequest,
     DocumentOverviewResponse,
@@ -20,6 +21,9 @@ from api.models import (
     AvailableFile,
     DeleteProjectFilesRequest,
     DeleteProjectFilesResponse,
+    GetPromptsResponse,
+    UpdatePromptRequest,
+    PromptResponse,
     ErrorResponse,
 )
 
@@ -90,6 +94,7 @@ def _build_empty_overview_response(
         project_folder=project_folder.strip("/"),
         bucket_name=bucket_name,
         documents_processed=[],
+        text="",
         status="empty",
         cached=False,
     )
@@ -116,6 +121,7 @@ def _build_overview_response(
         project_folder=result["project_folder"],
         bucket_name=result["bucket_name"],
         documents_processed=documents_processed,
+        text=result.get("text") or "",
         interaction_id=result.get("interaction_id"),
         status=result.get("status", "success"),
         generated_at=result.get("generated_at"),
@@ -131,6 +137,181 @@ def _build_get_overview_response(
         **result.model_dump(),
         available_files=available_files,
     )
+
+
+@router.get(
+    "/api/prompts",
+    response_model=GetPromptsResponse,
+    tags=["Prompt Manager"],
+    summary="Get all managed prompts",
+    description="""
+    Retrieve every prompt managed through the STAR Prompt Manager.
+
+    Each prompt is returned with two versions of its text:
+
+    - `default_prompt` — the original prompt shipped with the service. Acts as the
+      fallback and as the source for a "reset to default" action.
+    - `user_prompt` — the version currently used to generate results. Identical to
+      `default_prompt` until someone edits it.
+
+    Each version is split into four sections, assembled in this order:
+    `system_role`, `context`, `user_instructions`, `expected_output_format`.
+
+    The `context` section is a template containing `{variable}` placeholders that the
+    service replaces with real content at generation time. `variables` lists them with
+    a description each — render them as read-only in the Prompt Manager, since removing
+    a required one is rejected by the update endpoint.
+
+    A prompt that has never been edited has no stored record yet: it is returned
+    straight from the code defaults, with `created_at` and `updated_at` null.
+    """,
+    response_description="All managed prompts",
+    responses={
+        200: {
+            "description": "Managed prompts retrieved successfully",
+            "model": GetPromptsResponse,
+        },
+        500: {
+            "description": "Internal server error",
+            "model": ErrorResponse,
+        },
+    },
+)
+async def get_prompts() -> GetPromptsResponse:
+    """Return every managed prompt so STAR can filter by `id` in the Prompt Manager."""
+    try:
+        logger.info("📋 Prompt Manager — listing all managed prompts")
+
+        prompts = get_all_prompts()
+
+        logger.info(f"✅ Returned {len(prompts)} managed prompt(s)")
+        return GetPromptsResponse(prompts=[PromptResponse(**prompt) for prompt in prompts])
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        logger.error(f"Unexpected error while listing prompts: {str(e)}\n{tb}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "Internal server error",
+                "status": "error",
+                "details": str(e),
+            }
+        )
+
+
+@router.post(
+    "/api/prompts",
+    response_model=PromptResponse,
+    tags=["Prompt Manager"],
+    summary="Overwrite a prompt with the user's edits",
+    description="""
+    Overwrite the `user_prompt` of a specific prompt with the sections edited in the
+    STAR Prompt Manager. From then on, that version is used to generate results.
+
+    All four sections must be sent and none may be empty — this is a full replacement,
+    not a partial merge. The `default_prompt` is never overwritten, so a "reset to
+    default" is just a POST carrying the default section values back.
+
+    **Context variables are validated.** The `{variable}` placeholders are looked for
+    across all four sections combined, so one may be moved between sections. The request
+    is rejected with 400 when:
+
+    - a required variable is missing — that context would silently vanish from the prompt
+    - an unknown variable is present — a typo like `{uploaded_evidance}` would be sent to
+      the model literally
+    - a variable appears more than once — each must appear exactly once, since repeating
+      one injects the same context again and wastes tokens
+
+    Call `GET /api/prompts` for the list of valid variables.
+    """,
+    response_description="The updated prompt",
+    responses={
+        200: {
+            "description": "Prompt updated successfully",
+            "model": PromptResponse,
+        },
+        400: {
+            "description": "Unknown prompt id, empty section, or invalid context variables",
+            "model": ErrorResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "Invalid parameters",
+                        "status": "error",
+                        "details": "The prompt is missing required context variables: {uploaded_evidence}. Without them that context is silently dropped from the prompt."
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "model": ErrorResponse,
+        },
+    },
+)
+async def upsert_prompt(
+    request: UpdatePromptRequest,
+    mis: str = Depends(validate_with_clarisa("AI Insights Service - STAR (Prompt Update)"))
+) -> PromptResponse:
+    """
+    Overwrite the user version of a prompt.
+
+    - **id**: Identifier of the prompt to overwrite (e.g. `project-overview`)
+    - **user_prompt**: All four sections, replacing the stored user version entirely
+    - **updated_by**: Optional user identifier recorded for auditing
+    """
+    try:
+        logger.info(
+            f"✏️ Prompt Manager — updating prompt '{request.id}' "
+            f"(by={request.updated_by or 'N/A'})"
+        )
+
+        prompt = update_prompt(
+            prompt_id=request.id,
+            sections=request.user_prompt.model_dump(),
+            updated_by=request.updated_by,
+        )
+
+        await notification_service.send_slack_notification(
+            emoji=":ai: :pencil2:",
+            app_name=APP_NAME,
+            color="#F2C744",
+            title="Prompt Updated",
+            message=(
+                f"The prompt *{prompt['name']}* (`{prompt['id']}`) was updated "
+                f"through the STAR Prompt Manager.\n"
+                f"*User:* {request.updated_by or 'N/A'}"
+            ),
+            time_taken="*Time taken:* N/A",
+            priority="Medium",
+        )
+
+        logger.info(f"✅ Prompt '{request.id}' updated successfully")
+        return PromptResponse(**prompt)
+
+    except ValueError as e:
+        logger.error(f"Validation error while updating prompt: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "Invalid parameters",
+                "status": "error",
+                "details": str(e),
+            }
+        )
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        logger.error(f"Unexpected error while updating prompt: {str(e)}\n{tb}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "Internal server error",
+                "status": "error",
+                "details": str(e),
+            }
+        )
 
 
 @router.get(
@@ -283,9 +464,9 @@ async def delete_document_overview_files(
     Generate a comprehensive, structured overview of a project based on documents
     stored in an Amazon S3 folder.
 
-    The service lists all supported documents in the project folder (1 to 3 files),
-    extracts their text in parallel, and uses an LLM (Claude via AWS Bedrock) to
-    produce a single synthesized project overview.
+    The service lists all supported documents in the project folder (up to 3 files,
+    or up to 2 if `text` is provided), extracts their text in parallel, and uses an
+    LLM (Claude via AWS Bedrock) to produce a single synthesized project overview.
 
     **Supported document formats:**
     - **PDF** — via Amazon Textract
@@ -296,6 +477,19 @@ async def delete_document_overview_files(
     - **JPEG, PNG, TIFF** — Images via Amazon Textract
 
     The extraction method is selected automatically based on each file extension.
+
+    The `project_folder` value is also used as the STAR contract ID to fetch
+    project and results metadata for AI context enrichment.
+
+    STAR API calls require a valid access token, provided via the `Access-Token`
+    request header or via the `STAR_API_TOKEN` environment variable.
+
+    Documents are optional evidence: if the project folder has none, the overview
+    is generated from STAR project and results metadata alone. Free-text input also
+    counts as a source on its own, so a request fails only when there are no documents,
+    no STAR context and no `text` — that is, nothing at all to work from.
+
+    The maximum allowed documents drops from 3 to 2 when `text` is also provided.
     """,
     response_description="Structured project overview",
     responses={
@@ -311,7 +505,7 @@ async def delete_document_overview_files(
                     "example": {
                         "error": "Invalid parameters",
                         "status": "error",
-                        "details": "No supported documents found in s3://bucket/project-folder"
+                        "details": "No supported documents found in s3://bucket/project-folder, no STAR context is available for contract project-folder, and no text input was provided"
                     }
                 }
             }
@@ -331,25 +525,34 @@ async def delete_document_overview_files(
         }
     }
 )
-async def document_overview(request: DocumentOverviewRequest, mis: str = Depends(validate_with_clarisa("AI Insights Service - STAR"))) -> DocumentOverviewResponse:
+async def document_overview(
+    request: DocumentOverviewRequest,
+    access_token: str = Header(default=None, alias="Access-Token", description="STAR access token for authenticated STAR API calls"),
+    mis: str = Depends(validate_with_clarisa("AI Insights Service - STAR")),
+) -> DocumentOverviewResponse:
     """
     Generate a structured project overview from documents in an S3 folder.
 
     - **bucket_name**: S3 bucket containing the project documents
-    - **project_folder**: S3 folder prefix for the project (1-3 documents)
+    - **project_folder**: S3 folder prefix for the project (1-3 documents). Also used as STAR contract ID.
+    - **Access-Token** (header): STAR access token for authenticated STAR API calls
     - **user_id**: Optional user ID for interaction tracking
+    - **text**: Optional free-text input from the user, included in the AI context
     """
     try:
         logger.info(
-            f"Project overview request — "
+            f"🚀 Project overview request — "
             f"s3://{request.bucket_name}/{request.project_folder} "
-            f"(user={request.user_id})"
+            f"(user={request.user_id}, star_token={'yes' if access_token else 'no'}, "
+            f"text={'yes' if request.text else 'no'})"
         )
 
         result = process_project_overview(
             bucket_name=request.bucket_name,
             project_folder=request.project_folder,
             user_id=request.user_id,
+            token=access_token,
+            text=request.text,
         )
 
         await notification_service.send_slack_notification(

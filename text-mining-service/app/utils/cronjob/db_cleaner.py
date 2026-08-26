@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from app.utils.config.config_util import MS_NAME
 from app.utils.logger.logger_util import get_logger
-from app.llm.vectorize import DB_PATH, TEMP_TABLE_NAME
+from app.text_mining.shared.vectorize import DB_PATH, TEMP_TABLE_NAME
 from app.utils.notification.notification_service import NotificationService
 
 

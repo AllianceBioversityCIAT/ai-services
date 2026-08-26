@@ -12,12 +12,11 @@ Supported jobs:
 """
 
 import boto3
-import asyncio
 from typing import Dict, Any
+from app.llm.vectorize_annual import run_pipeline
 from db_conn.sql_connection import load_full_data
 from app.utils.logger.logger_util import get_logger
-from app.llm.vectorize_os_annual import run_pipeline
-from app.utils.config.config_util import KNOWLEDGE_BASE, BR
+from app.utils.config.config_util import KNOWLEDGE_BASE, AWS
 from app.utils.notification.notification_service import NotificationService
 
 logger = get_logger()
@@ -38,19 +37,24 @@ async def execute_update_ar_data() -> Dict[str, Any]:
         logger.info("=" * 80)
         logger.info("🚀 Starting AR data update job")
         logger.info("=" * 80)
-        
+
         indicator = "IPI 1.3"
         year = 2025
         insert_data = True
-        
-        logger.info(f"📊 Running pipeline for indicator: {indicator}, year: {year}, insert_data: {insert_data}")
-        
+
+        logger.info(
+            f"📊 Running pipeline for indicator: {indicator}, "
+            f"year: {year}, insert_data: {insert_data}"
+        )
+
         result = run_pipeline(indicator, year, insert_data=insert_data)
-        
-        if result is None or (isinstance(result, str) and result.startswith("# Report Generation Error")):
+
+        if result is None or (
+            isinstance(result, str) and result.startswith("# Report Generation Error")
+        ):
             error_msg = "AR data update pipeline failed"
             logger.error(f"❌ {error_msg}")
-            
+
             try:
                 await notification_service.send_slack_notification(
                     emoji="⚠️",
@@ -78,7 +82,7 @@ async def execute_update_ar_data() -> Dict[str, Any]:
                 app_name="AR Generator Service",
                 color="#36a64f",
                 title="AR Generator Data Update Completed",
-                message=f"Successfully updated data for AR generator module",
+                message="Successfully updated data for AR generator module",
                 priority="Low",
                 time_taken=None
             )
@@ -265,14 +269,14 @@ async def execute_sync_knowledge_base() -> Dict[str, Any]:
         try:
             bedrock_agent = boto3.client(
                 service_name='bedrock-agent',
-                region_name=BR.get('region', 'us-east-1')
+                region_name=AWS.get('region', 'us-east-1')
             )
         except Exception:
             bedrock_agent = boto3.client(
                 service_name='bedrock-agent',
-                aws_access_key_id=BR.get('aws_access_key'),
-                aws_secret_access_key=BR.get('aws_secret_key'),
-                region_name=BR.get('region', 'us-east-1')
+                aws_access_key_id=AWS.get('aws_access_key'),
+                aws_secret_access_key=AWS.get('aws_secret_key'),
+                region_name=AWS.get('region', 'us-east-1')
             )
         
         logger.info(f"🔄 Starting Knowledge Base synchronization: {kb_id}")

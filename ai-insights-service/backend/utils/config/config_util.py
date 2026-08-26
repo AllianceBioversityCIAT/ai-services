@@ -34,6 +34,31 @@ CLARISA_VALIDATE_URL = os.getenv("CLARISA_VALIDATE_URL")
 
 INTERACTION_SERVICE_URL = os.getenv("INTERACTION_SERVICE_URL")
 
+STAR_API_BASE_URL = os.getenv("STAR_API_BASE_URL")
+
+STAR_API_TOKEN = os.getenv("STAR_API_TOKEN")
+
+
+def _require_env(name: str) -> str:
+    """
+    Read a required variable, failing at import with a message that names it.
+
+    Without this, a missing variable surfaces as an AttributeError on None deep in this
+    module — and since every route imports it, the whole service fails to boot with a
+    traceback that says nothing about which variable is missing.
+    """
+    value = (os.getenv(name) or "").strip()
+    if not value:
+        raise RuntimeError(
+            f"Missing required environment variable '{name}'. "
+            f"Set it in .env for local runs, or in the Secrets Manager file synced to Lambda."
+        )
+    return value
+
+
+PROMPTS_BUCKET_NAME = _require_env("PROMPTS_BUCKET_NAME")
+PROMPTS_PREFIX = _require_env("PROMPTS_PREFIX").strip("/")
+
 
 def get_boto3_client_kwargs() -> dict:
     """Extra kwargs for boto3.client(). Empty in Lambda → IAM execution role."""

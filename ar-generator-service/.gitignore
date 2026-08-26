@@ -182,8 +182,6 @@ db/
 *.db
 lancedb/
 .lancedb/
-vector_store/
-.vector_store/
 chroma/
 .chroma/
 faiss/

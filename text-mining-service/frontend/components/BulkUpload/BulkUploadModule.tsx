@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import type { BulkUploadResult, RecordStatus, DocSource, AppStep, UnmappedInstitution, SummaryRecord } from './types';
 import { useBulkUploadApi } from './hooks/useBulkUploadApi';
 import { useTableFilters } from './hooks/useTableFilters';
+import { useTableSort } from './hooks/useTableSort';
 import { useNavigationGuard } from './hooks/useNavigationGuard';
 import { loadRecordStatuses } from './hooks/useDynamoDB';
 import { extractUnmappedInstitutions } from './utils/dataFormatters';
@@ -28,6 +29,8 @@ export default function BulkUploadModule() {
   const [userToken, setUserToken] = useState<string | null>(null);
   const [userName, setUserName] = useState<{ firstName: string; lastName: string } | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [starUserId, setStarUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userFullName, setUserFullName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,6 +54,8 @@ export default function BulkUploadModule() {
         if (data.valid) {
           setUserToken(token);
           setUserName({ firstName: data.firstName ?? '', lastName: data.lastName ?? '' });
+          setUserEmail(data.email ?? null);
+          setStarUserId(data.userId ?? null);
           // Prefer email as the user identifier for interaction tracking, fall back to userId
           setUserId(data.email ?? data.userId ?? null);
           setUserFullName([data.firstName, data.lastName].filter(Boolean).join(' ') || null);
@@ -106,11 +111,13 @@ export default function BulkUploadModule() {
   // ── API ───────────────────────────────────────────────
   const api = useBulkUploadApi(userToken, userId, userFullName);
 
-  // ── Filters ───────────────────────────────────────────
+  // ── Filters & Sort ───────────────────────────────────
   const filters = useTableFilters();
+  const sort = useTableSort();
 
-  // ── Derived: filtered results (rerender-derived-state-no-effect) ──
+  // ── Derived: filtered + sorted results ──
   const filteredResults = filters.applyFilters(editedData, recordStatuses);
+  const displayResults = sort.applySort(filteredResults, recordStatuses);
 
   const hasWorkInProgress = step !== 'upload' || api.isLoading;
   useNavigationGuard(hasWorkInProgress);
@@ -134,7 +141,8 @@ export default function BulkUploadModule() {
     setCurrentInteractionId(null);
     setEditedIds(new Set());
     filters.clearAllFilters();
-  }, [filters]);
+    sort.clearAllSorts();
+  }, [filters, sort]);
 
   const handleFinishProcess = useCallback(() => {
     handleNewUpload();
@@ -152,10 +160,11 @@ export default function BulkUploadModule() {
       setCurrentInteractionId(interactionId);
       setEditedIds(new Set());
       filters.clearAllFilters();
+      sort.clearAllSorts();
       setSelectedIndices(new Set());
       setStep('results');
     },
-    [filters],
+    [filters, sort],
   );
 
   const handleProcess = useCallback(
@@ -336,6 +345,10 @@ export default function BulkUploadModule() {
         {step === 'unmapped' && (
           <UnmappedTable
             institutions={unmappedInstitutions}
+            authToken={userToken}
+            userEmail={userEmail}
+            starUserId={starUserId}
+            userFullName={userFullName}
             onDownloadReport={handleDownloadUnmappedReport}
             onBackToResults={handleNextStep}
             onGoToSummary={() => setStep('summary')}
@@ -361,14 +374,21 @@ export default function BulkUploadModule() {
             editedData={editedData}
             recordStatuses={recordStatuses}
             activeFilters={filters.activeFilters}
+            activeSort={sort.activeSort}
             currentTab={filters.currentTab}
-            filteredResults={filteredResults}
+            filteredResults={displayResults}
             selectedIndices={selectedIndices}
             onEdit={handleCellEdit}
             onSelectionChange={setSelectedIndices}
             onFilterApply={filters.setFilter}
             onFilterClear={filters.clearFilter}
-            onTabChange={(tab) => { filters.setTab(tab); setSelectedIndices(new Set()); }}
+            onSortApply={sort.setSort}
+            onSortClear={sort.clearSort}
+            onTabChange={(tab) => {
+              filters.setTab(tab);
+              sort.setTab(tab);
+              setSelectedIndices(new Set());
+            }}
             onSubmitToStar={handleSubmitToStar}
             onClearSelections={handleClearSelections}
             onViewUnmapped={handleViewUnmapped}
