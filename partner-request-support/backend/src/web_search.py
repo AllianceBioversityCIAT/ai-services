@@ -402,6 +402,398 @@ def search_institution_online(
 
 
 # ============================================================================
+# PHASE 2 (AUTO-DECISION): STRUCTURED YES/NO DECISION (AWS Bedrock Claude)
+# ============================================================================
+
+def _phase2_auto_decision(
+    institution_name: str,
+    raw_content: str,
+    sources: list,
+    model_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Phase 2 (Auto-Decision mode): Analyze gathered information and return a
+    structured YES/NO decision for CGIAR partnership eligibility.
+    Uses AWS Bedrock Claude (rules-validation model, configurable via
+    BEDROCK_RULES_MODEL_ID — defaults to Claude Sonnet 4.5, unchanged behavior).
+
+    Returns:
+        dict: {
+            "approved": bool,
+            "confidence": "high" | "medium" | "low",
+            "institution_name": str,
+            "institution_type": str,
+            "is_legal_entity": bool | None,
+            "has_research_mandate": bool | None,
+            "reason": str,
+            "summary": str
+        }
+    """
+    model_id = model_id or os.getenv("BEDROCK_RULES_MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
+    try:
+        sources_text = "\n".join([f"- {url}" for url in sources[:10]]) if sources else "No sources available"
+
+        prompt = f"""You are evaluating whether an institution qualifies as a CGIAR partner based on web search information.
+
+INSTITUTION SEARCHED: {institution_name}
+
+INFORMATION GATHERED FROM WEB SEARCH:
+{raw_content}
+
+SOURCES CONSULTED:
+{sources_text}
+
+CGIAR PARTNERSHIP ELIGIBILITY CRITERIA:
+1. The institution must be a legal entity (or formally affiliated with one that can sign contracts).
+2. It must belong to one of these recognized types:
+   - University or academic institution
+   - National/local research institution
+   - International/regional research institution
+   - Government entity (ministry, department, agency)
+   - Bilateral development agency (e.g., USAID, DFID, GIZ)
+   - International/regional financial institution (e.g., World Bank, IDB)
+   - UN entity or international organization
+   - NGO (with legal registration)
+   - Private company (with legal registration)
+3. Sub-departments, units, or divisions WITHOUT independent legal status must be REJECTED.
+   They may request partnership through their parent organization instead.
+
+DECISION RULES:
+- APPROVE (true): Institution is a recognized legal entity of an eligible type.
+- REJECT (false): It is a non-independent sub-unit or department, does not exist,
+  cannot be verified online, or clearly does not meet the criteria above.
+- When available information is very limited or contradictory, lean toward REJECT with low confidence.
+
+Analyze the information and respond ONLY with a valid JSON object. No markdown fences, no extra text:
+{{
+  "approved": true or false,
+  "confidence": "high" or "medium" or "low",
+  "institution_name": "Official name found or original name if not found",
+  "institution_type": "Most specific CGIAR category that applies",
+  "is_legal_entity": true, false, or null,
+  "has_research_mandate": true, false, or null,
+  "reason": "Clear 1-2 sentence explanation of the decision",
+  "summary": "Brief 1-2 sentence description of the institution"
+}}"""
+
+        response = bedrock_client.invoke_model(
+            modelId=model_id,
+            contentType="application/json",
+            accept="application/json",
+            body=json.dumps({
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 1000,
+                "messages": [{"role": "user", "content": prompt}]
+            })
+        )
+
+        response_body = json.loads(response['body'].read())
+        raw_text = response_body['content'][0]['text'].strip()
+
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r'^```(?:json)?\s*', '', raw_text)
+            raw_text = re.sub(r'\s*```$', '', raw_text.strip()).strip()
+
+        logger.info(f"Auto-decision raw response: {raw_text}")
+
+        decision_data = json.loads(raw_text)
+
+        return {
+            "approved": bool(decision_data.get("approved", False)),
+            "confidence": decision_data.get("confidence", "low"),
+            "institution_name": decision_data.get("institution_name", institution_name),
+            "institution_type": decision_data.get("institution_type", ""),
+            "is_legal_entity": decision_data.get("is_legal_entity"),
+            "has_research_mandate": decision_data.get("has_research_mandate"),
+            "reason": decision_data.get("reason", ""),
+            "summary": decision_data.get("summary", "")
+        }
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse auto-decision JSON: {e}. Raw text: {raw_text if 'raw_text' in dir() else 'N/A'}")
+        return {
+            "approved": False,
+            "confidence": "low",
+            "institution_name": institution_name,
+            "institution_type": "",
+            "is_legal_entity": None,
+            "has_research_mandate": None,
+            "reason": "Could not parse analysis result. Manual review required.",
+            "summary": ""
+        }
+    except Exception as e:
+        logger.error(f"Phase 2 auto-decision error: {str(e)}")
+        return {
+            "approved": False,
+            "confidence": "low",
+            "institution_name": institution_name,
+            "institution_type": "",
+            "is_legal_entity": None,
+            "has_research_mandate": None,
+            "reason": f"Analysis failed: {str(e)}",
+            "summary": ""
+        }
+
+
+# ============================================================================
+# AUTO-DECISION SEARCH FUNCTION (Coordinates Phase 1 + Phase 2 Auto-Decision)
+# ============================================================================
+
+def search_institution_auto_decision(
+    name: str,
+    country: Optional[str] = None,
+    website: Optional[str] = None,
+    model_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    TWO-PHASE search that returns a structured YES/NO eligibility decision for
+    automated CGIAR partner request processing. Does NOT use the narrative
+    formatting of search_institution_online — returns structured JSON instead.
+
+    Phase 1: Exploratory search (OpenAI gpt-5-mini) — gather all available info.
+    Phase 2: Auto-decision (AWS Bedrock Claude, rules-validation model) — structured YES/NO.
+
+    Args:
+        name: Institution name (required)
+        country: Country hint (optional, improves search accuracy)
+        website: Official website (optional, enables focused domain search)
+        model_id: Optional Bedrock model override (defaults to BEDROCK_RULES_MODEL_ID / Sonnet 4.5)
+
+    Returns:
+        dict: {
+            "success": bool,
+            "approved": bool | None,
+            "confidence": "high" | "medium" | "low",
+            "institution_name": str,
+            "institution_type": str,
+            "is_legal_entity": bool | None,
+            "has_research_mandate": bool | None,
+            "reason": str,
+            "summary": str,
+            "error": str | None
+        }
+    """
+    _empty = {
+        "success": False,
+        "approved": None,
+        "confidence": "low",
+        "institution_name": name or "",
+        "institution_type": "",
+        "is_legal_entity": None,
+        "has_research_mandate": None,
+        "reason": "",
+        "summary": "",
+        "error": None
+    }
+
+    try:
+        if not name or str(name).strip() == "":
+            return {**_empty, "reason": "Institution name is required.", "error": "Institution name is required"}
+
+        name = str(name).strip()
+        logger.info(f"🤖 Starting AUTO-DECISION search for: {name}")
+
+        logger.info("   Phase 1/2: Gathering information (OpenAI)...")
+        phase1_result = _phase1_exploratory_search(name, country, website)
+
+        if not phase1_result["success"]:
+            return {
+                **_empty,
+                "institution_name": name,
+                "reason": f"Web search failed: {phase1_result['error']}",
+                "error": phase1_result["error"]
+            }
+
+        logger.info("   Phase 2/2: Making auto-decision (Claude rules-validation model)...")
+        decision = _phase2_auto_decision(
+            institution_name=name,
+            raw_content=phase1_result["raw_content"],
+            sources=phase1_result["sources"],
+            model_id=model_id
+        )
+
+        verdict = "APPROVED" if decision["approved"] else "REJECTED"
+        logger.info(f"🤖 Auto-decision: {verdict} ({decision['confidence']} confidence) — {name}")
+
+        return {
+            "success": True,
+            "approved": decision["approved"],
+            "confidence": decision["confidence"],
+            "institution_name": decision["institution_name"],
+            "institution_type": decision["institution_type"],
+            "is_legal_entity": decision["is_legal_entity"],
+            "has_research_mandate": decision["has_research_mandate"],
+            "reason": decision["reason"],
+            "summary": decision["summary"],
+            "error": None
+        }
+
+    except Exception as e:
+        logger.error(f"Auto-decision search error for '{name}': {str(e)}")
+        return {**_empty, "institution_name": name, "reason": f"Processing error: {str(e)}", "error": str(e)}
+
+
+# ============================================================================
+# SAME-INSTITUTION CHECK (duplicate confirmation, small/fast model)
+# ============================================================================
+
+def _phase_same_institution_check(
+    requester: Dict[str, Any],
+    candidate: Dict[str, Any],
+    model_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Single-call comparison (no web search) deciding whether the requester's
+    submitted institution and a CLARISA hybrid-search candidate are the same
+    real-world institution. Uses a smaller/faster Bedrock model than the
+    rules-validation Phase 2, since this is a simpler classification task and
+    is only run for Very Good / Good matches where latency matters.
+
+    Args:
+        requester: dict with whatever of name/acronym/website/institution_type/country
+                    the requester submitted (missing fields are simply omitted from the prompt)
+        candidate: dict with the CLARISA candidate's name/acronym/website/institution_type/countries
+        model_id: Optional Bedrock model override (defaults to BEDROCK_DUPLICATE_CHECK_MODEL_ID)
+
+    Returns:
+        dict: {"same_institution": bool, "confidence": "high"|"medium"|"low", "reason": str}
+    """
+    model_id = model_id or os.getenv("BEDROCK_DUPLICATE_CHECK_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
+
+    def _fmt(fields: Dict[str, Any]) -> str:
+        lines = []
+        for label, value in fields.items():
+            if value:
+                lines.append(f"- {label}: {value}")
+        return "\n".join(lines) if lines else "- (no additional data provided)"
+
+    requester_block = _fmt({
+        "Name": requester.get("name"),
+        "Acronym": requester.get("acronym"),
+        "Website": requester.get("website"),
+        "Institution type": requester.get("institution_type"),
+        "Country": requester.get("country"),
+    })
+
+    candidate_countries = candidate.get("countries")
+    candidate_block = _fmt({
+        "Name": candidate.get("name"),
+        "Acronym": candidate.get("acronym"),
+        "Website": candidate.get("website"),
+        "Institution type": candidate.get("institution_type"),
+        "Country/Countries": ", ".join(candidate_countries) if isinstance(candidate_countries, list) else candidate_countries,
+    })
+
+    prompt = f"""You are comparing two institution records to decide if they refer to the SAME real-world institution.
+
+REQUESTER SUBMITTED DATA (new partner request):
+{requester_block}
+
+CLARISA CANDIDATE (existing record found by search):
+{candidate_block}
+
+INSTRUCTIONS:
+- Treat spelling variations, translations, legal-form suffixes (e.g. "Inc.", "Ltd.", "Foundation"),
+  and acronym differences as the SAME institution if the underlying organization is clearly identical.
+- Treat them as DIFFERENT institutions if there is a real distinguishing difference: different country
+  of headquarters, a parent/sub-unit or affiliate relationship, a different mandate/sector, or simply
+  not enough overlap to conclude they are the same entity.
+- When the evidence is genuinely ambiguous, prefer "same_institution": false with "confidence": "low"
+  — a false negative here only triggers additional verification, while a false positive skips it entirely.
+
+Respond ONLY with a valid JSON object. No markdown fences, no extra text:
+{{
+  "same_institution": true or false,
+  "confidence": "high" or "medium" or "low",
+  "reason": "Clear 1-2 sentence explanation of the decision"
+}}"""
+
+    try:
+        response = bedrock_client.invoke_model(
+            modelId=model_id,
+            contentType="application/json",
+            accept="application/json",
+            body=json.dumps({
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 500,
+                "messages": [{"role": "user", "content": prompt}]
+            })
+        )
+
+        response_body = json.loads(response['body'].read())
+        raw_text = response_body['content'][0]['text'].strip()
+
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r'^```(?:json)?\s*', '', raw_text)
+            raw_text = re.sub(r'\s*```$', '', raw_text.strip()).strip()
+
+        logger.info(f"Same-institution check raw response: {raw_text}")
+
+        decision_data = json.loads(raw_text)
+
+        return {
+            "same_institution": bool(decision_data.get("same_institution", False)),
+            "confidence": decision_data.get("confidence", "low"),
+            "reason": decision_data.get("reason", "")
+        }
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse same-institution check JSON: {e}")
+        return {
+            "same_institution": False,
+            "confidence": "low",
+            "reason": "Could not parse comparison result — escalating to full validation."
+        }
+    except Exception as e:
+        logger.error(f"Same-institution check error: {str(e)}")
+        return {
+            "same_institution": False,
+            "confidence": "low",
+            "reason": f"Comparison failed ({str(e)}) — escalating to full validation."
+        }
+
+
+def check_same_institution(
+    requester_metadata: Dict[str, Any],
+    candidate_metadata: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Public entry point for the same-institution duplicate check.
+
+    On any error or parse failure, defaults to same_institution=False —
+    an error must only cause MORE verification (fall through to full
+    web-search + rules validation), never cause an auto-reject by itself.
+
+    Returns:
+        dict: {
+            "success": bool,
+            "same_institution": bool | None,
+            "confidence": "high" | "medium" | "low",
+            "reason": str,
+            "error": str | None
+        }
+    """
+    try:
+        result = _phase_same_institution_check(requester_metadata, candidate_metadata)
+        return {
+            "success": True,
+            "same_institution": result["same_institution"],
+            "confidence": result["confidence"],
+            "reason": result["reason"],
+            "error": None
+        }
+    except Exception as e:
+        logger.error(f"check_same_institution error: {str(e)}")
+        return {
+            "success": False,
+            "same_institution": False,
+            "confidence": "low",
+            "reason": f"Comparison failed ({str(e)}) — escalating to full validation.",
+            "error": str(e)
+        }
+
+
+# ============================================================================
 # TEST FUNCTION
 # ============================================================================
 
