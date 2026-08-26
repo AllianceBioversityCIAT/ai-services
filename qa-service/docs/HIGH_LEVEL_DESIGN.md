@@ -154,7 +154,7 @@ The PRMS QA Service follows a **layered microservices architecture** with clear 
 ---
 
 #### 3.2.3 AI Layer
-**Technology:** AWS Bedrock (Claude Sonnet 4)  
+**Technology:** AWS Bedrock (Claude Sonnet 4.6)  
 **Responsibilities:**
 - Execute generative AI inference for content improvement
 - Process multiple specialized prompts in parallel (title/description, impact areas, readiness assessment)
@@ -169,7 +169,7 @@ The PRMS QA Service follows a **layered microservices architecture** with clear 
 **Interacts With:** Orchestration Layer, Prompt Generation Utility
 
 **Configuration:**
-- Model: `us.anthropic.claude-sonnet-4-20250514-v1:0`
+- Model: `us.anthropic.claude-sonnet-4-6`
 - Region: `us-east-1`
 - Default max_tokens: 2000 (configurable per prompt type)
 
@@ -291,7 +291,7 @@ The PRMS QA Service follows a **layered microservices architecture** with clear 
 graph TB
     subgraph "External Systems"
         PRMS[PRMS Reporting Tool<br/>Frontend]
-        Bedrock[AWS Bedrock<br/>Claude Sonnet 4]
+        Bedrock[AWS Bedrock<br/>Claude Sonnet 4.6]
         InteractionSvc[Interaction Service<br/>Analytics API]
         Slack[Slack Webhook]
         EvidenceSources[Evidence Sources<br/>CGSpace, DOI, Web Pages,<br/>SharePoint, PDFs]
@@ -467,7 +467,7 @@ The PRMS QA Service follows a sequential, multi-stage data processing pipeline w
 - Create async tasks for each prompt type (main, readiness, use-level, impact areas)
 - Apply semaphore control limiting to 2 concurrent Bedrock API calls
 - Configure model parameters:
-  - Model: Claude Sonnet 4
+  - Model: Claude Sonnet 4.6
   - Temperature: 0.1 (deterministic outputs)
   - Max tokens: 2000 (default, varies by prompt type)
   - Top-k: 250, Top-p: 0.999
@@ -689,7 +689,7 @@ sequenceDiagram
 
 ### AI and Machine Learning
 - AWS Bedrock - Managed AI service for LLM inference
-- Claude Sonnet 4 (Anthropic) - Large language model for text generation
+- Claude Sonnet 4.6 (Anthropic) - Large language model for text generation
 - Pydantic - Data validation and schema enforcement
 
 ### Web Scraping and Content Extraction
@@ -778,7 +778,7 @@ python-dotenv         # Environment config
 
 ---
 
-### 7.2 AWS Bedrock (Claude Sonnet 4)
+### 7.2 AWS Bedrock (Claude Sonnet 4.6)
 
 **Integration Type:** Synchronous AI Inference Service  
 **Direction:** Outbound (Request/Response)  
@@ -789,7 +789,7 @@ python-dotenv         # Environment config
 **Interface:**
 - **Service:** AWS Bedrock Runtime
 - **Region:** us-east-1
-- **Model ID:** `us.anthropic.claude-sonnet-4-20250514-v1:0`
+- **Model ID:** `us.anthropic.claude-sonnet-4-6`
 - **API Method:** `invoke_model()`
 
 **Request Configuration:**

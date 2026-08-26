@@ -409,7 +409,7 @@ docker run -p 8000:8000 --env-file .env prms-qa-service
 ## Configuration
 
 ### AWS Bedrock Model
-- **Model**: `us.anthropic.claude-sonnet-4-20250514-v1:0`
+- **Model**: `us.anthropic.claude-sonnet-4-6`
 - **Region**: `us-east-1`
 - **Temperature**: `0.1` (low for consistency)
 - **Max Tokens**: `2000`

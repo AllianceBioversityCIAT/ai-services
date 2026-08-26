@@ -41,9 +41,6 @@ async def invoke_model_async(prompt, max_tokens=2000, prompt_name="unknown"):
                     "anthropic_version": "bedrock-2023-05-31",
                     "max_tokens": max_tokens,
                     "temperature": 0.1,
-                    "top_k": 250,
-                    "top_p": 0.999,
-                    "stop_sequences": [],
                     "messages": [
                         {
                             "role": "user",
@@ -58,7 +55,7 @@ async def invoke_model_async(prompt, max_tokens=2000, prompt_name="unknown"):
                 response = await loop.run_in_executor(
                     None,
                     lambda: bedrock_runtime.invoke_model(
-                        modelId="us.anthropic.claude-sonnet-4-20250514-v1:0",
+                        modelId="us.anthropic.claude-sonnet-4-6",
                         body=json.dumps(request_body),
                         contentType="application/json",
                         accept="application/json"
