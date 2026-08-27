@@ -1,4 +1,5 @@
 import type { BulkUploadResult, RawInstitution, RawUser } from '../types';
+import { RESEARCH_AREAS_MIN_YEAR, getPrimaryLeverOptions, parseResultYear } from '../constants';
 
 export interface CompletenessResult {
   isComplete: boolean;
@@ -44,6 +45,22 @@ export function checkCompleteness(result: BulkUploadResult): CompletenessResult 
   if (isEmpty(result.title)) fail('title', 'Title is required');
   if (isEmpty(result.year)) fail('year', 'Year is required');
   if (isEmpty(result.training_type)) fail('training_type', 'Training Type is required');
+
+  // Primary Levers (year < 2026) / Research Areas (year >= 2026)
+  const leverYear = parseResultYear(result.year);
+  const leverLabel = leverYear === null
+    ? 'Primary Levers / Research Areas'
+    : leverYear >= RESEARCH_AREAS_MIN_YEAR ? 'Research Areas' : 'Primary Levers';
+
+  if (isEmpty(result.primary_levers)) {
+    fail('primary_levers', `${leverLabel} is required`);
+  } else if (leverYear !== null) {
+    const allowed = new Set(getPrimaryLeverOptions(result.year).map((o) => o.id));
+    const invalid = (result.primary_levers as number[]).filter((id) => !allowed.has(Number(id)));
+    if (invalid.length > 0) {
+      fail('primary_levers', `${leverLabel}: ${invalid.length} selected option${invalid.length > 1 ? 's do' : ' does'} not belong to the ${leverYear} portfolio — please re-select`);
+    }
+  }
 
   // Main contact person
   if (!result.main_contact_person) {

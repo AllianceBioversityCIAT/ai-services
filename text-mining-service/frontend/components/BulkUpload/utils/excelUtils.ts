@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { SummaryRecord } from '../types';
+import { PRIMARY_LEVER_ID_TO_NAME } from '../constants';
 
 // ── Metadata columns (full BulkUploadResult fields) ──────────────────────────
 const METADATA_COLUMNS: { key: string; label: string }[] = [
@@ -8,6 +9,7 @@ const METADATA_COLUMNS: { key: string; label: string }[] = [
   { key: 'contract_code',                         label: 'Contract Code'                   },
   { key: 'description',                           label: 'Description'                     },
   { key: 'year',                                  label: 'Year'                            },
+  { key: 'primary_levers',                        label: 'Primary Levers / Research Areas' },
   { key: 'training_type',                         label: 'Training Type'                   },
   { key: 'training_category',                     label: 'Training Category'               },
   { key: 'training_purpose',                      label: 'Training Purpose'                },
@@ -44,6 +46,12 @@ function serialize(value: unknown): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
   return JSON.stringify(value);
+}
+
+/** Primary Lever / Research Area ids → readable names for Excel. */
+function serializeLevers(value: unknown): string {
+  if (!Array.isArray(value)) return serialize(value);
+  return value.map((id) => PRIMARY_LEVER_ID_TO_NAME[Number(id)] ?? String(id)).join(' | ');
 }
 
 function isBlankParticipantValue(value: unknown): boolean {
@@ -86,12 +94,14 @@ function buildMetadataRow(r: SummaryRecord, cols: { key: string; label: string }
     const data = applyIndividualTrainingExcelDefaults(raw);
     return cols.map((col) => {
       const val = data[col.key];
+      if (col.key === 'primary_levers') return serializeLevers(val);
       if (ARRAY_KEYS.has(col.key)) return serialize(val);
       return serialize(val);
     });
   } catch {
     return cols.map((col) => {
       const val = raw[col.key];
+      if (col.key === 'primary_levers') return serializeLevers(val);
       if (ARRAY_KEYS.has(col.key)) return serialize(val);
       return serialize(val);
     });

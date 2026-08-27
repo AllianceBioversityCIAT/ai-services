@@ -1,6 +1,8 @@
 import type { BulkUploadResult, RawInstitution, UnmappedInstitution } from '../types';
 import {
   ASSET_IP_OWNER_NAME_TO_ID,
+  filterLeversForYear,
+  parseResultYear,
   JSON_FIELDS,
   NON_CAPDEV_FIELDS,
   NUMERIC_FIELDS,
@@ -118,6 +120,36 @@ export function formatResultForSTAR(result: BulkUploadResult): Record<string, un
         return Number(r);
       }).filter((r) => !isNaN(r as number));
     }
+  }
+
+  // Step 4.5: primary_levers → array of ids (Primary Levers 1-9 / Research Areas 10-17)
+  if (formatted.primary_levers !== undefined && formatted.primary_levers !== null) {
+    let levers: unknown[] = [];
+    if (typeof formatted.primary_levers === 'string') {
+      try {
+        const parsed = JSON.parse(formatted.primary_levers as string);
+        levers = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        levers = [];
+      }
+    } else if (Array.isArray(formatted.primary_levers)) {
+      levers = formatted.primary_levers as unknown[];
+    }
+
+    let ids = levers
+      .map((l) => (typeof l === 'object' && l !== null && 'id' in l ? Number((l as { id: unknown }).id) : Number(l)))
+      .filter((n) => Number.isInteger(n));
+    ids = Array.from(new Set(ids));
+
+    // Guard: never mix the two catalogs — keep only the ids valid for this year
+    if (parseResultYear(formatted.year) !== null) {
+      ids = filterLeversForYear(ids, formatted.year);
+    }
+
+    if (ids.length === 0) delete formatted.primary_levers;
+    else formatted.primary_levers = ids;
+  } else {
+    delete formatted.primary_levers;
   }
 
   // Step 5: trainee_affiliation
