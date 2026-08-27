@@ -1,5 +1,5 @@
 import type { BulkUploadResult, ColumnDef, RawInstitution, RawUser, RawLanguage, RawCountry, RawEvidence, RecordStatus, TabType, SortDirection, TableSortConfig } from '../types';
-import { NUMERIC_FIELDS, RESULTS_TABLE_COLUMNS } from '../constants';
+import { NUMERIC_FIELDS, PRIMARY_LEVER_ID_TO_NAME, RESULTS_TABLE_COLUMNS } from '../constants';
 import { checkCompleteness } from './completenessChecker';
 
 const NON_SORTABLE_COLUMN_TYPES = new Set<ColumnDef['type']>(['checkbox', 'status', 'link']);
@@ -104,6 +104,13 @@ export function getFilterTokens(columnKey: string, value: unknown): string[] {
     const arr = value as number[];
     if (!Array.isArray(arr) || arr.length === 0) return ['(Empty)'];
     return arr.map(r => String(r));
+  }
+
+  // Primary Levers / Research Areas (number[] of catalog ids)
+  if (columnKey === 'primary_levers') {
+    const arr = value as number[];
+    if (!Array.isArray(arr) || arr.length === 0) return ['(Empty)'];
+    return arr.map(id => PRIMARY_LEVER_ID_TO_NAME[Number(id)] ?? String(id));
   }
 
   // String arrays: keywords

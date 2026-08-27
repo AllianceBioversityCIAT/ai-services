@@ -11,6 +11,7 @@ import { extractUnmappedInstitutions } from './utils/dataFormatters';
 import { createUnmappedReportCSV, downloadCSV } from './utils/csvUtils';
 import { setNestedValue } from './utils/tableHelpers';
 import { checkCompleteness } from './utils/completenessChecker';
+import { filterLeversForYear, getPrimaryLeverOptions } from './constants';
 
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { ErrorMessage } from './components/ErrorMessage';
@@ -210,6 +211,13 @@ export default function BulkUploadModule() {
       const next = [...prev];
       const updated = { ...next[globalIdx] } as BulkUploadResult;
       setNestedValue(updated, field, value);
+      // Primary Levers (1-9) and Research Areas (10-17) are two disjoint catalogs
+      // selected by year — drop selections the new year no longer allows.
+      if (field === 'year' && Array.isArray(updated.primary_levers) && updated.primary_levers.length > 0) {
+        if (getPrimaryLeverOptions(value).length > 0) {
+          updated.primary_levers = filterLeversForYear(updated.primary_levers, value);
+        }
+      }
       next[globalIdx] = updated;
       return next;
     });

@@ -12,6 +12,7 @@ import { useState } from 'react';
 import type { RawInstitution, RawCountry, TableSortConfig } from '../types';
 import { PartnersCell } from './PartnersCell';
 import { TrainingPurposeCell } from './TrainingPurposeCell';
+import { PrimaryLeversCell } from './PrimaryLeversCell';
 import { RegionsCell } from './RegionsCell';
 import { CountriesCell } from './CountriesCell';
 import { TraineeAffiliationCell } from './TraineeAffiliationCell';
@@ -307,6 +308,26 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
           value={raw !== undefined && raw !== null ? String(raw) : undefined}
           globalIdx={globalIdx}
           onEdit={onEdit as (globalIdx: number, field: string, value: string) => void}
+          disabled={isDisabled}
+        />
+      </td>
+    );
+  }
+
+  if (col.type === 'primary_levers') {
+    const raw = getNestedValue(result, col.key);
+    const leverIds: number[] = Array.isArray(raw)
+      ? (raw as unknown[]).map((v) => (typeof v === 'object' && v !== null && 'id' in v ? Number((v as { id: unknown }).id) : Number(v))).filter((n) => !isNaN(n))
+      : typeof raw === 'string' && raw.trim().startsWith('[')
+        ? (() => { try { return (JSON.parse(raw) as unknown[]).map(Number).filter((n) => !isNaN(n)); } catch { return []; } })()
+        : [];
+    return (
+      <td className={isReadOnly ? 'bulk-cell-readonly' : undefined}>
+        <PrimaryLeversCell
+          values={leverIds}
+          year={getNestedValue(result, 'year')}
+          globalIdx={globalIdx}
+          onEdit={onEdit as (globalIdx: number, field: string, value: number[]) => void}
           disabled={isDisabled}
         />
       </td>

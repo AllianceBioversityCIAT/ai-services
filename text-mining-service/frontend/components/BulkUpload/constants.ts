@@ -28,6 +28,67 @@ export const ASSET_IP_OWNER_ID_TO_NAME: Record<number, string> = {
   4: 'Others',
 };
 
+// ── Primary Levers / Research Areas ──────────────────────────────────────────
+// STAR renamed "Primary Levers" to "Research Areas" for the 2026-2030 portfolio.
+// Both share the same field (`primary_levers`) but use disjoint id ranges:
+// levers 1-9 (year < 2026) and research areas 10-17 (year >= 2026).
+export interface PrimaryLeverOption {
+  id: number;
+  name: string;
+}
+
+export const RESEARCH_AREAS_MIN_YEAR = 2026;
+
+export const PRIMARY_LEVERS: PrimaryLeverOption[] = [
+  { id: 1, name: 'Lever 1: Food Environments and Consumer Behavior' },
+  { id: 2, name: 'Lever 2: Multifunctional Landscapes' },
+  { id: 3, name: 'Lever 3: Climate Action' },
+  { id: 4, name: 'Lever 4: Biodiversity for Food and Agriculture' },
+  { id: 5, name: 'Lever 5: Digital Inclusion' },
+  { id: 6, name: 'Lever 6: Crops for Nutrition and Health' },
+  { id: 7, name: 'Lever 7: Gender and Inclusion' },
+  { id: 8, name: 'Lever 8: Performance, Innovation and Strategic Analysis for Impact' },
+  { id: 9, name: 'Other' },
+];
+
+export const RESEARCH_AREAS: PrimaryLeverOption[] = [
+  { id: 10, name: 'Food Environments and Consumer Behavior' },
+  { id: 11, name: 'Multifunctional Landscapes' },
+  { id: 12, name: 'Climate Action' },
+  { id: 13, name: 'Biodiversity for Food and Agriculture' },
+  { id: 14, name: 'Digital Inclusion' },
+  { id: 15, name: 'Crops for Nutrition and Health' },
+  { id: 16, name: 'Gender and Inclusion' },
+  { id: 17, name: 'Performance, Innovation and Strategic Analysis for Impact' },
+];
+
+export const PRIMARY_LEVER_ID_TO_NAME: Record<number, string> = Object.fromEntries(
+  [...PRIMARY_LEVERS, ...RESEARCH_AREAS].map((o) => [o.id, o.name]),
+);
+
+/** Parses a result year; returns null when it is missing or not a 4-digit year. */
+export function parseResultYear(year: unknown): number | null {
+  const n = Number(String(year ?? '').trim());
+  return Number.isInteger(n) && n > 1900 && n < 2100 ? n : null;
+}
+
+/**
+ * Option list for a result's year: Research Areas from 2026 onwards, Primary
+ * Levers before that. Returns an empty list when the year is unknown — the ids
+ * of the two ranges must never be mixed in the same record.
+ */
+export function getPrimaryLeverOptions(year: unknown): PrimaryLeverOption[] {
+  const parsed = parseResultYear(year);
+  if (parsed === null) return [];
+  return parsed >= RESEARCH_AREAS_MIN_YEAR ? RESEARCH_AREAS : PRIMARY_LEVERS;
+}
+
+/** Keeps only the ids that are valid for the result's year. */
+export function filterLeversForYear(values: number[], year: unknown): number[] {
+  const allowed = new Set(getPrimaryLeverOptions(year).map((o) => o.id));
+  return values.filter((v) => allowed.has(v));
+}
+
 export const NON_CAPDEV_FIELDS = [
   'evidence_for_stage',
   'policy_type',
@@ -53,6 +114,7 @@ export const NUMERIC_FIELDS = [
 
 export const JSON_FIELDS = [
   'keywords',
+  'primary_levers',
   'countries',
   'evidences',
   'partners',
@@ -111,6 +173,14 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
   { key: 'main_contact_person', label: 'Main Contact Name', type: 'staff', riskFlag: true, width: '200px' },
   { key: 'keywords', label: 'Keywords', type: 'chips', width: '400px' },
   { key: 'contract_code', label: 'Contract Code', type: 'text', width: '155px', showInSubmitted: true },
+  {
+    key: 'primary_levers',
+    label: 'Primary Levers / Research Areas',
+    type: 'primary_levers',
+    required: true,
+    tooltip: 'For the 2026-2030 portfolio, Primary Levers became Research Areas. The list shown depends on the result year.',
+    width: '300px',
+  },
   { key: 'training_type', label: 'Training Type', type: 'select', options: ['Individual training', 'Group training'], riskFlag: true, width: '185px' },
   { key: 'training_category', label: 'Training Category', type: 'select', options: ['Training', 'Engagement'], width: '175px' },
   { key: 'length_of_training', label: 'Length of Training', type: 'select', options: ['Short-term', 'Long-term'], width: '175px' },
