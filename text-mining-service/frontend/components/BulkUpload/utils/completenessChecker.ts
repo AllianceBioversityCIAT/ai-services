@@ -1,5 +1,5 @@
 import type { BulkUploadResult, RawInstitution, RawUser } from '../types';
-import { RESEARCH_AREAS_MIN_YEAR, getPrimaryLeverOptions, parseResultYear } from '../constants';
+import { PORTFOLIO_2026_MIN_YEAR, STRATEGIC_OBJECTIVES, getPrimaryLeverOptions, parseResultYear, strategicObjectivesApply } from '../constants';
 
 export interface CompletenessResult {
   isComplete: boolean;
@@ -50,7 +50,7 @@ export function checkCompleteness(result: BulkUploadResult): CompletenessResult 
   const leverYear = parseResultYear(result.year);
   const leverLabel = leverYear === null
     ? 'Primary Levers / Research Areas'
-    : leverYear >= RESEARCH_AREAS_MIN_YEAR ? 'Research Areas' : 'Primary Levers';
+    : leverYear >= PORTFOLIO_2026_MIN_YEAR ? 'Research Areas' : 'Primary Levers';
 
   if (isEmpty(result.primary_levers)) {
     fail('primary_levers', `${leverLabel} is required`);
@@ -59,6 +59,20 @@ export function checkCompleteness(result: BulkUploadResult): CompletenessResult 
     const invalid = (result.primary_levers as number[]).filter((id) => !allowed.has(Number(id)));
     if (invalid.length > 0) {
       fail('primary_levers', `${leverLabel}: ${invalid.length} selected option${invalid.length > 1 ? 's do' : ' does'} not belong to the ${leverYear} portfolio — please re-select`);
+    }
+  }
+
+  // Strategic Objectives — only exist for the 2026-2030 portfolio, so they are
+  // required there and simply not checked for earlier results.
+  if (strategicObjectivesApply(result.year)) {
+    if (isEmpty(result.strategic_objectives)) {
+      fail('strategic_objectives', 'Strategic Objectives is required');
+    } else {
+      const allowed = new Set(STRATEGIC_OBJECTIVES.map((o) => o.id));
+      const invalid = (result.strategic_objectives as number[]).filter((id) => !allowed.has(Number(id)));
+      if (invalid.length > 0) {
+        fail('strategic_objectives', `Strategic Objectives: ${invalid.length} selected option${invalid.length > 1 ? 's are' : ' is'} not in the catalog — please re-select`);
+      }
     }
   }
 

@@ -53,6 +53,8 @@ export interface BulkUploadResult {
   keywords?: string[];
   /** Primary Lever ids (1-9, year < 2026) or Research Area ids (10-17, year >= 2026). */
   primary_levers?: number[];
+  /** Strategic Objective ids (1-5). Only applies from 2026 onwards. */
+  strategic_objectives?: number[];
   main_contact_person?: RawUser;
   training_supervisor?: RawUser;
   trainee_affiliation?: RawInstitution;
@@ -180,7 +182,7 @@ export interface ColumnDef {
   label: string;
   /** Override label when the submitted tab is active (e.g. Completeness → STAR Status). */
   submittedLabel?: string;
-  type: 'checkbox' | 'text' | 'number' | 'textarea' | 'select' | 'status' | 'completeness' | 'link' | 'chips' | 'partners' | 'evidence_desc' | 'evidence_link' | 'training_purpose' | 'primary_levers' | 'date' | 'countries' | 'regions' | 'affiliation' | 'nationality' | 'language' | 'staff';
+  type: 'checkbox' | 'text' | 'number' | 'textarea' | 'select' | 'status' | 'completeness' | 'link' | 'chips' | 'partners' | 'evidence_desc' | 'evidence_link' | 'training_purpose' | 'primary_levers' | 'strategic_objectives' | 'date' | 'countries' | 'regions' | 'affiliation' | 'nationality' | 'language' | 'staff';
   readonly?: boolean;
   required?: boolean;
   riskFlag?: boolean;

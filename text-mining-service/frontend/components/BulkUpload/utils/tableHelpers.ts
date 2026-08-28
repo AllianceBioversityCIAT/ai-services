@@ -1,5 +1,5 @@
 import type { BulkUploadResult, ColumnDef, RawInstitution, RawUser, RawLanguage, RawCountry, RawEvidence, RecordStatus, TabType, SortDirection, TableSortConfig } from '../types';
-import { NUMERIC_FIELDS, PRIMARY_LEVER_ID_TO_NAME, RESULTS_TABLE_COLUMNS } from '../constants';
+import { NUMERIC_FIELDS, PRIMARY_LEVER_ID_TO_NAME, STRATEGIC_OBJECTIVE_ID_TO_NAME, RESULTS_TABLE_COLUMNS } from '../constants';
 import { checkCompleteness } from './completenessChecker';
 
 const NON_SORTABLE_COLUMN_TYPES = new Set<ColumnDef['type']>(['checkbox', 'status', 'link']);
@@ -16,6 +16,21 @@ const ASSET_IP_OWNER_ID_TO_NAME: Record<number, string> = {
   3: 'Bioversity International and International Center for Tropical Agriculture - CIAT',
   4: 'Others',
 };
+
+/**
+ * Normalises a stored catalog selection to a list of numeric ids.
+ * Accepts an array of numbers, an array of {id} objects, or a JSON string.
+ */
+export function parseIdList(raw: unknown): number[] {
+  const arr: unknown[] = Array.isArray(raw)
+    ? raw
+    : typeof raw === 'string' && raw.trim().startsWith('[')
+      ? (() => { try { return JSON.parse(raw) as unknown[]; } catch { return []; } })()
+      : [];
+  return arr
+    .map((v) => (typeof v === 'object' && v !== null && 'id' in v ? Number((v as { id: unknown }).id) : Number(v)))
+    .filter((n) => Number.isFinite(n));
+}
 
 /** Reads a deep path like "a.b.c" from an object. */
 export function getNestedValue(obj: BulkUploadResult, path: string): unknown {
@@ -111,6 +126,13 @@ export function getFilterTokens(columnKey: string, value: unknown): string[] {
     const arr = value as number[];
     if (!Array.isArray(arr) || arr.length === 0) return ['(Empty)'];
     return arr.map(id => PRIMARY_LEVER_ID_TO_NAME[Number(id)] ?? String(id));
+  }
+
+  // Strategic Objectives (number[] of catalog ids)
+  if (columnKey === 'strategic_objectives') {
+    const arr = value as number[];
+    if (!Array.isArray(arr) || arr.length === 0) return ['(Empty)'];
+    return arr.map(id => STRATEGIC_OBJECTIVE_ID_TO_NAME[Number(id)] ?? String(id));
   }
 
   // String arrays: keywords

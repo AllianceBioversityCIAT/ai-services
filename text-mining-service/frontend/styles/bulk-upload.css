@@ -1454,8 +1454,8 @@
     border: 1px solid #BFDBFE;
 }
 
-/* Primary Levers / Research Areas cell */
-.bulk-upload-container .levers-cell .bulk-chip {
+/* Catalog multi-select cells (Primary Levers, Strategic Objectives) */
+.bulk-upload-container .catalog-cell .bulk-chip {
     /* .bulk-chip has no box-sizing, so a plain max-width:100% would add padding +
        border on top of the cell width and get clipped by the td's overflow.
        The 2px keeps the rounded edge clear of the column border. */
@@ -1463,13 +1463,13 @@
     max-width: calc(100% - 2px);
 }
 
-.bulk-upload-container .levers-year-hint {
+.bulk-upload-container .catalog-year-hint {
     font-size: 12px;
     color: #9CA3AF;
     font-style: italic;
 }
 
-.bulk-upload-container .levers-popover-title {
+.bulk-upload-container .catalog-popover-title {
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -1960,7 +1960,7 @@
 /* Cells with chip/complex components: allow wrapping, never clip the × button */
 .bulk-upload-container .bulk-results-table td:has(.partners-cell),
 .bulk-upload-container .bulk-results-table td:has(.affiliation-cell),
-.bulk-upload-container .bulk-results-table td:has(.levers-cell),
+.bulk-upload-container .bulk-results-table td:has(.catalog-cell),
 .bulk-upload-container .bulk-results-table td:has(.geo-cell) {
     white-space: normal;
     overflow: hidden;

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, memo, useMemo } from 'react';
 import type { ChangeEvent } from 'react';
 import type { BulkUploadResult, ColumnDef, RecordStatus, TabType } from '../types';
 import { ASSET_IP_OWNER_ID_TO_NAME, RESULTS_TABLE_COLUMNS } from '../constants';
-import { getNestedValue, setNestedValue, getUniqueValues, getColumnLabel, getSortableColumns, findColumnBySortKey } from '../utils/tableHelpers';
+import { getNestedValue, setNestedValue, getUniqueValues, getColumnLabel, getSortableColumns, findColumnBySortKey, parseIdList } from '../utils/tableHelpers';
 import { usePagination } from '../hooks/usePagination';
 import { FilterPanel } from './FilterPanel';
 import { SortPanel } from './SortPanel';
@@ -13,6 +13,7 @@ import type { RawInstitution, RawCountry, TableSortConfig } from '../types';
 import { PartnersCell } from './PartnersCell';
 import { TrainingPurposeCell } from './TrainingPurposeCell';
 import { PrimaryLeversCell } from './PrimaryLeversCell';
+import { StrategicObjectivesCell } from './StrategicObjectivesCell';
 import { RegionsCell } from './RegionsCell';
 import { CountriesCell } from './CountriesCell';
 import { TraineeAffiliationCell } from './TraineeAffiliationCell';
@@ -314,18 +315,15 @@ const TableCell = memo(function TableCell({ col, result, globalIdx, recordStatus
     );
   }
 
-  if (col.type === 'primary_levers') {
-    const raw = getNestedValue(result, col.key);
-    const leverIds: number[] = Array.isArray(raw)
-      ? (raw as unknown[]).map((v) => (typeof v === 'object' && v !== null && 'id' in v ? Number((v as { id: unknown }).id) : Number(v))).filter((n) => !isNaN(n))
-      : typeof raw === 'string' && raw.trim().startsWith('[')
-        ? (() => { try { return (JSON.parse(raw) as unknown[]).map(Number).filter((n) => !isNaN(n)); } catch { return []; } })()
-        : [];
+  if (col.type === 'primary_levers' || col.type === 'strategic_objectives') {
+    const ids = parseIdList(getNestedValue(result, col.key));
+    const year = getNestedValue(result, 'year');
+    const Cell = col.type === 'primary_levers' ? PrimaryLeversCell : StrategicObjectivesCell;
     return (
       <td className={isReadOnly ? 'bulk-cell-readonly' : undefined}>
-        <PrimaryLeversCell
-          values={leverIds}
-          year={getNestedValue(result, 'year')}
+        <Cell
+          values={ids}
+          year={year}
           globalIdx={globalIdx}
           onEdit={onEdit as (globalIdx: number, field: string, value: number[]) => void}
           disabled={isDisabled}

@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { SummaryRecord } from '../types';
-import { PRIMARY_LEVER_ID_TO_NAME } from '../constants';
+import { PRIMARY_LEVER_ID_TO_NAME, STRATEGIC_OBJECTIVE_ID_TO_NAME } from '../constants';
 
 // ── Metadata columns (full BulkUploadResult fields) ──────────────────────────
 const METADATA_COLUMNS: { key: string; label: string }[] = [
@@ -10,6 +10,7 @@ const METADATA_COLUMNS: { key: string; label: string }[] = [
   { key: 'description',                           label: 'Description'                     },
   { key: 'year',                                  label: 'Year'                            },
   { key: 'primary_levers',                        label: 'Primary Levers / Research Areas' },
+  { key: 'strategic_objectives',                  label: 'Strategic Objectives'            },
   { key: 'training_type',                         label: 'Training Type'                   },
   { key: 'training_category',                     label: 'Training Category'               },
   { key: 'training_purpose',                      label: 'Training Purpose'                },
@@ -48,10 +49,10 @@ function serialize(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** Primary Lever / Research Area ids → readable names for Excel. */
-function serializeLevers(value: unknown): string {
+/** Catalog ids → readable names for Excel. */
+function serializeCatalog(value: unknown, names: Record<number, string>): string {
   if (!Array.isArray(value)) return serialize(value);
-  return value.map((id) => PRIMARY_LEVER_ID_TO_NAME[Number(id)] ?? String(id)).join(' | ');
+  return value.map((id) => names[Number(id)] ?? String(id)).join(' | ');
 }
 
 function isBlankParticipantValue(value: unknown): boolean {
@@ -94,14 +95,16 @@ function buildMetadataRow(r: SummaryRecord, cols: { key: string; label: string }
     const data = applyIndividualTrainingExcelDefaults(raw);
     return cols.map((col) => {
       const val = data[col.key];
-      if (col.key === 'primary_levers') return serializeLevers(val);
+      if (col.key === 'primary_levers') return serializeCatalog(val, PRIMARY_LEVER_ID_TO_NAME);
+      if (col.key === 'strategic_objectives') return serializeCatalog(val, STRATEGIC_OBJECTIVE_ID_TO_NAME);
       if (ARRAY_KEYS.has(col.key)) return serialize(val);
       return serialize(val);
     });
   } catch {
     return cols.map((col) => {
       const val = raw[col.key];
-      if (col.key === 'primary_levers') return serializeLevers(val);
+      if (col.key === 'primary_levers') return serializeCatalog(val, PRIMARY_LEVER_ID_TO_NAME);
+      if (col.key === 'strategic_objectives') return serializeCatalog(val, STRATEGIC_OBJECTIVE_ID_TO_NAME);
       if (ARRAY_KEYS.has(col.key)) return serialize(val);
       return serialize(val);
     });
