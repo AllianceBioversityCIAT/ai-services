@@ -1917,6 +1917,7 @@
     position: fixed;
     background: #1F2937;
     color: #fff;
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 12px;
     font-weight: 400;
     padding: 6px 10px;
@@ -1942,6 +1943,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Primary levers tooltip */
+.bulk-upload-container .bulk-results-table th:has(.col-tooltip-icon),
+.bulk-upload-container .th-content > span:first-child:has(.col-tooltip-icon) {
+    overflow: visible;
 }
 
 /* Cells containing textareas need to wrap */
