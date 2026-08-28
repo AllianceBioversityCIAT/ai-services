@@ -1,5 +1,5 @@
 import type { UnmappedInstitution, BulkUploadResult, RecordStatus } from '../types';
-import { PRIMARY_LEVER_ID_TO_NAME } from '../constants';
+import { PRIMARY_LEVER_ID_TO_NAME, STRATEGIC_OBJECTIVE_ID_TO_NAME } from '../constants';
 import { checkCompleteness } from './completenessChecker';
 
 const SOURCE_FIELD_LABELS: Record<string, string> = {
@@ -94,6 +94,7 @@ export function createDraftReportCSV(
     'keywords',
     'contract_code',
     'primary_levers',
+    'strategic_objectives',
     'training_type',
     'training_category',
     'length_of_training',
@@ -157,6 +158,9 @@ export function createDraftReportCSV(
       r.contract_code,
       Array.isArray(r.primary_levers)
         ? r.primary_levers.map((id: number) => PRIMARY_LEVER_ID_TO_NAME[Number(id)] ?? String(id)).join(' | ')
+        : '',
+      Array.isArray(r.strategic_objectives)
+        ? r.strategic_objectives.map((id: number) => STRATEGIC_OBJECTIVE_ID_TO_NAME[Number(id)] ?? String(id)).join(' | ')
         : '',
       r.training_type,
       r.training_category,

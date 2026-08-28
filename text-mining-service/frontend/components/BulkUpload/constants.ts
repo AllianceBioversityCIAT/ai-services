@@ -32,14 +32,16 @@ export const ASSET_IP_OWNER_ID_TO_NAME: Record<number, string> = {
 // STAR renamed "Primary Levers" to "Research Areas" for the 2026-2030 portfolio.
 // Both share the same field (`primary_levers`) but use disjoint id ranges:
 // levers 1-9 (year < 2026) and research areas 10-17 (year >= 2026).
-export interface PrimaryLeverOption {
+export interface CatalogOption {
   id: number;
   name: string;
 }
 
-export const RESEARCH_AREAS_MIN_YEAR = 2026;
+/** First year of the 2026-2030 portfolio. Research Areas and Strategic
+ *  Objectives both key off this boundary. */
+export const PORTFOLIO_2026_MIN_YEAR = 2026;
 
-export const PRIMARY_LEVERS: PrimaryLeverOption[] = [
+export const PRIMARY_LEVERS: CatalogOption[] = [
   { id: 1, name: 'Lever 1: Food Environments and Consumer Behavior' },
   { id: 2, name: 'Lever 2: Multifunctional Landscapes' },
   { id: 3, name: 'Lever 3: Climate Action' },
@@ -51,7 +53,7 @@ export const PRIMARY_LEVERS: PrimaryLeverOption[] = [
   { id: 9, name: 'Other' },
 ];
 
-export const RESEARCH_AREAS: PrimaryLeverOption[] = [
+export const RESEARCH_AREAS: CatalogOption[] = [
   { id: 10, name: 'Food Environments and Consumer Behavior' },
   { id: 11, name: 'Multifunctional Landscapes' },
   { id: 12, name: 'Climate Action' },
@@ -77,15 +79,48 @@ export function parseResultYear(year: unknown): number | null {
  * Levers before that. Returns an empty list when the year is unknown — the ids
  * of the two ranges must never be mixed in the same record.
  */
-export function getPrimaryLeverOptions(year: unknown): PrimaryLeverOption[] {
+export function getPrimaryLeverOptions(year: unknown): CatalogOption[] {
   const parsed = parseResultYear(year);
   if (parsed === null) return [];
-  return parsed >= RESEARCH_AREAS_MIN_YEAR ? RESEARCH_AREAS : PRIMARY_LEVERS;
+  return parsed >= PORTFOLIO_2026_MIN_YEAR ? RESEARCH_AREAS : PRIMARY_LEVERS;
 }
 
 /** Keeps only the ids that are valid for the result's year. */
 export function filterLeversForYear(values: number[], year: unknown): number[] {
   const allowed = new Set(getPrimaryLeverOptions(year).map((o) => o.id));
+  return values.filter((v) => allowed.has(v));
+}
+
+// ── Strategic Objectives ─────────────────────────────────────────────────────
+// Only applies to the 2026-2030 portfolio; results before 2026 have no such
+// field. Ids are independent of the Primary Lever ids — do not merge the maps.
+export const STRATEGIC_OBJECTIVES: CatalogOption[] = [
+  { id: 1, name: 'Bank on Agrobiodiversity' },
+  { id: 2, name: 'Make Farms and Landscapes Thrive' },
+  { id: 3, name: 'Unlock Climate Action' },
+  { id: 4, name: 'Enable Healthy Food Choices' },
+  { id: 5, name: 'Boost Inclusion and Prosperity' },
+];
+
+export const STRATEGIC_OBJECTIVE_ID_TO_NAME: Record<number, string> = Object.fromEntries(
+  STRATEGIC_OBJECTIVES.map((o) => [o.id, o.name]),
+);
+
+/** Strategic Objectives only exist from 2026 onwards. */
+export function strategicObjectivesApply(year: unknown): boolean {
+  const parsed = parseResultYear(year);
+  return parsed !== null && parsed >= PORTFOLIO_2026_MIN_YEAR;
+}
+
+/** Option list for a result's year — empty when the field does not apply. */
+export function getStrategicObjectiveOptions(year: unknown): CatalogOption[] {
+  return strategicObjectivesApply(year) ? STRATEGIC_OBJECTIVES : [];
+}
+
+/** Keeps only ids that exist in the catalog, and only when the year allows it. */
+export function filterObjectivesForYear(values: number[], year: unknown): number[] {
+  if (!strategicObjectivesApply(year)) return [];
+  const allowed = new Set(STRATEGIC_OBJECTIVES.map((o) => o.id));
   return values.filter((v) => allowed.has(v));
 }
 
@@ -115,6 +150,7 @@ export const NUMERIC_FIELDS = [
 export const JSON_FIELDS = [
   'keywords',
   'primary_levers',
+  'strategic_objectives',
   'countries',
   'evidences',
   'partners',
@@ -180,6 +216,14 @@ export const RESULTS_TABLE_COLUMNS: ColumnDef[] = [
     required: true,
     tooltip: 'For the 2026-2030 portfolio, Primary Levers became Research Areas. The list shown depends on the result year.',
     width: '300px',
+  },
+  {
+    key: 'strategic_objectives',
+    label: 'Strategic Objectives',
+    type: 'strategic_objectives',
+    required: true,
+    tooltip: 'Only applies to the 2026-2030 portfolio.',
+    width: '280px',
   },
   { key: 'training_type', label: 'Training Type', type: 'select', options: ['Individual training', 'Group training'], riskFlag: true, width: '185px' },
   { key: 'training_category', label: 'Training Category', type: 'select', options: ['Training', 'Engagement'], width: '175px' },
