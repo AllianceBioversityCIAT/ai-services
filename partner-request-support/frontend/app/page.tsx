@@ -34,7 +34,7 @@ export default function Home() {
     setResults,
   } = usePartnerProcessing();
 
-  const { apiPartners, syncing, syncError, syncPartnerRequests } = useApiSync();
+  const { apiPartners, batchSize, syncing, syncError, syncPartnerRequests } = useApiSync();
   
   const { file, handleFileChange, clearFile } = useFileUpload();
   
@@ -74,8 +74,16 @@ export default function Home() {
   };
 
   const handleNewUpload = () => {
+    // Requests answered in CLARISA are no longer pending, so re-sync to show the
+    // shrunken queue and the next batch. Excel runs never touch that queue.
+    const cameFromApiQueue = results?.partners?.some((partner) => partner.api_data) ?? false;
+
     clearResults();
     clearFile();
+
+    if (cameFromApiQueue) {
+      syncPartnerRequests();
+    }
   };
 
   const handleClearCache = async () => {
@@ -247,6 +255,7 @@ export default function Home() {
             error={error}
             onUpload={handleUpload}
             apiPartners={apiPartners}
+            batchSize={batchSize}
             syncing={syncing}
             syncError={syncError}
             onSyncPartnerRequests={syncPartnerRequests}

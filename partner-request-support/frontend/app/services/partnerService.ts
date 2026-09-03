@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ProcessingResults, ApiPartnerRequest } from '../types/api.types';
+import { ProcessingResults, SyncPartnerRequestsResponse } from '../types/api.types';
 import { Partner, WebSearch } from '../types/partner.types';
 
 const getApiUrl = () => process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -27,6 +27,7 @@ export const partnerService = {
   },
 
   async processApiPartners(): Promise<ProcessingResults> {
+    // No body: the backend picks the oldest batch itself.
     const response = await axios.post<ProcessingResults>(
       `${getApiUrl()}/api/process-api-partners`,
       null,
@@ -50,9 +51,11 @@ export const partnerService = {
     });
   },
 
-  async syncPartnerRequests(): Promise<ApiPartnerRequest[]> {
-    const response = await axios.get(`${getApiUrl()}/api/sync-partner-requests`);
-    return response.data.pending_requests || [];
+  async syncPartnerRequests(): Promise<SyncPartnerRequestsResponse> {
+    const response = await axios.get<SyncPartnerRequestsResponse>(
+      `${getApiUrl()}/api/sync-partner-requests`
+    );
+    return response.data;
   },
 
   async respondToRequest(
