@@ -36,6 +36,11 @@ CLARISA_RESPOND_URL = os.getenv("CLARISA_RESPOND_URL") or ""
 CLARISA_COUNTRIES_URL = os.getenv("CLARISA_COUNTRIES_URL") or ""
 CLARISA_INSTITUTION_TYPES_URL = os.getenv("CLARISA_INSTITUTION_TYPES_URL") or ""
 
+# How many pending requests are processed per run when the caller does not pick
+# them explicitly. The full pending queue exceeds the API gateway timeout, so it
+# is drained in batches, oldest first. Mirrors API_BATCH_SIZE in the frontend.
+DEFAULT_BATCH_SIZE = 10
+
 app = FastAPI(
     title="Partner Request Support API",
     description="""
@@ -851,6 +856,33 @@ async def process_partners(
 
 
 
+def fetch_pending_partner_requests():
+    """
+    Fetches partner requests from CLARISA and refreshes the in-memory cache.
+
+    Returns a (all_requests, pending_requests) tuple. The in-memory cache is what
+    the processing endpoints read, and it is empty on a cold Lambda container, so
+    this is also used to recover from that state.
+    """
+    global synced_partner_requests
+
+    logger.info(f"🔄 Fetching partner requests from {CLARISA_API_URL}")
+
+    response = requests.get(CLARISA_API_URL, timeout=30)
+    response.raise_for_status()
+
+    partner_requests = response.json()
+
+    pending_requests = [
+        pr for pr in partner_requests
+        if pr.get('requestStatus') == 'Pending'
+    ]
+
+    synced_partner_requests = pending_requests
+
+    return partner_requests, pending_requests
+
+
 @app.get("/api/sync-partner-requests", tags=["Synchronization"])
 async def sync_partner_requests():
     """
@@ -867,6 +899,7 @@ async def sync_partner_requests():
         "success": true,
         "count": 25,
         "total_requests": 100,
+        "batch_size": 10,
         "pending_requests": [
             {
                 "id": 123,
@@ -886,6 +919,7 @@ async def sync_partner_requests():
     - **success**: Boolean indicating operation success
     - **count**: Number of pending partner requests
     - **total_requests**: Total number of all requests (any status)
+    - **batch_size**: How many of them `/api/process-api-partners` handles per run
     - **pending_requests**: Array of pending partner request objects
     
     ## HTTP Status Codes
@@ -900,22 +934,8 @@ async def sync_partner_requests():
     - Results are stored in server memory for subsequent processing
     - This is a read-only operation that doesn't modify any data
     """
-    global synced_partner_requests
-    
     try:
-        logger.info(f"🔄 Fetching partner requests from {CLARISA_API_URL}")
-        
-        response = requests.get(CLARISA_API_URL, timeout=30)
-        response.raise_for_status()
-        
-        partner_requests = response.json()
-        
-        pending_requests = [
-            pr for pr in partner_requests 
-            if pr.get('requestStatus') == 'Pending'
-        ]
-        
-        synced_partner_requests = pending_requests
+        partner_requests, pending_requests = fetch_pending_partner_requests()
         
         logger.info(f"✅ Synced {len(pending_requests)} pending partner requests")
         
@@ -923,6 +943,7 @@ async def sync_partner_requests():
             "success": True,
             "count": len(pending_requests),
             "total_requests": len(partner_requests),
+            "batch_size": DEFAULT_BATCH_SIZE,
             "pending_requests": pending_requests
         }
         
@@ -1084,17 +1105,18 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
     
     ## Request Body
     
+    A bare JSON array of partner request IDs (not an object):
+    
     ```json
-    {
-        "partner_ids": [123, 456, 789]
-    }
+    [123, 456, 789]
     ```
     
     ## Parameters
     
     - **partner_ids**: Optional array of specific partner request IDs to process
       - If provided: processes only the specified IDs
-      - If null/omitted: processes last 5 synced partners (for testing)
+      - If null/omitted: processes the 10 oldest pending requests, the same batch
+        the frontend would send
     
     ## Response Structure
     
@@ -1174,6 +1196,15 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
     global synced_partner_requests
     
     if not synced_partner_requests:
+        # A cold Lambda container holds no synced state, so recover it here
+        # instead of making the client sync again.
+        logger.info("ℹ️  No partner requests in memory - re-syncing from CLARISA")
+        try:
+            fetch_pending_partner_requests()
+        except Exception as e:
+            logger.error(f"❌ Automatic re-sync failed: {e}")
+    
+    if not synced_partner_requests:
         raise HTTPException(
             status_code=400,
             detail="No partner requests available. Please sync first using /api/sync-partner-requests"
@@ -1221,7 +1252,12 @@ async def process_api_partners(partner_ids: Optional[List[int]] = Body(None)):
                 if pr.get('id') in partner_ids
             ]
         else:
-            partners_to_process = synced_partner_requests[-5:]
+            # Same criterion as the app: oldest first, id as tiebreaker when
+            # created_at is missing.
+            partners_to_process = sorted(
+                synced_partner_requests,
+                key=lambda pr: (pr.get('created_at') or '', pr.get('id') or 0)
+            )[:DEFAULT_BATCH_SIZE]
         
         if not partners_to_process:
             raise HTTPException(

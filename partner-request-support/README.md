@@ -400,7 +400,8 @@ Upload and process Excel file with partner requests
 
 #### **`POST /api/process-api-partners`**
 Process partners from synced API requests
-- **Body**: user_email, user_name, auth_token, partner_ids (optional)
+- **Body**: a bare JSON array of partner request IDs, e.g. `[5723, 5751]` (optional)
+- **Default**: with no body, processes the 10 oldest pending requests
 - **Returns**: Same as process-partners
 
 #### **`GET /api/sync-partner-requests`**
