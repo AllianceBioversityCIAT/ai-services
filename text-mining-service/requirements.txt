@@ -5,7 +5,7 @@ python-docx
 numpy
 pandas
 openpyxl
-lancedb
+lancedb==0.36.0
 python-dotenv
 langchain
 langchain-text-splitters
