@@ -3,11 +3,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Others
-.DS_Store
-data/train/**
-data/files/**
-
 # C extensions
 *.so
 
@@ -19,7 +14,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -133,7 +127,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-myenv/
 .env
 .venv
 env/
@@ -173,8 +166,14 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+# Ruff stuff:
+.ruff_cache/
+
 # PyPI configuration file
 .pypirc
+
+# Database folders
+.DS_Store
 
 # Database folders
 db/
@@ -188,15 +187,4 @@ chroma/
 faiss/
 .faiss/
 
-# Data files
-*.json
-*.csv
-*.jsonl
-*.xlsx
-
-# Data logs
-data/logs/
-
-# Web scraping downloads
-data/evidence_downloads/
-*.pdf
+backend/test/test_auto.py

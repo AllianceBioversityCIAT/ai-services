@@ -1,13 +1,63 @@
 """REST API endpoints for PRMS QA Service."""
 
+import httpx
 import traceback
+from fastapi.security import APIKeyHeader
 from app.utils.logger.logger_util import get_logger
-from fastapi import APIRouter, HTTPException, status
 from app.llm.mining import improve_prms_result_metadata
+from app.utils.config.config_util import CLARISA_VALIDATE_URL
 from app.api.models import PrmsRequest, PrmsResponse, ErrorResponse
+from fastapi import APIRouter, HTTPException, status, Request, Depends
+from app.utils.notification.notification_service import NotificationService
 
 logger = get_logger()
 router = APIRouter()
+
+notification_service = NotificationService()
+
+
+API_KEY_NAME = "X-API-Key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
+
+http_client = httpx.AsyncClient()
+
+async def validate_with_clarisa(request: Request, api_key: str = Depends(api_key_header)):
+    client_ip = request.client.host if request.client else "0.0.0.0"
+    endpoint = request.url.path
+
+    payload = {
+        "api_key": api_key,
+        "microservice_name": "AI Review - PRMS",
+        "endpoint_accessed": endpoint,
+        "ip_address": client_ip
+    }
+
+    try:
+        response = await http_client.post(CLARISA_VALIDATE_URL, json=payload, timeout=5.0)
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Communication error with the authentication service"
+            )
+
+        data = response.json()
+
+        if not data.get("valid"):
+            error_msg = data.get("error", "Invalid API Key")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=error_msg
+            )
+
+        return data.get("mis")
+
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service is temporarily unavailable"
+        )
+
 
 @router.post(
     "/api/prms-qa",
@@ -84,6 +134,7 @@ router = APIRouter()
         }
     }
 )
+# async def prms_qa(request: PrmsRequest, mis: str = Depends(validate_with_clarisa)) -> PrmsResponse:
 async def prms_qa(request: PrmsRequest) -> PrmsResponse:
     """
     Process PRMS result metadata using an LLM.
@@ -93,43 +144,150 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
     try:
         logger.info(f"🔍 Processing PRMS QA for user: {request.user_id}")
         
-        result = improve_prms_result_metadata(request.result_metadata, request.user_id)
+        result = await improve_prms_result_metadata(request.result_metadata, request.user_id)
+
+        await notification_service.send_slack_notification(
+            emoji=":ai: :sparkles:",
+            app_name="PRMS Reporting Tool QA-AI Service",
+            color="#36a64f",
+            title="Reporting Tool Result Processed",
+            message=f"Successfully improved result metadata\nUser: *{request.user_id or 'Unknown'}*\nResult Type: *{request.result_metadata.get('result_type_name', 'Unknown')}*",
+            time_taken=f"Processing time: *{result['time_taken']}* seconds",
+            priority="Low"
+        )
+
         return PrmsResponse(
             time_taken=result["time_taken"],
             json_content=result["json_content"],
             interaction_id=result.get("interaction_id"),
+            evidence_metadata=result.get("evidence_metadata"),
             status="success"
         )
     
     except ValueError as e:
-        logger.error(f"Validation error: {str(e)}")
+        error_msg = str(e)
+        
+        if "LLM returned invalid JSON" in error_msg or "Output schema validation failed" in error_msg:
+            logger.error(f"LLM/service error: {error_msg}")
+            
+            await notification_service.send_slack_notification(
+                emoji=":ai: :alert:",
+                app_name="PRMS Reporting Tool QA-AI Service",
+                color="#ff0000",
+                title="Validation Error",
+                message=f"LLM validation failed\nUser: *{request.user_id or 'Unknown'}*",
+                time_taken="Time taken: *N/A*",
+                priority="High"
+            )
+            
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    "error": "The AI service returned invalid response. Please try submitting your request again.", 
+                    "message": error_msg, 
+                    "status": "error",
+                    "error_type": "INVALID_AI_RESPONSE",
+                    "debug_info": {
+                        "has_response_wrapper": "response" in request.result_metadata,
+                        "traceback": traceback.format_exc()
+                    }
+                }
+            )
+        else:
+            logger.error(f"Validation error: {error_msg}")
+            
+            await notification_service.send_slack_notification(
+                emoji=":ai: :alert:",
+                app_name="PRMS Reporting Tool QA-AI Service",
+                color="#ff0000",
+                title="Validation Error",
+                message=f"Invalid data provided\nUser: *{request.user_id or 'Unknown'}*",
+                time_taken="Time taken: *N/A*",
+                priority="High"
+            )
+            
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "Some of the information you provided appears to be incomplete or in an unexpected format. Please review and try again.", 
+                    "message": error_msg, 
+                    "status": "error",
+                    "error_type": "VALIDATION_ERROR",
+                    "debug_info": {
+                        "has_response_wrapper": "response" in request.result_metadata,
+                        "traceback": traceback.format_exc()
+                    }
+                }
+            )
+    
+    except KeyError as e:
+        logger.error(f"Missing required field: {str(e)}")
+        
+        await notification_service.send_slack_notification(
+            emoji=":ai: :alert:",
+            app_name="PRMS Reporting Tool QA-AI Service",
+            color="#ff0000",
+            title="Missing Required Field",
+            message=f"Required field missing: *{str(e)}*\nUser: *{request.user_id or 'Unknown'}*",
+            time_taken="Time taken: *N/A*",
+            priority="High"
+        )
+        
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "error": "Invalid parameters", 
-                "details": str(e), 
+                "error": "Some required information is missing. Please make sure all fields are filled out and try again.",
+                "message": f"Missing required field: {str(e)}",
                 "status": "error",
+                "error_type": "MISSING_FIELD",
                 "debug_info": {
+                    "missing_field": str(e),
                     "received_keys": list(request.result_metadata.keys()),
-                    "has_response_wrapper": "response" in request.result_metadata,
                     "traceback": traceback.format_exc()
                 }
             }
         )
     
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        error_type = type(e).__name__
+        error_msg = str(e)
+        
+        if "ThrottlingException" in error_msg:
+            user_message = "Service is temporarily overloaded. Please try again in a few minutes."
+            error_code = "THROTTLING_ERROR"
+            status_code = status.HTTP_429_TOO_MANY_REQUESTS
+        elif "Timeout" in error_msg or "timeout" in error_msg:
+            user_message = "The request is taking longer than expected. Try reducing the number of evidence files or try again later."
+            error_code = "TIMEOUT_ERROR"
+            status_code = status.HTTP_408_REQUEST_TIMEOUT
+        else:
+            user_message = "Something unexpected happened. Please try again or contact support if the issue persists."
+            error_code = "INTERNAL_ERROR"
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        
+        logger.error(f"Unexpected error: {error_msg}")
         tb = traceback.format_exc()
         logger.error(f"📋 Full traceback:\n{tb}")
+        
+        await notification_service.send_slack_notification(
+            emoji=":ai: :alert:",
+            app_name="PRMS Reporting Tool QA-AI Service",
+            color="#ff0000",
+            title=f"Service Error - {error_code}",
+            message=f"Unexpected error occurred\nUser: *{request.user_id or 'Unknown'}*\nError: *{user_message}*",
+            time_taken="Time taken: *N/A*",
+            priority="High"
+        )
+        
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status_code,
             detail={
-                "error": "Internal error", 
-                "details": str(e), 
+                "error": user_message, 
+                "message": error_msg,
                 "status": "error",
+                "error_type": error_code,
                 "debug_info": {
-                    "error_type": type(e).__name__,
-                    "received_keys": list(request.result_metadata.keys()) if hasattr(request, 'result_metadata') else [],
+                    "original_error_type": error_type,
                     "has_response_wrapper": "response" in request.result_metadata if hasattr(request, 'result_metadata') else False,
                     "traceback": tb
                 }
