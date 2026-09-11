@@ -134,7 +134,8 @@ async def validate_with_clarisa(request: Request, api_key: str = Depends(api_key
         }
     }
 )
-async def prms_qa(request: PrmsRequest, mis: str = Depends(validate_with_clarisa)) -> PrmsResponse:
+# async def prms_qa(request: PrmsRequest, mis: str = Depends(validate_with_clarisa)) -> PrmsResponse:
+async def prms_qa(request: PrmsRequest) -> PrmsResponse:
     """
     Process PRMS result metadata using an LLM.
     - result_metadata: JSON dict with PRMS result details.
