@@ -178,6 +178,38 @@ r = run(payload(), llm=omits)
 check("criterio omitido no cuenta como aprobado en silencio",
       r.overall.verdict.value == "green" and r.status.value == "completed")
 
+print("\n--- Tipos sin sección Type-Specific ---")
+
+def other_output(**over):
+    return payload(**{"result.type": "Other Output",
+                      "sections.type_specific": {"fields": {}}, **over})
+
+async def flag_type_check(system, user, tool, **kw):
+    ids = tool["input_schema"]["properties"]["findings"]["items"]["properties"]["criterion_id"]["enum"]
+    out = {"findings": [{"criterion_id": i,
+                         "outcome": "flagged" if i == "otheroutput.result_type_check" else "passed",
+                         "comment": "Should be reported as Capacity Sharing."} for i in ids]}
+    if tool["name"] == "report_evidence_assessment":
+        out["evidence"] = [{"index": 0, "verdict": "green", "reason": "ok"}]
+    return out
+
+r = run(other_output(), llm=flag_type_check)
+check("Other Output no devuelve type_specific",
+      r.sections.type_specific is None, str(r.sections.type_specific))
+check("el JSON tampoco lo incluye",
+      "type_specific" not in r.sections.model_dump(), str(list(r.sections.model_dump())))
+check("el flag aparece en General Information, donde el usuario puede actuar",
+      r.sections.general_information.verdict.value == "red"
+      and any("Capacity Sharing" in i for i in r.sections.general_information.issues),
+      r.sections.general_information.verdict.value)
+check("sigue arrastrando el global a rojo (el criterio es core)",
+      r.overall.verdict.value == "red", r.overall.verdict.value)
+
+r = run(payload())
+check("los tipos que sí la tienen la siguen devolviendo",
+      r.sections.type_specific is not None
+      and "type_specific" in r.sections.model_dump())
+
 print("\n--- Tracking de interacción ---")
 import app.llm.assessment as _am
 from app.utils.interactions import interaction_client as _ic

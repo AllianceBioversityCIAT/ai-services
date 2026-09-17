@@ -617,7 +617,10 @@ OTHER_OUTCOME_CRITERIA = [
     Criterion(
         id="otheroutcome.result_level.behavior_change",
         mds_field="Result level",
-        section=Section.TYPE_SPECIFIC,
+        # Reads general_information.result_level, and what the user would fix is
+        # the title and description. Other Outcome has no type-specific section in
+        # the form, so flagging it there would point at something they cannot see.
+        section=Section.GENERAL_INFORMATION,
         core=True,
         check=Check.LLM,
         needs=Needs.METADATA,
@@ -1007,7 +1010,9 @@ OTHER_OUTPUT_CRITERIA = [
     Criterion(
         id="otheroutput.result_type_check",
         mds_field="Result type check",
-        section=Section.TYPE_SPECIFIC,
+        # Judged from the title and description; Other Output has no type-specific
+        # section in the form. See the note on otheroutcome.result_level.
+        section=Section.GENERAL_INFORMATION,
         core=True,
         check=Check.LLM,
         needs=Needs.METADATA,

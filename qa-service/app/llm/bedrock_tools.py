@@ -11,20 +11,27 @@ A cache breakpoint sits on the system block, which holds the role and criteria a
 is identical for every result of the same type. Bedrock supports explicit
 cache_control but not top-level automatic caching, so the breakpoint is placed by
 hand and the volatile result data is kept in the user message, after it.
+
+The breakpoint uses the one-hour TTL rather than the five-minute default. Results
+are submitted minutes to tens of minutes apart, not in bursts: with a five-minute
+window every request would find the cache cold, paying the 1.25x write and never
+reading — 25% MORE than not caching at all. At one hour the same traffic keeps the
+entry warm (each hit refreshes the TTL), so one 2x write covers many 0.1x reads.
+Worth revisiting if usage ever becomes either much denser or much sparser than an
+hour between submissions of the same result type.
 """
 
 import json
+import boto3
 import asyncio
 from typing import Optional
-
-import boto3
-
 from app.utils.logger.logger_util import get_logger
 
 logger = get_logger()
 
 MODEL_ID = "us.anthropic.claude-sonnet-4-6"
 ASSESSMENT_SEMAPHORE = asyncio.Semaphore(4)
+CACHE_TTL = "1h"
 
 _bedrock = boto3.client(service_name="bedrock-runtime", region_name="us-east-1")
 
@@ -51,7 +58,7 @@ async def invoke_with_tool(
             {
                 "type": "text",
                 "text": system,
-                "cache_control": {"type": "ephemeral"},
+                "cache_control": {"type": "ephemeral", "ttl": CACHE_TTL},
             }
         ],
         "tools": [tool],

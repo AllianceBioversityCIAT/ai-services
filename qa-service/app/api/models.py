@@ -1,7 +1,7 @@
 """Pydantic models for PRMS QA services"""
 
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_serializer
 from typing import Dict, Any, List, Optional
 
 
@@ -226,7 +226,16 @@ class SectionVerdicts(BaseModel):
     contributors_and_partners: SectionVerdict
     geographic_location: SectionVerdict
     evidence: SectionVerdict
-    type_specific: SectionVerdict
+    # Omitted entirely — not even grey — for result types whose form has no
+    # type-specific section (Other Output, Other Outcome). Reporting a section
+    # the user cannot see would send them looking for a field that is not there.
+    type_specific: Optional[SectionVerdict] = None
+
+    @model_serializer
+    def _omit_absent_sections(self):
+        ordered = ("general_information", "contributors_and_partners",
+                   "geographic_location", "evidence", "type_specific")
+        return {k: getattr(self, k) for k in ordered if getattr(self, k) is not None}
 
 
 class QualityAssessmentResponse(BaseModel):

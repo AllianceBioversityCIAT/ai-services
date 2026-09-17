@@ -26,25 +26,24 @@ import time
 import json
 import asyncio
 from typing import List, Dict, Tuple, Optional
+from app.utils.logger.logger_util import get_logger
+from app.utils.assessment.selection import applicable
+from app.llm.bedrock_tools import invoke_with_tool, MODEL_ID
+from app.web_scraping.evidence_scraper import EvidenceEnhancer
+from app.utils.assessment.scoring import score as compute_score
+from app.utils.interactions.interaction_client import interaction_client
+from app.utils.prompt.assessment.tool_schemas import metadata_tool, evidence_tool
+from app.utils.assessment.rules_engine import run_metadata_rules, run_evidence_rules
+from app.utils.assessment.criteria_catalog import Section, Check, Needs, sections_for
+from app.utils.prompt.assessment.builders import build_metadata_prompt, build_evidence_prompt
+from app.utils.assessment.aggregation import Finding, Outcome, Verdict, aggregate, assert_rule_equivalence
 
 from app.api.models import (
     QualityAssessmentRequest, QualityAssessmentResponse, OverallVerdict,
     SectionVerdict, SectionVerdicts, EvidenceVerdict, Verdict as ApiVerdict,
     CheckStatus, Coverage,
 )
-from app.utils.assessment.aggregation import (
-    Finding, Outcome, Verdict, aggregate, assert_rule_equivalence,
-)
-from app.utils.assessment.criteria_catalog import Section, Check, Needs, sections_for
-from app.utils.assessment.rules_engine import run_metadata_rules, run_evidence_rules
-from app.utils.assessment.scoring import score as compute_score
-from app.utils.assessment.selection import applicable
-from app.utils.prompt.assessment.builders import build_metadata_prompt, build_evidence_prompt
-from app.utils.prompt.assessment.tool_schemas import metadata_tool, evidence_tool
-from app.llm.bedrock_tools import invoke_with_tool, MODEL_ID
-from app.utils.interactions.interaction_client import interaction_client
-from app.web_scraping.evidence_scraper import EvidenceEnhancer
-from app.utils.logger.logger_util import get_logger
+
 
 logger = get_logger()
 
