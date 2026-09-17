@@ -133,6 +133,40 @@ check("privada -> grey", r.evidence[0].verdict.value == "grey")
 check("razón explícita", "not evaluated" in r.evidence[0].reason.lower(), r.evidence[0].reason)
 check("no penaliza el global", r.overall.verdict.value == "green", r.overall.verdict.value)
 
+print("\n--- Evidencia adjunta que no se pudo leer ---")
+
+def six_evidence(**over):
+    ev = [{"description": f"e{i}", "link": f"https://hdl.handle.net/10568/{i}",
+           "source": "url", "visibility": "public", "tags": []} for i in range(6)]
+    return payload(**{"sections.evidence": ev, **over})
+
+async def read_none(request, budget):
+    items, by = [], {}
+    for i, e in enumerate(request.sections.evidence):
+        if not e.is_evaluable: continue
+        d = {"index": i, "status": "timeout", "determined": False, "error": "Exceeded time budget"}
+        items.append(d); by[i] = d
+    return items, by
+
+r = run(six_evidence(), scrape=read_none)
+check("6 adjuntas, 0 leídas -> sección Evidence en gris",
+      r.sections.evidence.verdict.value == "grey", r.sections.evidence.verdict.value)
+check("el comentario lo dice claro",
+      "None of the attached evidence could be read" in r.sections.evidence.comments,
+      r.sections.evidence.comments)
+check("el gris de sección no arrastra el global",
+      r.overall.verdict.value == "green", r.overall.verdict.value)
+
+blocked = six_evidence()
+blocked.sections.evidence[0].link = "https://cgiar.sharepoint.com/:b:/s/x/doc.pdf"
+r = run(blocked, scrape=read_none)
+check("un flag real gana sobre el gris (dominio bloqueado -> rojo)",
+      r.sections.evidence.verdict.value == "red", r.sections.evidence.verdict.value)
+
+r = run(six_evidence(), scrape=stub_scrape())
+check("si se leen, vuelve a verde", r.sections.evidence.verdict.value == "green",
+      r.sections.evidence.verdict.value)
+
 print("\n--- El modelo omite un criterio ---")
 async def omits(system, user, tool, **kw):
     ids = tool["input_schema"]["properties"]["findings"]["items"]["properties"]["criterion_id"]["enum"]

@@ -112,20 +112,17 @@ async def _scrape_evidence(request, budget: Budget) -> Tuple[List[dict], Dict[in
         f"budget {total_budget:.1f}s (per URL {per_url:.1f}s)"
     )
 
+    # The batch deadline is handled inside the scraper so that sources which
+    # finished in time are kept. Wrapping the whole batch in wait_for discarded
+    # completed results along with the stragglers.
     enhancer = EvidenceEnhancer()
-    try:
-        raw = await asyncio.wait_for(
-            enhancer.extract_evidence_content(
-                [ev.link for _, ev in evaluable],
-                max_content_length=MAX_EVIDENCE_CONTENT_CHARS,
-                concurrency=SCRAPE_CONCURRENCY,
-                per_url_timeout=per_url,
-            ),
-            timeout=total_budget,
-        )
-    except asyncio.TimeoutError:
-        logger.warning("⏱️ Evidence scraping exceeded its total budget")
-        raw = []
+    raw = await enhancer.extract_evidence_content(
+        [ev.link for _, ev in evaluable],
+        max_content_length=MAX_EVIDENCE_CONTENT_CHARS,
+        concurrency=SCRAPE_CONCURRENCY,
+        per_url_timeout=per_url,
+        batch_timeout=total_budget,
+    )
 
     by_index: Dict[int, dict] = {}
     for position, (index, _) in enumerate(evaluable):
@@ -271,8 +268,8 @@ _OVERALL_SUMMARY = {
 MAX_STRENGTHS_PER_SECTION = 3
 
 
-def _section_payload(section_result) -> SectionVerdict:
-    verdict = _TO_API[section_result.verdict]
+def _section_payload(section_result, force_grey: bool = False) -> SectionVerdict:
+    verdict = ApiVerdict.GREY if force_grey else _TO_API[section_result.verdict]
     issues = [f.comment for f in section_result.findings if f.is_flag and f.comment]
     strengths = [
         f.comment for f in section_result.findings
@@ -283,7 +280,12 @@ def _section_payload(section_result) -> SectionVerdict:
                     if f.outcome == Outcome.NOT_EVALUATED)
 
     comments = _SECTION_SUMMARY[verdict]
-    if issues:
+    if force_grey:
+        comments = (
+            "None of the attached evidence could be read this time, so the "
+            "evidence itself was not reviewed."
+        )
+    elif issues:
         comments = (
             f"{len(issues)} point{'s' if len(issues) > 1 else ''} to address "
             f"before this section is at its best."
@@ -369,7 +371,23 @@ async def assess_result(request: QualityAssessmentRequest) -> QualityAssessmentR
     assert_rule_equivalence(result)
 
     overall = _TO_API[result.overall]
-    sections = {s.section.value: _section_payload(s) for s in result.sections}
+
+    # Evidence attached but nothing readable: the two structural checks (item
+    # count, blocked domains) would otherwise carry the section to green without
+    # a single document having been opened. A reviewer must not see a green light
+    # on evidence that was never read.
+    submitted = len(request.sections.evidence)
+    read = sum(1 for v in by_index.values() if v.get("status") == "ok")
+
+    sections = {}
+    for s in result.sections:
+        blind = (
+            s.section == Section.EVIDENCE
+            and submitted > 0
+            and read == 0
+            and not s.flags
+        )
+        sections[s.section.value] = _section_payload(s, force_grey=blind)
 
     errors = [e for e in (meta_error, ev_error) if e]
     if len(errors) == 2:

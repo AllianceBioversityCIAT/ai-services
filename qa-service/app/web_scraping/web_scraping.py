@@ -1,6 +1,7 @@
 import os
 import re
 import asyncio
+import functools
 import pymupdf
 import requests
 import pandas as pd
@@ -11,6 +12,19 @@ from playwright.async_api import async_playwright
 from app.utils.logger.logger_util import get_logger
 
 logger = get_logger()
+
+
+async def _blocking(func, *args, **kwargs):
+    """Run a blocking call off the event loop.
+
+    requests, PDF extraction and file writes are synchronous. Awaited directly
+    inside a coroutine they freeze the whole loop: no other source can make
+    progress and no asyncio timeout can fire, because cancellation only happens
+    at an await point. Handing them to the default executor keeps concurrent
+    scrapes genuinely concurrent and keeps per-URL deadlines enforceable.
+    """
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, functools.partial(func, *args, **kwargs))
 
 
 class WebScraperService:
@@ -214,16 +228,19 @@ class WebScraperService:
                 uuid = download_link.split("/")[2]
                 real_url = f"https://cgspace.cgiar.org/server/api/core/bitstreams/{uuid}/content"
                 
-                r = requests.get(real_url)
+                r = await _blocking(requests.get, real_url, timeout=30)
                 filename = os.path.join(self.download_dir, f"{uuid}.pdf")
-                
-                with open(filename, "wb") as f:
-                    f.write(r.content)
-                
+
+                def _write():
+                    with open(filename, "wb") as f:
+                        f.write(r.content)
+
+                await _blocking(_write)
+
                 await browser.close()
                 logger.info(f"✅ Downloaded PDF: {filename}")
-                
-                text = self._extract_pdf_text(filename)
+
+                text = await _blocking(self._extract_pdf_text, filename)
                 validation = self._validate_content(text, title, url)
                 
                 result = {
@@ -499,7 +516,8 @@ class WebScraperService:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         
-        response = requests.get(download_url, headers=headers, allow_redirects=True, timeout=15)
+        response = await _blocking(requests.get, download_url, headers=headers,
+                                   allow_redirects=True, timeout=15)
         
         if response.status_code != 200:
             return {
@@ -530,19 +548,22 @@ class WebScraperService:
             filename = f"sharepoint_file_{abs(hash(url))}.pdf"
         
         download_path = os.path.join(self.download_dir, filename)
-        
-        with open(download_path, 'wb') as f:
-            f.write(response.content)
-        
+
+        def _write():
+            with open(download_path, 'wb') as f:
+                f.write(response.content)
+
+        await _blocking(_write)
+
         logger.info(f"✅ Download successful: {download_path}")
 
         file_ext = os.path.splitext(filename)[1].lower()
         
         if file_ext == '.pdf':
-            text = self._extract_pdf_text(download_path)
+            text = await _blocking(self._extract_pdf_text, download_path)
             file_type = "sharepoint_pdf"
         elif file_ext == '.xlsx':
-            text = self._extract_excel_text(download_path)
+            text = await _blocking(self._extract_excel_text, download_path)
             file_type = "sharepoint_xlsx"
         else:
             return {

@@ -97,7 +97,7 @@ class EvidenceEnhancer:
                 "is_valid": False
             }
 
-    async def extract_evidence_content(self, evidence_urls: List[str], max_content_length: int = 40000, cleanup_files: bool = True, concurrency: int = 1, per_url_timeout: Optional[float] = None) -> List[Dict]:
+    async def extract_evidence_content(self, evidence_urls: List[str], max_content_length: int = 40000, cleanup_files: bool = True, concurrency: int = 1, per_url_timeout: Optional[float] = None, batch_timeout: Optional[float] = None) -> List[Dict]:
         """
         Scrape a list of evidence URLs.
 
@@ -105,6 +105,10 @@ class EvidenceEnhancer:
         behaviour exactly. The quality-assessment endpoint passes a higher value
         so the fetches overlap, and a per_url_timeout so one slow source cannot
         consume the whole request budget. Results always keep input order.
+
+        batch_timeout caps the whole batch. When it is reached, whatever finished
+        is kept and only the stragglers are marked as timed out - a deadline on
+        the batch must never throw away sources that were already read.
         """
         total = len(evidence_urls)
         logger.info(f"📚 Processing {total} evidence URLs (concurrency={concurrency})")
@@ -138,9 +142,41 @@ class EvidenceEnhancer:
                         "is_valid": False,
                     }
 
-        return list(await asyncio.gather(
-            *(bounded(url, idx) for idx, url in enumerate(evidence_urls, 1))
-        ))
+        tasks = [
+            asyncio.ensure_future(bounded(url, idx))
+            for idx, url in enumerate(evidence_urls, 1)
+        ]
+
+        if batch_timeout is None:
+            return list(await asyncio.gather(*tasks))
+
+        done, pending = await asyncio.wait(tasks, timeout=batch_timeout)
+        for task in pending:
+            task.cancel()
+        if pending:
+            logger.warning(
+                f"⏱️ Batch budget of {batch_timeout}s reached; "
+                f"{len(done)}/{total} finished, {len(pending)} cancelled"
+            )
+
+        results = []
+        for url, task in zip(evidence_urls, tasks):
+            if task in done and not task.cancelled():
+                try:
+                    results.append(task.result())
+                    continue
+                except Exception as e:                      # pragma: no cover
+                    logger.error(f"❌ Task failed for {url}: {e}")
+            results.append({
+                "url": url,
+                "type": "timeout",
+                "title": "Timed out",
+                "content": "",
+                "error": f"Not finished within the {batch_timeout}s batch budget",
+                "full_length": 0,
+                "is_valid": False,
+            })
+        return results
 
     def _remove_references_section(self, content: str, title: str = "") -> tuple:
         reference_headers = [
