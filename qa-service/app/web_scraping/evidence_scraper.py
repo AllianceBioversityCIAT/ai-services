@@ -20,88 +20,127 @@ class EvidenceEnhancer:
         logger.info(f"🔍 Evidence scraper initialized with download dir: {self.download_dir}")
     
 
-    async def extract_evidence_content(self, evidence_urls: List[str], max_content_length: int = 40000, cleanup_files: bool = True) -> List[Dict]:
-        evidence_contents = []
-        
-        logger.info(f"📚 Processing {len(evidence_urls)} evidence URLs")
-        
-        for idx, url in enumerate(evidence_urls, 1):
-            try:
-                logger.info(f"🔗 [{idx}/{len(evidence_urls)}] Scraping: {url}")
-                
-                result = await self.scraper.scrape_url(url)
-                
-                is_valid = result.get('is_valid', True)
-                validation_reason = result.get('validation_reason', 'unknown')
-                validation_message = result.get('validation_message', '')
-                
-                if not is_valid:
-                    logger.warning(f"⚠️ Invalid content detected for {url}")
-                    logger.warning(f"   Reason: {validation_reason}")
-                    logger.warning(f"   Message: {validation_message}")
-                    
-                    if cleanup_files and 'file_path' in result:
-                        self._cleanup_file(result['file_path'])
-                    
-                    evidence_contents.append({
-                        "url": url,
-                        "type": "invalid_content",
-                        "title": result.get('title', 'Invalid Content'),
-                        "content": "",
-                        "error": validation_message,
-                        "validation_reason": validation_reason,
-                        "full_length": 0
-                    })
-                    continue
-                
-                content = result['content']
+    async def _scrape_one(self, url: str, idx: int, total: int,
+                          max_content_length: int, cleanup_files: bool) -> Dict:
+        """Scrape and normalise one evidence URL. Never raises."""
+        try:
+            logger.info(f"🔗 [{idx}/{total}] Scraping: {url}")
 
-                content, refs_removed = self._remove_references_section(content, result['title'])
+            result = await self.scraper.scrape_url(url)
 
-                if 'validation_warnings' in result and result['validation_warnings']:
-                    logger.warning(f"⚠️ Validation warnings for {url}:")
-                    for warning in result['validation_warnings']:
-                        logger.warning(f"   - {warning}")
-                
-                if len(content) > max_content_length:
-                    content = content[:max_content_length] + f"\n\n[Content truncated - original length: {len(result['content'])} chars]"
-                
-                evidence_data = {
-                    "url": url,
-                    "type": result['type'],
-                    "title": result['title'],
-                    "content": content,
-                    "full_length": len(result['content']),
-                    "is_valid": True
-                }
-                
-                if 'file_path' in result:
-                    evidence_data['file_path'] = result['file_path']
-                
-                if 'validation_warnings' in result:
-                    evidence_data['validation_warnings'] = result['validation_warnings']
-                
-                evidence_contents.append(evidence_data)
-                logger.info(f"✅ Successfully scraped: {result['title']} ({result['type']})")
-                logger.info(f"Content preview: {content[:2000]}...\n")
-                
+            is_valid = result.get('is_valid', True)
+            validation_reason = result.get('validation_reason', 'unknown')
+            validation_message = result.get('validation_message', '')
+
+            if not is_valid:
+                logger.warning(f"⚠️ Invalid content detected for {url}")
+                logger.warning(f"   Reason: {validation_reason}")
+                logger.warning(f"   Message: {validation_message}")
+
                 if cleanup_files and 'file_path' in result:
                     self._cleanup_file(result['file_path'])
-                
-            except Exception as e:
-                logger.error(f"❌ Error scraping {url}: {str(e)}")
-                evidence_contents.append({
+
+                return {
                     "url": url,
-                    "type": "error",
-                    "title": "Failed to scrape",
+                    "type": "invalid_content",
+                    "title": result.get('title', 'Invalid Content'),
                     "content": "",
-                    "error": str(e),
-                    "full_length": 0,
-                    "is_valid": False
-                })
-        
-        return evidence_contents
-    
+                    "error": validation_message,
+                    "validation_reason": validation_reason,
+                    "full_length": 0
+                }
+
+            content = result['content']
+
+            content, refs_removed = self._remove_references_section(content, result['title'])
+
+            if 'validation_warnings' in result and result['validation_warnings']:
+                logger.warning(f"⚠️ Validation warnings for {url}:")
+                for warning in result['validation_warnings']:
+                    logger.warning(f"   - {warning}")
+
+            if len(content) > max_content_length:
+                content = content[:max_content_length] + f"\n\n[Content truncated - original length: {len(result['content'])} chars]"
+
+            evidence_data = {
+                "url": url,
+                "type": result['type'],
+                "title": result['title'],
+                "content": content,
+                "full_length": len(result['content']),
+                "is_valid": True
+            }
+
+            if 'file_path' in result:
+                evidence_data['file_path'] = result['file_path']
+
+            if 'validation_warnings' in result:
+                evidence_data['validation_warnings'] = result['validation_warnings']
+
+            logger.info(f"✅ Successfully scraped: {result['title']} ({result['type']})")
+            logger.info(f"Content preview: {content[:2000]}...\n")
+
+            if cleanup_files and 'file_path' in result:
+                self._cleanup_file(result['file_path'])
+
+            return evidence_data
+
+        except Exception as e:
+            logger.error(f"❌ Error scraping {url}: {str(e)}")
+            return {
+                "url": url,
+                "type": "error",
+                "title": "Failed to scrape",
+                "content": "",
+                "error": str(e),
+                "full_length": 0,
+                "is_valid": False
+            }
+
+    async def extract_evidence_content(self, evidence_urls: List[str], max_content_length: int = 40000, cleanup_files: bool = True, concurrency: int = 1, per_url_timeout: Optional[float] = None) -> List[Dict]:
+        """
+        Scrape a list of evidence URLs.
+
+        concurrency defaults to 1, which preserves the original sequential
+        behaviour exactly. The quality-assessment endpoint passes a higher value
+        so the fetches overlap, and a per_url_timeout so one slow source cannot
+        consume the whole request budget. Results always keep input order.
+        """
+        total = len(evidence_urls)
+        logger.info(f"📚 Processing {total} evidence URLs (concurrency={concurrency})")
+
+        if concurrency <= 1 and per_url_timeout is None:
+            evidence_contents = []
+            for idx, url in enumerate(evidence_urls, 1):
+                evidence_contents.append(
+                    await self._scrape_one(url, idx, total, max_content_length, cleanup_files)
+                )
+            return evidence_contents
+
+        semaphore = asyncio.Semaphore(max(1, concurrency))
+
+        async def bounded(url: str, idx: int) -> Dict:
+            async with semaphore:
+                coro = self._scrape_one(url, idx, total, max_content_length, cleanup_files)
+                if per_url_timeout is None:
+                    return await coro
+                try:
+                    return await asyncio.wait_for(coro, timeout=per_url_timeout)
+                except asyncio.TimeoutError:
+                    logger.warning(f"⏱️ Timed out after {per_url_timeout}s scraping {url}")
+                    return {
+                        "url": url,
+                        "type": "timeout",
+                        "title": "Timed out",
+                        "content": "",
+                        "error": f"Exceeded {per_url_timeout}s time budget",
+                        "full_length": 0,
+                        "is_valid": False,
+                    }
+
+        return list(await asyncio.gather(
+            *(bounded(url, idx) for idx, url in enumerate(evidence_urls, 1))
+        ))
 
     def _remove_references_section(self, content: str, title: str = "") -> tuple:
         reference_headers = [

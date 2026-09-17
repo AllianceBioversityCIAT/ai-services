@@ -46,6 +46,10 @@ app = FastAPI(
             "description": "Operations for processing PRMS result metadata with LLM QA"
         },
         {
+            "name": "Quality Assessment",
+            "description": "W3/Bilateral AI quality check with traffic-light verdicts"
+        },
+        {
             "name": "Health",
             "description": "Service health and status endpoints"
         }
@@ -82,6 +86,7 @@ async def root():
         },
         "endpoints": {
             "POST /api/prms-qa": "Process PRMS result metadata for QA improvements",
+            "POST /prms/quality-assessment": "AI quality check for W3/Bilateral results",
             "GET /health": "Health check endpoint"
         },
         "technology_stack": ["FastAPI", "AWS Bedrock", "Python 3.13"]
