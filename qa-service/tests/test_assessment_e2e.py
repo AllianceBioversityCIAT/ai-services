@@ -178,6 +178,72 @@ r = run(payload(), llm=omits)
 check("criterio omitido no cuenta como aprobado en silencio",
       r.overall.verdict.value == "green" and r.status.value == "completed")
 
+print("\n--- Tracking de interacción ---")
+import app.llm.assessment as _am
+from app.utils.interactions import interaction_client as _ic
+
+tracked = []
+def fake_track(**kw):
+    tracked.append(kw)
+    return {"interaction_id": "int-abc123"}
+_am.interaction_client.track_interaction = fake_track
+
+r = run(payload())
+check("sin user_id no se trackea", not tracked and r.interaction_id is None,
+      f"tracked={len(tracked)} id={r.interaction_id}")
+
+tracked.clear()
+p_with_user = payload()
+p_with_user.user_id = "user123"
+r = run(p_with_user)
+check("con user_id sí se trackea", len(tracked) == 1, str(len(tracked)))
+check("el interaction_id vuelve en la respuesta", r.interaction_id == "int-abc123",
+      str(r.interaction_id))
+if tracked:
+    kw = tracked[0]
+    check("manda user_id y plataforma",
+          kw["user_id"] == "user123" and kw["platform"] == "PRMS", str(kw.get("platform")))
+    ctx = kw["context"]
+    check("el contexto lleva veredicto, cobertura y evidencias",
+          ctx["verdict"] == "green"
+          and {"criteria_total", "criteria_evaluated", "evidence_total",
+               "evidence_read", "model_used", "criteria_version"} <= set(ctx),
+          str(sorted(ctx))[:150])
+    check("registra el tiempo de respuesta", kw["response_time_seconds"] >= 0,
+          str(kw.get("response_time_seconds")))
+
+# El tracking nunca puede tumbar la evaluación.
+tracked.clear()
+def boom_track(**kw):
+    raise RuntimeError("interaction service down")
+_am.interaction_client.track_interaction = boom_track
+r = run(p_with_user)
+check("si el tracking falla, el veredicto sale igual",
+      r.overall.verdict.value == "green" and r.interaction_id is None,
+      f"{r.overall.verdict.value} {r.interaction_id}")
+
+import time as _t2
+def slow_track(**kw):
+    _t2.sleep(20)
+    return {"interaction_id": "never"}
+_am.interaction_client.track_interaction = slow_track
+_am.TRACKING_TIMEOUT_S = 1.0
+
+# El tiempo se mide DENTRO de la corrutina: asyncio.run() espera al cierre del
+# executor al salir, cosa que uvicorn no hace entre peticiones.
+async def _timed():
+    _t0 = _t2.monotonic()
+    resp = await _am.assess_result(p_with_user)
+    return _t2.monotonic() - _t0, resp
+
+_am.invoke_with_tool = stub_llm(); _am._scrape_evidence = stub_scrape()
+_el, r = asyncio.run(_timed())
+check(f"un tracking colgado no retrasa la evaluación (tardó {_el:.1f}s)",
+      _el < 5 and r.overall.verdict.value == "green" and r.interaction_id is None,
+      f"{_el:.1f}s id={r.interaction_id}")
+_am.interaction_client.track_interaction = fake_track
+_am.TRACKING_TIMEOUT_S = 8.0
+
 print("\n--- Endpoint HTTP ---")
 from fastapi.testclient import TestClient
 from app.api.main import app
@@ -204,7 +270,8 @@ resp = client.post("/prms/quality-assessment", json=body)
 check("200 en payload válido", resp.status_code == 200, str(resp.status_code))
 check("llaves del contrato",
       set(resp.json()) == {"request_id", "criteria_version", "overall", "sections",
-                           "evidence", "status", "degraded_reason", "coverage"},
+                           "evidence", "status", "degraded_reason", "coverage",
+                           "interaction_id"},
       str(sorted(resp.json())))
 
 bad = payload().model_dump(mode="json")

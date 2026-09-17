@@ -366,6 +366,7 @@ async def quality_assessment(request: QualityAssessmentRequest, mis: str = Depen
 
         message = (
             f"Successfully assessed result quality\n"
+            f"User: *{request.user_id or 'Unknown'}*\n"
             f"Result Type: *{request.result.type}*\n"
             f"\n"
             f"*Result quality (QA outcome):*\n"
@@ -405,6 +406,7 @@ async def quality_assessment(request: QualityAssessmentRequest, mis: str = Depen
             title="❌ Quality assessment unavailable",
             message=(
                 f"The AI could not review this result\n"
+                f"User: *{request.user_id or 'Unknown'}*\n"
                 f"Result Type: *{request.result.type}*\n"
                 f"\n"
                 f"*Reason:*\n"
@@ -436,6 +438,7 @@ async def quality_assessment(request: QualityAssessmentRequest, mis: str = Depen
             title="❌ Quality assessment failed",
             message=(
                 f"The service could not produce an assessment\n"
+                f"User: *{request.user_id or 'Unknown'}*\n"
                 f"Result Type: *{request.result.type}*\n"
                 f"\n"
                 f"*Error:*\n"

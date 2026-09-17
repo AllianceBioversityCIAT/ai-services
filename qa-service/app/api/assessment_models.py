@@ -134,6 +134,11 @@ class QualityAssessmentRequest(BaseModel):
     sections: Sections
     impact_areas: List[ImpactArea] = Field(default_factory=list)
     constraints: Constraints = Field(default_factory=Constraints)
+    user_id: Optional[str] = Field(
+        None,
+        description="User identifier, used to track the interaction for analytics.",
+        examples=["user123"],
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -187,3 +192,6 @@ class QualityAssessmentResponse(BaseModel):
     status: CheckStatus = CheckStatus.COMPLETED
     degraded_reason: Optional[str] = None
     coverage: Coverage = Field(default_factory=Coverage)
+    interaction_id: Optional[str] = Field(
+        None, description="Interaction tracking id, when a user_id was supplied."
+    )

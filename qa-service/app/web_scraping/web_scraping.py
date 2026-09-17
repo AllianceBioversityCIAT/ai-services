@@ -196,7 +196,237 @@ class WebScraperService:
         }
     
 
+
+    # ------------------------------------------------------------------ #
+    # API-first paths
+    #
+    # CGSpace and Crossref both expose the metadata we need over plain HTTP.
+    # Going through the API instead of a rendered page is faster, needs no
+    # browser at all, and does not break when the front end changes - the old
+    # page scraper looked for DSpace 6 class names that CGSpace (now DSpace 7)
+    # no longer emits, so it silently returned nothing but a title.
+    #
+    # Both fall back to the original browser path on any failure, so a source
+    # that the API cannot serve is no worse off than before.
+    # ------------------------------------------------------------------ #
+
+    CGSPACE_API = "https://cgspace.cgiar.org/server/api"
+    CROSSREF_API = "https://api.crossref.org/works"
+    API_TIMEOUT = 20
+    # Publishers routinely block scrapers. Once Crossref has given us a usable
+    # floor (title, journal, authors), the browser attempt is a bonus, not a
+    # necessity - so it gets a short leash instead of the full per-URL budget.
+    DOI_BROWSER_TIMEOUT = 12
+    # Playwright applies its own 30s navigation timeout. Without lowering it, an
+    # outer asyncio deadline cannot take effect: the coroutine does not reach an
+    # await point until the navigation gives up on its own.
+    NAV_TIMEOUT_MS = 10_000
+
+    def _handle_from_url(self, url: str) -> Optional[str]:
+        """'https://hdl.handle.net/10568/100000' -> '10568/100000'."""
+        m = re.search(r"(?:hdl\.handle\.net|cgspace\.cgiar\.org/handle)/(\d+/\d+)", url)
+        return m.group(1) if m else None
+
+    def _doi_from_url(self, url: str) -> Optional[str]:
+        m = re.search(r"doi\.org/(10\.\S+)", url)
+        return m.group(1).rstrip("/") if m else None
+
     async def _scrape_cgspace_handle(self, url: str) -> Dict[str, str]:
+        handle = self._handle_from_url(url)
+        if handle:
+            try:
+                result = await self._scrape_cgspace_api(url, handle)
+                if result is not None:
+                    return result
+            except Exception as e:
+                logger.warning(f"⚠️ CGSpace API failed for {url}: {e}")
+        logger.info("↩️  Falling back to browser scraping for CGSpace")
+        return await self._scrape_cgspace_handle_browser(url)
+
+    async def _scrape_cgspace_api(self, url: str, handle: str) -> Optional[Dict[str, str]]:
+        logger.info(f"⚡ CGSpace API: {handle}")
+        headers = {"User-Agent": "PRMS-QA/1.0"}
+
+        item = await _blocking(
+            requests.get, f"{self.CGSPACE_API}/pid/find",
+            params={"id": f"hdl:{handle}"}, headers=headers, timeout=self.API_TIMEOUT,
+        )
+        if item.status_code != 200:
+            return None
+        item = item.json()
+        md = item.get("metadata", {})
+
+        def first(*keys):
+            for k in keys:
+                if md.get(k):
+                    return md[k][0].get("value", "")
+            return ""
+
+        title = first("dc.title") or "CGSpace item"
+
+        # Prefer the full text when a PDF is attached.
+        pdf = await self._cgspace_pdf(item["uuid"], headers)
+        if pdf:
+            name, content_url = pdf
+            r = await _blocking(requests.get, content_url, headers=headers, timeout=60)
+            if r.status_code == 200 and r.content:
+                filename = os.path.join(self.download_dir, f"{item['uuid']}.pdf")
+
+                def _write():
+                    with open(filename, "wb") as f:
+                        f.write(r.content)
+
+                await _blocking(_write)
+                logger.info(f"✅ Downloaded PDF via API: {name} ({len(r.content)/1024:.0f} KB)")
+                text = await _blocking(self._extract_pdf_text, filename)
+                validation = self._validate_content(text, title, url)
+                out = {
+                    "type": "cgspace_pdf", "title": title, "content": text, "url": url,
+                    "file_path": filename, "is_valid": validation["is_valid"],
+                    "validation_reason": validation["reason"],
+                    "validation_message": validation["message"],
+                }
+                if validation["warnings"]:
+                    out["validation_warnings"] = validation["warnings"]
+                return out
+
+        # No PDF: build a record from the metadata the API returns. This is the
+        # case the old page scraper lost entirely.
+        parts = [f"Title: {title}", "=" * 60]
+        abstract = first("dcterms.abstract", "dc.description.abstract", "dc.description")
+        if abstract:
+            parts += ["Abstract:", abstract]
+        for label, keys in (
+            ("Authors", ("dc.contributor.author", "dcterms.creator")),
+            ("Published", ("dcterms.issued", "dc.date.issued")),
+            ("Type", ("dcterms.type", "dc.type")),
+            ("Publisher", ("dcterms.publisher", "dc.publisher")),
+            ("Subjects", ("dcterms.subject", "dc.subject")),
+            ("Countries", ("cg.coverage.country",)),
+        ):
+            for k in keys:
+                if md.get(k):
+                    parts.append(f"{label}: " + "; ".join(v.get("value", "") for v in md[k]))
+                    break
+
+        content = "\n\n".join(parts)
+        validation = self._validate_content(content, title, url)
+        logger.info(f"✅ CGSpace metadata via API: {len(content)} chars")
+        out = {
+            "type": "cgspace_metadata", "title": title, "content": content, "url": url,
+            "is_valid": validation["is_valid"], "validation_reason": validation["reason"],
+            "validation_message": validation["message"],
+        }
+        if validation["warnings"]:
+            out["validation_warnings"] = validation["warnings"]
+        return out
+
+    async def _cgspace_pdf(self, item_uuid: str, headers: dict):
+        """Return (name, content_url) of the first PDF bitstream, if any."""
+        bundles = await _blocking(
+            requests.get, f"{self.CGSPACE_API}/core/items/{item_uuid}/bundles",
+            headers=headers, timeout=self.API_TIMEOUT,
+        )
+        if bundles.status_code != 200:
+            return None
+        for bundle in bundles.json().get("_embedded", {}).get("bundles", []):
+            if bundle.get("name") != "ORIGINAL":
+                continue
+            listing = await _blocking(
+                requests.get, bundle["_links"]["bitstreams"]["href"],
+                headers=headers, timeout=self.API_TIMEOUT,
+            )
+            if listing.status_code != 200:
+                continue
+            for bs in listing.json().get("_embedded", {}).get("bitstreams", []):
+                if bs.get("name", "").lower().endswith(".pdf"):
+                    return bs["name"], bs["_links"]["content"]["href"]
+        return None
+
+    async def _scrape_doi(self, url: str) -> Dict[str, str]:
+        doi = self._doi_from_url(url)
+        crossref = None
+        if doi:
+            try:
+                crossref = await self._scrape_doi_crossref(url, doi)
+            except Exception as e:
+                logger.warning(f"⚠️ Crossref failed for {doi}: {e}")
+
+        # An abstract is enough to judge whether the evidence supports a result.
+        if crossref and crossref.pop("_has_abstract", False):
+            return crossref
+
+        # No abstract deposited (Elsevier, among others). Try the page, but
+        # briefly: publishers that withhold abstracts tend to block scrapers too,
+        # and Crossref's metadata already beats an error page.
+        try:
+            page = await asyncio.wait_for(
+                self._scrape_doi_browser(url), timeout=self.DOI_BROWSER_TIMEOUT
+            )
+            if page.get("is_valid") and len(page.get("content", "")) > len(
+                (crossref or {}).get("content", "")
+            ):
+                return page
+            logger.info("⚠️  Page scraping added nothing; keeping Crossref metadata")
+        except asyncio.TimeoutError:
+            logger.info(f"⏱️  Page scraping exceeded {self.DOI_BROWSER_TIMEOUT}s; "
+                        "keeping Crossref metadata")
+        except Exception as e:
+            logger.warning(f"⚠️ Page scraping failed for {url}: {e}")
+
+        if crossref:
+            crossref.pop("_has_abstract", None)
+            return crossref
+        return await self._scrape_doi_browser(url)
+
+    async def _scrape_doi_crossref(self, url: str, doi: str) -> Optional[Dict[str, str]]:
+        logger.info(f"⚡ Crossref: {doi}")
+        r = await _blocking(
+            requests.get, f"{self.CROSSREF_API}/{doi}",
+            headers={"User-Agent": "PRMS-QA/1.0 (mailto:prms@cgiar.org)"},
+            timeout=self.API_TIMEOUT,
+        )
+        if r.status_code != 200:
+            return None
+        m = r.json().get("message", {})
+
+        title = (m.get("title") or ["Untitled"])[0]
+        abstract = m.get("abstract", "")
+        if abstract:
+            abstract = re.sub(r"<[^>]+>", " ", abstract)
+            abstract = re.sub(r"\s+", " ", abstract).strip()
+
+        has_abstract = len(abstract) >= 200
+        parts = [f"Title: {title}", "=" * 60]
+        if has_abstract:
+            parts += ["Abstract:", abstract]
+        else:
+            logger.info("⚠️  Crossref has no usable abstract for this DOI")
+        for label, value in (
+            ("Journal", (m.get("container-title") or [""])[0]),
+            ("Published", str((m.get("published", {}).get("date-parts") or [["?"]])[0][0])),
+            ("Type", m.get("type", "")),
+            ("Publisher", m.get("publisher", "")),
+        ):
+            if value:
+                parts.append(f"{label}: {value}")
+        authors = m.get("author", [])
+        if authors:
+            parts.append("Authors: " + "; ".join(
+                f"{a.get('given','')} {a.get('family','')}".strip() for a in authors[:20]))
+
+        content = "\n\n".join(parts)
+        validation = self._validate_content(content, title, url)
+        logger.info(f"✅ Crossref metadata: {len(content)} chars"
+                    f"{' (with abstract)' if has_abstract else ' (no abstract)'}")
+        return {
+            "type": "doi_article", "title": title, "content": content, "url": url,
+            "is_valid": True, "validation_reason": validation["reason"],
+            "validation_message": validation["message"],
+            "_has_abstract": has_abstract,
+        }
+
+    async def _scrape_cgspace_handle_browser(self, url: str) -> Dict[str, str]:
         """
         Extracts content from CGSpace handles.
         Strategy:
@@ -326,7 +556,7 @@ class WebScraperService:
         return result
     
 
-    async def _scrape_doi(self, url: str) -> Dict[str, str]:
+    async def _scrape_doi_browser(self, url: str) -> Dict[str, str]:
         logger.info(f"🔗 Scraping DOI: {url}")
         
         async with async_playwright() as p:
@@ -343,7 +573,8 @@ class WebScraperService:
             page = await browser.new_page()
             
             try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                await page.goto(url, wait_until="domcontentloaded",
+                                timeout=self.NAV_TIMEOUT_MS)
                 
                 try:
                     await page.wait_for_timeout(3000)
@@ -367,7 +598,7 @@ class WebScraperService:
                             logger.info("✅ Closed cookie banner")
                             await page.wait_for_timeout(1000)
                             break
-                        except:
+                        except Exception:
                             continue
 
                     close_buttons = [
@@ -386,10 +617,10 @@ class WebScraperService:
                             await page.click(selector, timeout=1000)
                             logger.info("✅ Closed modal/ad")
                             await page.wait_for_timeout(500)
-                        except:
+                        except Exception:
                             continue
                             
-                except:
+                except Exception:
                     pass
                 
                 title = await page.title()

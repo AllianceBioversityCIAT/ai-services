@@ -23,6 +23,7 @@ submission.
 """
 
 import time
+import json
 import asyncio
 from typing import List, Dict, Tuple, Optional
 
@@ -40,7 +41,8 @@ from app.utils.assessment.scoring import score as compute_score
 from app.utils.assessment.selection import applicable
 from app.utils.prompt.assessment.builders import build_metadata_prompt, build_evidence_prompt
 from app.utils.prompt.assessment.tool_schemas import metadata_tool, evidence_tool
-from app.llm.bedrock_tools import invoke_with_tool
+from app.llm.bedrock_tools import invoke_with_tool, MODEL_ID
+from app.utils.interactions.interaction_client import interaction_client
 from app.web_scraping.evidence_scraper import EvidenceEnhancer
 from app.utils.logger.logger_util import get_logger
 
@@ -344,6 +346,89 @@ def _evidence_payload(request, by_index, llm_verdicts) -> List[EvidenceVerdict]:
     return out
 
 
+CRITERIA_VERSION = "QA-2026-v1"
+TRACKING_TIMEOUT_S = 8.0
+
+
+async def _track_interaction(request, response, findings, elapsed: float,
+                             evidence_read: int) -> Optional[str]:
+    """Record the assessment with the interaction service.
+
+    interaction_client.track_interaction posts synchronously, so it runs in the
+    executor: at this point the verdict is already computed and a blocking call
+    would only delay a response that is ready. Failure here is never allowed to
+    affect the assessment.
+    """
+    if not request.user_id:
+        return None
+
+    try:
+        gi = request.sections.general_information
+        user_input = (
+            f"W3/Bilateral quality assessment - Result type: {request.result.type}, "
+            f"Title: {gi.title}, Level: {gi.result_level}"
+        )
+        ai_output = json.dumps(
+            {
+                "overall": response.overall.model_dump(),
+                "sections": response.sections.model_dump(),
+                "evidence": [e.model_dump() for e in response.evidence],
+            },
+            indent=2, ensure_ascii=False,
+        )
+        tracking_context = {
+            "criteria_version": CRITERIA_VERSION,
+            "result_type": request.result.type,
+            "verdict": response.overall.verdict.value,
+            "score": response.overall.score,
+            "flags": sum(1 for f in findings if f.is_flag),
+            "criteria_total": response.coverage.criteria_total,
+            "criteria_evaluated": response.coverage.criteria_evaluated,
+            "llm_calls": 2,
+            "model_used": MODEL_ID,
+            "evidence_total": len(request.sections.evidence),
+            "evidence_read": evidence_read,
+            "check_status": response.status.value,
+        }
+
+        loop = asyncio.get_event_loop()
+        future = asyncio.ensure_future(
+            loop.run_in_executor(
+                None,
+                lambda: interaction_client.track_interaction(
+                    user_id=request.user_id,
+                    user_input=user_input,
+                    ai_output=ai_output,
+                    service_name="qa-ai-traffic-light",
+                    display_name="PRMS Reporting Tool - Bilateral QA Assessment",
+                    service_description="W3/Bilateral quality assessment with "
+                                        "traffic-light verdicts and evidence review",
+                    context=tracking_context,
+                    response_time_seconds=elapsed,
+                    platform="PRMS",
+                ),
+            )
+        )
+
+        done, _ = await asyncio.wait([future], timeout=TRACKING_TIMEOUT_S)
+        if not done:
+            logger.warning(
+                f"⏱️ Interaction tracking exceeded {TRACKING_TIMEOUT_S}s; "
+                "returning without the interaction id"
+            )
+            return None
+
+        result = future.result()
+        if result:
+            interaction_id = result.get("interaction_id")
+            logger.info(f"📊 Interaction tracked with ID: {interaction_id}")
+            return interaction_id
+        logger.warning("⚠️ Failed to track interaction with interaction service")
+    except Exception as e:
+        logger.error(f"❌ Error tracking interaction: {e}")
+    return None
+
+
 # --------------------------------------------------------------------------- #
 # Entry point
 # --------------------------------------------------------------------------- #
@@ -409,7 +494,7 @@ async def assess_result(request: QualityAssessmentRequest) -> QualityAssessmentR
         f"criteria {evaluated}/{len(result.findings)}"
     )
 
-    return QualityAssessmentResponse(
+    response = QualityAssessmentResponse(
         request_id=request.request_id,
         overall=OverallVerdict(
             verdict=overall,
@@ -423,3 +508,8 @@ async def assess_result(request: QualityAssessmentRequest) -> QualityAssessmentR
         coverage=Coverage(criteria_total=len(result.findings),
                           criteria_evaluated=evaluated),
     )
+
+    response.interaction_id = await _track_interaction(
+        request, response, result.findings, budget.elapsed, read
+    )
+    return response
