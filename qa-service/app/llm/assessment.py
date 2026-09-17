@@ -27,7 +27,7 @@ import json
 import asyncio
 from typing import List, Dict, Tuple, Optional
 
-from app.api.assessment_models import (
+from app.api.models import (
     QualityAssessmentRequest, QualityAssessmentResponse, OverallVerdict,
     SectionVerdict, SectionVerdicts, EvidenceVerdict, Verdict as ApiVerdict,
     CheckStatus, Coverage,

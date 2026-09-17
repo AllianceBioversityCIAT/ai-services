@@ -4,15 +4,14 @@ import time
 import httpx
 import traceback
 from fastapi.security import APIKeyHeader
-from app.llm.assessment import assess_result, AssessmentUnavailable
 from app.utils.logger.logger_util import get_logger
 from app.llm.mining import improve_prms_result_metadata
 from app.utils.config.config_util import CLARISA_VALIDATE_URL
 from app.utils.assessment.contract_validation import validate
-from app.api.models import PrmsRequest, PrmsResponse, ErrorResponse
+from app.llm.assessment import assess_result, AssessmentUnavailable
 from fastapi import APIRouter, HTTPException, status, Request, Depends
 from app.utils.notification.notification_service import NotificationService
-from app.api.assessment_models import QualityAssessmentRequest, QualityAssessmentResponse
+from app.api.models import PrmsRequest, PrmsResponse, ErrorResponse, QualityAssessmentRequest, QualityAssessmentResponse
 
 
 logger = get_logger()

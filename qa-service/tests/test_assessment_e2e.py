@@ -8,7 +8,7 @@ import sys, os, asyncio
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import app.llm.assessment as orch
-from app.api.assessment_models import QualityAssessmentRequest
+from app.api.models import QualityAssessmentRequest
 
 PASSED, FAILED = [], []
 

@@ -7,7 +7,7 @@ Run: python tests/test_assessment_rules.py
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.api.assessment_models import QualityAssessmentRequest
+from app.api.models import QualityAssessmentRequest
 from app.utils.assessment.aggregation import Outcome, aggregate, Verdict
 from app.utils.assessment.rules_engine import run_metadata_rules, run_evidence_rules
 from app.utils.assessment.criteria_catalog import sections_for
