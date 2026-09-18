@@ -73,3 +73,51 @@ def coverage(result_type: str):
         else:
             bound.append(c)
     return {"bound": bound, "unbound": unbound, "label_tbc": tbc}
+
+
+# --------------------------------------------------------------------------- #
+# Field names as the Reporting Tool sends them
+# --------------------------------------------------------------------------- #
+#
+# FIELD_BINDINGS above documents where a criterion reads from. This maps the same
+# MDS fields to the names the response reports back, so the review window can
+# point at the exact inputs a user has to revisit. Keys inside type_specific are
+# the visible labels, which is what the contract uses there; everywhere else it is
+# the payload key.
+#
+# One MDS field can span several inputs - fixing "Internal collaboration" may mean
+# touching the lead centre or the project - so each maps to a tuple.
+
+REPORTING_FIELDS = {
+    "Title": ("title",),
+    "Result description": ("description",),
+    "Result level": ("result_level",),
+    "Result type check": ("title", "description"),
+    "ToC link (SP/A)": ("theory_of_change",),
+    "Impact area tags": ("impact_areas",),
+    "Internal collaboration": ("lead_center", "contributing_centers",
+                               "lead_project", "contributing_projects"),
+    "Partner collaboration": ("external_partners", "no_external_partners"),
+    "Geographic focus": ("scope", "regions", "countries", "sub_national"),
+    "Evidence": ("evidence",),
+    "Evidence (per IRL)": ("evidence",),
+    # type_specific: the visible label is the key the contract uses
+    "Policy type": ("Policy type",),
+    "Policy stage": ("Policy stage",),
+    "Policy owner (implementing org.)": ("Implementing organizations",),
+    "User type": ("User types",),
+    "# people/actors using": ("Number of people using",),
+    "Other quantitative measure": ("Other quantitative measures",),
+    "Estimated USD spend": ("Investment (USD)",),
+    "# people trained": ("Number of people trained",),
+    "Length of training": ("Length of training",),
+    "Delivery method": ("Delivery method",),
+    "Innovation type (typology)": ("Innovation typology",),
+    "Innovation Readiness Level (IRL)": ("Readiness level",),
+    "Innovation Developer": ("Innovation developers",),
+}
+
+
+def reporting_fields(mds_field: str) -> tuple:
+    """Inputs the user would revisit to address a finding on this MDS field."""
+    return REPORTING_FIELDS.get(mds_field, ())

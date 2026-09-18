@@ -28,6 +28,7 @@ import asyncio
 from typing import List, Dict, Tuple, Optional
 from app.utils.logger.logger_util import get_logger
 from app.utils.assessment.selection import applicable
+from app.utils.assessment.payload_binding import reporting_fields
 from app.llm.bedrock_tools import invoke_with_tool, MODEL_ID
 from app.web_scraping.evidence_scraper import EvidenceEnhancer
 from app.utils.assessment.scoring import score as compute_score
@@ -280,6 +281,16 @@ def _section_payload(section_result, force_grey: bool = False) -> SectionVerdict
     unchecked = sum(1 for f in section_result.findings
                     if f.outcome == Outcome.NOT_EVALUATED)
 
+    # The inputs behind the flags, in catalog order and without repeats, so the
+    # review window can send the user straight to what needs revisiting.
+    flagged_fields = []
+    for f in section_result.findings:
+        if not f.is_flag:
+            continue
+        for name in reporting_fields(f.mds_field):
+            if name not in flagged_fields:
+                flagged_fields.append(name)
+
     comments = _SECTION_SUMMARY[verdict]
     if force_grey:
         comments = (
@@ -306,6 +317,7 @@ def _section_payload(section_result, force_grey: bool = False) -> SectionVerdict
         comments=comments,
         strengths=[] if issues else strengths,
         issues=issues,
+        fields=flagged_fields,
     )
 
 

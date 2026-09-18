@@ -179,6 +179,67 @@ r = run(payload(), llm=omits)
 check("criterio omitido no cuenta como aprobado en silencio",
       r.overall.verdict.value == "green" and r.status.value == "completed")
 
+print("\n--- fields: qué inputs debe revisar el usuario ---")
+
+def flagging(*criterion_ids):
+    async def fake(system, user, tool, **kw):
+        ids = tool["input_schema"]["properties"]["findings"]["items"]["properties"]["criterion_id"]["enum"]
+        out = {"findings": [{"criterion_id": i,
+                             "outcome": "flagged" if i in criterion_ids else "passed",
+                             "comment": "needs work" if i in criterion_ids else "fine"}
+                            for i in ids]}
+        if tool["name"] == "report_evidence_assessment":
+            out["evidence"] = [{"index": 0, "verdict": "green", "reason": "ok"}]
+        return out
+    return fake
+
+r = run(payload(), llm=flagging("generic.title.quality"))
+check("un flag en el título -> fields: ['title']",
+      r.sections.general_information.fields == ["title"],
+      str(r.sections.general_information.fields))
+
+r = run(payload(), llm=flagging("generic.title.quality",
+                                "generic.description.cgiar_contribution"))
+check("dos criterios distintos -> los dos campos, sin repetir",
+      r.sections.general_information.fields == ["title", "description"],
+      str(r.sections.general_information.fields))
+
+r = run(payload(), llm=flagging("generic.title.quality", "generic.description.quality",
+                                "generic.description.cgiar_contribution"))
+check("dos criterios del MISMO campo -> no lo duplica",
+      r.sections.general_information.fields == ["title", "description"],
+      str(r.sections.general_information.fields))
+
+r = run(payload(), llm=flagging("generic.geographic_focus.consistency"))
+check("un criterio que abarca varios inputs los devuelve todos",
+      r.sections.geographic_location.fields == ["scope", "regions", "countries", "sub_national"],
+      str(r.sections.geographic_location.fields))
+
+r = run(payload(), llm=flagging("innovdev.irl.supported"))
+check("type_specific usa la etiqueta visible, no la llave interna",
+      r.sections.type_specific.fields == ["Readiness level"],
+      str(r.sections.type_specific.fields))
+
+r = run(payload())
+check("sección verde -> fields vacío",
+      r.sections.general_information.fields == []
+      and r.sections.type_specific.fields == [],
+      str(r.sections.general_information.fields))
+
+r = run(payload(**{"result.type": "Other Output",
+                   "sections.type_specific": {"fields": {}}}),
+        llm=flagging("otheroutput.result_type_check"))
+check("Result type check apunta a title y description en General Information",
+      r.sections.general_information.fields == ["title", "description"],
+      str(r.sections.general_information.fields))
+
+# Todo campo MDS del catálogo debe tener nombre de Reporting, o fields saldría
+# vacío para ese criterio sin que nadie se entere.
+from app.utils.assessment.criteria_catalog import CATALOG
+from app.utils.assessment.payload_binding import reporting_fields
+sin_nombre = sorted({c.mds_field for c in CATALOG if not reporting_fields(c.mds_field)})
+check("ningún campo MDS se queda sin nombre de Reporting", not sin_nombre, str(sin_nombre))
+
 print("\n--- Tipos sin sección Type-Specific ---")
 
 def other_output(**over):

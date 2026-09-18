@@ -213,6 +213,14 @@ class SectionVerdict(BaseModel):
     comments: str = ""
     strengths: List[str] = Field(default_factory=list)
     issues: List[str] = Field(default_factory=list)
+    fields: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Inputs in this section that need a change, named as the Reporting "
+            "Tool sends them. Empty when nothing was flagged."
+        ),
+        examples=[["title", "description"]],
+    )
 
 
 class EvidenceVerdict(BaseModel):
