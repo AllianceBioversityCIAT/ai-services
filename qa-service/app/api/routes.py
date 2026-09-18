@@ -1,14 +1,18 @@
 """REST API endpoints for PRMS QA Service."""
 
+import time
 import httpx
 import traceback
 from fastapi.security import APIKeyHeader
 from app.utils.logger.logger_util import get_logger
 from app.llm.mining import improve_prms_result_metadata
 from app.utils.config.config_util import CLARISA_VALIDATE_URL
-from app.api.models import PrmsRequest, PrmsResponse, ErrorResponse
+from app.utils.assessment.contract_validation import validate
+from app.llm.assessment import assess_result, AssessmentUnavailable
 from fastapi import APIRouter, HTTPException, status, Request, Depends
 from app.utils.notification.notification_service import NotificationService
+from app.api.models import PrmsRequest, PrmsResponse, ErrorResponse, QualityAssessmentRequest, QualityAssessmentResponse
+
 
 logger = get_logger()
 router = APIRouter()
@@ -16,47 +20,58 @@ router = APIRouter()
 notification_service = NotificationService()
 
 
+if not CLARISA_VALIDATE_URL:
+    logger.error("❌ CLARISA_VALIDATE_URL is not configured; refusing to authorize")
+    raise RuntimeError(
+        "CLARISA_VALIDATE_URL is not configured. The service refuses to start without authentication."
+    )
+
+
 API_KEY_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
 
 http_client = httpx.AsyncClient()
 
-async def validate_with_clarisa(request: Request, api_key: str = Depends(api_key_header)):
-    client_ip = request.client.host if request.client else "0.0.0.0"
-    endpoint = request.url.path
 
-    payload = {
-        "api_key": api_key,
-        "microservice_name": "AI Review - PRMS",
-        "endpoint_accessed": endpoint,
-        "ip_address": client_ip
-    }
+def validate_with_clarisa(microservice_name: str):
+    async def _validate(request: Request, api_key: str = Depends(api_key_header)):
+        client_ip = request.client.host if request.client else "0.0.0.0"
+        endpoint = request.url.path
 
-    try:
-        response = await http_client.post(CLARISA_VALIDATE_URL, json=payload, timeout=5.0)
+        payload = {
+            "api_key": api_key,
+            "microservice_name": microservice_name,
+            "endpoint_accessed": endpoint,
+            "ip_address": client_ip
+        }
 
-        if response.status_code != 200:
+        try:
+            response = await http_client.post(CLARISA_VALIDATE_URL, json=payload, timeout=5.0)
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Communication error with the authentication service"
+                )
+
+            data = response.json()
+
+            if not data.get("valid"):
+                error_msg = data.get("error", "Invalid API Key")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=error_msg
+                )
+
+            return data.get("mis")
+
+        except httpx.RequestError:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Communication error with the authentication service"
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service is temporarily unavailable"
             )
 
-        data = response.json()
-
-        if not data.get("valid"):
-            error_msg = data.get("error", "Invalid API Key")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=error_msg
-            )
-
-        return data.get("mis")
-
-    except httpx.RequestError:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service is temporarily unavailable"
-        )
+    return _validate
 
 
 @router.post(
@@ -134,7 +149,7 @@ async def validate_with_clarisa(request: Request, api_key: str = Depends(api_key
         }
     }
 )
-# async def prms_qa(request: PrmsRequest, mis: str = Depends(validate_with_clarisa)) -> PrmsResponse:
+# async def prms_qa(request: PrmsRequest, mis: str = Depends(validate_with_clarisa("AI Review - PRMS"))) -> PrmsResponse:
 async def prms_qa(request: PrmsRequest) -> PrmsResponse:
     """
     Process PRMS result metadata using an LLM.
@@ -292,4 +307,153 @@ async def prms_qa(request: PrmsRequest) -> PrmsResponse:
                     "traceback": tb
                 }
             }
+        )
+
+
+quality_assessment_auth = validate_with_clarisa("AI Traffic Light - PRMS")
+
+@router.post(
+    "/prms/quality-assessment",
+    response_model=QualityAssessmentResponse,
+    tags=["Quality Assessment"],
+    summary="AI quality check for W3/Bilateral results",
+    description="""
+    🚦 Assess a W3/Bilateral result against the CGIAR QA criteria and return a
+    traffic-light verdict for the result as a whole and for each section.
+
+    Applies the same criteria QA assessors use for pooled-funding results. Roughly
+    half the criteria are resolved deterministically in code; the rest are judged
+    by the model against a closed list, so the set of possible findings never
+    grows between runs.
+
+    Evidence links are fetched and read: the check reports whether each item is
+    reachable, genuine, and actually supports the result.
+
+    The check never blocks a submission. If part of it cannot be completed the
+    response still returns, with `status` set to `partial` or `unavailable`.
+    """,
+)
+async def quality_assessment(request: QualityAssessmentRequest, mis: str = Depends(quality_assessment_auth)) -> QualityAssessmentResponse:
+    problems = validate(request)
+    if problems:
+        logger.warning(f"⚠️ Contract problems in {request.request_id}: {len(problems)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "The submitted payload does not match the agreed contract.",
+                "status": "error",
+                "error_type": "CONTRACT_VIOLATION",
+                "request_id": request.request_id,
+                "problems": problems,
+            },
+        )
+
+    started = time.monotonic()
+
+    try:
+        result = await assess_result(request)
+        elapsed = time.monotonic() - started
+
+        total = len(request.sections.evidence)
+        evaluated = sum(1 for e in result.evidence if e.verdict.value != "grey")
+
+        light = {"green": ":large_green_circle:", "amber": ":large_yellow_circle:",
+                 "red": ":red_circle:", "grey": ":white_circle:"}
+        verdict = result.overall.verdict.value
+        issues = sum(len(sec["issues"]) for sec in result.sections.model_dump().values())
+        skipped = result.coverage.criteria_total - result.coverage.criteria_evaluated
+
+        message = (
+            f"Successfully assessed result quality\n"
+            f"User: *{request.user_id or 'Unknown'}*\n"
+            f"Result Type: *{request.result.type}*\n"
+            f"\n"
+            f"*Result quality (QA outcome):*\n"
+            f"Verdict: {light.get(verdict, '')} *{verdict.upper()}*"
+            f"{f' — score *{result.overall.score}*' if result.overall.score is not None else ''}\n"
+            f"Points to address: *{issues}*\n"
+            f"\n"
+            f"*Run details (service):*\n"
+            f"Evidence: *{total}* total, *{evaluated}* read, *{total - evaluated}* not read\n"
+            f"Checks: *{result.coverage.criteria_evaluated}* of "
+            f"*{result.coverage.criteria_total}* completed"
+            f"{f' — *{skipped}* skipped' if skipped else ''}\n"
+            f"Coverage: *{result.status.value}*"
+            f"{f' — _{result.degraded_reason}_' if result.degraded_reason else ''}\n"
+            f"Request: `{request.request_id}`"
+        )
+
+        await notification_service.send_slack_notification(
+            emoji=":ai: :vertical_traffic_light:",
+            app_name="PRMS Bilateral QA Assessment",
+            color="#36a64f",
+            title="✅ Reporting Tool Result Assessed",
+            message=message,
+            time_taken=f"Processing time: *{elapsed:.2f}* seconds",
+            priority="Low",
+        )
+
+        return result
+
+    except AssessmentUnavailable as e:
+        logger.error(f"❌ No assessment produced for {request.request_id}: {e}")
+
+        await notification_service.send_slack_notification(
+            emoji=":ai: :vertical_traffic_light:",
+            app_name="PRMS Bilateral QA Assessment",
+            color="#ff0000",
+            title="❌ Quality assessment unavailable",
+            message=(
+                f"The AI could not review this result\n"
+                f"User: *{request.user_id or 'Unknown'}*\n"
+                f"Result Type: *{request.result.type}*\n"
+                f"\n"
+                f"*Reason:*\n"
+                f"_{str(e)[:300]}_\n"
+                f"Request: `{request.request_id}`"
+            ),
+            time_taken=f"Processing time: *{time.monotonic() - started:.2f}* seconds",
+            priority="High",
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "The AI quality check is not available at the moment.",
+                "status": "error",
+                "error_type": "ASSESSMENT_UNAVAILABLE",
+                "request_id": request.request_id,
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Assessment failed for {request.request_id}: {e}")
+        logger.error(f"📋 Full traceback:\n{traceback.format_exc()}")
+
+        await notification_service.send_slack_notification(
+            emoji=":ai: :vertical_traffic_light:",
+            app_name="PRMS Bilateral QA Assessment",
+            color="#ff0000",
+            title="❌ Quality assessment failed",
+            message=(
+                f"The service could not produce an assessment\n"
+                f"User: *{request.user_id or 'Unknown'}*\n"
+                f"Result Type: *{request.result.type}*\n"
+                f"\n"
+                f"*Error:*\n"
+                f"`{type(e).__name__}` — _{str(e)[:300]}_\n"
+                f"Request: `{request.request_id}`"
+            ),
+            time_taken="Time taken: *N/A*",
+            priority="High",
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "The AI quality check is not available at the moment.",
+                "status": "error",
+                "error_type": "ASSESSMENT_UNAVAILABLE",
+                "request_id": request.request_id,
+            },
         )
