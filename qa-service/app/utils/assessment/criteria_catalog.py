@@ -383,7 +383,17 @@ GENERIC = [
             "Flag blocked domains: SharePoint, OneDrive, Google Drive, Dropbox. "
             "Non-public evidence: use PRMS repository."
         ),
-        flag_when="Flag if blocked domain or login-gated link.",
+        flag_when=(
+            "Flag if blocked domain or login-gated link, for evidence pasted as a "
+            "plain URL. Evidence uploaded through the PRMS repository is exempt."
+        ),
+        notes=(
+            "Agreed with PRMS: an evidence item carrying the public/private "
+            "visibility flag came through the PRMS repository, which runs on "
+            "SharePoint. Those are never blocked regardless of the link. Only "
+            "items arriving without that flag are checked against the document's "
+            "blocked-domain list."
+        ),
     ),
     Criterion(
         id="generic.evidence.supports_result",

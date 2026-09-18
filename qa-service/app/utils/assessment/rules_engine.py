@@ -215,6 +215,12 @@ def _evidence_max_items(request) -> Finding:
 
 
 def _is_blocked(url: str) -> Optional[str]:
+    """Name the blocked file-sharing service hosting this URL, if any.
+
+    Only reached for evidence that arrived without a visibility flag - anything
+    uploaded through the PRMS repository carries one and is exempted by the
+    caller, so this never sees a repository link.
+    """
     host = (urlparse(url).hostname or "").lower()
     for blocked in BLOCKED_DOMAINS:
         if host == blocked or host.endswith("." + blocked):
@@ -223,21 +229,33 @@ def _is_blocked(url: str) -> Optional[str]:
 
 
 def _evidence_blocked_domain(request) -> Finding:
+    """Flag evidence parked on a personal file-sharing service.
+
+    An item carrying the public/private flag was uploaded through the PRMS
+    repository, which is hosted on SharePoint and is the location the criteria
+    document points users at. Those are never blocked, whatever the link looks
+    like (confirmed with PRMS). Only items that arrive without the flag - a URL
+    the user pasted in - go through the document's blocked-domain list.
+    """
     cid = "generic.evidence.blocked_domain"
     offenders = []
     for i, ev in enumerate(request.sections.evidence):
         if not ev.link:
             continue  # repository items carry no link; that is the sanctioned route
+        if ev.visibility:
+            continue  # came through the PRMS repository
         blocked = _is_blocked(ev.link)
         if blocked:
-            offenders.append(f"item {i + 1} ({blocked})")
+            offenders.append(f"item {i + 1} on {blocked}")
     if offenders:
         return _flag(
             cid,
-            "Evidence hosted on a blocked file-sharing service: "
-            f"{', '.join(offenders)}. Use the PRMS repository for non-public files.",
+            f"Evidence hosted on a personal file-sharing service: "
+            f"{', '.join(offenders)}. Reviewers outside your team may not be able to "
+            "open these links, and shared links often stop working. Upload the file "
+            "to the PRMS repository and link to it from there instead.",
         )
-    return _ok(cid, "No evidence is hosted on a blocked file-sharing service.")
+    return _ok(cid, "Evidence is hosted somewhere reviewers can reach.")
 
 
 def _evidence_accessible(request, scrape_results: Dict[int, dict]) -> Finding:

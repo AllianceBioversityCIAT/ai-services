@@ -159,6 +159,7 @@ check("el gris de sección no arrastra el global",
 
 blocked = six_evidence()
 blocked.sections.evidence[0].link = "https://cgiar.sharepoint.com/:b:/s/x/doc.pdf"
+blocked.sections.evidence[0].visibility = None   # URL pegada, no del repositorio
 r = run(blocked, scrape=read_none)
 check("un flag real gana sobre el gris (dominio bloqueado -> rojo)",
       r.sections.evidence.verdict.value == "red", r.sections.evidence.verdict.value)

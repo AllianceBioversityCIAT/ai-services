@@ -117,8 +117,8 @@ check("sin impact areas el criterio se omite (no aparece)",
 print("\n--- Evidencia: dominios bloqueados y repositorio ---")
 r = build(ID, **{"sections.evidence": [
     {"description": "a", "link": "https://cgiar.sharepoint.com/:b:/s/x", "source": "url",
-     "visibility": "public", "tags": []}]})
-check("SharePoint se flaggea",
+     "tags": []}]})   # sin visibility: URL pegada, no viene del repositorio
+check("SharePoint pegado como URL se flaggea",
       outcome(run_metadata_rules(r), "generic.evidence.blocked_domain") == Outcome.FLAGGED)
 
 r = build(ID, **{"sections.evidence": [
@@ -173,6 +173,43 @@ res = aggregate(fs, sections_for("Innovation development"))
 code_flags = [f.criterion_id for f in fs if f.is_flag]
 check("ningún criterio de código se dispara sobre un payload correcto",
       not code_flags, f"flags: {code_flags}")
+
+print("\n--- Bloqueo de dominios: el flag de visibilidad manda ---")
+PRMS_LINK = ("https://cgiar.sharepoint.com/:b:/s/OneCGIARPRMSRepository/"
+             "IQDguq1lCiU8QZH-XvEUh1OuAYQYI")
+OTRO_SP = "https://cgiar.sharepoint.com/:x:/s/MiEquipo/a.xlsx"
+
+def blocked_outcome(item):
+    r = build(ID, **{"sections.evidence": [item]})
+    return outcome(run_metadata_rules(r), "generic.evidence.blocked_domain")
+
+# Con flag de visibilidad -> viene del repositorio PRMS -> nunca se bloquea.
+for link, vis, label in [
+    (PRMS_LINK, "public",  "repositorio PRMS público"),
+    (PRMS_LINK, "private", "repositorio PRMS privado"),
+    (OTRO_SP,   "public",  "otro SharePoint pero CON flag"),
+]:
+    check(f"con flag ({label}) -> no se bloquea",
+          blocked_outcome({"description": "d", "link": link, "source": "url",
+                           "visibility": vis, "tags": []}) == Outcome.PASSED)
+
+# Sin flag -> URL pegada por el usuario -> se aplica la lista del documento.
+check("sin flag, SharePoint ajeno -> se bloquea",
+      blocked_outcome({"description": "d", "link": OTRO_SP, "source": "url",
+                       "tags": []}) == Outcome.FLAGGED)
+check("sin flag, Google Drive -> se bloquea",
+      blocked_outcome({"description": "d", "link": "https://drive.google.com/file/d/a/view",
+                       "source": "url", "tags": []}) == Outcome.FLAGGED)
+check("sin flag, CGSpace -> no se bloquea",
+      blocked_outcome({"description": "d", "link": "https://hdl.handle.net/10568/1",
+                       "source": "url", "tags": []}) == Outcome.PASSED)
+
+r = build(ID, **{"sections.evidence": [
+    {"description": "d", "link": OTRO_SP, "source": "url", "tags": []}]})
+msg = [f.comment for f in run_metadata_rules(r)
+       if f.criterion_id == "generic.evidence.blocked_domain"][0]
+check("el mensaje ya no dice 'usa el repositorio' a quien lo está usando",
+      "personal file-sharing" in msg and "(item" not in msg, msg[:70])
 
 print(f"\n{'='*60}\n{len(PASSED)} pasaron, {len(FAILED)} fallaron")
 if FAILED:
