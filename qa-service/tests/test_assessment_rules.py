@@ -57,40 +57,40 @@ IU = "Innovation Use"
 ID = "Innovation development"
 
 
-print("\n--- Delivery method vs geography (el substring trap) ---")
+print("\n--- Delivery method vs geography (the substring trap) ---")
 for method, countries, expected, why in [
-    ("Virtual / Online", [], Outcome.NOT_EVALUATED, "virtual sin geografía: exenta"),
-    ("Blended (in-person and virtual)", [], Outcome.FLAGGED, "blended sin geografía: NO exenta"),
-    ("In person", [], Outcome.FLAGGED, "presencial sin geografía"),
+    ("Virtual / Online", [], Outcome.NOT_EVALUATED, "fully virtual, no geography: exempt"),
+    ("Blended (in-person and virtual)", [], Outcome.FLAGGED, "blended, no geography: NOT exempt"),
+    ("In person", [], Outcome.FLAGGED, "in person, no geography: flagged"),
 ]:
     r = build(CS, **{"sections.geographic_location": {"regions": [], "countries": countries,
                                                       "sub_national": []},
                      "sections.type_specific": {"fields": {"Delivery method": method}}})
     got = outcome(run_metadata_rules(r), "generic.geographic_focus.presence")
-    check(why, got == expected, f"esperado {expected}, obtenido {got}")
+    check(why, got == expected, f"expected {expected}, got {got}")
 
 
-print("\n--- Innovation Use: las partes pueden sumar menos que el total ---")
+print("\n--- Innovation Use: the parts may sum to less than the total ---")
 r = build(IU, **{"sections.type_specific": {"fields": {
     "Number of people using": {"total": 500, "women": 120, "men": 90}}}})
 fs = run_metadata_rules(r)
-check("total 500 con 120+90 desagregados NO se flaggea",
+check("total 500 with 120+90 disaggregated is NOT flagged",
       outcome(fs, "innovuse.count.gender_disaggregation") == Outcome.PASSED,
       str(outcome(fs, "innovuse.count.gender_disaggregation")))
 
 r = build(IU, **{"sections.type_specific": {"fields": {
     "Number of people using": {"total": 500}}}})
-check("sin women ni men SÍ se flaggea",
+check("neither women nor men count IS flagged",
       outcome(run_metadata_rules(r), "innovuse.count.gender_disaggregation") == Outcome.FLAGGED)
 
 
-print("\n--- Impact areas: la asimetría pilar/tag ---")
+print("\n--- Impact areas: the pillar/tag asymmetry ---")
 r = build(ID, **{
     "impact_areas": [{"name": "Climate adaptation and mitigation", "score": "2 — Principal",
                       "subcomponents": ["Adaptation"]}],
     "sections.evidence": [{"description": "e", "link": "https://x.org/a", "source": "url",
                            "visibility": "public", "tags": []}]})
-check("Climate=2 sin tag posible NO se flaggea (no existe tag de Climate)",
+check("Climate=2 is NOT flagged - no evidence tag maps to Climate",
       outcome(run_metadata_rules(r), "generic.impact_area.score2_evidence") == Outcome.PASSED)
 
 r = build(ID, **{
@@ -98,7 +98,7 @@ r = build(ID, **{
                       "score": "2 — Principal", "subcomponents": ["Youth"]}],
     "sections.evidence": [{"description": "e", "link": "https://x.org/a", "source": "url",
                            "visibility": "public", "tags": ["Youth"]}]})
-check("Gender=2 con evidencia tag 'Youth' pasa (Youth mapea a Gender)",
+check("Gender=2 passes with a Youth-tagged item - Youth maps to Gender",
       outcome(run_metadata_rules(r), "generic.impact_area.score2_evidence") == Outcome.PASSED)
 
 r = build(ID, **{
@@ -106,52 +106,52 @@ r = build(ID, **{
                       "score": "2 — Principal", "subcomponents": ["Jobs"]}],
     "sections.evidence": [{"description": "e", "link": "https://x.org/a", "source": "url",
                            "visibility": "public", "tags": ["Gender"]}]})
-check("Poverty=2 con solo evidencia Gender SÍ se flaggea",
+check("Poverty=2 with only Gender-tagged evidence IS flagged",
       outcome(run_metadata_rules(r), "generic.impact_area.score2_evidence") == Outcome.FLAGGED)
 
 r = build(ID)
-check("sin impact areas el criterio se omite (no aparece)",
+check("no impact areas: the criterion is omitted entirely",
       outcome(run_metadata_rules(r), "generic.impact_area.score2_evidence") is None)
 
 
-print("\n--- Evidencia: dominios bloqueados y repositorio ---")
+print("\n--- Evidence: blocked domains and the repository ---")
 r = build(ID, **{"sections.evidence": [
     {"description": "a", "link": "https://cgiar.sharepoint.com/:b:/s/x", "source": "url",
-     "tags": []}]})   # sin visibility: URL pegada, no viene del repositorio
-check("SharePoint pegado como URL se flaggea",
+     "tags": []}]})   # no visibility flag: a pasted URL, not from the repository
+check("SharePoint pasted as a URL is flagged",
       outcome(run_metadata_rules(r), "generic.evidence.blocked_domain") == Outcome.FLAGGED)
 
 r = build(ID, **{"sections.evidence": [
     {"description": "a", "link": None, "source": "prms_repository",
      "visibility": "private", "tags": []}]})
-check("repositorio PRMS sin link NO se flaggea (es la vía sancionada)",
+check("a repository item with no link is NOT flagged - that is the sanctioned route",
       outcome(run_metadata_rules(r), "generic.evidence.blocked_domain") == Outcome.PASSED)
 
 r = build(ID, **{"sections.evidence": [
     {"description": f"e{i}", "link": f"https://x.org/{i}", "source": "url",
      "visibility": "public", "tags": []} for i in range(7)]})
-check("7 evidencias se flaggea (máximo 6)",
+check("7 evidence items are flagged - the maximum is 6",
       outcome(run_metadata_rules(r), "generic.evidence.max_items") == Outcome.FLAGGED)
 
 
-print("\n--- Futuro y falsos positivos ---")
+print("\n--- Future tense and false positives ---")
 for desc, expected, why in [
-    ("The team will deliver the toolkit next year.", Outcome.FLAGGED, "'will' se detecta"),
+    ("The team will deliver the toolkit next year.", Outcome.FLAGGED, "'will' is detected"),
     ("The project generated goodwill among farmers in Williams county.",
-     Outcome.PASSED, "'goodwill'/'Williams' NO son falsos positivos"),
-    ("The variety was released and adopted by 200 farmers.", Outcome.PASSED, "pasado limpio"),
+     Outcome.PASSED, "'goodwill'/'Williams' are NOT false positives"),
+    ("The variety was released and adopted by 200 farmers.", Outcome.PASSED, "clean past tense passes"),
 ]:
     r = build(ID, **{"sections.general_information": {
         "title": "T", "description": desc + " " + " ".join(["word"] * 60)}})
     got = outcome(run_metadata_rules(r), "generic.description.future_tense")
-    check(why, got == expected, f"esperado {expected}, obtenido {got}")
+    check(why, got == expected, f"expected {expected}, got {got}")
 
 
-print("\n--- Capacity Sharing: evidencia condicionada a IA=2 ---")
+print("\n--- Capacity Sharing: evidence required only when an impact area scores 2 ---")
 r = build(CS, **{"sections.type_specific": {"fields": {
     "Delivery method": "In person", "Length of training": "Short-term",
     "Number of people trained": {"total": 40, "female": 20, "male": 20}}}})
-check("sin IA=2 la evidencia queda NOT_EVALUATED (gris)",
+check("no impact area at 2: evidence is NOT_EVALUATED (grey)",
       outcome(run_metadata_rules(r), "capsharing.evidence.ia_score2_required") == Outcome.NOT_EVALUATED)
 
 r = build(CS, **{
@@ -160,21 +160,21 @@ r = build(CS, **{
     "sections.type_specific": {"fields": {
         "Delivery method": "In person", "Length of training": "Short-term",
         "Number of people trained": {"total": 40, "female": 20, "male": 20}}}})
-check("con IA=2 y sin evidencia SÍ se flaggea (core -> RED)",
+check("impact area at 2 with no evidence IS flagged (core -> RED)",
       outcome(run_metadata_rules(r), "capsharing.evidence.ia_score2_required") == Outcome.FLAGGED)
 
 
-print("\n--- Integración: un resultado limpio sale verde ---")
+print("\n--- Integration: a clean result comes out green ---")
 r = build(ID, **{"sections.type_specific": {"fields": {
     "Innovation typology": "Technological", "Readiness level": "Level 6 — …",
     "Innovation developers": "DRABO Inoussa, CIMMYT"}}})
 fs = run_metadata_rules(r) + run_evidence_rules(r, {})
 res = aggregate(fs, sections_for("Innovation development"))
 code_flags = [f.criterion_id for f in fs if f.is_flag]
-check("ningún criterio de código se dispara sobre un payload correcto",
+check("no code criterion fires on a well-formed payload",
       not code_flags, f"flags: {code_flags}")
 
-print("\n--- Bloqueo de dominios: el flag de visibilidad manda ---")
+print("\n--- Blocked domains: the visibility flag decides ---")
 PRMS_LINK = ("https://cgiar.sharepoint.com/:b:/s/OneCGIARPRMSRepository/"
              "IQDguq1lCiU8QZH-XvEUh1OuAYQYI")
 OTRO_SP = "https://cgiar.sharepoint.com/:x:/s/MiEquipo/a.xlsx"
@@ -183,24 +183,24 @@ def blocked_outcome(item):
     r = build(ID, **{"sections.evidence": [item]})
     return outcome(run_metadata_rules(r), "generic.evidence.blocked_domain")
 
-# Con flag de visibilidad -> viene del repositorio PRMS -> nunca se bloquea.
+# With a visibility flag -> came through the PRMS repository -> never blocked.
 for link, vis, label in [
-    (PRMS_LINK, "public",  "repositorio PRMS público"),
-    (PRMS_LINK, "private", "repositorio PRMS privado"),
-    (OTRO_SP,   "public",  "otro SharePoint pero CON flag"),
+    (PRMS_LINK, "public",  "PRMS repository, public"),
+    (PRMS_LINK, "private", "PRMS repository, private"),
+    (OTRO_SP,   "public",  "another SharePoint site, but WITH the flag"),
 ]:
-    check(f"con flag ({label}) -> no se bloquea",
+    check(f"with the flag ({label}) -> not blocked",
           blocked_outcome({"description": "d", "link": link, "source": "url",
                            "visibility": vis, "tags": []}) == Outcome.PASSED)
 
-# Sin flag -> URL pegada por el usuario -> se aplica la lista del documento.
-check("sin flag, SharePoint ajeno -> se bloquea",
+# No flag -> a URL the user pasted -> the document's blocked list applies.
+check("no flag, another SharePoint site -> blocked",
       blocked_outcome({"description": "d", "link": OTRO_SP, "source": "url",
                        "tags": []}) == Outcome.FLAGGED)
-check("sin flag, Google Drive -> se bloquea",
+check("no flag, Google Drive -> blocked",
       blocked_outcome({"description": "d", "link": "https://drive.google.com/file/d/a/view",
                        "source": "url", "tags": []}) == Outcome.FLAGGED)
-check("sin flag, CGSpace -> no se bloquea",
+check("no flag, CGSpace -> not blocked",
       blocked_outcome({"description": "d", "link": "https://hdl.handle.net/10568/1",
                        "source": "url", "tags": []}) == Outcome.PASSED)
 
@@ -208,10 +208,10 @@ r = build(ID, **{"sections.evidence": [
     {"description": "d", "link": OTRO_SP, "source": "url", "tags": []}]})
 msg = [f.comment for f in run_metadata_rules(r)
        if f.criterion_id == "generic.evidence.blocked_domain"][0]
-check("el mensaje ya no dice 'usa el repositorio' a quien lo está usando",
+check("the message no longer tells a repository user to use the repository",
       "personal file-sharing" in msg and "(item" not in msg, msg[:70])
 
-print(f"\n{'='*60}\n{len(PASSED)} pasaron, {len(FAILED)} fallaron")
+print(f"\n{'='*60}\n{len(PASSED)} passed, {len(FAILED)} failed")
 if FAILED:
-    for f in FAILED: print("  FALLÓ:", f)
+    for f in FAILED: print("  FAILED:", f)
     sys.exit(1)

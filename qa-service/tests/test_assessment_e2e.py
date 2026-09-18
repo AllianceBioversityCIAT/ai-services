@@ -80,15 +80,15 @@ def run(req, llm=None, scrape=None):
     return asyncio.run(orch.assess_result(req))
 
 
-print("\n--- Camino feliz ---")
+print("\n--- Happy path ---")
 r = run(payload())
-check("todo pasa -> green", r.overall.verdict.value == "green", r.overall.verdict.value)
-check("status completed", r.status.value == "completed", r.status.value)
-check("score 100", r.overall.score == 100, str(r.overall.score))
-check("las 5 secciones vienen", len(r.sections.model_dump()) == 5)
-check("evidencia [0] con veredicto", r.evidence[0].verdict.value == "green")
+check("everything passes -> green", r.overall.verdict.value == "green", r.overall.verdict.value)
+check("status is completed", r.status.value == "completed", r.status.value)
+check("score is 100", r.overall.score == 100, str(r.overall.score))
+check("all five sections are returned", len(r.sections.model_dump()) == 5)
+check("evidence item 0 carries a verdict", r.evidence[0].verdict.value == "green")
 
-print("\n--- Un flag core -> rojo ---")
+print("\n--- One core flag -> red ---")
 async def flag_core(system, user, tool, **kw):
     ids = tool["input_schema"]["properties"]["findings"]["items"]["properties"]["criterion_id"]["enum"]
     out = {"findings": [{"criterion_id": i,
@@ -98,42 +98,42 @@ async def flag_core(system, user, tool, **kw):
         out["evidence"] = [{"index": 0, "verdict": "amber", "reason": "partially related"}]
     return out
 r = run(payload(), llm=flag_core)
-check("IRL flaggeado -> overall red", r.overall.verdict.value == "red", r.overall.verdict.value)
-# El criterio es sobre el campo IRL, así que pinta Type-Specific -- aunque para
-# juzgarlo haya que leer la evidencia. La sección la define el campo, no el input.
-check("sección type_specific en red", r.sections.type_specific.verdict.value == "red",
+check("IRL flagged -> overall red", r.overall.verdict.value == "red", r.overall.verdict.value)
+# The criterion is about the IRL field, so it colours Type-Specific -- even though
+# judging it means reading the evidence. The section follows the field, not the input.
+check("type_specific section is red", r.sections.type_specific.verdict.value == "red",
       r.sections.type_specific.verdict.value)
-check("score en banda roja (0-49)", 0 <= r.overall.score <= 49, str(r.overall.score))
-check("el issue llega al usuario", bool(r.sections.type_specific.issues))
+check("score lands in the red band (0-49)", 0 <= r.overall.score <= 49, str(r.overall.score))
+check("the issue reaches the user", bool(r.sections.type_specific.issues))
 
-print("\n--- Degradación ---")
+print("\n--- Degradation ---")
 r = run(payload(), llm=stub_llm(fail_on=("report_evidence_assessment",)))
-check("falla la llamada de evidencia -> partial", r.status.value == "partial", r.status.value)
-check("degraded_reason explica qué falló", "evidence" in (r.degraded_reason or ""))
-check("no revienta: sigue habiendo veredicto", r.overall.verdict is not None)
+check("the evidence call fails -> partial", r.status.value == "partial", r.status.value)
+check("degraded_reason says what failed", "evidence" in (r.degraded_reason or ""))
+check("does not blow up: a verdict is still produced", r.overall.verdict is not None)
 
-# Si el modelo no corrió en absoluto, no hay veredicto que dar: es un error.
+# If the model never ran at all there is no verdict to give: that is an error.
 import app.llm.assessment as _orch_mod
 try:
     run(payload(), llm=stub_llm(fail_on=("report_evidence_assessment", "report_metadata_assessment")))
-    check("fallan ambas -> lanza AssessmentUnavailable", False, "no lanzó")
+    check("both calls fail -> raises AssessmentUnavailable", False, "did not raise")
 except _orch_mod.AssessmentUnavailable as e:
-    check("fallan ambas -> lanza AssessmentUnavailable", True)
-    check("el error dice qué falló", "metadata" in str(e) and "evidence" in str(e), str(e))
+    check("both calls fail -> raises AssessmentUnavailable", True)
+    check("the error names what failed", "metadata" in str(e) and "evidence" in str(e), str(e))
 
 r = run(payload(), scrape=stub_scrape(status="timeout"))
-check("scraping con timeout -> partial", r.status.value == "partial", r.status.value)
-check("evidencia queda gris", r.evidence[0].verdict.value == "grey", r.evidence[0].verdict.value)
+check("scraping timeout -> partial", r.status.value == "partial", r.status.value)
+check("the evidence item is grey", r.evidence[0].verdict.value == "grey", r.evidence[0].verdict.value)
 
-print("\n--- Evidencia privada ---")
+print("\n--- Private evidence ---")
 r = run(payload(**{"sections.evidence": [
     {"description": "Internal", "link": None, "source": "prms_repository",
      "visibility": "private", "tags": []}]}))
-check("privada -> grey", r.evidence[0].verdict.value == "grey")
-check("razón explícita", "not evaluated" in r.evidence[0].reason.lower(), r.evidence[0].reason)
-check("no penaliza el global", r.overall.verdict.value == "green", r.overall.verdict.value)
+check("private -> grey", r.evidence[0].verdict.value == "grey")
+check("the reason says so explicitly", "not evaluated" in r.evidence[0].reason.lower(), r.evidence[0].reason)
+check("it does not penalise the overall verdict", r.overall.verdict.value == "green", r.overall.verdict.value)
 
-print("\n--- Evidencia adjunta que no se pudo leer ---")
+print("\n--- Attached evidence that could not be read ---")
 
 def six_evidence(**over):
     ev = [{"description": f"e{i}", "link": f"https://hdl.handle.net/10568/{i}",
@@ -149,26 +149,26 @@ async def read_none(request, budget):
     return items, by
 
 r = run(six_evidence(), scrape=read_none)
-check("6 adjuntas, 0 leídas -> sección Evidence en gris",
+check("6 attached, 0 read -> Evidence section is grey",
       r.sections.evidence.verdict.value == "grey", r.sections.evidence.verdict.value)
-check("el comentario lo dice claro",
+check("the comment says so plainly",
       "None of the attached evidence could be read" in r.sections.evidence.comments,
       r.sections.evidence.comments)
-check("el gris de sección no arrastra el global",
+check("a grey section does not drag the overall verdict",
       r.overall.verdict.value == "green", r.overall.verdict.value)
 
 blocked = six_evidence()
 blocked.sections.evidence[0].link = "https://cgiar.sharepoint.com/:b:/s/x/doc.pdf"
-blocked.sections.evidence[0].visibility = None   # URL pegada, no del repositorio
+blocked.sections.evidence[0].visibility = None   # a pasted URL, not from the repository
 r = run(blocked, scrape=read_none)
-check("un flag real gana sobre el gris (dominio bloqueado -> rojo)",
+check("a real flag wins over grey (blocked domain -> red)",
       r.sections.evidence.verdict.value == "red", r.sections.evidence.verdict.value)
 
 r = run(six_evidence(), scrape=stub_scrape())
-check("si se leen, vuelve a verde", r.sections.evidence.verdict.value == "green",
+check("once they are read, it goes back to green", r.sections.evidence.verdict.value == "green",
       r.sections.evidence.verdict.value)
 
-print("\n--- El modelo omite un criterio ---")
+print("\n--- The model omits a criterion ---")
 async def omits(system, user, tool, **kw):
     ids = tool["input_schema"]["properties"]["findings"]["items"]["properties"]["criterion_id"]["enum"]
     out = {"findings": [{"criterion_id": i, "outcome": "passed", "comment": "ok"} for i in ids[1:]]}
@@ -176,10 +176,10 @@ async def omits(system, user, tool, **kw):
         out["evidence"] = [{"index": 0, "verdict": "green", "reason": "ok"}]
     return out
 r = run(payload(), llm=omits)
-check("criterio omitido no cuenta como aprobado en silencio",
+check("an omitted criterion is not silently counted as passed",
       r.overall.verdict.value == "green" and r.status.value == "completed")
 
-print("\n--- fields: qué inputs debe revisar el usuario ---")
+print("\n--- fields: which inputs the user must revisit ---")
 
 def flagging(*criterion_ids):
     async def fake(system, user, tool, **kw):
@@ -194,34 +194,34 @@ def flagging(*criterion_ids):
     return fake
 
 r = run(payload(), llm=flagging("generic.title.quality"))
-check("un flag en el título -> fields: ['title']",
+check("a flag on the title -> fields: ['title']",
       r.sections.general_information.fields == ["title"],
       str(r.sections.general_information.fields))
 
 r = run(payload(), llm=flagging("generic.title.quality",
                                 "generic.description.cgiar_contribution"))
-check("dos criterios distintos -> los dos campos, sin repetir",
+check("two different criteria -> both fields, no repeats",
       r.sections.general_information.fields == ["title", "description"],
       str(r.sections.general_information.fields))
 
 r = run(payload(), llm=flagging("generic.title.quality", "generic.description.quality",
                                 "generic.description.cgiar_contribution"))
-check("dos criterios del MISMO campo -> no lo duplica",
+check("two criteria on the SAME field -> not duplicated",
       r.sections.general_information.fields == ["title", "description"],
       str(r.sections.general_information.fields))
 
 r = run(payload(), llm=flagging("generic.geographic_focus.consistency"))
-check("un criterio que abarca varios inputs los devuelve todos",
+check("a criterion spanning several inputs returns them all",
       r.sections.geographic_location.fields == ["scope", "regions", "countries", "sub_national"],
       str(r.sections.geographic_location.fields))
 
 r = run(payload(), llm=flagging("innovdev.irl.supported"))
-check("type_specific usa la etiqueta visible, no la llave interna",
+check("type_specific uses the visible label, not an internal key",
       r.sections.type_specific.fields == ["Readiness level"],
       str(r.sections.type_specific.fields))
 
 r = run(payload())
-check("sección verde -> fields vacío",
+check("green section -> fields is empty",
       r.sections.general_information.fields == []
       and r.sections.type_specific.fields == [],
       str(r.sections.general_information.fields))
@@ -229,18 +229,48 @@ check("sección verde -> fields vacío",
 r = run(payload(**{"result.type": "Other Output",
                    "sections.type_specific": {"fields": {}}}),
         llm=flagging("otheroutput.result_type_check"))
-check("Result type check apunta a title y description en General Information",
+check("Result type check points at title and description in General Information",
       r.sections.general_information.fields == ["title", "description"],
       str(r.sections.general_information.fields))
 
-# Todo campo MDS del catálogo debe tener nombre de Reporting, o fields saldría
-# vacío para ese criterio sin que nadie se entere.
+# Every MDS field in the catalog needs a Reporting field name, or `fields` would
+# come back empty for that criterion without anyone noticing.
 from app.utils.assessment.criteria_catalog import CATALOG
 from app.utils.assessment.payload_binding import reporting_fields
-sin_nombre = sorted({c.mds_field for c in CATALOG if not reporting_fields(c.mds_field)})
-check("ningún campo MDS se queda sin nombre de Reporting", not sin_nombre, str(sin_nombre))
+unmapped = sorted({c.mds_field for c in CATALOG if not reporting_fields(c.mds_field)})
+check("no MDS field is left without a Reporting field name", not unmapped, str(unmapped))
 
-print("\n--- Tipos sin sección Type-Specific ---")
+print("\n--- Per-section score ---")
+
+BANDS = {"green": (100, 100), "amber": (50, 99), "red": (0, 49)}
+
+r = run(payload(), llm=flagging("generic.title.quality"))
+for name, sec in r.sections.model_dump().items():
+    if sec is None:
+        continue
+    if sec["verdict"] == "grey":
+        check(f"{name} is grey -> score is None", sec["score"] is None, str(sec["score"]))
+        continue
+    lo, hi = BANDS[sec["verdict"]]
+    check(f"{name}: score sits inside the {sec['verdict']} band",
+          sec["score"] is not None and lo <= sec["score"] <= hi,
+          f"{sec['verdict']} -> {sec['score']}")
+
+check("no coloured section returns a null score",
+      all(s["score"] is not None for s in r.sections.model_dump().values()
+          if s and s["verdict"] != "grey"))
+
+r_verde = run(payload())
+r_rojo = run(payload(), llm=flagging("innovdev.irl.supported"))
+check("fixing a criterion raises its section score",
+      r_verde.sections.type_specific.score > r_rojo.sections.type_specific.score,
+      f"{r_rojo.sections.type_specific.score} -> {r_verde.sections.type_specific.score}")
+
+r = run(six_evidence(), scrape=read_none)
+check("grey Evidence -> score is None", r.sections.evidence.score is None,
+      str(r.sections.evidence.score))
+
+print("\n--- Result types with no Type-Specific section ---")
 
 def other_output(**over):
     return payload(**{"result.type": "Other Output",
@@ -256,23 +286,23 @@ async def flag_type_check(system, user, tool, **kw):
     return out
 
 r = run(other_output(), llm=flag_type_check)
-check("Other Output no devuelve type_specific",
+check("Other Output does not return type_specific",
       r.sections.type_specific is None, str(r.sections.type_specific))
-check("el JSON tampoco lo incluye",
+check("the JSON does not include it either",
       "type_specific" not in r.sections.model_dump(), str(list(r.sections.model_dump())))
-check("el flag aparece en General Information, donde el usuario puede actuar",
+check("the flag lands in General Information, where the user can act",
       r.sections.general_information.verdict.value == "red"
       and any("Capacity Sharing" in i for i in r.sections.general_information.issues),
       r.sections.general_information.verdict.value)
-check("sigue arrastrando el global a rojo (el criterio es core)",
+check("it still drags the overall verdict to red (the criterion is core)",
       r.overall.verdict.value == "red", r.overall.verdict.value)
 
 r = run(payload())
-check("los tipos que sí la tienen la siguen devolviendo",
+check("types that do have the section still return it",
       r.sections.type_specific is not None
       and "type_specific" in r.sections.model_dump())
 
-print("\n--- Tracking de interacción ---")
+print("\n--- Interaction tracking ---")
 import app.llm.assessment as _am
 from app.utils.interactions import interaction_client as _ic
 
@@ -283,36 +313,36 @@ def fake_track(**kw):
 _am.interaction_client.track_interaction = fake_track
 
 r = run(payload())
-check("sin user_id no se trackea", not tracked and r.interaction_id is None,
+check("no user_id -> nothing is tracked", not tracked and r.interaction_id is None,
       f"tracked={len(tracked)} id={r.interaction_id}")
 
 tracked.clear()
 p_with_user = payload()
 p_with_user.user_id = "user123"
 r = run(p_with_user)
-check("con user_id sí se trackea", len(tracked) == 1, str(len(tracked)))
-check("el interaction_id vuelve en la respuesta", r.interaction_id == "int-abc123",
+check("with a user_id -> the interaction is tracked", len(tracked) == 1, str(len(tracked)))
+check("the interaction_id comes back in the response", r.interaction_id == "int-abc123",
       str(r.interaction_id))
 if tracked:
     kw = tracked[0]
-    check("manda user_id y plataforma",
+    check("it sends the user_id and the platform",
           kw["user_id"] == "user123" and kw["platform"] == "PRMS", str(kw.get("platform")))
     ctx = kw["context"]
-    check("el contexto lleva veredicto, cobertura y evidencias",
+    check("the context carries verdict, coverage and evidence counts",
           ctx["verdict"] == "green"
           and {"criteria_total", "criteria_evaluated", "evidence_total",
                "evidence_read", "model_used", "criteria_version"} <= set(ctx),
           str(sorted(ctx))[:150])
-    check("registra el tiempo de respuesta", kw["response_time_seconds"] >= 0,
+    check("it records the response time", kw["response_time_seconds"] >= 0,
           str(kw.get("response_time_seconds")))
 
-# El tracking nunca puede tumbar la evaluación.
+# Tracking must never take the assessment down with it.
 tracked.clear()
 def boom_track(**kw):
     raise RuntimeError("interaction service down")
 _am.interaction_client.track_interaction = boom_track
 r = run(p_with_user)
-check("si el tracking falla, el veredicto sale igual",
+check("a failing tracker leaves the verdict intact",
       r.overall.verdict.value == "green" and r.interaction_id is None,
       f"{r.overall.verdict.value} {r.interaction_id}")
 
@@ -323,8 +353,8 @@ def slow_track(**kw):
 _am.interaction_client.track_interaction = slow_track
 _am.TRACKING_TIMEOUT_S = 1.0
 
-# El tiempo se mide DENTRO de la corrutina: asyncio.run() espera al cierre del
-# executor al salir, cosa que uvicorn no hace entre peticiones.
+# Timed INSIDE the coroutine: asyncio.run() waits for the executor to shut down on
+# the way out, which uvicorn does not do between requests.
 async def _timed():
     _t0 = _t2.monotonic()
     resp = await _am.assess_result(p_with_user)
@@ -332,13 +362,13 @@ async def _timed():
 
 _am.invoke_with_tool = stub_llm(); _am._scrape_evidence = stub_scrape()
 _el, r = asyncio.run(_timed())
-check(f"un tracking colgado no retrasa la evaluación (tardó {_el:.1f}s)",
+check(f"a hanging tracker does not delay the assessment (took {_el:.1f}s)",
       _el < 5 and r.overall.verdict.value == "green" and r.interaction_id is None,
       f"{_el:.1f}s id={r.interaction_id}")
 _am.interaction_client.track_interaction = fake_track
 _am.TRACKING_TIMEOUT_S = 8.0
 
-print("\n--- Endpoint HTTP ---")
+print("\n--- HTTP endpoint ---")
 from fastapi.testclient import TestClient
 from app.api.main import app
 import app.api.routes as routes
@@ -355,14 +385,14 @@ orch.invoke_with_tool = stub_llm(); orch._scrape_evidence = stub_scrape()
 client = TestClient(app)
 
 # Sin clave, CLARISA rechaza: eso es correcto y se verifica primero.
-check("401 sin X-API-Key válida",
+check("401 without a valid X-API-Key",
       client.post("/prms/quality-assessment", json=payload().model_dump(mode="json")).status_code == 401)
 app.dependency_overrides[quality_assessment_auth] = lambda: "PRMS"
 
 body = payload().model_dump(mode="json")
 resp = client.post("/prms/quality-assessment", json=body)
-check("200 en payload válido", resp.status_code == 200, str(resp.status_code))
-check("llaves del contrato",
+check("200 on a valid payload", resp.status_code == 200, str(resp.status_code))
+check("contract keys",
       set(resp.json()) == {"request_id", "criteria_version", "overall", "sections",
                            "evidence", "status", "degraded_reason", "coverage",
                            "interaction_id"},
@@ -371,19 +401,19 @@ check("llaves del contrato",
 bad = payload().model_dump(mode="json")
 bad["sections"]["type_specific"]["fields"].pop("Readiness level")
 resp = client.post("/prms/quality-assessment", json=bad)
-check("400 cuando falta una etiqueta obligatoria", resp.status_code == 400, str(resp.status_code))
+check("400 when a required label is missing", resp.status_code == 400, str(resp.status_code))
 d = resp.json()["detail"]
-check("el error dice exactamente qué falta",
+check("the error names exactly what is missing",
       d["problems"][0]["code"] == "MISSING_LABEL" and "Readiness level" in d["problems"][0]["message"],
       str(d["problems"][0]))
 
-print("\n--- Notificación de Slack ---")
+print("\n--- Slack notification ---")
 sent = _slack_sent
 
 for fail_on, expect_colour, label in [
-    ((), "#36a64f", "proceso exitoso -> notificación verde"),
+    ((), "#36a64f", "successful run -> green notification"),
     (("report_evidence_assessment",), "#36a64f",
-     "falla parcial -> sigue siendo verde, no bloquea"),
+     "partial failure -> still green, never blocks"),
 ]:
     sent.clear()
     orch.invoke_with_tool = stub_llm(fail_on=fail_on); orch._scrape_evidence = stub_scrape()
@@ -391,50 +421,50 @@ for fail_on, expect_colour, label in [
     ok = resp.status_code == 200 and len(sent) == 1 and sent[0]["color"] == expect_colour
     check(label, ok, f"{resp.status_code} {sent and sent[0]['color']}")
 
-# El modelo entero caído -> 503 y notificación roja.
+# The whole model down -> 503 and a red notification.
 sent.clear()
 orch.invoke_with_tool = stub_llm(
     fail_on=("report_evidence_assessment", "report_metadata_assessment"))
 orch._scrape_evidence = stub_scrape()
 resp = client.post("/prms/quality-assessment", json=payload().model_dump(mode="json"))
-check("modelo caído -> HTTP 503", resp.status_code == 503, str(resp.status_code))
-check("modelo caído -> notificación roja", len(sent) == 1 and sent[0]["color"] == "#ff0000", str(sent))
-check("el rojo dice que la IA no pudo revisar",
+check("model down -> HTTP 503", resp.status_code == 503, str(resp.status_code))
+check("model down -> red notification", len(sent) == 1 and sent[0]["color"] == "#ff0000", str(sent))
+check("the red one says the AI could not review the result",
       "could not review" in sent[0]["message"], sent and sent[0]["message"][:80])
-check("error_type para el frontend",
+check("error_type for the frontend",
       resp.json()["detail"]["error_type"] == "ASSESSMENT_UNAVAILABLE",
       str(resp.json()["detail"]))
 
-# Un fallo inesperado del endpoint manda rojo también.
+# An unexpected endpoint failure sends a red notification too.
 sent.clear()
 async def boom(request):
     raise RuntimeError("bedrock is down")
 _real = orch.assess_result
 routes.assess_result = boom
 resp = client.post("/prms/quality-assessment", json=payload().model_dump(mode="json"))
-check("el proceso falla -> notificación roja", len(sent) == 1 and sent[0]["color"] == "#ff0000",
+check("the run fails -> red notification", len(sent) == 1 and sent[0]["color"] == "#ff0000",
       str(sent))
-check("el rojo lleva el error", "RuntimeError" in sent[0]["message"], sent and sent[0]["message"])
-check("el rojo devuelve 500", resp.status_code == 500, str(resp.status_code))
+check("the red one carries the error", "RuntimeError" in sent[0]["message"], sent and sent[0]["message"])
+check("the red one returns 500", resp.status_code == 500, str(resp.status_code))
 routes.assess_result = _real
 
 sent.clear()
 orch.invoke_with_tool = stub_llm(); orch._scrape_evidence = stub_scrape()
 client.post("/prms/quality-assessment", json=payload().model_dump(mode="json"))
 msg = sent[0]["message"]
-check("el verde lleva veredicto, tipo y conteo de evidencias",
+check("the green one carries verdict, result type and evidence counts",
       "GREEN" in msg and "Innovation development" in msg and "total" in msg, msg)
-check("reporta el tiempo real", "Processing time" in sent[0]["time_taken"])
+check("it reports the real elapsed time", "Processing time" in sent[0]["time_taken"])
 
-# La protección contra un webhook colgado vive en NotificationService, no en el
-# endpoint: aiohttp usa 300s por defecto, más que el timeout del propio cliente.
+# The guard against a hung webhook lives in NotificationService, not in the
+# endpoint: aiohttp defaults to 300s, longer than the caller's own timeout.
 from app.utils.notification import notification_service as _ns
-check("el servicio de notificaciones acota el tiempo del webhook",
+check("the notification service bounds the webhook timeout",
       getattr(_ns, "SLACK_TIMEOUT_SECONDS", None) is not None
       and _ns.SLACK_TIMEOUT_SECONDS <= 10,
       str(getattr(_ns, "SLACK_TIMEOUT_SECONDS", None)))
 
-# Prueba real: webhook muerto, con el servicio de notificaciones de verdad.
+# Real check: a dead webhook, with the actual notification service.
 import os as _os, time as _time
 from app.utils.notification.notification_service import NotificationService
 _os.environ["SLACK_WEBHOOK_URL"] = "https://10.255.255.1/hooks/never-answers"
@@ -442,11 +472,11 @@ routes.notification_service = NotificationService()
 _t0 = _time.monotonic()
 resp = client.post("/prms/quality-assessment", json=payload().model_dump(mode="json"))
 _took = _time.monotonic() - _t0
-check("webhook muerto: la respuesta sigue siendo 200", resp.status_code == 200, str(resp.status_code))
-check(f"webhook muerto: no cuelga la petición (tardó {_took:.1f}s)", _took < 10, f"{_took:.1f}s")
+check("dead webhook: the response is still 200", resp.status_code == 200, str(resp.status_code))
+check(f"dead webhook: the request does not hang (took {_took:.1f}s)", _took < 10, f"{_took:.1f}s")
 routes.notification_service.send_slack_notification = _capture_slack
 
-print(f"\n{'='*64}\n{len(PASSED)} pasaron, {len(FAILED)} fallaron")
+print(f"\n{'='*64}\n{len(PASSED)} passed, {len(FAILED)} failed")
 if FAILED:
-    for f in FAILED: print("  FALLÓ:", f)
+    for f in FAILED: print("  FAILED:", f)
     sys.exit(1)

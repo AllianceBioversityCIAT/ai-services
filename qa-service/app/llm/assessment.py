@@ -313,7 +313,9 @@ def _section_payload(section_result, force_grey: bool = False) -> SectionVerdict
         )
     return SectionVerdict(
         verdict=verdict,
-        score=None,
+        score=None if force_grey else compute_score(
+            section_result.findings, section_result.verdict
+        ),
         comments=comments,
         strengths=[] if issues else strengths,
         issues=issues,
