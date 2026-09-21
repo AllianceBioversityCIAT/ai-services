@@ -2,7 +2,7 @@
 
 from enum import Enum
 from pydantic import BaseModel, Field, model_serializer
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 
 
 """Pydantic models for PRMS QA API."""
@@ -108,7 +108,7 @@ class TheoryOfChange(BaseModel):
     level: Optional[str] = None
     result: Optional[str] = None
     indicator: Optional[str] = None
-    contribution: Optional[str] = None
+    contribution: Optional[Union[int, float, str]] = None
     why_reported: Optional[str] = None
 
 
