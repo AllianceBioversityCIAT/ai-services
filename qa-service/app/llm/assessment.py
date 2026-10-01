@@ -32,6 +32,7 @@ from app.utils.assessment.payload_binding import reporting_fields
 from app.llm.bedrock_tools import invoke_with_tool, MODEL_ID
 from app.web_scraping.evidence_scraper import EvidenceEnhancer
 from app.utils.assessment.scoring import score as compute_score
+from app.utils.assessment.suggestions import validate as validate_suggestions
 from app.utils.interactions.interaction_client import interaction_client
 from app.utils.prompt.assessment.tool_schemas import metadata_tool, evidence_tool
 from app.utils.assessment.rules_engine import run_metadata_rules, run_evidence_rules
@@ -42,7 +43,7 @@ from app.utils.assessment.aggregation import Finding, Outcome, Verdict, aggregat
 from app.api.models import (
     QualityAssessmentRequest, QualityAssessmentResponse, OverallVerdict,
     SectionVerdict, SectionVerdicts, EvidenceVerdict, Verdict as ApiVerdict,
-    CheckStatus, Coverage,
+    CheckStatus, Coverage, Suggestions,
 )
 
 
@@ -174,21 +175,34 @@ def _unevaluated(criteria, reason: str) -> List[Finding]:
     return [Finding(c.id, Outcome.NOT_EVALUATED, comment=reason) for c in criteria]
 
 
-async def _metadata_call(request, budget: Budget) -> Tuple[List[Finding], Optional[str]]:
+async def _metadata_call(request, budget: Budget, code_findings: List[Finding]):
+    """Returns (findings, raw suggestions, error)."""
     criteria = applicable(request, check=Check.LLM, needs=Needs.METADATA)
     if not criteria:
-        return [], None
-    parts = build_metadata_prompt(request, criteria)
+        return [], None, None
+
+    # The deterministic rules have already run. Their General Information flags
+    # are settled, but a replacement the model writes has to satisfy them too.
+    known = [
+        f.comment for f in code_findings
+        if f.is_flag and f.section == Section.GENERAL_INFORMATION and f.comment
+    ]
+    parts = build_metadata_prompt(request, criteria, known_issues=known)
     try:
         result = await invoke_with_tool(
             parts.system, parts.user, metadata_tool(criteria),
             call_name="metadata", timeout=budget.slice(LLM_BUDGET_SHARE),
         )
-        return _to_findings(result.get("findings", []), criteria), None
+        return (
+            _to_findings(result.get("findings", []), criteria),
+            result.get("suggestions"),
+            None,
+        )
     except Exception as e:
         logger.error(f"❌ Metadata assessment unavailable: {e}")
         return (
             _unevaluated(criteria, "This part of the check could not be completed."),
+            None,
             f"metadata assessment unavailable: {type(e).__name__}",
         )
 
@@ -270,7 +284,8 @@ _OVERALL_SUMMARY = {
 MAX_STRENGTHS_PER_SECTION = 3
 
 
-def _section_payload(section_result, force_grey: bool = False) -> SectionVerdict:
+def _section_payload(section_result, force_grey: bool = False,
+                     suggestions: Optional[Suggestions] = None) -> SectionVerdict:
     verdict = ApiVerdict.GREY if force_grey else _TO_API[section_result.verdict]
     issues = [f.comment for f in section_result.findings if f.is_flag and f.comment]
     strengths = [
@@ -320,6 +335,7 @@ def _section_payload(section_result, force_grey: bool = False) -> SectionVerdict
         strengths=[] if issues else strengths,
         issues=issues,
         fields=flagged_fields,
+        suggestions=suggestions,
     )
 
 
@@ -456,9 +472,9 @@ async def assess_result(request: QualityAssessmentRequest) -> QualityAssessmentR
     code_findings = run_metadata_rules(request)
 
     # Scraping and the metadata call have no dependency on each other.
-    (scraped, by_index), (meta_findings, meta_error) = await asyncio.gather(
+    (scraped, by_index), (meta_findings, raw_suggestions, meta_error) = await asyncio.gather(
         _scrape_evidence(request, budget),
-        _metadata_call(request, budget),
+        _metadata_call(request, budget, code_findings),
     )
 
     ev_findings, ev_verdicts, ev_error = await _evidence_call(request, scraped, budget)
@@ -477,6 +493,24 @@ async def assess_result(request: QualityAssessmentRequest) -> QualityAssessmentR
     submitted = len(request.sections.evidence)
     read = sum(1 for v in by_index.values() if v.get("status") == "ok")
 
+    # A replacement is only offered where the user has something to fix. On a
+    # green or grey General Information it is dropped: there is nothing to apply.
+    gi = next((s for s in result.sections
+               if s.section == Section.GENERAL_INFORMATION), None)
+    suggestions = None
+    if gi is not None and _TO_API[gi.verdict] in (ApiVerdict.AMBER, ApiVerdict.RED):
+        usable = validate_suggestions(
+            raw_suggestions,
+            request.sections.general_information.title,
+            request.sections.general_information.description,
+        )
+        if usable:
+            suggestions = Suggestions(**usable)
+            offered = [k for k, v in usable.items() if v]
+            logger.info(f"💡 Suggested replacement for: {', '.join(offered)}")
+        elif raw_suggestions:
+            logger.info("💡 Suggestion discarded: did not pass validation")
+
     sections = {}
     for s in result.sections:
         blind = (
@@ -485,7 +519,10 @@ async def assess_result(request: QualityAssessmentRequest) -> QualityAssessmentR
             and read == 0
             and not s.flags
         )
-        sections[s.section.value] = _section_payload(s, force_grey=blind)
+        sections[s.section.value] = _section_payload(
+            s, force_grey=blind,
+            suggestions=suggestions if s.section == Section.GENERAL_INFORMATION else None,
+        )
 
     errors = [e for e in (meta_error, ev_error) if e]
     if len(errors) == 2:

@@ -87,8 +87,40 @@ def _result_context(request) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
-def build_metadata_prompt(request, criteria: List[Criterion]) -> PromptParts:
-    """Call B: everything answerable without reading the evidence documents."""
+SUGGESTION_GUIDANCE = """\
+## Replacement title and description
+
+When you flag something about the title or the description, also write a
+replacement the user can apply with one click.
+
+- Write the finished text, not advice about it. "Name the crop and the country"
+  is a comment; the suggestion is the rewritten title itself.
+- Use ONLY what is in the result above. Do not invent a figure, a place, a
+  partner, a date or an outcome that is not already there. The user may apply
+  your text without checking it, so anything you add becomes a false claim in
+  their report.
+- Where the metadata is too thin to write a good replacement, leave that field
+  null rather than padding it with invention. A missing suggestion is fine; a
+  fabricated one is not.
+- Address what you flagged. If the finding is that the title names the activity
+  instead of the result, the replacement must name the result.
+- Keep the author's meaning. You are rewriting their result, not reporting a
+  different one.
+- Plain text only: one line for the title, 30 words or fewer; 300 words or fewer
+  for the description, paragraphs separated by a newline. No markdown, no HTML,
+  no surrounding quotes.
+"""
+
+
+def build_metadata_prompt(request, criteria: List[Criterion],
+                          known_issues: Optional[List[str]] = None) -> PromptParts:
+    """Call B: everything answerable without reading the evidence documents.
+
+    `known_issues` carries the General Information findings the deterministic
+    rules already raised - word counts, future tense. The model does not assess
+    those, but a replacement it writes has to satisfy them too, so it needs to
+    see them.
+    """
     labels_note = ""
     no_criteria = vocab.LABELS_WITHOUT_CRITERIA.get((request.result.type or "").lower(), ())
     if no_criteria:
@@ -100,7 +132,17 @@ def build_metadata_prompt(request, criteria: List[Criterion]) -> PromptParts:
     system = f"""{SHARED_ROLE}
 ## Criteria to assess
 
-{render_criteria(criteria)}"""
+{render_criteria(criteria)}
+{SUGGESTION_GUIDANCE}"""
+
+    already = ""
+    if known_issues:
+        already = (
+            "\n## Already found by the automated checks\n\n"
+            "You are not asked to judge these - they are settled. Any replacement "
+            "you write must satisfy them as well:\n"
+            + "".join(f"- {i}\n" for i in known_issues)
+        )
 
     user = f"""## The result
 
@@ -109,11 +151,12 @@ This is what the user reported. Treat it as the factual record.
 ```json
 {_result_context(request)}
 ```
-
+{already}
 ## Your task
 
 Call `report_metadata_assessment` with exactly one finding per criterion you were \
-given ({len(criteria)} findings), in the same order.
+given ({len(criteria)} findings), in the same order, plus a replacement title or \
+description if either needs one.
 """
     return PromptParts(system=system, user=user)
 

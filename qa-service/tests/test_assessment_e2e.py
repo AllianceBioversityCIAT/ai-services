@@ -240,6 +240,77 @@ from app.utils.assessment.payload_binding import reporting_fields
 unmapped = sorted({c.mds_field for c in CATALOG if not reporting_fields(c.mds_field)})
 check("no MDS field is left without a Reporting field name", not unmapped, str(unmapped))
 
+print("\n--- Suggestions on General Information ---")
+
+SUGGESTED_TITLE = "Drought-tolerant rice variety released for smallholder farmers in Ivory Coast"
+
+def llm_with_suggestions(sug, flag_ids=("generic.title.quality",)):
+    async def fake(system, user, tool, **kw):
+        ids = tool["input_schema"]["properties"]["findings"]["items"]["properties"]["criterion_id"]["enum"]
+        out = {"findings": [{"criterion_id": i,
+                             "outcome": "flagged" if i in flag_ids else "passed",
+                             "comment": "needs work" if i in flag_ids else "fine"}
+                            for i in ids]}
+        if tool["name"] == "report_metadata_assessment" and sug is not None:
+            out["suggestions"] = sug
+        if tool["name"] == "report_evidence_assessment":
+            out["evidence"] = [{"index": 0, "verdict": "green", "reason": "ok"}]
+        return out
+    return fake
+
+r = run(payload(), llm=llm_with_suggestions({"title": SUGGESTED_TITLE, "description": None}))
+gi = r.sections.general_information
+check("an amber section carries the suggestion",
+      gi.suggestions is not None and gi.suggestions.title == SUGGESTED_TITLE,
+      str(gi.suggestions))
+check("it rides inside general_information, not at the root",
+      "suggestions" in r.sections.model_dump()["general_information"]
+      and "suggestions" not in r.model_dump())
+check("other sections carry none",
+      all(s["suggestions"] is None for k, s in r.sections.model_dump().items()
+          if s and k != "general_information"))
+
+# Green General Information: nothing to apply, so nothing is offered.
+r = run(payload(), llm=llm_with_suggestions({"title": SUGGESTED_TITLE, "description": None},
+                                            flag_ids=()))
+check("a green section drops the suggestion",
+      r.sections.general_information.verdict.value == "green"
+      and r.sections.general_information.suggestions is None,
+      str(r.sections.general_information.suggestions))
+
+# Each way a suggestion can be unusable, dropped on its own.
+for sug, label in [
+    ({"title": " ".join(["word"] * 34), "description": None}, "over 30 words"),
+    ({"title": "**Bold** replacement title for the result", "description": None}, "markdown"),
+    ({"title": "", "description": None}, "empty"),
+    ({"title": 123, "description": None}, "not a string"),
+    ({"title": payload().sections.general_information.title, "description": None},
+     "identical to the submitted title"),
+    (None, "omitted by the model"),
+]:
+    r = run(payload(), llm=llm_with_suggestions(sug))
+    check(f"discarded: {label}", r.sections.general_information.suggestions is None,
+          str(r.sections.general_information.suggestions))
+    check(f"  and the verdict survives it: {label}",
+          r.sections.general_information.verdict.value == "amber",
+          r.sections.general_information.verdict.value)
+
+# A title that fails does not take a good description down with it.
+r = run(payload(), llm=llm_with_suggestions(
+    {"title": " ".join(["word"] * 34), "description": " ".join(["word"] * 80)}))
+gi = r.sections.general_information
+check("a bad title does not discard a good description",
+      gi.suggestions is not None and gi.suggestions.title is None
+      and gi.suggestions.description is not None,
+      str(gi.suggestions))
+
+# Wrapping quotes are stripped rather than rejected.
+r = run(payload(), llm=llm_with_suggestions(
+    {"title": f'"{SUGGESTED_TITLE}"', "description": None}))
+check("wrapping quotes are stripped",
+      r.sections.general_information.suggestions.title == SUGGESTED_TITLE,
+      str(r.sections.general_information.suggestions.title))
+
 print("\n--- Per-section score ---")
 
 BANDS = {"green": (100, 100), "amber": (50, 99), "red": (0, 49)}

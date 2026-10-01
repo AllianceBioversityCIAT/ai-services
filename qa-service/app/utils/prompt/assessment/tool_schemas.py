@@ -48,10 +48,43 @@ def _finding_item(criteria: List[Criterion]) -> dict:
 def metadata_tool(criteria: List[Criterion]) -> dict:
     return {
         "name": "report_metadata_assessment",
-        "description": "Report one finding for every criterion you were given. No more, no fewer.",
+        "description": (
+            "Report one finding for every criterion you were given, and a "
+            "replacement title or description when either is weak."
+        ),
         "input_schema": {
             "type": "object",
-            "properties": {"findings": {"type": "array", "items": _finding_item(criteria)}},
+            "properties": {
+                "findings": {"type": "array", "items": _finding_item(criteria)},
+                "suggestions": {
+                    "type": "object",
+                    "description": (
+                        "Replacement text the user can apply with one click. Fill a "
+                        "field only when you flagged something about it; leave the "
+                        "other null. Omit the object entirely when nothing about the "
+                        "title or the description needs changing."
+                    ),
+                    "properties": {
+                        "title": {
+                            "type": ["string", "null"],
+                            "description": (
+                                "A complete replacement title, not an instruction and "
+                                "not a fragment. Plain text, one line, 30 words or "
+                                "fewer, no markdown, no HTML, no surrounding quotes."
+                            ),
+                        },
+                        "description": {
+                            "type": ["string", "null"],
+                            "description": (
+                                "A complete replacement description. Plain text, 300 "
+                                "words or fewer, paragraphs separated by a newline, no "
+                                "markdown and no HTML."
+                            ),
+                        },
+                    },
+                    "additionalProperties": False,
+                },
+            },
             "required": ["findings"],
             "additionalProperties": False,
         },
