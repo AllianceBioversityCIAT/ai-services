@@ -207,6 +207,24 @@ class OverallVerdict(BaseModel):
     summary: str = ""
 
 
+class Suggestions(BaseModel):
+    """Replacement text the user can apply as-is.
+
+    Only populated for General Information, and only when that section is amber
+    or red. Either field may be null: the model suggests a replacement for what
+    it actually flagged, not for both by default.
+    """
+    title: Optional[str] = Field(
+        None,
+        description="Full replacement title: plain text, one line, 30 words or fewer.",
+        examples=["Improved rice variety adopted by 12,000 smallholder farmers in Côte d'Ivoire"],
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Full replacement description: plain text, 300 words or fewer.",
+    )
+
+
 class SectionVerdict(BaseModel):
     verdict: Verdict
     score: Optional[int] = Field(None, ge=0, le=100)
@@ -220,6 +238,13 @@ class SectionVerdict(BaseModel):
             "Tool sends them. Empty when nothing was flagged."
         ),
         examples=[["title", "description"]],
+    )
+    suggestions: Optional[Suggestions] = Field(
+        None,
+        description=(
+            "Replacement title and/or description the user can apply. Only on "
+            "General Information, and only when that section is amber or red."
+        ),
     )
 
 
