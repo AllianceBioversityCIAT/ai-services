@@ -56,6 +56,15 @@ export interface ApiPartnerRequest {
   };
 }
 
+export interface SyncPartnerRequestsResponse {
+  success: boolean;
+  count: number;
+  total_requests: number;
+  /** How many of the pending requests the backend processes per run. */
+  batch_size: number;
+  pending_requests: ApiPartnerRequest[];
+}
+
 export interface ResponseMessage {
   type: 'success' | 'error';
   message: string;

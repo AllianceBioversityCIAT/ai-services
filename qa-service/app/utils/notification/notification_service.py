@@ -6,6 +6,9 @@ import aiohttp
 from typing import Dict, Any, Optional
 
 
+SLACK_TIMEOUT_SECONDS = 5
+
+
 class NotificationService:
     def __init__(self):
         """Initialize notification service"""
@@ -51,7 +54,10 @@ class NotificationService:
 
             ssl_context = ssl.create_default_context(cafile=certifi.where())
 
-            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
+            async with aiohttp.ClientSession(
+                connector=aiohttp.TCPConnector(ssl=ssl_context),
+                timeout=aiohttp.ClientTimeout(total=SLACK_TIMEOUT_SECONDS),
+            ) as session:
                 async with session.post(self.slack_webhook, json=payload) as response:
                     if response.status != 200:
                         self.logger.error(

@@ -1,6 +1,10 @@
 import type { BulkUploadResult, RawInstitution, UnmappedInstitution } from '../types';
 import {
   ASSET_IP_OWNER_NAME_TO_ID,
+  filterLeversForYear,
+  filterObjectivesForYear,
+  parseResultYear,
+  strategicObjectivesApply,
   JSON_FIELDS,
   NON_CAPDEV_FIELDS,
   NUMERIC_FIELDS,
@@ -118,6 +122,68 @@ export function formatResultForSTAR(result: BulkUploadResult): Record<string, un
         return Number(r);
       }).filter((r) => !isNaN(r as number));
     }
+  }
+
+  // Step 4.5: primary_levers → array of ids (Primary Levers 1-9 / Research Areas 10-17)
+  if (formatted.primary_levers !== undefined && formatted.primary_levers !== null) {
+    let levers: unknown[] = [];
+    if (typeof formatted.primary_levers === 'string') {
+      try {
+        const parsed = JSON.parse(formatted.primary_levers as string);
+        levers = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        levers = [];
+      }
+    } else if (Array.isArray(formatted.primary_levers)) {
+      levers = formatted.primary_levers as unknown[];
+    }
+
+    let ids = levers
+      .map((l) => (typeof l === 'object' && l !== null && 'id' in l ? Number((l as { id: unknown }).id) : Number(l)))
+      .filter((n) => Number.isInteger(n));
+    ids = Array.from(new Set(ids));
+
+    // Guard: never mix the two catalogs — keep only the ids valid for this year
+    if (parseResultYear(formatted.year) !== null) {
+      ids = filterLeversForYear(ids, formatted.year);
+    }
+
+    if (ids.length === 0) delete formatted.primary_levers;
+    else formatted.primary_levers = ids;
+  } else {
+    delete formatted.primary_levers;
+  }
+
+  // Step 4.6: strategic_objectives → array of ids (1-5, 2026 portfolio only)
+  if (formatted.strategic_objectives !== undefined && formatted.strategic_objectives !== null) {
+    let raw: unknown[] = [];
+    if (typeof formatted.strategic_objectives === 'string') {
+      try {
+        const parsed = JSON.parse(formatted.strategic_objectives as string);
+        raw = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        raw = [];
+      }
+    } else if (Array.isArray(formatted.strategic_objectives)) {
+      raw = formatted.strategic_objectives as unknown[];
+    }
+
+    let ids = raw
+      .map((o) => (typeof o === 'object' && o !== null && 'id' in o ? Number((o as { id: unknown }).id) : Number(o)))
+      .filter((n) => Number.isInteger(n));
+    ids = Array.from(new Set(ids));
+
+    // The field does not exist before 2026 — drop it rather than send stale ids
+    if (parseResultYear(formatted.year) !== null) {
+      ids = filterObjectivesForYear(ids, formatted.year);
+    } else {
+      ids = [];
+    }
+
+    if (ids.length === 0) delete formatted.strategic_objectives;
+    else formatted.strategic_objectives = ids;
+  } else {
+    delete formatted.strategic_objectives;
   }
 
   // Step 5: trainee_affiliation

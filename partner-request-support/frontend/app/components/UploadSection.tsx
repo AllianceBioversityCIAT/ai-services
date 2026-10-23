@@ -23,6 +23,7 @@ interface UploadSectionProps {
   error: string | null;
   onUpload: () => void;
   apiPartners: ApiPartnerRequest[];
+  batchSize: number;
   syncing: boolean;
   syncError: string | null;
   onSyncPartnerRequests: () => void;
@@ -38,6 +39,7 @@ export const UploadSection = ({
   error,
   onUpload,
   apiPartners,
+  batchSize,
   syncing,
   syncError,
   onSyncPartnerRequests,
@@ -49,6 +51,11 @@ export const UploadSection = ({
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearingCache, setClearingCache] = useState(false);
   const [clearCacheMessage, setClearCacheMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // The backend processes the oldest batchSize requests per run and reports that
+  // size in the sync response; a backend that does not report it processes all.
+  const batchCount = batchSize > 0 ? Math.min(batchSize, apiPartners.length) : apiPartners.length;
+  const remainingAfterBatch = apiPartners.length - batchCount;
 
   const handleClearCacheConfirm = async () => {
     setClearingCache(true);
@@ -490,9 +497,11 @@ export const UploadSection = ({
               >
                 {syncing
                   ? 'Fetching partner requests from CLARISA API...'
-                  : apiPartners.length > 0
-                  ? 'Ready to process all partner requests'
-                  : 'Click Refresh to sync with CLARISA API'}
+                  : apiPartners.length === 0
+                  ? 'Click Refresh to sync with CLARISA API'
+                  : remainingAfterBatch > 0
+                  ? `Ready to process the ${batchCount} oldest requests. The remaining ${remainingAfterBatch} stay queued for the next run.`
+                  : `Ready to process all ${apiPartners.length} pending requests.`}
               </p>
             </div>
 
@@ -558,10 +567,58 @@ export const UploadSection = ({
               ) : (
                 <>
                   <BarChart3 size={18} />
-                  Process Partner Requests
+                  {remainingAfterBatch > 0
+                    ? `Process ${batchCount} Oldest Requests`
+                    : 'Process Partner Requests'}
                 </>
               )}
             </button>
+
+            {/* Info Box */}
+            <div
+              style={{
+                marginTop: 'var(--space-md)',
+                padding: 'var(--space-md)',
+                background: '#FFF4E6',
+                borderRadius: 'var(--radius-md)',
+                borderLeft: '3px solid var(--cgiar-yellow)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'start', gap: 'var(--space-xs)' }}>
+                <Info
+                  size={16}
+                  style={{
+                    color: 'var(--cgiar-yellow)',
+                    marginTop: '2px',
+                    flexShrink: 0,
+                  }}
+                />
+                <div>
+                  <h4
+                    style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: 'var(--cgiar-navy)',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Batch Processing
+                  </h4>
+                  <p
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--color-text-secondary)',
+                      lineHeight: 1.5,
+                      margin: 0,
+                    }}
+                  >
+                    Requests are processed in batches, oldest first, to stay within the
+                    processing time limit. Accept or reject each one in CLARISA and hit
+                    Refresh: resolved requests leave the queue and the next batch moves up.
+                  </p>
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
 

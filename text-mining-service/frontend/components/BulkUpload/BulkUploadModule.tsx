@@ -11,6 +11,7 @@ import { extractUnmappedInstitutions } from './utils/dataFormatters';
 import { createUnmappedReportCSV, downloadCSV } from './utils/csvUtils';
 import { setNestedValue } from './utils/tableHelpers';
 import { checkCompleteness } from './utils/completenessChecker';
+import { filterLeversForYear, filterObjectivesForYear, getPrimaryLeverOptions, parseResultYear } from './constants';
 
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { ErrorMessage } from './components/ErrorMessage';
@@ -210,6 +211,20 @@ export default function BulkUploadModule() {
       const next = [...prev];
       const updated = { ...next[globalIdx] } as BulkUploadResult;
       setNestedValue(updated, field, value);
+      // Both catalogs are keyed by year — drop selections the new year disallows.
+      // Levers only reconcile once the new year resolves to a catalog, so that
+      // half-typed years do not wipe the selection; objectives simply stop
+      // applying before 2026, which is knowable as soon as the year parses.
+      if (field === 'year') {
+        if (Array.isArray(updated.primary_levers) && updated.primary_levers.length > 0
+            && getPrimaryLeverOptions(value).length > 0) {
+          updated.primary_levers = filterLeversForYear(updated.primary_levers, value);
+        }
+        if (Array.isArray(updated.strategic_objectives) && updated.strategic_objectives.length > 0
+            && parseResultYear(value) !== null) {
+          updated.strategic_objectives = filterObjectivesForYear(updated.strategic_objectives, value);
+        }
+      }
       next[globalIdx] = updated;
       return next;
     });
