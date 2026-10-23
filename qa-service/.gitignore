@@ -196,3 +196,7 @@ faiss/
 
 # Data logs
 data/logs/
+
+# Web scraping downloads
+data/evidence_downloads/
+*.pdf
