@@ -1454,6 +1454,30 @@
     border: 1px solid #BFDBFE;
 }
 
+/* Catalog multi-select cells (Primary Levers, Strategic Objectives) */
+.bulk-upload-container .catalog-cell .bulk-chip {
+    /* .bulk-chip has no box-sizing, so a plain max-width:100% would add padding +
+       border on top of the cell width and get clipped by the td's overflow.
+       The 2px keeps the rounded edge clear of the column border. */
+    box-sizing: border-box;
+    max-width: calc(100% - 2px);
+}
+
+.bulk-upload-container .catalog-year-hint {
+    font-size: 12px;
+    color: #9CA3AF;
+    font-style: italic;
+}
+
+.bulk-upload-container .catalog-popover-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #6B7280;
+    padding: 2px 4px 8px;
+}
+
 .bulk-upload-container .geo-country-block {
     display: flex;
     flex-direction: column;
@@ -1893,6 +1917,7 @@
     position: fixed;
     background: #1F2937;
     color: #fff;
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 12px;
     font-weight: 400;
     padding: 6px 10px;
@@ -1920,6 +1945,12 @@
     white-space: nowrap;
 }
 
+/* Primary levers tooltip */
+.bulk-upload-container .bulk-results-table th:has(.col-tooltip-icon),
+.bulk-upload-container .th-content > span:first-child:has(.col-tooltip-icon) {
+    overflow: visible;
+}
+
 /* Cells containing textareas need to wrap */
 .bulk-upload-container .bulk-results-table td:has(textarea) {
     white-space: normal;
@@ -1929,6 +1960,7 @@
 /* Cells with chip/complex components: allow wrapping, never clip the × button */
 .bulk-upload-container .bulk-results-table td:has(.partners-cell),
 .bulk-upload-container .bulk-results-table td:has(.affiliation-cell),
+.bulk-upload-container .bulk-results-table td:has(.catalog-cell),
 .bulk-upload-container .bulk-results-table td:has(.geo-cell) {
     white-space: normal;
     overflow: hidden;
