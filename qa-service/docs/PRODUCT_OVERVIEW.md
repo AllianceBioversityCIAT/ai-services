@@ -1,106 +1,61 @@
-# Product Overview – PRMS QA Service (AI Review)
+# PRMS QA Service: product overview
 
-## Problem Statement
+The service helps PRMS reporting teams improve result metadata and identify quality issues before submission. It provides two separate API workflows: AI Review for metadata improvement and a traffic-light quality assessment for W3/Bilateral results.
 
-CGIAR's Performance & Results Measurement System (PRMS) captures thousands of research results annually across multiple result types (Innovation Development, Knowledge Products, Capacity Development, Policy Change, Innovation Use, and Other) and result levels (Output, Outcome, Impact). These results must be documented with titles, descriptions, and metadata that comply with institutional reporting standards while remaining accessible to non-specialist audiences including donors, policymakers, and partner organizations.
+This overview describes backend capabilities implemented in this branch. It does not certify a deployment, frontend integration, or measured improvement in reporting outcomes.
 
-Reporting officers and research teams face significant challenges in producing quality metadata that meets CGIAR's strict formatting and content guidelines. Manual review and revision is time-intensive, inconsistent across teams, and prone to errors including technical jargon, unclear phrasing, non-compliance with word limits, and inadequate incorporation of supporting evidence. Additionally, result documentation must be enriched with evidence from multiple sources (publications, web pages, institutional repositories) requiring manual content extraction and synthesis.
+## Users and purpose
 
-Poor quality result metadata creates downstream risks: reduced transparency to donors, weakened institutional credibility, inconsistent reporting across programs, and delayed approval cycles as submissions are returned for revision. The manual quality assurance process does not scale effectively as reporting volume increases across CGIAR's expanding portfolio.
+Reporting officers and research teams need clear descriptions of research results, consistent use of institutional criteria, and supporting evidence. Validation teams need to understand what was checked and which inputs need attention.
 
-The PRMS QA Service addresses these operational inefficiencies by providing AI-powered automated quality review and metadata enhancement. It applies CGIAR-specific writing standards, result type and level-specific guidance, and evidence-based enrichment to systematically improve result documentation quality while reducing manual workload and ensuring consistency across the institution.
+The service returns suggestions and assessments to its caller. It does not save edits to PRMS, accept a suggestion on behalf of a user, or implement the Reporting Tool's submission workflow.
 
----
+## Two workflows
 
-## Target Users
+| Workflow | Input | Output |
+| --- | --- | --- |
+| AI Review: `POST /api/prms-qa` | Existing PRMS result metadata, impact-area selections, optional evidence and user ID | Suggested metadata and impact-area feedback, processing time, optional evidence metadata and interaction ID |
+| Quality assessment: `POST /prms/quality-assessment` | Structured W3/Bilateral result, form sections, evidence, optional impact areas and user ID | Overall and section verdicts, scores, issues, affected inputs, evidence verdicts, coverage, and optional replacement text |
 
-- **Reporting officers** who submit research results to PRMS
-- **Research teams** preparing result documentation for institutional reporting
-- **Project managers** overseeing reporting quality and compliance
-- **Data validation teams** responsible for ensuring metadata meets CGIAR standards
-- **Program coordinators** managing result submissions across multiple initiatives
+AI Review generates a short name for Innovation Development results. Knowledge Products use the impact-area review without title or description rewriting. Other result types use the metadata and impact-area prompts.
 
----
+The traffic-light assessment supports Policy Change, Innovation Use, Capacity Sharing for Development, Innovation Development, Other Output, and Other Outcome. Knowledge Product is not in that endpoint's current result-type catalog.
 
-## Beneficiaries
+## Reading an assessment
 
-- **Senior management** – improved quality enables better decision-making and portfolio oversight
-- **Donors and funding partners** – enhanced transparency and clarity in results reporting
-- **Program and initiative leads** – consistent quality across all result types reduces review overhead
-- **Institutional communications teams** – publication-ready content for external stakeholder engagement
-- **External stakeholders** – accessible language improves understanding of CGIAR's research impact
+| Verdict | Meaning |
+| --- | --- |
+| Red | At least one core criterion was flagged |
+| Amber | A non-core criterion was flagged, with no core flags |
+| Green | No evaluated criterion was flagged |
+| Grey | The section or evidence item was not evaluated |
 
----
+Verdicts describe quality findings. `status`, `degraded_reason`, and `coverage` describe execution and must also be read. A green verdict alone does not establish that every applicable check completed.
 
-## Access & Availability
+Scores are derived by the service: red maps to 0–49, amber to 50–99, and green to 100. A score is null when nothing was evaluated. It is not a probability or an independently validated measure of research impact.
 
-**Production Access:**  
-`https://dj3rjcpfvsiytr7ydjhmlc7ho40wglws.lambda-url.us-east-1.on.aws/api/prms-qa`
+Each section identifies issues and the corresponding Reporting Tool inputs in `fields`. General Information can also include a replacement title or description when its verdict is amber or red. Suggestions are optional, are validated before being returned, and do not alter the submitted data.
 
-**User Access:** Through PRMS Reporting Tool interface – an AI review button is present on all result forms and becomes enabled when all required fields are completely filled out, allowing users to request automated quality enhancement
+## Evidence and coverage
 
-**Integration Mode:** Embedded service consumed by PRMS Reporting Tool frontend
+The shared scraper attempts to retrieve content from CGSpace, DOI pages, SharePoint/OneDrive links, general web pages, PDFs, and Excel files. Retrieval depends on source access and extractable content; support for a source does not guarantee every link will be readable.
 
-**Deployment:** AWS Lambda (serverless), deployed in US-East-1 region
+For the assessment workflow, private evidence or items without a usable link are not scraped. Their individual verdict is grey. Retrieval failures are reported separately from quality findings. Some criteria cannot be verified without additional data sources and are left unverified rather than guessed.
 
-**Environment:** Production (with development and test environments available)
+An assessment may return HTTP 200 with partial coverage. Failures of both assessment model calls produce HTTP 503. Other startup, authentication, input, and processing errors also have explicit error responses; the caller must decide how these affect its own submission flow.
 
-**API Documentation:** Available at `/docs` endpoint for developer reference
+## Access and integrations
 
----
+- The assessment endpoint validates `X-API-Key` with CLARISA for `AI Traffic Light - PRMS`.
+- The AI Review route currently has no active application authentication dependency. Any infrastructure controls must be checked separately.
+- Both workflows invoke Claude Sonnet 4.6 through AWS Bedrock in `us-east-1`.
+- Providing `user_id` enables an attempt to record the interaction with the external analytics service.
+- Slack notifications are attempted when a webhook is configured.
 
-## Inputs
+The code includes an AWS Lambda container and a local FastAPI server. Confirm deployed URLs, frontend behavior, credentials, and access with the environment owner.
 
-The module receives structured JSON metadata for each result submission:
+## Expected value and validation limits
 
-- **Result identification** – result ID, result type (Innovation Development, Knowledge Product, etc.), result level (Output, Outcome, Impact)
-- **Content fields** – original title, description, short name (for innovations)
-- **Contextual metadata** – geographic scope, partner organizations, CGIAR center/program attribution
-- **Impact area assessments** – user-provided scores and components across five dimensions (Gender Equality/Youth/Social Inclusion; Climate Adaptation/Mitigation; Nutrition/Health/Food Security; Environmental Health/Biodiversity; Poverty Reduction/Livelihoods/Jobs)
-- **Supporting evidence** – URLs to publications, documents, and web resources (CGSpace repository links, PDFs, institutional pages)
-- **User identifier** – for interaction tracking and analytics
+The intended benefits are less repetitive editing, more consistent review, and clearer feedback about evidence and missing information. This repository does not establish a measured time saving, rejection-rate reduction, or accuracy guarantee.
 
-Input is system-generated from the PRMS Reporting Tool interface as users complete result submission forms. Evidence URLs may be manually uploaded or pre-populated from existing PRMS records.
-
----
-
-## Outputs
-
-The module produces validated, standards-compliant result metadata:
-
-**Primary outputs:**
-- **Improved title** (maximum 30 words) – rewritten for clarity, non-specialist audiences, and compliance with result type/level guidelines
-- **Improved description** (maximum 150 words) – enhanced with context, CGIAR contribution visibility, and evidence integration
-- **Short name** (for Innovation Development results only) – concise, jargon-free identifier suitable for public communication
-- **Impact area assessments** – refined scores and justifications across five CGIAR impact dimensions
-
-**Metadata and analytics:**
-- Processing time and performance metrics
-- Interaction tracking ID for user analytics
-- Evidence enrichment metadata (number of sources processed, successful extractions, validation warnings)
-- Validation status and error handling information
-
-**Storage and display:**  
-Outputs are returned via REST API response to the PRMS Reporting Tool, where they are displayed side-by-side with original content for user review and acceptance. Users may accept, further edit, or regenerate suggestions before final submission to PRMS.
-
----
-
-## Value Proposition
-
-**Operational Efficiency:**  
-Reduces manual quality review time from 15-30 minutes per result to under 2 minutes. Enables reporting officers to process higher volumes of results with consistent quality, freeing staff capacity for strategic work rather than repetitive editing tasks.
-
-**Quality Assurance:**  
-Systematically applies CGIAR writing standards across all result types and levels, ensuring compliance with formatting rules, word limits, audience appropriateness, and evidence integration requirements. Eliminates human inconsistency in applying complex, result-specific guidelines.
-
-**Risk Mitigation:**  
-Reduces submission rejection rates by catching non-compliance issues before formal review. Minimizes reputational risk from unclear or non-compliant external-facing documentation. Ensures donor-facing reports maintain institutional quality standards.
-
-**Scalability:**  
-Handles concurrent processing of multiple results without manual bottlenecks. Supports CGIAR's growing reporting portfolio as research programs expand. Maintains consistent quality regardless of reporting volume spikes during submission deadlines.
-
-**Evidence Integration:**  
-Automatically extracts and synthesizes content from publications, repositories, and web sources to enrich result context. Eliminates manual content review of supporting documents, enabling evidence-based metadata enhancement at scale.
-
-**Strategic Importance:**  
-Strengthens institutional credibility through consistent, high-quality results communication. Improves donor transparency and stakeholder trust. Positions CGIAR as a leader in AI-enhanced research management and reporting innovation. Provides data foundation for continuous improvement through interaction tracking and quality analytics.
+For integration examples, see the [API guide](API_GUIDE.md). For component flows and operational limits, see the [high-level design](HIGH_LEVEL_DESIGN.md). For setup, see the [service README](../README.md).
