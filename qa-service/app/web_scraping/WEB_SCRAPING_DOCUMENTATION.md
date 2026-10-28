@@ -1,10 +1,20 @@
 # 📚 Complete Web Scraping System Documentation
 
+## Current scope and entry points
+
+This reference was originally written for metadata enrichment through `/api/prms-qa`. The scraper is now also used by `/prms/quality-assessment`. See the current [API guide](../../docs/API_GUIDE.md) and [high-level design](../../docs/HIGH_LEVEL_DESIGN.md) for endpoint contracts, authentication, coverage, and orchestration.
+
+The metadata flow calls `enhance_prms_context(result_metadata, evidence_urls, max_evidences=5)`. Assessment calls `extract_evidence_content()` directly, with concurrent retrieval and time budgets. It does not inherit that five-URL cap.
+
+The current extraction signature is `extract_evidence_content(evidence_urls, max_content_length=40000, cleanup_files=True, concurrency=1, per_url_timeout=None, batch_timeout=None)`. Content limits are measured in characters. Results retain input order, and a batch timeout preserves completed extractions.
+
+The download directory defaults to `/tmp/evidence_downloads` and can be changed with `WEB_SCRAPING_DOWNLOAD_DIR` or the constructor's `download_dir`. Source-specific examples below are background references, not a live verification of external websites or deployment availability.
+
 ## 🎯 Executive Summary
 
 The web scraping system for the PRMS QA service allows automatic extraction of content from multiple sources to enrich the LLM model context with documentary evidence. The system automatically detects the source type and applies the most appropriate extraction strategy.
 
-### ✅ Status: Fully Implemented and Functional
+### Implementation reference
 
 **Implemented**: November 2025  
 **Version**: 1.0  
