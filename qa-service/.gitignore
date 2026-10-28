@@ -194,6 +194,10 @@ faiss/
 *.jsonl
 *.xlsx
 
+# Fictional API payloads maintained with the documentation
+!docs/examples/metadata-request.json
+!docs/examples/assessment-request.json
+
 # Data logs
 data/logs/
 
