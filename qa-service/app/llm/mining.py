@@ -294,7 +294,7 @@ async def improve_prms_result_metadata(
                 tracking_context = {
                     "prompts_executed": len(tasks),
                     "prompt_types": prompt_types,
-                    "model_used": "claude-4-sonnet",
+                    "model_used": "claude-sonnet-4-6",
                     "evidence_context_length": len(evidence_context),
                     "evidence_count": evidence_data['evidence_count'] if evidence_data else 0,
                     "evidence_urls": evidence_urls[:5] if evidence_urls else []

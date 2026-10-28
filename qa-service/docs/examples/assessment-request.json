@@ -1,0 +1,38 @@
+{
+  "contract_version": "0.2",
+  "request_id": "example-assessment-001",
+  "result": {
+    "type": "Innovation Development",
+    "reporting_phase": "Reporting 2026",
+    "reporting_center": "AfricaRice"
+  },
+  "sections": {
+    "general_information": {
+      "title": "Drought-tolerant rice variety evaluated in field trials with smallholder farmers",
+      "description": "AfricaRice researchers developed a drought-tolerant rice variety and evaluated it in field trials with smallholder farmers. The trials compared performance with locally used varieties under water-limited conditions. Researchers and participating farmers documented the findings to inform the next stage of validation. This example describes a development-stage output rather than claiming adoption or impact.",
+      "result_level": "Output",
+      "lead_contact_person": "Example reporting contact"
+    },
+    "contributors_and_partners": {
+      "lead_center": "AfricaRice",
+      "no_external_partners": true
+    },
+    "geographic_location": {
+      "scope": "National",
+      "countries": ["Côte d'Ivoire"]
+    },
+    "evidence": [],
+    "type_specific": {
+      "type": "innovation_development",
+      "fields": {
+        "Innovation typology": "Technological",
+        "Readiness level": "Level 6 — Uptake",
+        "Innovation developers": "AfricaRice"
+      }
+    }
+  },
+  "impact_areas": [],
+  "constraints": {
+    "timeout_seconds": 60
+  }
+}
