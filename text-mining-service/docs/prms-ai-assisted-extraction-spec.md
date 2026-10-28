@@ -1,5 +1,7 @@
 # PRMS AI-Assisted Extraction: Implementation Specification
 
+> Planning reference: this draft records proposed architecture and acceptance criteria. For the current per-source extraction pipeline and runtime contract, read [high-level design](HIGH_LEVEL_DESIGN.md) and the [PRMS integration guide](prms-integration-guide.md).
+
 > **Source of truth:** [`bilateral-ai-workflow-ai-consolidated.md`](bilateral-ai-workflow-ai-consolidated.md)
 >
 > **Target service:** `text-mining-service`
