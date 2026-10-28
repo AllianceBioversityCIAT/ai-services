@@ -2,7 +2,7 @@
 
 This document is for the **PRMS product team** implementing the client side of multisource AI-assisted extraction: uploading sources, calling the mining API, consuming responses, and mapping results into PRMS MDS.
 
-It focuses on **contracts and operational rules**, not internal implementation details. A full successful response example is provided separately (`test4.json`).
+It focuses on **contracts and operational rules**, not internal implementation details. Examples here illustrate contracts. Separate test artifacts such as `test4.json` are not required or guaranteed to exist in a checkout. For the other mining workflows, see the [service API guide](API_GUIDE.md).
 
 ---
 
@@ -94,7 +94,7 @@ Full endpoint path on both environments:
 POST {base_url}/prms/text-mining
 ```
 
-These limits and URLs are **configured on the mining service** (operations / AI team). PRMS does not set them — only needs to respect them when uploading files and building requests.
+The URLs above are recorded in application metadata, not verified live endpoints. Confirm the destination and deployed limits with the environment owner. The limits below describe source-code defaults unless stated otherwise; environment overrides can change them.
 
 ### 3.2 Endpoint contract
 
@@ -104,7 +104,7 @@ These limits and URLs are **configured on the mining service** (operations / AI 
 
 ### 3.3 Request body (`PrmsTextMiningRequest`)
 
-Extra JSON properties are **rejected** (`422`).
+Extra JSON properties are **ignored** (`ConfigDict(extra="ignore")`). They do not replace supported source fields or CLARISA authentication. Type-invalid supported fields still produce request validation errors.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -147,22 +147,22 @@ Use the **production** base URL in prod deployments.
 
 ## 4. Success response (HTTP 200)
 
-The HTTP layer returns the MCP tool payload. Shape depends on whether `user_id` was sent:
+The HTTP layer returns the MCP tool payload. An interaction wrapper is returned only if analytics tracking succeeds, not merely because `user_id` was supplied:
 
 ### 4.1 Without `user_id`
 
 ```json
 {
-  "results": [ /* see §5 */ ]
+  "results": []
 }
 ```
 
-### 4.2 With `user_id` (interaction tracking)
+### 4.2 With successful interaction tracking
 
 ```json
 {
   "json_content": {
-    "results": [ /* see §5 */ ]
+    "results": []
   },
   "interaction_id": "req_<uuid>"
 }
@@ -175,17 +175,17 @@ The HTTP layer returns the MCP tool payload. Shape depends on whether `user_id` 
 | Property | Always present? | Description |
 |----------|-----------------|-------------|
 | `results` | Yes (direct or under `json_content`) | Array of validated MDS-shaped result objects. May be empty `[]`. |
-| `interaction_id` | Only with `user_id` | ID for feedback / interaction APIs. |
+| `interaction_id` | Only when requested tracking succeeds | ID for feedback / interaction APIs. |
 
 **Important behaviors:**
 
-- Null and empty optional fields are **omitted** from JSON (`exclude_none=True`).
+- Null optional fields are **omitted** from JSON (`exclude_none=True`). Empty arrays or other values may remain unless a field-specific validator normalizes them.
 - Results that fail final Pydantic validation are **silently omitted** from `results` (HTTP still `200`). Check server logs if counts seem low.
 - **Knowledge Product** results are never returned.
 - Institution mapping may add or normalize `institution_id` on centers/partners when mapping succeeds.
 - There is **no** guarantee that every extracted candidate appears in the final array (final validation may merge or drop items).
 
-Refer to the separate **`test4.json`** artifact for a full real-world example with multiple indicators.
+The empty arrays above illustrate the success envelope, not an expected extraction result. Use the schema definitions below for individual result fields; do not depend on untracked real-world examples.
 
 ---
 
@@ -286,7 +286,7 @@ Common fields only (`title`, `description`, `geo_focus`, centers, partners, evid
 
 ## 6. Source and file rules (current service limits)
 
-The tables below reflect the **limits currently enforced** by the deployed AI Text Mining Service. Use them for PRMS-side validation (upload UI, pre-flight checks, user messaging). If limits change in a future release, the AI team will communicate an updated version of this document.
+The tables below describe source-code defaults in this branch. Deployment environment variables can override them; testing and production settings have not been verified here. Confirm the target environment's limits before using them for PRMS-side pre-flight checks and user messaging.
 
 ### 6.1 Limits summary
 
@@ -296,9 +296,11 @@ The tables below reflect the **limits currently enforced** by the deployed AI Te
 | **Max file size** | **25 MB** (25,000,000 bytes) per S3 object | Each document or audio file |
 | **Max PDF pages** | **100** pages | PDF documents only |
 | **Max free-text length** | **50,000** characters | `text` field |
-| **Max audio duration** | **10 minutes** (600 seconds) | Each audio file (after transcription) |
-| **Audio transcription** | **Amazon Transcribe** (enabled) | All audio sources |
-| **Audio languages** | **Auto-detect** among `en-US`, `es-ES`, `fr-FR`, `pt-BR` | Transcription |
+| **Max audio duration** | Optional `PRMS_MAX_AUDIO_SECONDS`; unset by default | Each audio file, when a limit is configured |
+| **Audio transcription** | Disabled by default; set `PRMS_AUDIO_TRANSCRIBER=amazon_transcribe` | Required for audio sources |
+| **Audio languages** | Default options `en-US`, `es-ES`, `fr-FR`, `pt-BR`; explicit language code/option overrides supported | When transcription is enabled |
+
+Server-side controls are defined in `app/utils/config/config_util.py`: `PRMS_MAX_SOURCES`, `PRMS_MAX_FILE_BYTES`, `PRMS_MAX_PDF_PAGES`, `PRMS_MAX_TEXT_CHARS`, and optional `PRMS_MAX_AUDIO_SECONDS`. Related defaults are four extraction workers, a 300,000-token estimated context budget, a 50,000-character full-document threshold, and eight retrieval chunks per large source. The request body does not override these server settings.
 
 **Per request:** up to **6 sources** in any combination, e.g. 3 documents + 1 audio + 1 free text = 5 sources.
 
@@ -333,16 +335,16 @@ Counting: each document key = 1 source; each audio key = 1 source; non-empty `te
 |------|-------|
 | **Supported extensions** | `mp3`, `wav`, `m4a`, `ogg`, `flac`, `webm` |
 | **Max file size** | **25 MB** per file |
-| **Max duration** | **10 minutes** (600 seconds) |
-| **Transcription provider** | Amazon Transcribe |
-| **Languages** | Auto language identification using **English (US), Spanish (Spain), French (France), Portuguese (Brazil)** |
+| **Max duration** | Optional `PRMS_MAX_AUDIO_SECONDS`; no configured limit by default |
+| **Transcription provider** | Amazon Transcribe when explicitly enabled with `PRMS_AUDIO_TRANSCRIBER` |
+| **Languages** | Auto-identification defaults to `en-US`, `es-ES`, `fr-FR`, `pt-BR`; a configured language code or option list overrides this |
 | **Upload** | Audio must be in S3; **no** audio upload on the mining endpoint |
 
-**Too long → `413`:** *"The audio file is too long to process. Maximum allowed duration: 10 min 0 sec; …"*
+**When a duration limit is configured, too long → `413`.** For example, a deployment configured with 600 seconds can report: *"The audio file is too long to process. Maximum allowed duration: 10 min 0 sec; …"*
 
 **Transcription failure → `422`:** messages referencing the audio file or Transcribe job.
 
-**Transcriber unavailable → `503`:** only if the service is misconfigured (not expected in testing/production).
+**Transcriber unavailable → `503`:** includes audio requests when no provider is configured. Enabling audio and choosing its duration limit are deployment configuration decisions, not defaults guaranteed by this repository.
 
 ### 6.4 Free text (`text`)
 
@@ -356,7 +358,7 @@ Counting: each document key = 1 source; each audio key = 1 source; non-empty `te
 
 ### 6.5 Large documents (service behavior)
 
-For very long documents, the service may use semantic retrieval instead of sending the full text to the model (internal threshold: ~**50,000 characters** of extracted text per source, up to **10** retrieved chunks per source). PRMS does not configure this; it is handled automatically.
+For very long documents, the service may use semantic retrieval instead of sending the full text to the model (internal threshold: ~**50,000 characters** of extracted text per source, up to **8** retrieved chunks per source by default (`PRMS_RETRIEVAL_TOP_K_PER_SOURCE`)). PRMS does not configure this; it is handled automatically.
 
 If a single source is still too large after retrieval, the request may fail with **`413`**. Prefer splitting oversized reports before upload when possible.
 
@@ -373,7 +375,7 @@ For validation errors (`422` from malformed JSON body):
 ```json
 {
   "detail": [
-    { "type": "...", "loc": ["body", "field"], "msg": "...", "input": ... }
+    { "type": "...", "loc": ["body", "field"], "msg": "...", "input": "example invalid value" }
   ]
 }
 ```
@@ -389,7 +391,7 @@ For validation errors (`422` from malformed JSON body):
 | **413** | Payload / limits | Too many sources; file too large; PDF too many pages; audio too long; free text too long; source too large for token budget |
 | **415** | Unsupported media | Bad document or audio extension; legacy `.doc` |
 | **422** | Extraction / download | S3 object not found; unreadable file; empty free text source; audio transcription errors |
-| **422** | JSON schema (request) | Unknown fields in body (`extra=forbid`); type mismatches |
+| **422** | JSON schema (request) | Malformed body or type mismatches in supported fields; unknown fields are ignored |
 | **502** | Model output | Final validation could not produce parseable JSON (rare after repair pass) |
 | **503** | Dependency down | CLARISA validate unreachable: *"Authentication service is temporarily unavailable"* |
 | **503** | Audio unavailable | Transcriber not configured |
