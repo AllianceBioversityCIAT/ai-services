@@ -1,6 +1,6 @@
 # Interaction and feedback HTTP contract
 
-Implemented by [models](../app/api/models.py), [routes](../app/api/routes.py) and the [DynamoDB service](../app/utils/feedback/feedback_util.py). This guide describes `dev-feedback`; generated descriptions include historical claims that are not operational guarantees.
+Implemented by [models](../app/api/models.py), [routes](../app/api/routes.py) and the [DynamoDB service](../app/utils/feedback/feedback_util.py). This guide describes `main-feedback`; its models/routes match development after the reviewed local merge. Generated descriptions include historical claims that are not operational guarantees.
 
 ## Routes
 

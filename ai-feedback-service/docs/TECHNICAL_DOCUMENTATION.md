@@ -1,6 +1,6 @@
 # Feedback service maintenance
 
-The active service tracks interactions in DynamoDB and optionally publishes negative-feedback email jobs. Use the [README](../README.md) for onboarding and [API contract](API.md) before changing callers.
+This guide describes `main-feedback`. The active service tracks interactions in DynamoDB and optionally publishes negative-feedback email jobs. Use the [README](../README.md) for onboarding and [API contract](API.md) before changing callers.
 
 ## Entry points and import effects
 
@@ -50,7 +50,7 @@ The template includes user input (truncated to 500 characters), full AI output, 
 
 Dependencies match between pyproject.toml and requirements.txt; no lockfile is tracked. Docker actually installs requirements and copies .env plus full context. Keep secrets and artifacts out of images/commits; this documentation does not change packaging. ENV does not switch the current logger away from /tmp/logs.
 
-The workflow jenkins-trigger-ai-feedback.yml triggers feedback-service on push/PR to main-feedback and manual dispatch. Dev and service-main service trees matched at inspection; still compare complete trees after each authorized integration.
+The workflow jenkins-trigger-ai-feedback.yml triggers feedback-service on push/PR to main-feedback and manual dispatch. The reviewed local merge preserved the same service code, Dockerfile, dependencies and configuration as development; see the [merge comparison](BRANCH_DIFFERENCES.md). Subsequent branch-specific documentation edits do not imply runtime differences. Compare full trees again after future integrations.
 
 ## Offline checks
 
