@@ -44,4 +44,3 @@ next-env.d.ts
 !tsconfig.open-next.json
 
 .agents/
-CLAUDE.md
