@@ -499,14 +499,13 @@ export function ResultsTable({
     setTotalItems(filteredResults.length);
   }, [filteredResults.length, setTotalItems]);
 
-  useEffect(() => {
-    setSortPanelOpen(false);
-  }, [currentTab]);
-
   const { currentPage, perPage, totalPages, startIndex, endIndex } = pagination;
 
   const [openFilter, setOpenFilter] = useState<{ key: string; rect: DOMRect } | null>(null);
   const [sortPanelOpen, setSortPanelOpen] = useState(false);
+  useEffect(() => {
+    setSortPanelOpen(false);
+  }, [currentTab]);
   const sortButtonRef = useRef<HTMLButtonElement>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const sortableColumns = getSortableColumns(currentTab);

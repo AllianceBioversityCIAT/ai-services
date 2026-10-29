@@ -1,14 +1,15 @@
 # STAR Bulk Upload frontend
 
-Next.js 15 / React 19 application for extracting Capacity Development candidates from spreadsheets, reviewing/editing them, and submitting records to STAR. It is a separate app from the Python Text Mining backend.
+Next.js 16 / React 19 application for extracting Capacity Development candidates from spreadsheets, reviewing/editing them, and submitting records to STAR. It is a separate app from the Python Text Mining backend.
 
 See the [service README](../README.md) for extraction workflows and [frontend AGENTS.md](AGENTS.md) for implementation conventions.
 
 ## Run locally
 
-Use Node.js 20+ and the checked-in npm lockfile. Run from `text-mining-service/frontend/`:
+Use Node.js 22 (see `.nvmrc` and `package.json#engines`) and the checked-in npm lockfile. Keep Jenkins on a patched Node 22 release. Run from `text-mining-service/frontend/`:
 
 ```bash
+nvm use
 npm ci
 npm run dev
 ```
@@ -60,6 +61,7 @@ The legacy HTML interface under `../interface/bulk_upload/` is separate from thi
 
 ```bash
 npm run lint
+npm run typecheck
 ```
 
 Lint checks code style/static rules; it does not validate live extraction, STAR submissions, or Dynamo writes. For a deliberate live check, use development credentials and test data and exercise upload, review, draft/approved submission, and re-upload/status restoration.
@@ -71,3 +73,94 @@ Use the development server while iterating. Production builds rewrite Next/OpenN
 SST configures `sst.aws.Nextjs` with OpenNext for AWS hosting. The package defines `sst:dev`, `sst:deploy`, `sst:remove`, `build`, and `build:open-next` scripts. Deployment/removal commands change AWS resources; they are not routine validation commands.
 
 Start in `components/BulkUpload/BulkUploadModule.tsx` for orchestration, `hooks/` for API/status behavior, `constants.ts` for table fields/destinations, `app/api/` for BFF handlers, and `sst.config.ts` for deployment configuration. Follow [AGENTS.md](AGENTS.md) before editing frontend behavior.
+
+
+## Node 22 / Next 16 deployment checks
+
+The reviewed dependency set is Next.js 16.4.3, React/React DOM 19.3.1, and
+OpenNext AWS 4.1.13. Next.js, its ESLint configuration, React, and OpenNext are
+pinned; `package-lock.json` records the complete dependency selection. Run
+`npm ci`, not an unversioned adapter downloaded with `npx`, in deployment jobs.
+
+`npm run build:open-next` invokes the installed OpenNext CLI. OpenNext then runs
+`npm run build` exactly once, using Next's Webpack builder explicitly. This keeps
+the bundler choice stable across the Next 15 to 16 migration. The existing dummy
+cache overrides and custom S3 asset resolver remain in use.
+
+For Jenkins, use Node 22 and run these checks before packaging or deploying:
+
+```bash
+npm ci
+npm run lint
+npm run typecheck
+npm run build:open-next
+npm run test:open-next
+```
+
+`test:open-next` invokes the generated Lambda handler with fictional inputs and
+local HTTP upstreams. It checks pages, a referenced static bundle, S3 binary GET/HEAD via a local endpoint, token validation,
+multipart forwarding, upstream error status, and partner creation. It does not
+contact AWS, Bedrock, STAR, or CLARISA.
+
+The GitHub `Bulk Upload frontend checks` workflow runs the same checks without
+AWS credentials or a deployment. It runs independently of the existing Jenkins
+triggers; configure it as a required PR check in repository settings if desired.
+The Jenkins pipeline definition is not tracked here, so infra must apply this
+check sequence to the actual job. Neither path uses the unsupported-version flag.
+
+Two deployment definitions exist; choose the one that owns the environment:
+
+- CloudFormation/Function URL: the template under
+  `infrastructure/cloudformation/bulk-upload-frontend-opennext.yaml` declares
+  `nodejs22.x`. Continue packaging `.open-next/server-functions/default/` with
+  `index.mjs` at the zip root and syncing `.open-next/assets/` under `_assets/`.
+  Preserve the environment variables and permissions managed by infra.
+- SST: `sst.config.ts` explicitly runs the locally installed adapter and sets
+  the server and image optimizer to `nodejs22.x`. SST deployment has not been
+  verified against AWS. Do not deploy SST over an environment owned by the
+  CloudFormation pipeline merely to complete this migration.
+
+Updating the Jenkins agent alone does not update a Lambda runtime. Before
+promotion, infra must confirm the deployed runtime, handler, architecture, S3
+prefix, environment variables, and the pipeline's actual adapter command.
+
+After deployment to development, verify static JS/CSS/images, token validation,
+Excel upload/extraction, editing, STAR submission, and status restoration using
+test data. Live checks can invoke Bedrock and write STAR/DynamoDB data. Keep the
+previous server artifact and matching assets available for rollback.
+
+## Dependency maintenance
+
+Dependabot proposes weekly npm updates against `dev-text-mining`, grouping Next,
+its lint packages, and OpenNext together and React with React DOM/types. Review and test
+those PRs; they do not auto-merge or deploy. GitHub security alerts/security-update
+settings are managed separately, and custom-target version updates do not replace
+security monitoring of the default branch. Apply urgent security patches promptly.
+
+Update Next and `eslint-config-next` together, and React and React DOM together.
+For each adapter or framework upgrade, repeat the Node 22 checks and the development
+smoke test before promotion. Revisit Node's and Next's support windows regularly;
+Node 22 is the current infrastructure requirement, not a permanent runtime choice.
+
+References: [Next 16 migration](https://nextjs.org/docs/app/guides/upgrading/version-16),
+[Next support policy](https://nextjs.org/support-policy),
+[OpenNext releases](https://github.com/opennextjs/opennextjs-aws/releases).
+
+
+### Remaining migration follow-ups
+
+- Next 16's new `react-hooks/set-state-in-effect` diagnostics are warnings for
+  existing Bulk Upload components. Rules of hooks, immutability, and manual
+  memoization checks still fail lint. An existing declaration-order issue in
+  `ResultsTable` was corrected without changing its effect behavior. Resolve
+  the remaining warnings in focused UI changes before making this rule blocking.
+- The dependency audit after compatible fixes still reports 12 affected packages
+  (10 high, 2 moderate, no critical). This is not a clean security audit. Remaining
+  chains include SST 3 / OpenControl / AWS SDK v2, OpenNext's minifier / glob, and
+  `xlsx` 0.18.5. Runtime exposure must be assessed separately from build-tool
+  findings. `xlsx` has no npm-provided fix; select a maintained spreadsheet
+  version/source or replacement and test Excel import/export separately. SST 4
+  is another migration and has not been applied here. Do not use `npm audit fix
+  --force` to fold those behavior changes into this upgrade.
+- Jenkins job definition, live Lambda configuration, IAM/S3 permissions, and the
+  browser wizard against real development services remain external validation.

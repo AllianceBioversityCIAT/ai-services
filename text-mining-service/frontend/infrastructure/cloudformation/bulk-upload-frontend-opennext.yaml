@@ -128,7 +128,7 @@ Resources:
     Properties:
       FunctionName: !Sub 'star-bulk-upload-server-${EnvironmentName}'
       Role: !GetAtt ServerLambdaRole.Arn
-      Runtime: nodejs20.x
+      Runtime: nodejs22.x
       Handler: index.handler
       Architectures:
         - x86_64
@@ -178,7 +178,7 @@ Resources:
 
 Outputs:
   AssetsBucketName:
-    Description: Sincronizar .open-next/assets/ bajo el prefijo _assets/ (OpenNext 3; la Lambda usa BUCKET_NAME + BUCKET_KEY_PREFIX=_assets).
+    Description: Sincronizar .open-next/assets/ bajo el prefijo _assets/ (la Lambda usa BUCKET_NAME + BUCKET_KEY_PREFIX=_assets).
     Value: !Ref AssetsBucket
     Export:
       Name: !Sub '${AWS::StackName}-AssetsBucketName'
