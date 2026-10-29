@@ -2,7 +2,7 @@
 
 Conversational access to AICCRA reporting data using Amazon Bedrock Agents and a configured Knowledge Base. Users can explore deliverables, contributions, innovations and Outcome Impact Case Reports (OICRs), with reporting-phase, indicator and section filters.
 
-This guide describes **`dev-chatbot`**: a FastAPI backend, a static browser interface and a separate Streamlit interface. Production packaging and destinations differ on `main-chatbot-service`; review the [branch comparison](docs/BRANCH_DIFFERENCES.md) before promotion.
+This guide describes **`dev-chatbot-service`**: a FastAPI backend, a static browser interface and a separate Streamlit interface. Production packaging and destinations differ on `main-chatbot-service`; review the [branch comparison](docs/BRANCH_DIFFERENCES.md) before promotion.
 
 ## Documentation
 
@@ -30,7 +30,7 @@ uv run --frozen python api_server.py --host 127.0.0.1 --port 8000 --reload
 
 Open `http://localhost:8000/chatbot-ui` for browser chat, `/docs` for OpenAPI or `/health` for HTTP availability. Health returns static capability labels; it does **not** probe AWS, ingestion or database connectivity. Some generated API descriptions still promise an inactive data-reload path; the [API guide](docs/API.md) describes the implementation.
 
-The HTML chat URL is fixed to `http://localhost:8000/api/chat`. Its interaction/feedback destination is a separate remote service; serving the page locally does not make tracking local. Review the [interface guide](interface/README.md) before submitting information.
+The HTML page calls the fixed Lambda endpoint `https://lvurhov4wryn4pygqxf6tp54uq0jdpgs.lambda-url.us-east-1.on.aws/api/chat`, even when opened at localhost. It also sends interaction/feedback records to a separate remote service. Opening `/chatbot-ui` therefore does not test the local chat backend. Use the local curl/Python examples below to test it. Pointing the page at a local API would require an explicit change to its JavaScript constant; `.env` does not override it. See the [interface guide](interface/README.md).
 
 `uv sync --frozen` uses the manifest and lockfile. This branch's `requirements.txt` has trailing commas on dependency lines and is not a valid equivalent pip installation path. The inherited project metadata says `aiccra-report-generator`; this application is the chatbot. Dependency reconciliation is outside this documentation change.
 
@@ -119,7 +119,7 @@ Examples depend on indexed source data and agent configuration:
 
 | Control | Meaning |
 | --- | --- |
-| Phase / Cycle | UI choices include AWPB, Progress and AR for 2021–2025; HTTP field remains `phase`, e.g. `AR 2025` |
+| Phase | UI choices include AWPB, Progress and AR for 2021–2025; HTTP field remains `phase`, e.g. `AR 2025` |
 | Indicator | Literal acronym such as `IPI 1.1` or `PDO Indicator 3`; UI options depend on year |
 | Section | `Deliverables`, `Contributions`, `Innovations`, `OICRs`, or `All sections` |
 
@@ -155,9 +155,9 @@ chatbot-service/
 ├── app/utils/prompts/              # Templates for auxiliary paths
 ├── app/utils/s3/                   # Auxiliary export/upload helpers
 ├── app/utils/feedback/             # Inactive helper; missing model imports
+├── app/utils/conversion/           # Five JSONL-to-OpenAI JSON conversion scripts
 ├── db_conn/sql_connection.py       # Auxiliary SQL extraction + uploads
 ├── openai_chatbot.py               # Independent OpenAI CLI experiment
-├── jsonl_to_json.py                # File conversion, executes on import
 └── pyproject.toml / uv.lock / requirements.txt
 ```
 
@@ -200,7 +200,7 @@ No dedicated service test suite is tracked here. Check documentation links, exam
 | Health succeeds but chat fails | Health is static; check region, agent/alias/KB IDs and AWS credentials/permissions |
 | UI calls an unexpected server | HTML constants are independent of `.env` |
 | Missing/broad results | Check metadata values/types, section mapping, HYBRID support and external ingestion |
-| Reload reports success but data stays old | Agent reload code is commented out; response flags/timings do not prove ingestion |
+| Reload reports success but data stays old | The agent does not implement reload; response flags/timings do not prove ingestion |
 | Null section fails with a selected phase | Builder may call `.lower()` on `None`; send a string such as `All sections` |
 | Feedback fails | Check separate interaction service URL, response and CORS |
 | SQL import fails | Auxiliary `pyodbc` is undeclared; it also requires ODBC Driver 18 and database access |
@@ -211,4 +211,4 @@ No dedicated service test suite is tracked here. Check documentation links, exam
 
 `main.py` exports `main.handler = Mangum(app)`. This development snapshot has **no Dockerfile**. Service-main has a Lambda Python 3.13 image installing `requirements.txt`, `/tmp/logs` and production frontend destinations. Recheck those after the local merge.
 
-Use `codex/docs-chatbot → dev-chatbot → main-chatbot-service → staging → main`. `dev-chatbot-service` is another existing line, not an interchangeable alias. This dev snapshot has no Chatbot-specific GitHub Actions workflow. The inspected service-main workflow triggers Jenkins on pushes/PRs to `main-chatbot-service`, despite its misleading QA display name. Documentation-only changes can trigger it. Pipeline completion and deployment need separate validation.
+Prepare tasks from `dev-chatbot-service`, then promote through `dev-chatbot-service → main-chatbot-service → staging → main`. This dev snapshot has no Chatbot-specific GitHub Actions workflow. The inspected service-main workflow triggers Jenkins on pushes/PRs to `main-chatbot-service`, despite its misleading QA display name. Documentation-only changes can trigger it. Pipeline completion and deployment need separate validation.

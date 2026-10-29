@@ -1,6 +1,6 @@
 # Chatbot system architecture
 
-The active `dev-chatbot` path delegates conversation and retrieval to an externally configured Bedrock Agent. It does not run the auxiliary SQL/OpenSearch ingestion pipeline for each query.
+The active `dev-chatbot-service` path delegates conversation and retrieval to an externally configured Bedrock Agent. It does not run the auxiliary SQL/OpenSearch ingestion pipeline for each query.
 
 ## Runtime boundaries
 

@@ -1,6 +1,6 @@
 # HTTP API contract
 
-Implemented by [models](../app/api/models.py), [routes](../app/api/routes.py) and the [application](../app/api/main.py) on `dev-chatbot`. Generated descriptions include historical reload/model claims; use the behavior below when integrating.
+Implemented by [models](../app/api/models.py), [routes](../app/api/routes.py) and the [application](../app/api/main.py) on `dev-chatbot-service`. Generated descriptions include historical reload/model claims; use the behavior below when integrating.
 
 ## Routes
 
@@ -74,7 +74,7 @@ Illustrative response; answer text depends on AWS:
 
 The API consumes the agent generator completely before returning JSON. No HTTP token stream or structured citation list is exposed. An empty provider completion can produce an empty message.
 
-With `insert_data=true`, the route reports `data_reloaded=true` and adds processing-info fields `data_reload_time`, `total_processing_time` and `tables_updated` (deliverables, contributions, innovations, oicrs, questions). These are derived from the request flag and elapsed request time. The actual agent reload block is commented out: **these fields do not prove any refresh or table update**. Keep the flag false for ordinary chat.
+With `insert_data=true`, the route reports `data_reloaded=true` and adds processing-info fields `data_reload_time`, `total_processing_time` and `tables_updated` (deliverables, contributions, innovations, oicrs, questions). These are derived from the request flag and elapsed request time. The active agent does not implement a reload: **these fields do not prove any refresh or table update**. Keep the flag false for ordinary chat.
 
 ## Errors
 

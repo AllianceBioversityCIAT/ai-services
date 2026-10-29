@@ -1,6 +1,6 @@
 # Chatbot backend maintenance
 
-This guide maps `dev-chatbot`. See the [README](README.md) for setup and [API contract](docs/API.md) for payloads.
+This guide maps `dev-chatbot-service`. See the [README](README.md) for setup and [API contract](docs/API.md) for payloads.
 
 ## Request flow
 
@@ -37,11 +37,13 @@ These modules are not part of an active agent chat request:
 | `db_conn/sql_connection.py` | Uses pyodbc/ODBC Driver 18, can create/alter views, writes JSONL/CSV and invokes splitting/uploads; catches errors and can return an empty DataFrame |
 | `app/utils/s3/divide_jsonl_files.py` | Creates per-record CSV and metadata, uploads both under `aiccra/chatbot/knowledge_base/`, deletes per-record files; logs/continues on line errors |
 | `app/utils/s3/upload_file_to_s3.py` | S3 existence/upload helpers with explicit development AWS credentials |
-| `jsonl_to_json.py` | Reads/writes hardcoded paths at import; not an inert library |
+| `app/utils/conversion/jsonl_to_json_*.py` | Five scripts for contributions, deliverables, innovations, OICRs and questions; read/write hardcoded working-directory paths at import, so they are not inert libraries |
 | `openai_chatbot.py` | Independent interactive OpenAI vector-store search and Responses experiment |
 | `app/utils/feedback/feedback_util.py` | Unused local-file/S3 helper with missing feedback model imports |
 
-SQL extraction and S3 upload do not establish that KB ingestion completed. The active agent reload block is commented out. API `insert_data=true` metadata does not demonstrate database or ingestion activity. `pyodbc` is not declared here; do not make auxiliary SQL a prerequisite of normal chat setup.
+SQL extraction and S3 upload do not establish that KB ingestion completed. The active agent accepts `insert_data` but contains no reload implementation. API `insert_data=true` metadata does not demonstrate database or ingestion activity. `pyodbc` is not declared here; do not make auxiliary SQL a prerequisite of normal chat setup.
+
+The conversion scripts read the corresponding `vw_ai_*.jsonl` file and write `vw_ai_*_openai.json`; the contributions script uses `vw_ai_project_contribution`. They do not upload the converted output or establish that it is indexed. Inspect input/output paths before running a script from the service directory.
 
 ## Client lifecycle and configuration
 
