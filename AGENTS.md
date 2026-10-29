@@ -30,13 +30,14 @@ Actual branch names are not always identical to directory names. Known pairs inc
 | `ai-feedback-service/` | `dev-feedback` | `main-feedback` |
 | `ai-insights-service/` | `dev-ai-insights` | `main-ai-insights` |
 | `ar-generator-service/` | `dev-ar-generator` | `main-ar-generator` |
+| `chatbot-service/` | `dev-chatbot-service` | `main-chatbot-service` |
 | `fast-response-service/` | `dev-fast-response` | `main-fast-response` |
 | `mapping-service/` | `dev-mapping` | `main-mapping` |
 | `partner-request-support/` | `dev-partner-request-support` | `main-partner-request-support` |
 | `qa-service/` | `dev-qa` | `main-qa` |
 | `text-mining-service/` | `dev-text-mining` | `main-text-mining` |
 
-Verify these names against current references. For `chatbot-service/`, both `dev-chatbot` and `dev-chatbot-service` references exist; confirm the intended development line for `main-chatbot-service`. `admin-module/` has a `dev-admin-module` reference, but a matching service-main branch is not established here. Confirm the workflow for `clarisa-agresso-service/` rather than inferring one from its name.
+Verify these names against current references. `admin-module/` has a `dev-admin-module` reference, but a matching service-main branch is not established here. Confirm the workflow for `clarisa-agresso-service/` rather than inferring one from its name.
 
 - Prepare service work from its development branch, using a focused task branch when appropriate. Follow a different base when explicitly requested.
 - Development-to-service-main merges are handled by the maintainer unless explicitly delegated. Preparing documentation does not authorize release merges or deployments.
