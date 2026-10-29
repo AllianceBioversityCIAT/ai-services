@@ -1,6 +1,6 @@
 # Fast Response API guide
 
-This documents the implementation on `dev-fast-response`. Start/configure the service through its [README](../README.md). The API has three application routes plus FastAPI's generated documentation endpoints.
+This documents the implementation on `main-fast-response`. Start/configure the service through its [README](../README.md). The API has three application routes plus FastAPI's generated documentation endpoints.
 
 ## Routes
 

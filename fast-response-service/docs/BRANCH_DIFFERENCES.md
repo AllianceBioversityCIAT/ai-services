@@ -4,7 +4,7 @@ Initial comparison: development `edbb4b80` (`dev-fast-response`) and service-mai
 
 ## Current service comparison
 
-The tracked service file paths are identical. The only content difference is `app/utils/logger/logger_util.py`:
+The tracked service file paths are identical. The only implementation difference is `app/utils/logger/logger_util.py`; the guides also receive branch-specific wording during documentation promotion:
 
 | Area | Development | Service-main |
 | --- | --- | --- |
@@ -14,6 +14,17 @@ The tracked service file paths are identical. The only content difference is `ap
 Preserve the service-main path for its writable temporary filesystem. The development path is based on the source file's location, not the shell's current directory. Both variants initialize the directory/file at import, emit to stdout, rotate at 5 MiB with five backups, and use logger level DEBUG.
 
 At this comparison, API routes, schemas, model ID/settings, region, dependency declarations/lockfile, Dockerfile, and local/Lambda entry points match. The rest of the monorepo can differ between branches; those snapshot differences do not authorize bringing unrelated services into a documentation change.
+
+## Local service-main review
+
+Reviewed merge `490599ca` against development `6fdaee10` and its service-main first parent `3431d9a3`:
+
+- All development commits are included, with no missing tracked service paths.
+- The merge changes only seven Markdown files relative to its service-main first parent: the shared guide and service documentation. It introduces no runtime, dependency, deployment, or other-service changes.
+- Routes, schemas, model settings, AWS configuration, dependency declarations/lockfile, Dockerfile, and local/Lambda entry points match development. The intentional log-path difference remains intact.
+- README, API/design guides, and agent instructions now identify `main-fast-response` and `/tmp/logs/app.log` as current. The quick start, system architecture, examples, project map, and troubleshooting remain available.
+
+This repository comparison does not verify live AWS access, model output, a Jenkins run, or a deployment.
 
 ## Promotion checklist
 

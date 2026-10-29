@@ -1,6 +1,6 @@
 # Fast Response Service design
 
-This is the implemented development-branch design. The [README diagram](../README.md#system-architecture) gives the call flow; the [API guide](API_GUIDE.md) defines request/error semantics.
+This is the implemented design on `main-fast-response`. The [README diagram](../README.md#system-architecture) gives the call flow; the [API guide](API_GUIDE.md) defines request/error semantics.
 
 ## Components and execution
 
@@ -31,7 +31,7 @@ Changing model, region, prompt concatenation, or response parsing changes behavi
 
 Each request carries its own inputs; there is no conversation/session record. The Bedrock client and logger are module-level objects. The async route executes a synchronous SDK call directly, which occupies its worker during the call; no background job or nonblocking provider adapter is implemented.
 
-Development creates a rotating file under service-relative `data/logs/app.log` during import, with a 5 MiB limit and five backups, in addition to stdout. Service-main uses `/tmp/logs/app.log`. Initialization requires a writable directory. Logger level is DEBUG; Uvicorn's CLI log-level option does not change that application constant.
+This branch creates a rotating file at `/tmp/logs/app.log` during import, with a 5 MiB limit and five backups, in addition to stdout. The same path applies during local execution. Development uses service-relative `data/logs/app.log`. Initialization requires a writable directory. Logger level is DEBUG; Uvicorn's CLI log-level option does not change that application constant.
 
 The route logs the full prompt. Model calls log usage and stop reason, and error paths log exception text. Request/response logs are not a durable request database or evidence of successful upstream delivery. Handle them according to their contents rather than committing them as examples.
 

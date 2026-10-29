@@ -2,7 +2,7 @@
 
 Fast Response Service applies a caller-supplied instruction to input text through AWS Bedrock and returns generated text as JSON. Typical uses include summarization, rewriting, translation, and drafting replies. This service contains a Python API; it has no dedicated frontend, document ingestion pipeline, vector database, or conversation store.
 
-This README describes `dev-fast-response`. Service-main currently differs in its log-file location; see [branch differences](docs/BRANCH_DIFFERENCES.md). Model quality, response time, and deployed access controls require separate verification.
+This README describes `main-fast-response`. This branch writes file logs to `/tmp/logs/app.log`, including when run locally; see [branch differences](docs/BRANCH_DIFFERENCES.md). Model quality, response time, and deployed access controls require separate verification.
 
 ## Start here
 
@@ -13,7 +13,7 @@ This README describes `dev-fast-response`. Service-main currently differs in its
 | Integrate requests and handle errors | [API guide](docs/API_GUIDE.md) |
 | Follow components and provider calls | [System architecture](#system-architecture), [detailed design](docs/HIGH_LEVEL_DESIGN.md) |
 | Continue implementation | [Agent guide](AGENTS.md) |
-| Prepare service-main integration | [Branch differences](docs/BRANCH_DIFFERENCES.md) |
+| Review branch integration | [Branch differences](docs/BRANCH_DIFFERENCES.md) |
 | Diagnose common failures | [Troubleshooting](#troubleshooting) |
 
 ## Quick start
@@ -40,7 +40,7 @@ AWS_ACCESS_KEY_ID_BR=YOUR_AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY_BR=YOUR_AWS_SECRET_ACCESS_KEY
 ```
 
-Use real development credentials supplied outside Git, or an appropriate standard boto3 credential source when those variables are unset. The current model is `us.anthropic.claude-sonnet-4-6`, invoked through a Bedrock Runtime client explicitly configured for `us-east-1`.
+Use credentials for the intended environment supplied outside Git, or an appropriate standard boto3 credential source when those variables are unset. The current model is `us.anthropic.claude-sonnet-4-6`, invoked through a Bedrock Runtime client explicitly configured for `us-east-1`.
 
 `AWS_REGION` is read into the configuration dictionary but does **not** override this client's hardcoded region. There is no model-ID environment override. See [configuration](#configuration) before changing either behavior.
 
@@ -134,7 +134,7 @@ fast-response-service/
         └── logger/logger_util.py # stdout and rotating file logging
 ```
 
-`.env`, virtual environments, and generated logs are local artifacts. Development file logs are created under `data/logs/app.log`; service-main uses `/tmp/logs/app.log`.
+`.env`, virtual environments, and generated logs are local artifacts. This service-main branch creates file logs at `/tmp/logs/app.log`; development uses service-relative `data/logs/app.log`.
 
 ## API and usage
 
@@ -248,7 +248,7 @@ The checked workflow triggers Jenkins on pushes to `main-fast-response`, pull re
 | HTTP 400 or 500 | Inspect the nested `detail` object and relevant logs; see [error semantics](docs/API_GUIDE.md#errors). A caught `ValueError` becomes 400, while other generation failures become 500. |
 | Incomplete output with HTTP 200 | The response contains only the first Bedrock content block. Non-`end_turn` stop reasons are logged, not exposed as API failure; token/stop metadata is not returned. |
 | Port 8000 is occupied | Choose another port with `python api_server.py --port 8001` and update the client's URL. |
-| Read-only filesystem or log initialization failure | This development logger creates `data/logs` during import. Service-main uses writable `/tmp/logs`; preserve that branch difference before deployment. |
+| Read-only filesystem or log initialization failure | This branch creates `/tmp/logs` during import and writes `/tmp/logs/app.log`. Check directory permissions and preserve this service-main path; development uses service-relative `data/logs`. |
 | Docker build cannot find `.env` | The current Dockerfile explicitly copies it; review the build inputs and packaging behavior described above. |
 
 Logs use stdout plus a rotating file (5 MiB, five backups), with logger level DEBUG. The route logs the complete supplied prompt, and model calls log token usage and stop reason. Avoid embedding credentials or sensitive data in prompts and shared diagnostics. Changing Uvicorn's `--log-level` does not reconfigure the service logger's DEBUG constant.

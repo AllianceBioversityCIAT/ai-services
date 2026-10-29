@@ -1,12 +1,12 @@
 # Fast Response Service: agent guide
 
-Read the [root guide](../AGENTS.md), [README](README.md), and relevant implementation before editing. This is a small Python API with a single generation operation; do not import assumptions about retrieval, storage, or frontends from other services.
+Read the [root guide](../AGENTS.md), [README](README.md), and relevant implementation before editing. These instructions describe `main-fast-response`, which writes logs to `/tmp/logs/app.log`. This is a small Python API with a single generation operation; do not import assumptions about retrieval, storage, or frontends from other services.
 
 ## Scope and branches
 
 - Development: `dev-fast-response`; service-main: `main-fast-response`. Verify current references before integration.
 - Prepare focused work from development. Maintainers handle development-to-service-main merges unless explicitly delegated. Keep shared guide changes separate from service work in commits/review.
-- Current service-main changes only the file-log location to `/tmp/logs`; development uses service-relative `data/logs`. Preserve that intentional runtime difference and adapt docs after the maintainer's local merge. See [comparison](docs/BRANCH_DIFFERENCES.md).
+- The active log location in this branch is `/tmp/logs`, including local execution; development uses service-relative `data/logs`. Preserve that intentional runtime difference and keep branch-specific documentation aligned after integration. See [comparison](docs/BRANCH_DIFFERENCES.md).
 - A branch snapshots the whole monorepo. Review incoming commits/diffs before authorized integration; do not copy unrelated service changes or merge all of main merely to obtain docs.
 
 ## Implementation map
