@@ -2,7 +2,7 @@
 
 Records AI interactions across services and optionally attaches positive/negative feedback. The active API stores records in **DynamoDB**, supports later feedback updates and exposes search and summary endpoints. Negative feedback can queue an email notification through RabbitMQ.
 
-This guide describes `dev-feedback`. The inspected `main-feedback` service files currently match development; compare them again after integration. The service has no frontend and does not invoke an AI model to generate answers.
+This guide describes `main-feedback` after the local development merge. The complete service tree matched `dev-feedback` before these branch-specific documentation adjustments; no production-only code or route difference was found. See the [merge comparison](docs/BRANCH_DIFFERENCES.md). The service has no frontend and does not invoke an AI model to generate answers.
 
 ## Documentation
 
@@ -50,7 +50,7 @@ Copy [.env.example](.env.example) without committing real credentials. [config_u
 | `EMAIL_RECIPIENT` | Comma-separated recipient list; whitespace trimmed |
 | `BUCKET_NAME` | Only retained legacy S3 configuration; not used by the active DynamoDB service |
 
-Choose an environment intentionally: branch names do not set `ENV`, and development is not automatically prevented from accessing production. DynamoDB access needs table read/write/scan permissions; automatic provisioning also needs table creation and describe permissions. RabbitMQ is contacted on negative-feedback notification attempts, not as a startup health dependency. An empty broker URL disables successful queueing; failed notifications do not roll back stored interactions.
+Choose an environment intentionally: branch names do not set `ENV`, and development is not automatically prevented from accessing production. `.env.example` uses `ENV=testing` for local setup; it does not establish the deployed environment. Configure the intended suffix and AWS identity explicitly for deployment. DynamoDB access needs table read/write/scan permissions; automatic provisioning also needs table creation and describe permissions. RabbitMQ is contacted on negative-feedback notification attempts, not as a startup health dependency. An empty broker URL disables successful queueing; failed notifications do not roll back stored interactions.
 
 ## Integration: create, then attach feedback
 

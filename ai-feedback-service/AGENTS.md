@@ -1,10 +1,12 @@
 # Feedback service: agent guide
 
-Read [root instructions](../AGENTS.md), [README](README.md), [API contract](docs/API.md) and the relevant implementation. This guide describes dev-feedback; verify branch/tree and preserve local user files before editing.
+Read [root instructions](../AGENTS.md), [README](README.md), [API contract](docs/API.md) and the relevant implementation. This guide describes main-feedback; verify branch/tree and preserve local user files before editing.
 
 ## Scope and workflow
 
-Use a focused task branch from dev-feedback when appropriate. Integration is task branch → dev-feedback → main-feedback → staging → main. The maintainer handles release merges unless delegated. After a local merge into main-feedback, compare full trees and adapt docs for actual runtime/config differences. Commit and push are separate requests. Preserve shared guide updates separately from service changes in commits/review.
+Normal development starts in a focused task branch from dev-feedback when appropriate. Integration is task branch → dev-feedback → main-feedback → staging → main. When the maintainer requests review after a local main-feedback merge, compare full trees and adapt documentation on main-feedback to its resulting files. The maintainer handles release merges unless delegated. Commit and push are separate requests. Preserve shared guide updates separately from service changes in commits/review.
+
+The reviewed merge retained the same service code/configuration as development; see the [comparison](docs/BRANCH_DIFFERENCES.md). Do not invent production-only routes, credential arguments or environment defaults. `.env.example` is a local testing template, not a declaration of deployed ENV. Keep technical documentation under `docs/` and update relative links when moving guides.
 
 ## Implementation map
 
