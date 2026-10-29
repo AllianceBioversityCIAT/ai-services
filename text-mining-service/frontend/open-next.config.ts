@@ -17,9 +17,11 @@ const config = {
     },
   },
   middleware: {
+    external: false,
     assetResolver: () => import("./s3AssetResolver").then((m) => m.default),
   },
-  /* Fase 1: no desplegamos Lambda de imágenes; evita instalar sharp en CI (fallos en algunos entornos Windows). */
+  // The Function URL deployment does not serve optimized images. OpenNext still
+  // generates its auxiliary image bundle and installs sharp during the build.
   imageOptimization: {
     loader: "dummy",
   },

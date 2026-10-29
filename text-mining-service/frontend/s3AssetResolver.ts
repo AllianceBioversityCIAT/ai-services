@@ -4,7 +4,7 @@ import type { AssetResolver } from "@opennextjs/aws/types/overrides.js";
 
 /**
  * Sirve estáticos desde S3 cuando solo hay Function URL (sin CloudFront delante).
- * OpenNext 3 usa por defecto assetResolver "dummy" y asume CF→S3 para /_next/static.
+ * OpenNext usa por defecto assetResolver "dummy" y asume CF→S3 para /_next/static.
  *
  * URL del navegador: /_next/static/media/foo.<hash>.png
  * Clave S3: <BUCKET_KEY_PREFIX>/_next/static/media/foo.<hash>.png (p. ej. prefijo _assets)
