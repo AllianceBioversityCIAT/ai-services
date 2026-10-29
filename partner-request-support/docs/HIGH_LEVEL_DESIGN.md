@@ -1,6 +1,6 @@
 # Partner Request Support design
 
-This is the implemented development-branch design. Deployment templates and configuration are not proof of live infrastructure state. Start with the [product workflows](PRODUCT_OVERVIEW.md) or [API guide](API_GUIDE.md).
+This is the implemented design of `main-partner-request-support`. Deployment templates and configuration are not proof of live infrastructure state. Start with the [product workflows](PRODUCT_OVERVIEW.md) or [API guide](API_GUIDE.md).
 
 ## Components and calls
 
@@ -40,7 +40,7 @@ ACCEPT/REJECT are sent upstream only under the selected response/creation mode a
 | State/client | Location and boundary |
 | --- | --- |
 | Institution snapshot | Supabase `clarisa_institutions_v2`; Titan vectors, SQL functions, synchronized source data |
-| Match cache | `partner_request_cache_test` in development; `partner_request_cache_prod` in service-main; selected in code/SQL |
+| Match cache | `partner_request_cache_prod` in this branch; `partner_request_cache_test` in development; selected in code/SQL |
 | Pending snapshot | Module-global Python list, refreshed from CLARISA; isolated per process/Lambda instance |
 | Frontend session | Token/user/result state in React hooks |
 | Provider clients | Constructed during imports for Supabase, OpenAI, and AWS; configuration can prevent startup |

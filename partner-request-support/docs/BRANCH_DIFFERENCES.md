@@ -16,6 +16,18 @@ Both CORS defaults also include localhost ports 3000/3001. `CORS_ORIGINS` can ov
 
 The previous service-main README also omitted a stale first-three-requests development note. Current development code defaults to ten oldest pending requests, not three. Verify the code after integration rather than restoring that historical limit. An observed backend `.gitignore` difference was only its final newline.
 
+## Local service-main review
+
+Reviewed the local merge `302cbc1b` against development `a559365a` and its service-main first parent `b2d3550f`:
+
+- The merge adds/updates only 14 Markdown files relative to its service-main first parent. It introduces no runtime, dependency, deployment, or other-service changes.
+- Both service trees contain the same tracked file paths, including frontend files, SQL, documentation, and example scripts. Backend manifests/lockfile and frontend manifests/lockfile are identical.
+- Within the service, the remaining runtime differences are exactly the production choices in the table above: CORS, cache constant/SQL, login, and badge. The only additional file difference is the backend `.gitignore` final newline.
+- API routes, request models, batch size/selection, and automatic-decision logic match development. Differences elsewhere in the monorepo between the branch snapshots were already present in service-main and were not introduced by this documentation merge.
+- Service-main README, component READMEs, API/design guides, and agent instructions have been adapted to identify production choices as current. The README retains its quick start, project map, system architecture, and troubleshooting.
+
+This review verifies repository contents. It does not check a deployed pipeline, live credentials, provider access, or production data.
+
 ## Integration checklist
 
 1. Let the maintainer integrate development into service-main locally, without pushing yet.

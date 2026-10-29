@@ -1,6 +1,6 @@
 # Partner Request Support API guide
 
-Source of truth: `backend/api.py` and its current callers. This guide documents the development branch's implemented request shapes and side effects, not an independently verified external CLARISA specification. Run/configure the backend using its [README](../backend/README.md).
+Source of truth: `backend/api.py` and its current callers. This guide documents `main-partner-request-support`'s implemented request shapes and side effects, not an independently verified external CLARISA specification. Run/configure the backend using its [README](../backend/README.md).
 
 ## Route index
 

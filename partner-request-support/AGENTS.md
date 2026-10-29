@@ -1,12 +1,12 @@
 # Partner Request Support: agent guide
 
-Read the [root instructions](../AGENTS.md), [service README](README.md), and the relevant component README before editing. This service combines a FastAPI backend and a static Next.js frontend. Documentation describes development; verify the current branch before applying it to service-main.
+Read the [root instructions](../AGENTS.md), [service README](README.md), and the relevant component README before editing. This service combines a FastAPI backend and a static Next.js frontend. Documentation here describes `main-partner-request-support`; its cache table, default CORS origin, frontend login, and badge retain production choices. Local execution does not switch them to development.
 
 ## Scope and integration
 
 - Development: `dev-partner-request-support`; service-main: `main-partner-request-support`. Verify references before starting.
 - Prepare focused work from development. The maintainer handles development-to-service-main integration unless explicitly delegated. Review the complete incoming diff; a branch snapshots the whole monorepo.
-- Preserve production cache constants/SQL, CORS, frontend login URL, and environment label. Read [branch differences](docs/BRANCH_DIFFERENCES.md) before adapting service-main docs.
+- This branch selects `partner_request_cache_prod`, defaults CORS to `https://d2xsau6p4hnevy.cloudfront.net` plus localhost, uses `https://api.clarisa.cgiar.org/auth` for login, and displays Production Environment. Preserve these production cache constants/SQL, CORS, frontend login URL, and environment label. Read [branch differences](docs/BRANCH_DIFFERENCES.md) before adapting service-main docs.
 - Keep shared `AGENTS.md` changes separable from service documentation. Do not change other services, dependencies, or Jenkins configuration as part of documentation maintenance.
 
 ## Implementation map

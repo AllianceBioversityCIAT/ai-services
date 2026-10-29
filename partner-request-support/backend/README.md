@@ -16,7 +16,9 @@ Docker installs `requirements.txt` with pip. `pyproject.toml` is a separate loca
 
 ## Configuration
 
-Create `.env` in this backend directory with values supplied for development. No template is included in this checkout. A minimal placeholder configuration is:
+This README describes `main-partner-request-support`, whose cache constant and cache SQL select `partner_request_cache_prod`. Local execution retains that choice. Use the development branch for its test-cache defaults.
+
+Create `.env` in this backend directory with values supplied for the intended environment. No template is included in this checkout. A minimal placeholder configuration is:
 
 ```env
 SUPABASE_URL=https://your-supabase-project.example
@@ -72,11 +74,11 @@ Health returns process status without testing Supabase, CLARISA, model access, o
 The SQL files under `sql/` define the institution vector table/RPCs and the branch-specific cache table. Review and provision them deliberately in the intended database; initialization/synchronization is not a harmless smoke test. The cache SQL also creates a trigger and is not simply a universally repeatable migration.
 
 - [Institution vector schema](sql/create_clarisa_vector_table.sql)
-- [Development cache schema](sql/create_partner_cache_table.sql)
+- [Production cache schema](sql/create_partner_cache_table.sql)
 
 `src/populate_clarisa_db.py` populates/synchronizes institutions, creates embeddings, and can remove obsolete rows. Processing endpoints also perform synchronization with `delete_obsolete=True`. Confirm data ownership and intended environment before live execution.
 
-The active cache constant is `partner_request_cache_test` in development; service-main selects `partner_request_cache_prod`. `POST /api/clear-cache` clears the selected cache and is not a read-only readiness check.
+The active cache constant in this service-main branch is `partner_request_cache_prod`; development selects `partner_request_cache_test`. `POST /api/clear-cache` clears the selected cache and is not a read-only readiness check.
 
 ## Deployment and validation
 

@@ -2,7 +2,7 @@
 
 Partner Request Support compares proposed institutions with the CLARISA institution catalog and supports manual review, web research, and an optional automated decision flow. It contains a FastAPI backend and a Next.js frontend exported as static files.
 
-This documentation describes the development branch. The service-main branch preserves different cache-table and environment destinations; see [branch differences](docs/BRANCH_DIFFERENCES.md). Repository checks do not certify live CLARISA contracts, model accuracy, or deployment availability.
+This documentation describes `main-partner-request-support`, the service-main branch. It selects the production cache table, CLARISA login host, and environment label; see [branch differences](docs/BRANCH_DIFFERENCES.md). Repository checks do not certify live CLARISA contracts, model accuracy, or deployment availability.
 
 ## Start here
 
@@ -21,7 +21,7 @@ This documentation describes the development branch. The service-main branch pre
 
 ## Quick start
 
-You need Python 3.13, Node.js/npm compatible with the frontend lockfile, and access to the development Supabase, CLARISA, AWS, and OpenAI resources. Use an existing prepared development database; first-time database provisioning is covered in the [backend setup guide](backend/README.md#database-and-operational-setup).
+You need Python 3.13, Node.js/npm compatible with the frontend lockfile, and access to the intended Supabase, CLARISA, AWS, and OpenAI resources. This branch retains production login/cache choices even when run locally; use `dev-partner-request-support` for the development defaults. Use an existing prepared database for the intended environment; first-time database provisioning is covered in the [backend setup guide](backend/README.md#database-and-operational-setup).
 
 ### 1. Prepare the backend
 
@@ -34,7 +34,7 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-Create `.env` in the backend directory using the [configuration example and variable table](backend/README.md#configuration). Supply development values for Supabase, OpenAI, the CLARISA URLs, and AWS access. The URLs in the example are placeholders; provider clients are constructed during import, so configuration must be ready before starting the API.
+Create `.env` in the backend directory using the [configuration example and variable table](backend/README.md#configuration). Supply values for the intended environment for Supabase, OpenAI, the CLARISA URLs, and AWS access. The selected cache table remains `partner_request_cache_prod`; `.env` does not switch that code constant. The URLs in the example are placeholders; provider clients are constructed during import, so configuration must be ready before starting the API.
 
 ### 2. Start the API
 
@@ -67,7 +67,7 @@ Then start the UI:
 npm run dev
 ```
 
-Open [the local application](http://localhost:3000). Development login uses the CLARISA test authentication host independently of `NEXT_PUBLIC_API_URL`; see the [frontend setup guide](frontend/README.md).
+Open [the local application](http://localhost:3000). Login in this branch uses the production CLARISA authentication host independently of `NEXT_PUBLIC_API_URL`; see the [frontend setup guide](frontend/README.md).
 
 ### 4. Check startup and choose a workflow
 
@@ -189,13 +189,13 @@ Field completeness is returned as information in the current automatic web/rules
 
 The Next.js app supports Excel upload, pending-request synchronization, ten-request processing batches, candidate inspection, manual web search, and human accept/reject actions. React hooks keep login state and results; the UI calls the configured Python API directly.
 
-In this development branch, login targets the CLARISA test authentication host. The browser receives an access token and passes it as an internal `auth_token` value for creation/response operations. Those calls translate it to an upstream Bearer header.
+In this service-main branch, login targets `https://api.clarisa.cgiar.org/auth/login`, and the header displays Production Environment. The browser receives an access token and passes it as an internal `auth_token` value for creation/response operations. Those calls translate it to an upstream Bearer header.
 
 The local FastAPI routes do not define a general authentication dependency. A frontend login does not establish protection of every backend route. Confirm infrastructure access controls and external catalog/endpoint contracts for the target environment.
 
 ## Storage and configuration
 
-Supabase stores `clarisa_institutions_v2` and the development cache table `partner_request_cache_test`. Service-main uses `partner_request_cache_prod`. The table is selected by a code constant and matching SQL, not an environment flag. Preserve that distinction during integration.
+Supabase stores `clarisa_institutions_v2` and, in this branch, the production cache table `partner_request_cache_prod`. Development uses `partner_request_cache_test`. The table is selected by a code constant and matching SQL, not an environment flag. Preserve that distinction during integration.
 
 Configuration includes Supabase access, CLARISA institution/pending/create/respond/catalog URLs, AWS Bedrock/Translate/S3 access, OpenAI, and optional RabbitMQ email settings. See the [backend configuration table](backend/README.md#configuration); no `.env.example` is included in the reviewed tree.
 
@@ -221,7 +221,7 @@ Start with the API terminal output and the browser's Network panel to identify w
 | Symptom | What to check |
 | --- | --- |
 | Backend fails during startup or reports a missing module | Activate the backend virtual environment and install its `requirements.txt` using that environment's Python. For provider configuration errors, check `backend/.env`, Supabase/OpenAI settings, and AWS credentials. Imports can fail before `/health` becomes available. |
-| Supabase reports a missing relation or RPC function | Confirm that `SUPABASE_URL` points to the intended development database and that the required schema/functions were provisioned. Compare the [institution SQL](backend/sql/create_clarisa_vector_table.sql) and [cache SQL](backend/sql/create_partner_cache_table.sql) with that database before applying changes. |
+| Supabase reports a missing relation or RPC function | Confirm the database selected by `SUPABASE_URL`, the required schema/functions, and the `partner_request_cache_prod` table selected by this branch. Compare the [institution SQL](backend/sql/create_clarisa_vector_table.sql) and [cache SQL](backend/sql/create_partner_cache_table.sql) with that database before applying changes. |
 | Embedding dimension mismatch | Confirm Titan Text Embeddings V2 and the 1,024-dimensional columns/RPC parameters used by this service. Check the existing database schema before changing the model or regenerating vectors; see [matching details](backend/docs/HOW%20THE%20SEARCH%20WORKS.md). |
 | UI cannot reach the API or the browser reports CORS errors | Check that the API is running, `NEXT_PUBLIC_API_URL` uses the intended host/port, and `CORS_ORIGINS` includes the frontend's exact origin, including its port. Restart the frontend after changing `.env.local`; a static deployment requires rebuilding its assets. |
 | Login fails, or CLARISA rejects a create/respond call | Login uses the separate host in `frontend/app/services/authService.ts`. Confirm that the login environment, backend CLARISA URLs, user, and token belong to the intended environment. Changing the backend URL alone does not change the login host. |

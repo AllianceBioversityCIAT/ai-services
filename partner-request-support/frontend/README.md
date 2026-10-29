@@ -17,7 +17,7 @@ Create `.env.local` with the intended backend URL:
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-The URL is public browser configuration. Login is separate and currently uses a hardcoded CLARISA test authentication host in `app/services/authService.ts`. Service-main uses the production host. Changing `NEXT_PUBLIC_API_URL` alone does not change the login destination or the hardcoded environment badge.
+The URL is public browser configuration. Login in this service-main branch is separate and uses the hardcoded production base `https://api.clarisa.cgiar.org/auth` in `app/services/authService.ts`; the header displays Production Environment. The development branch uses the CLARISA test host. Running this branch locally retains its production login destination. Changing `NEXT_PUBLIC_API_URL` alone does not change the login destination or the hardcoded environment badge.
 
 ## User and API flow
 
