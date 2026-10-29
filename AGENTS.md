@@ -41,6 +41,7 @@ Verify these names against current references. For `chatbot-service/`, both `dev
 - Prepare service work from its development branch, using a focused task branch when appropriate. Follow a different base when explicitly requested.
 - Development-to-service-main merges are handled by the maintainer unless explicitly delegated. Preparing documentation does not authorize release merges or deployments.
 - Before any authorized merge, inspect all incoming commits and the complete diff. A documentation merge can also carry unreleased code or intentional environment differences.
+- After the maintainer's local development-to-service-main merge and before push, compare the resulting service-main with development. Check missing tests/interfaces, route changes, dependencies, and environment destinations; adapt the service-main README and agent guides to its actual tree while preserving deliberate differences.
 - Do not merge all of `main` into a service development branch merely to obtain documentation. Bring only the intended documentation changes when authorized.
 - Never reset, discard, or rewrite user work as part of switching branches or resolving conflicts.
 

@@ -1,5 +1,7 @@
 # Product Overview – STAR Text Mining
 
+> Historical product/design reference retained from the earlier service-main documentation. Model identifiers and performance descriptions in the body have not been validated as current runtime facts. Use the [current product overview](PRODUCT_OVERVIEW.md), [API guide](API_GUIDE.md), and [high-level design](HIGH_LEVEL_DESIGN.md) for the reviewed implementation and operational instructions.
+
 ---
 
 ## Problem Statement
