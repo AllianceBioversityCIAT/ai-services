@@ -28,11 +28,25 @@ Service-main tries directory creation in this order:
 
 An `OSError` during directory creation advances to the next candidate. If all candidates fail, the resolver raises a runtime error. File-handler initialization follows the choice and can still fail independently. Handlers are added only when the logger has none, unlike development's unconditional installation.
 
+The current application imports the logger before `config_util.py` loads dotenv. Supply main's `LOGS_DIR` in the process environment before startup; relying only on a `.env` value does not configure that initial selection.
+
 Both variants use stdout plus `app.log`, logger level DEBUG, 5 MiB rotation, and five backups. Do not simplify service-main to a fixed `/tmp/logs` path copied from another service.
 
 ## Packaging to preserve
 
 The service-main Dockerfile installs its requirements, copies app/handler files, explicitly copies `.env`, then copies the context, and starts `main.handler`. Git ignore rules do not exclude Docker inputs. Preserve the existing packaging file and the Mangum requirement unless a separate deployment change is requested. A tree difference does not by itself establish whether a future merge will delete or retain the file; inspect the actual resulting merge.
+
+## Local service-main review
+
+Reviewed merge `54908340` against development `97226090` and service-main first parent `4bf1c713`:
+
+- All development commits and tracked service paths are included. The main-only Dockerfile remains present.
+- The merge changes only seven Markdown files relative to its service-main first parent. No runtime, dependency, deployment, or other-service changes were introduced by this documentation merge.
+- API routes/models, query construction, normalization, prompts, environment/index selection, LLM parsing, config, pyproject, and entry points match development. The only implementation/tree differences remain Dockerfile presence, the Mangum requirement, and logger resolver/handler guard.
+- The preserved Dockerfile, requirements, and logger are identical to the pre-merge service-main versions.
+- README, API/design guides, and agent instructions have been adapted to the current service-main tree. The quick start, architecture, project map, examples, and troubleshooting remain available.
+
+This review verifies repository contents and offline behavior, not live OpenSearch/LLM access, Jenkins results, or a deployed Lambda image.
 
 ## Promotion checklist
 

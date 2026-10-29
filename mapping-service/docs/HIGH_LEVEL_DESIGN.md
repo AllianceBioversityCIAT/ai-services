@@ -1,10 +1,10 @@
 # Mapping Service design
 
-This is the implemented development-branch design. The [README diagram](../README.md#system-architecture) provides the component flow; the [API guide](API_GUIDE.md) defines the public contract and failure semantics.
+This is the implemented design of `main-mapping`. The [README diagram](../README.md#system-architecture) provides the component flow; the [API guide](API_GUIDE.md) defines the public contract and failure semantics.
 
 ## Components and execution
 
-Uvicorn's `api_server.py` launches `app.api.main:app` on port 8001 by default. `main.py` exports `Mangum(app)` for Lambda, although development requirements do not include Mangum. The FastAPI app registers the mapping router under `/map`, making the operation `/map/fields`.
+Uvicorn's `api_server.py` launches `app.api.main:app` on port 8001 by default. `main.py` exports `Mangum(app)` for Lambda, and this branch includes Mangum in both requirements and pyproject. The FastAPI app registers the mapping router under `/map`, making the operation `/map/fields`.
 
 The route calls `map_entries_to_ids` directly. Each entry selects an index, searches OpenSearch, builds candidates, optionally validates them through the LLM endpoint, and appends one result. Entries are processed sequentially with no batch queue, concurrency pool, local catalog store, or result cache.
 
@@ -30,15 +30,15 @@ The prompt's confidence guidance is not a separate code-enforced threshold. Publ
 
 ## Runtime, configuration, and logging
 
-`load_dotenv` and configuration dictionaries are evaluated during import, and the mapping module snapshots those values. Configuration changes require restart. No public-route authentication, rate limiting, or CORS middleware is configured in this app.
+`load_dotenv` and configuration dictionaries are evaluated during import, and the mapping module snapshots those values. Configuration changes require restart. The logger is imported before `config_util.py` calls `load_dotenv` in the current application import chain; a `LOGS_DIR` override must already be present in the process environment at logger initialization. No public-route authentication, rate limiting, or CORS middleware is configured in this app.
 
 OpenSearch requests have no explicit timeout. The async route executes blocking requests sequentially; LLM timeout does not bound the full batch. The service implements searches, not catalog writes, but search/LLM requests and logs have external/data effects.
 
-Development initializes stdout plus a rotating service-relative `data/logs/app.log` at import. Files rotate at 5 MiB with five backups and logger level DEBUG. Service-main has a directory resolver and handler guard; see [branch comparison](BRANCH_DIFFERENCES.md). Logs can contain names, candidate identifiers, decisions, and parsed/extracted model response data. Candidate staff email/center metadata can be transmitted to the LLM.
+This branch resolves the log directory from `LOGS_DIR`, service-relative `data/logs`, or `/tmp/mapping-service/logs`, then initializes stdout/file handlers when the logger has none. Files rotate at 5 MiB with five backups and logger level DEBUG. Development uses a fixed service-relative directory; see [branch comparison](BRANCH_DIFFERENCES.md). Logs can contain names, candidate identifiers, decisions, and parsed/extracted model response data. Candidate staff email/center metadata can be transmitted to the LLM.
 
 ## Deployment boundaries
 
-No Dockerfile exists in development. Service-main provides a Lambda Python 3.13 image, adds Mangum to requirements, and copies `.env` plus the full context during packaging. The service-main logger tries `LOGS_DIR`, then service-relative logs, then `/tmp/mapping-service/logs` when directory creation fails. That resolver does not certify successful later file opening or deployed availability.
+This branch's Dockerfile provides a Lambda Python 3.13 image, installs requirements including Mangum, copies `.env` plus the full context, and starts `main.handler`. Development lacks this Dockerfile and omits Mangum from requirements. This branch's logger tries `LOGS_DIR`, then service-relative logs, then `/tmp/mapping-service/logs` when directory creation fails. That resolver does not certify successful later file opening or deployed availability.
 
 No Mapping-specific GitHub workflow was found in the reviewed tree. Live Jenkins wiring, OpenSearch access, LLM/model choice, and deployment settings cannot be inferred from local code or the lack of a workflow file.
 

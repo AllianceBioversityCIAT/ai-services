@@ -2,7 +2,7 @@
 
 Mapping Service resolves free-text staff and institution names to identifiers from configured OpenSearch catalogs. It retrieves candidates with text/fuzzy queries, then asks an external LLM API to select a candidate or reject the match. Staff IDs come from STAR's `carnet`; institution IDs come from CLARISA's `code`.
 
-This guide describes `dev-mapping`. Service-main differs in packaging, Lambda dependencies, and logging; see [branch differences](docs/BRANCH_DIFFERENCES.md). The implemented retrieval uses text queries, not a vector/embedding search. There is no dedicated frontend or local catalog database.
+This guide describes `main-mapping`, which includes a Lambda Dockerfile, Mangum in requirements, and a log-directory resolver; see [branch differences](docs/BRANCH_DIFFERENCES.md). The implemented retrieval uses text queries, not a vector/embedding search. There is no dedicated frontend or local catalog database.
 
 ## Start here
 
@@ -13,7 +13,7 @@ This guide describes `dev-mapping`. Service-main differs in packaging, Lambda de
 | Integrate the API and interpret scores | [API guide](docs/API_GUIDE.md) |
 | Follow components and external calls | [System architecture](#system-architecture), [detailed design](docs/HIGH_LEVEL_DESIGN.md) |
 | Continue implementation | [Agent guide](AGENTS.md) |
-| Prepare service-main integration | [Branch differences](docs/BRANCH_DIFFERENCES.md) |
+| Review branch integration | [Branch differences](docs/BRANCH_DIFFERENCES.md) |
 | Diagnose failures or missing matches | [Troubleshooting](#troubleshooting) |
 
 ## Quick start
@@ -29,7 +29,7 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-This installs the local API dependencies. The development `requirements.txt` does not include `mangum`, although `pyproject.toml` declares it and `main.py` imports it for Lambda. That mismatch does not affect the documented Uvicorn entry point. No `uv.lock` or Dockerfile is present in this development tree; do not copy service-main deployment assumptions into local setup.
+This installs the local API and Lambda-adapter dependencies from this branch's `requirements.txt`, including `mangum`. `pyproject.toml` also declares Mangum. A Lambda Dockerfile is present in this branch; no tracked dependency lockfile is included. Development differs in these packaging/dependency details; see the [branch comparison](docs/BRANCH_DIFFERENCES.md).
 
 ### 2. Configure the external services
 
@@ -130,7 +130,8 @@ mapping-service/
 ├── docs/                           # API, product, design, branch comparison
 ├── api_server.py                   # Local Uvicorn CLI, default port 8001
 ├── main.py                         # Mangum Lambda handler
-├── requirements.txt                # Development local API dependencies
+├── Dockerfile                      # Lambda Python 3.13 image, main.handler
+├── requirements.txt                # Local API and Lambda-adapter dependencies
 ├── pyproject.toml                  # Project metadata; also declares mangum
 └── app/
     ├── api/
@@ -146,7 +147,7 @@ mapping-service/
             └── prompt_institutions.py
 ```
 
-`.env`, virtual environments, and generated logs are local artifacts. This branch writes logs to service-relative `data/logs/app.log`. Service-main has a different log-directory resolver and an additional Dockerfile.
+`.env`, virtual environments, and generated logs are local artifacts. This branch tries `LOGS_DIR`, service-relative `data/logs`, then `/tmp/mapping-service/logs` for directory creation, and writes `app.log` in the selected directory. It installs handlers only when none already exist. Development uses a fixed service-relative directory.
 
 ## API and examples
 
@@ -231,7 +232,9 @@ No hits, a no-match decision, or a caught per-entry error produces null mapped f
 | `CLARISA_OPENSEARCH_TEST_INDEX`, `CLARISA_OPENSEARCH_PROD_INDEX` | Institution index selected by the request's environment |
 | `CLARISA_OPENSEARCH_USERNAME`, `CLARISA_OPENSEARCH_PASSWORD` | Institution search Basic auth |
 | `LLM_API_URL` | Full generation endpoint; no model ID is configured inside Mapping |
-| `LOGS_DIR` | Not consumed by the development logger; service-main tries it first |
+| `LOGS_DIR` | First log-directory candidate in this branch; supply it in the process environment before startup. Development ignores it. |
+
+The logger is imported before `config_util.py` loads dotenv in the current app import chain. For explicit log selection, export `LOGS_DIR` before starting the process; a value only in `.env` is not loaded in time for that initial selection.
 
 The route has no implemented API-key/token dependency, rate limiter, or CORS middleware. OpenSearch credentials authenticate outbound searches; they do not authenticate callers of `/map/fields`. Deployment access controls must be checked separately.
 
@@ -244,9 +247,9 @@ task branch from dev-mapping
     → dev-mapping → main-mapping → staging → main
 ```
 
-This development branch has no Dockerfile. Service-main has a Lambda Python 3.13 Dockerfile, includes `mangum` in requirements, and uses a logger resolver that tries `LOGS_DIR`, the service log directory, then `/tmp/mapping-service/logs`. Preserve those differences during integration rather than replacing them with development assumptions.
+This service-main branch has a Lambda Python 3.13 Dockerfile, includes `mangum` in requirements, and uses a logger resolver that tries `LOGS_DIR`, the service log directory, then `/tmp/mapping-service/logs`. Preserve these implementation differences during integration. The image starts `main.handler`; the local Uvicorn command remains a separate execution path.
 
-The service-main Dockerfile copies `.env` and the full build context into its image. This is a description of that branch's packaging, not a verified build or deployment. No Mapping-specific GitHub workflow was found among the reviewed workflows; external Jenkins triggers are not established by that absence.
+The current Dockerfile copies `.env` and the full build context into its image. This records the checked-in packaging, not a verified build or deployment. No Mapping-specific GitHub workflow was found among the reviewed workflows; external Jenkins triggers are not established by that absence.
 
 After the maintainer's local merge, compare the resulting tree and **adjust the main-specific documentation before push**. The [branch guide](docs/BRANCH_DIFFERENCES.md) records files, dependencies, and logging behavior to check. Completed service work accumulates in staging for the agreed consolidated PR to main.
 
@@ -261,8 +264,8 @@ After the maintainer's local merge, compare the resulting tree and **adjust the 
 | A match scores 90 during LLM outages | First-hit fallback assigns 90. The response does not identify fallback separately from an LLM-selected match. |
 | Staff does not change with `environment=test` | Staff always uses the configured STAR index. The environment selector affects institution indexing only. |
 | Configuration changes appear ineffective | Restart after editing `.env`; configuration values are captured at import. |
-| Log initialization fails on a read-only filesystem | Development creates service-relative `data/logs` during import. Main's resolver differs; check [branch differences](docs/BRANCH_DIFFERENCES.md). |
-| Lambda import fails because Mangum is missing | Development requirements omit `mangum`; pyproject and service-main requirements include it. Review the target dependency source before preparing deployment. |
+| Log initialization fails on a read-only filesystem | Set a suitable `LOGS_DIR` in the process environment before startup, or inspect the resolver's service-directory and `/tmp/mapping-service/logs` fallbacks. File opening can still fail after directory selection; see [branch differences](docs/BRANCH_DIFFERENCES.md). |
+| Lambda import fails because Mangum is missing | This branch declares `mangum` in both requirements and pyproject. Verify that the actual image/environment installed this branch's dependencies; development requirements omit it. |
 
 Logs use stdout and a rotating file (5 MiB, five backups), with logger level DEBUG. They can contain search terms, candidate names/IDs, and LLM decisions or extracted response text. Staff candidate email/center metadata is sent to the LLM when present. Use fictional data in examples and redact shared diagnostics.
 

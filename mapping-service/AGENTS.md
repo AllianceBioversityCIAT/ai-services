@@ -1,6 +1,6 @@
 # Mapping Service: agent guide
 
-Read the [root instructions](../AGENTS.md), [README](README.md), and relevant source before editing. This guide describes development. Mapping uses OpenSearch text/fuzzy retrieval plus an external LLM API; it does not implement vector embeddings or direct Bedrock invocation.
+Read the [root instructions](../AGENTS.md), [README](README.md), and relevant source before editing. This guide describes `main-mapping` and its Lambda packaging/logging choices. Mapping uses OpenSearch text/fuzzy retrieval plus an external LLM API; it does not implement vector embeddings or direct Bedrock invocation.
 
 ## Scope and branches
 
@@ -23,7 +23,8 @@ Read the [root instructions](../AGENTS.md), [README](README.md), and relevant so
 | `app/utils/config/config_util.py` | Module-level STAR/CLARISA/LLM configuration |
 | `app/utils/prompts/` | Staff/institution matching prompts |
 | `app/utils/logger/logger_util.py` | Import-time directory/file logging and stdout |
-| `requirements.txt`, `pyproject.toml` | Different dependency declarations; development requirements omit Mangum |
+| `requirements.txt`, `pyproject.toml` | Both include Mangum in this branch; development requirements omit it |
+| `Dockerfile` | Lambda Python 3.13 image starting `main.handler`; absent from development |
 
 ## Contracts and behavior to preserve
 
@@ -41,7 +42,7 @@ Read the [root instructions](../AGENTS.md), [README](README.md), and relevant so
 
 ## Run and checks
 
-Use Python 3.13 from `mapping-service/`, install `requirements.txt` for the local API, and run `python api_server.py --host 127.0.0.1 --reload` or Uvicorn's `app.api.main:app` on port 8001. Lambda uses `main.handler`, but development requirements omit its Mangum dependency. There is no development Dockerfile or lockfile to infer an image build from.
+Use Python 3.13 from `mapping-service/`, install `requirements.txt` for the local API, and run `python api_server.py --host 127.0.0.1 --reload` or Uvicorn's `app.api.main:app` on port 8001. Lambda uses `main.handler`, and this branch includes Mangum in both requirements and pyproject. Its Dockerfile builds a Lambda Python 3.13 image; no dependency lockfile is tracked. Do not substitute development's missing Dockerfile/Mangum requirement for the current tree.
 
 No isolated tests/lint configuration were found. For offline verification, stub logging before import, prevent real dotenv loading, block network, and replace HTTP calls. Check request validation, empty/mixed batches, query bodies/Basic auth, environment selection, nested/direct/fenced LLM responses, fallback cases, and per-entry exceptions. Use fictional staff/catalog data; do not call live endpoints for documentation checks.
 
@@ -51,6 +52,6 @@ For docs-only work, verify local links, example syntax, source claims, and the M
 
 OpenSearch calls use `/_search` and do not implement catalog writes, but nonempty requests send data to configured search/LLM services and create logs. Candidate staff email/center metadata can be sent to the LLM. Logs can include terms, candidates, and parsed/extracted model data; keep real records, credentials, and logs out of commits.
 
-Development ignores `LOGS_DIR`. Service-main tries that variable, then its service log directory, then `/tmp/mapping-service/logs`, and avoids duplicate handler installation. Directory creation success is not a guarantee that opening the log file will succeed.
+This branch tries `LOGS_DIR`, then its service log directory, then `/tmp/mapping-service/logs`, and avoids duplicate handler installation. Development ignores `LOGS_DIR`. In the current app import chain, logger initialization precedes config_util's dotenv loading, so supply `LOGS_DIR` in the process environment before startup rather than relying only on `.env`. Directory creation success is not a guarantee that opening the log file will succeed.
 
 Service-main's Dockerfile copies `.env` and the full context. Do not copy secrets into examples or change build inputs during unrelated documentation work. No Mapping-specific workflow was found in the reviewed checkout; external Jenkins triggers remain unknown. Do not infer that a push cannot deploy.

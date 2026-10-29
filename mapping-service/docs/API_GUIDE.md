@@ -1,6 +1,6 @@
 # Mapping API guide
 
-This describes `dev-mapping` and its implemented request/result semantics. Start with the [README](../README.md) for setup. The only application route is `POST /map/fields`; generated Swagger/ReDoc/OpenAPI endpoints are also available. There is no GET root or health operation.
+This describes `main-mapping` and its implemented request/result semantics. Start with the [README](../README.md) for setup. The only application route is `POST /map/fields`; generated Swagger/ReDoc/OpenAPI endpoints are also available. There is no GET root or health operation.
 
 ## Request
 
