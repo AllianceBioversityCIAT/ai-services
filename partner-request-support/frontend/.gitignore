@@ -48,5 +48,5 @@ next-env.d.ts
 .agent/
 .agents/
 *.backup
-AGENTS.md
+
 CLAUDE.md
