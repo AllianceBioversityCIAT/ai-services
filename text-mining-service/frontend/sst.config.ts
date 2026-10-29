@@ -11,6 +11,12 @@ export default $config({
   },
   async run() {
     new sst.aws.Nextjs("BulkUploadWeb", {
+      // Use the adapter installed by npm ci, rather than SST's independent default.
+      buildCommand: "npm run build:open-next",
+      transform: {
+        server: (args) => { args.runtime = "nodejs22.x"; },
+        imageOptimizer: (args) => { args.runtime = "nodejs22.x"; },
+      },
       // Same-origin `/api/*` (e.g. validate-token) is served by this deployment; no basePath.
       environment: {
         NEXT_PUBLIC_MINING_API_BASE_URL: process.env.NEXT_PUBLIC_MINING_API_BASE_URL ?? "",

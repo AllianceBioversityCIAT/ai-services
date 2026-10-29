@@ -1,595 +1,208 @@
-# AI Services Feedback API
+# AI Interaction Tracking and Feedback Service
 
-![Python](https://img.shields.io/badge/python-3.13+-green.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-red.svg)
-![AWS](https://img.shields.io/badge/AWS-S3%20%7C%20Lambda-orange.svg)
+Records AI interactions across services and optionally attaches positive/negative feedback. The active API stores records in **DynamoDB**, supports later feedback updates and exposes search and summary endpoints. Negative feedback can queue an email notification through RabbitMQ.
 
-🔄 **AI Feedback Collection System**
+This guide describes `main-feedback` after the local development merge. The complete service tree matched `dev-feedback` before these branch-specific documentation adjustments; no production-only code or route difference was found. See the [merge comparison](docs/BRANCH_DIFFERENCES.md). The service has no frontend and does not invoke an AI model to generate answers.
 
-A comprehensive feedback management service for collecting, storing, and analyzing user feedback on AI-generated responses across multiple AI services and applications.
+## Documentation
 
-## 🎯 **Overview**
+| Need | Guide |
+| --- | --- |
+| Install, configure and integrate | This README |
+| Request fields, updates, search and errors | [API contract](docs/API.md) |
+| Storage, startup, notifications and maintenance | [Technical documentation](docs/TECHNICAL_DOCUMENTATION.md) |
+| Component boundaries and data flow | [Architecture](docs/HIGH_LEVEL_SOFTWARE_DESIGN.md) |
+| Users, workflow and product limitations | [Product overview](docs/PRODUCT_OVERVIEW.md) |
+| Promote changes safely | [Branch comparison](docs/BRANCH_DIFFERENCES.md) |
+| Continue work as an agent | [Service instructions](AGENTS.md) |
 
-This service provides a **feedback collection platform** designed to work with any AI service that generates user-facing content. Originally built for chatbot feedback, it has been restructured to support multiple AI services while maintaining backward compatibility.
+## Quick start
 
-### **Key Features**
-
-- 📝 **Feedback Collection**: Works with any AI service
-- 🔍 **Advanced Analytics**: Service-specific and cross-service insights  
-- 📊 **Real-time Monitoring**: Track AI service performance and user satisfaction
-- 🏗️ **Flexible Architecture**: Service-agnostic design for easy integration
-- 🔒 **Secure Storage**: AWS S3 with future database migration support
-- 📈 **Scalable Design**: Built to handle feedback from multiple services
-- 🎛️ **Rich Context Support**: Flexible metadata for service-specific insights
-- 🔄 **Auto-Registration**: Automatically discovers and registers new AI services
-
-## 🚀 **Quick Start**
-
-### **Prerequisites**
-
-- Python 3.13+
-- AWS Account with S3 access
-- Environment variables configured
-
-### **Installation**
+Use Python 3.13 to match the Lambda base image. Start from the service directory:
 
 ```bash
-# Clone the repository
-git clone <repository-url>
 cd ai-feedback-service
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure environment variables
+python3.13 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 cp .env.example .env
-# Edit .env with your AWS credentials
+# Set AWS_REGION, ENV and AWS credentials/profile before starting.
+.venv/bin/python api_server.py --host 127.0.0.1 --port 8001 --reload
 ```
 
-### **Environment Configuration**
+Open `http://localhost:8001/docs` for generated OpenAPI or `/health` for process/service-registry status. The local launcher's actual default port is **8001**, although one help string says 8000. `main.py` exports `main.handler` for Lambda; it is not the local HTTP launcher.
+
+**Startup contacts DynamoDB and may create a table.** Importing the application constructs the global service, loads `ai-requests-{ENV}` and creates it if absent. Use the intended AWS identity, region and exact environment suffix before starting; this is not an offline preview. Network-free documentation checks require fake AWS clients before importing the service.
+
+Docker installs `requirements.txt`; `pyproject.toml` lists the same direct dependencies, but there is no tracked lockfile. Both lists are unpinned. S3/Bedrock are not the active interaction storage/model pipeline despite older descriptions in this repository.
+
+## Configuration
+
+Copy [.env.example](.env.example) without committing real credentials. [config_util.py](app/utils/config/config_util.py) loads environment values using python-dotenv.
+
+| Setting | Actual use |
+| --- | --- |
+| `AWS_REGION` | Region for DynamoDB resource and client |
+| `ENV` | Literal suffix of `ai-requests-{ENV}`; no default or enum validation. An unset value selects `ai-requests-None` |
+| AWS credentials/profile/role | Standard SDK credential chain; active DynamoDB clients do not pass explicit access/secret keys |
+| `RABBITMQ_URL`, `EMAIL_QUEUE_NAME` | Optional negative-feedback notification transport and durable queue |
+| `MS_AUTH_USER`, `MS_AUTH_PASSWORD` | Authentication fields embedded in the downstream email-service message, separate from broker credentials in the URL |
+| `EMAIL_SENDER`, `EMAIL_SENDER_NAME` | Notification sender fields |
+| `EMAIL_RECIPIENT` | Comma-separated recipient list; whitespace trimmed |
+| `BUCKET_NAME` | Only retained legacy S3 configuration; not used by the active DynamoDB service |
+
+Choose an environment intentionally: branch names do not set `ENV`, and development is not automatically prevented from accessing production. `.env.example` uses `ENV=testing` for local setup; it does not establish the deployed environment. Configure the intended suffix and AWS identity explicitly for deployment. DynamoDB access needs table read/write/scan permissions; automatic provisioning also needs table creation and describe permissions. RabbitMQ is contacted on negative-feedback notification attempts, not as a startup health dependency. An empty broker URL disables successful queueing; failed notifications do not roll back stored interactions.
+
+## Integration: create, then attach feedback
+
+Send one record after the AI service produces an answer. This writes to DynamoDB; the fictional payload below has no feedback, so it does not request an email notification.
 
 ```bash
-# .env file
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=your_aws_access_key_here
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key_here
-BUCKET_NAME=your_bucket_name_here
+curl -X POST http://localhost:8001/api/interactions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_id": "demo-user",
+    "service_name": "chatbot",
+    "display_name": "Example Chatbot",
+    "service_description": "Example reporting assistant",
+    "session_id": "demo-session",
+    "user_input": "Summarize the example records",
+    "ai_output": "Example answer for documentation",
+    "platform": "AICCRA",
+    "context": {"filters_applied": {"phase": "AR 2025"}},
+    "response_time_seconds": 2.5
+  }'
 ```
 
-### **Running the Service**
+Retain the returned `interaction_id` (format `req_<uuid>`). Later use the **same endpoint** with `update_mode=true`, that ID, the original `service_name` and a `feedback_type`:
 
-```bash
-# Development server with auto-reload
-python api_server.py --reload
-
-# Production server
-python api_server.py --host 0.0.0.0 --port 8001
-
-# AWS Lambda deployment
-# Uses main.py as the Lambda handler
-```
-
-### **Testing the API**
-
-```bash
-# Health check
-curl http://localhost:8001/health
-
-# API documentation
-open http://localhost:8001/docs
-```
-
-## 📊 **Supported AI Services**
-
-### **Currently Registered Services**
-
-| Service | Description | Context Fields | Status |
-|---------|-------------|----------------|--------|
-| `chatbot` | Conversational AI interactions | `filters_applied` | ✅ Active |
-
-### **Adding New Services**
-
-New AI services are **automatically registered** when first encountered, or you can manually register them:
-
-```python
-# Automatic registration (first feedback submission)
-POST /api/feedback
+```json
 {
-    "service_name": "my-new-service",
-    "user_id": "user@example.com",
-    "ai_output": "AI response...",
-    "feedback_type": "positive"
-}
-
-# Manual registration (recommended for better analytics)
-POST /api/feedback/services/register
-{
-    "service_name": "reports-generator",
-    "display_name": "AICCRA Reports Generator",
-    "description": "AI-powered report generation service",
-    "expected_context": ["report_type", "data_sources"]
+  "user_id": "demo-user",
+  "service_name": "chatbot",
+  "interaction_id": "req_550e8400-e29b-41d4-a716-446655440000",
+  "update_mode": true,
+  "feedback_type": "positive",
+  "feedback_comment": "The example answer was useful."
 }
 ```
 
-## 🔧 **API Endpoints**
+`user_id` and `service_name` remain required in update requests. A true update flag without an ID currently creates a new record instead. The update path does not verify ownership or existence; use an ID actually returned for the same service. Comment-only updates are not a supported example because the current DynamoDB call can fail without a feedback type. See [update limitations](docs/API.md).
 
-### **Core Feedback Endpoints**
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/feedback` | Submit feedback for any AI service |
-| `GET` | `/api/feedback/summary` | Get cross-service analytics summary |
-| `POST` | `/api/feedback/search` | Advanced feedback search and filtering |
-| `GET` | `/api/feedback/services` | Get registered AI services information |
-| `GET` | `/api/feedback/service/{service_name}` | Get service-specific feedback |
-
-### **Service Management**
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/feedback/services/register` | Register a new AI service |
-| `GET` | `/health` | Service health check |
-| `GET` | `/` | API information and integration guide |
-
-### **Documentation**
-
-| Endpoint | Description |
-|----------|-------------|
-| `/docs` | Interactive Swagger UI documentation |
-| `/redoc` | ReDoc documentation |
-
-## 💻 **Integration Examples**
-
-### **Basic Feedback Submission**
+### Python example
 
 ```python
 import requests
 
-# Submit feedback for any AI service
-response = requests.post('http://localhost:8001/api/feedback', json={
-    'user_id': 'user@example.com',
-    'session_id': 'session-123',
-    'user_input': 'What is the weather like today?',
-    'ai_output': 'Today is sunny with 22°C in your location.',
-    'feedback_type': 'positive',
-    'feedback_comment': 'Very accurate and helpful response!',
-    'service_name': 'chatbot',
-    'context': {
-        'filters_applied': {'location': 'detected', 'source': 'weather_api'}
+base_url = "http://localhost:8001"
+response = requests.post(
+    f"{base_url}/api/interactions",
+    json={
+        "user_id": "demo-user",
+        "service_name": "example-service",
+        "ai_output": "Example output",
     },
-    'response_time_seconds': 2.5,
-    'platform': 'AICCRA'
-})
+    timeout=30,
+)
+response.raise_for_status()
+interaction_id = response.json()["interaction_id"]
 
-print(response.json())
-# {
-#   "feedback_id": "fb_550e8400-e29b-41d4-a716-446655440000",
-#   "status": "success",
-#   "message": "Feedback submitted successfully...",
-#   "timestamp": "2025-01-27T10:30:00Z",
-#   "service_name": "chatbot"
-# }
-```
-
-### **JavaScript/React Integration**
-
-```javascript
-class AIFeedbackService {
-    constructor(apiUrl) {
-        this.apiUrl = apiUrl;
-    }
-    
-    async submitFeedback(feedbackData) {
-        const response = await fetch(`${this.apiUrl}/api/feedback`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(feedbackData)
-        });
-        return response.json();
-    }
-    
-    async getServiceAnalytics(serviceName) {
-        const response = await fetch(
-            `${this.apiUrl}/api/feedback/summary?service_name=${serviceName}`
-        );
-        return response.json();
-    }
-}
-
-// React component example
-const FeedbackButton = ({ aiInteraction }) => {
-    const feedbackService = new AIFeedbackService('/api');
-    
-    const submitFeedback = async (type) => {
-        await feedbackService.submitFeedback({
-            feedback_type: type,
-            service_name: aiInteraction.serviceName,
-            user_id: currentUser.id,
-            user_input: aiInteraction.userInput,
-            ai_output: aiInteraction.aiOutput,
-            context: aiInteraction.context,
-            session_id: currentSession.id
-        });
-    };
-    
-    return (
-        <div>
-            <button onClick={() => submitFeedback('positive')}>👍</button>
-            <button onClick={() => submitFeedback('negative')}>👎</button>
-        </div>
-    );
-};
-```
-
-### **Service-Specific Examples**
-
-#### **Chatbot Service**
-
-```python
-# Chatbot feedback with conversation context
-requests.post('/api/feedback', json={
-    'service_name': 'chatbot',
-    'user_id': 'researcher@cgiar.org',
-    'session_id': 'chat-session-456',
-    'user_input': 'What progress has been made on IPI 1.1?',
-    'ai_output': 'AICCRA has achieved significant progress on IPI 1.1...',
-    'feedback_type': 'positive',
-    'context': {
-        'filters_applied': {
-            'phase': 'Progress 2025',
-            'indicator': 'IPI 1.1',
-            'section': 'All sections'
-        }
+feedback = requests.post(
+    f"{base_url}/api/interactions",
+    json={
+        "user_id": "demo-user",
+        "service_name": "example-service",
+        "interaction_id": interaction_id,
+        "update_mode": True,
+        "feedback_type": "positive",
     },
-    'response_time_seconds': 3.2
-})
+    timeout=30,
+)
+feedback.raise_for_status()
+print(feedback.json()["status"])
 ```
 
-#### **Report Generator Service**
+A client timeout is not a service latency guarantee. Retrying a create is not idempotent: each call generates another ID. Negative feedback attempts a real downstream notification when configured; API success does not prove email delivery.
 
-```python
-# Report generation feedback
-requests.post('/api/feedback', json={
-    'service_name': 'reports-generator',
-    'user_id': 'analyst@company.com',
-    'user_input': 'Generate Q4 financial report for ACME Corp',
-    'ai_output': '[Generated 50-page PDF report content]',
-    'feedback_type': 'negative',
-    'feedback_comment': 'Report missing key financial metrics',
-    'context': {
-        'report_type': 'quarterly_financial',
-        'data_sources': ['erp_system', 'crm_data'],
-        'template_used': 'standard_template_v2',
-        'generation_time_seconds': 120
-    },
-    'response_time_seconds': 120.5
-})
+## API navigation
+
+| Method/path | Implemented purpose |
+| --- | --- |
+| `POST /api/interactions` | Create an interaction or update feedback |
+| `GET /api/interactions/summary` | Counts, feedback/satisfaction rates and response-time average |
+| `POST /api/interactions/search` | Filter, sort and paginate records in application memory after scans |
+| `GET /api/feedback/services` | Process-local service registry |
+| `GET /api/feedback/service/{service_name}` | Service-filtered interaction list, including entries without feedback |
+| `GET /`, `GET /health` | Static metadata and in-memory registry information |
+| `/docs`, `/redoc`, `/openapi.json` | Generated documentation/schema |
+
+There is no `POST /api/feedback`, `/api/feedback/search`, `/api/feedback/summary` or HTTP registration route in the current router. Two read paths retain the `/api/feedback` prefix. Generated descriptions still contain older claims about replication/retention and health; code behavior is documented in the [API guide](docs/API.md).
+
+## System architecture
+
+```mermaid
+flowchart TD
+    Caller[AI service or browser caller] -->|POST interactions / feedback update| API[FastAPI]
+    API --> Service[AIInteractionService]
+    Service --> DDB[DynamoDB: ai-requests-ENV]
+    Service --> Registry[In-memory service metadata]
+    Service -->|Negative feedback: best effort| Email[Email message builder]
+    Email --> Rabbit[RabbitMQ queue]
+    Rabbit --> Worker[External email worker]
+    API -->|Search / summary| Scans[DynamoDB scans and in-memory aggregation]
+    Scans --> DDB
 ```
 
-## 📊 **Analytics & Monitoring**
+The module creates its DynamoDB service during import. Storage uses the composite key `(interaction_id, service_name)` and provisions `ServiceTimestampIndex`, but current reads use paginated scans rather than that index. Details are in the [technical guide](docs/TECHNICAL_DOCUMENTATION.md).
 
-### **Getting Service Analytics**
+Service metadata is not a durable global registry. `chatbot` is pre-registered per process. Request display name/description override metadata for that record; when either override is supplied, the service need not be added to the registry. Unknown names with neither override auto-register in that process. Restarting does not reconstruct the registry from stored data.
 
-```python
-# Get overall feedback summary
-summary = requests.get('/api/feedback/summary').json()
+## Project map
 
-# Get service-specific summary
-chatbot_summary = requests.get('/api/feedback/summary?service_name=chatbot').json()
-
-# Get detailed feedback for a service
-feedback_data = requests.get('/api/feedback/service/chatbot?limit=100').json()
-```
-
-### **Advanced Search**
-
-```python
-# Search with filters
-search_request = {
-    'service_name': 'chatbot',
-    'feedback_type': 'negative',
-    'has_comment': True,
-    'start_date': '2025-01-01T00:00:00Z',
-    'end_date': '2025-01-31T23:59:59Z',
-    'limit': 50,
-    'sort_by': 'timestamp',
-    'sort_order': 'desc'
-}
-
-results = requests.post('/api/feedback/search', json=search_request).json()
-```
-
-## 🏗️ **Architecture**
-
-### **Current Implementation**
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   AI Services   │    │  Feedback API    │    │   AWS S3        │
-│                 │───▶│                  │───▶│                 │
-│ • Chatbot       │    │ • FastAPI        │    │ • Organized     │
-│ • Reports Gen   │    │ • Pydantic       │    │   Structure     │
-│ • Text Mining   │    │ • Auto-register  │    │ • Secure        │
-│ • Custom        │    │ • Analytics      │    │   Storage       │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-```
-
-### **Data Storage Structure**
-
-```
-S3 Bucket: ai-services-ibd/
-├── ai-feedback/
-│   ├── chatbot/
-│   │   ├── 20250127/
-│   │   │   ├── feedback_chatbot_20250127_143022_fb_abc123.json
-│   │   │   └── feedback_chatbot_20250127_143145_fb_def456.json
-│   │   └── 20250128/
-│   ├── reports-generator/
-│   │   └── 20250127/
-│   └── text-mining/
-│       └── 20250127/
-```
-
-### **Technology Stack**
-
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| **API Framework** | FastAPI + Pydantic | High-performance API with validation |
-| **Storage** | AWS S3 | Secure, scalable feedback storage |
-| **Deployment** | AWS Lambda + Mangum | Serverless deployment option |
-| **Logging** | Python logging | Comprehensive operation tracking |
-| **Documentation** | OpenAPI/Swagger | Interactive API documentation |
-
-## 📋 **Data Models**
-
-### **Feedback Request**
-
-```python
-{
-    "user_id": "string",                    # Required: User identifier
-    "session_id": "string",                 # Optional: Session ID
-    "user_input": "string",                 # Optional: Original user input
-    "ai_output": "string",                  # Required: AI response
-    "feedback_type": "positive|negative",   # Required: Feedback type
-    "feedback_comment": "string",           # Optional: Detailed comment
-    "service_name": "string",               # Required: AI service name
-    "context": {},                          # Optional: Service-specific context
-    "response_time_seconds": 2.5,           # Optional: Performance metric
-    "platform": "string"                   # Optional: Platform identifier
-}
-```
-
-### **Stored Feedback Record**
-
-```json
-{
-    "feedback_id": "fb_550e8400-e29b-41d4-a716-446655440000",
-    "timestamp": "2025-01-27T10:30:00.123456+00:00",
-    "feedback_type": "positive",
-    "feedback_comment": "Great response!",
-    "has_comment": true,
-    "user_id": "user@example.com",
-    "session_id": "session-123",
-    "platform": "AICCRA",
-    "service_name": "chatbot",
-    "service_display_name": "AICCRA Chatbot",
-    "service_description": "Conversational AI for AICCRA data exploration",
-    "user_input": "What is the weather?",
-    "ai_output": "Today is sunny with 22°C...",
-    "input_length": 19,
-    "output_length": 156,
-    "response_time_seconds": 2.5,
-    "context": {
-        "filters_applied": {"location": "detected"}
-    },
-    "metadata": {
-        "comment_length": 15,
-        "has_session": true,
-        "has_performance_data": true,
-        "context_fields": ["filters_applied"]
-    }
-}
-```
-
-## 🔒 **Security & Privacy**
-
-### **Data Security**
-
-- **Encrypted Storage**: All feedback data is encrypted in AWS S3
-- **Access Control**: IAM-based access control for AWS resources
-- **Secure Transmission**: HTTPS/TLS for all API communications
-- **Input Validation**: Strict Pydantic model validation
-
-### **Privacy Considerations**
-
-- **User Identification**: Supports email, session ID, or anonymous tokens
-- **Data Retention**: Configurable retention policies (future enhancement)
-- **Content Privacy**: AI output content can be excluded for sensitive applications
-- **Audit Trails**: Complete logging for compliance and monitoring
-
-### **Configuration Security**
-
-```bash
-# Environment variables (never commit to code)
-AWS_ACCESS_KEY_ID=your_key_here
-AWS_SECRET_ACCESS_KEY=your_secret_here
-BUCKET_NAME=your_bucket_name
-```
-
-## 📈 **Monitoring & Observability**
-
-### **Health Monitoring**
-
-```bash
-# Health check endpoint
-curl http://localhost:8001/health
-
-# Response includes:
-# - Service status
-# - Registered services count
-# - System capabilities
-# - Performance metrics
-```
-
-### **Logging**
-
-The service provides comprehensive logging:
-
-```python
-# Log locations
-data/logs/app.log          # Rotating file logs
-stdout                     # Console logs (development)
-
-# Log levels
-DEBUG    # Detailed operation information
-INFO     # General operation status
-WARNING  # Non-critical issues
-ERROR    # Error conditions
-```
-
-### **Performance Metrics**
-
-- **Feedback Submission**: < 1 second
-- **Analytics Generation**: < 3 seconds  
-- **Search Queries**: < 2 seconds
-- **Service Registration**: < 500ms
-
-## 🚀 **Deployment**
-
-### **Local Development**
-
-```bash
-# Start development server
-python api_server.py --reload --port 8001
-
-# Run with custom configuration
-python api_server.py --host 0.0.0.0 --port 8080 --log-level debug
-```
-
-### **AWS Lambda Deployment**
-
-```python
-# main.py serves as the Lambda handler
-from mangum import Mangum
-from app.api.main import app
-
-handler = Mangum(app)
-```
-
-### **Docker Deployment** (Future Enhancement)
-
-```dockerfile
-FROM python:3.13-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-EXPOSE 8001
-CMD ["python", "api_server.py", "--host", "0.0.0.0", "--port", "8001"]
-```
-
-## 🛠️ **Development**
-
-### **Project Structure**
-
-```
+```text
 ai-feedback-service/
-├── app/
-│   ├── api/
-│   │   ├── __init__.py          # API module initialization
-│   │   ├── main.py              # FastAPI application
-│   │   ├── models.py            # Pydantic models
-│   │   └── routes.py            # API endpoints
-│   └── utils/
-│       ├── config/
-│       │   └── config_util.py   # Configuration management
-│       ├── feedback/
-│       │   └── feedback_util.py # Core feedback service
-│       ├── logger/
-│       │   └── logger_util.py   # Logging configuration
-│       └── s3/
-│           └── upload_file_to_s3.py # S3 integration
-├── data/
-│   └── logs/                    # Application logs
-├── main.py                      # Lambda entry point
-├── api_server.py               # Development server
-├── requirements.txt            # Python dependencies
-├── pyproject.toml             # Project configuration
-├── .env.example               # Environment template
-└── README.md                  # This file
+├── README.md / AGENTS.md
+├── docs/                              # API, technical guide, architecture, product, branch comparison
+├── api_server.py                      # Local Uvicorn launcher, port 8001
+├── main.py                            # Mangum Lambda handler
+├── Dockerfile                         # Lambda Python 3.13 image
+├── requirements.txt / pyproject.toml   # Unpinned dependencies; no tracked lock
+├── app/api/                           # FastAPI application, routes and models
+├── app/utils/feedback/feedback_util.py # Active DynamoDB service
+├── app/utils/feedback/feedback_util_s3.py # Inactive historical S3 implementation
+├── app/utils/microservices/send_email.py # RabbitMQ email adapter
+├── app/utils/config/                  # .env/config dictionaries
+├── app/utils/logger/                  # Console + /tmp/logs/app.log
+└── app/utils/s3/                      # Legacy helper with stale config import
 ```
 
-### **Adding New Features**
+## Operations and limitations
 
-1. **New AI Service Support**: Services auto-register, no code changes needed
-2. **New Endpoints**: Add to [`app/api/routes.py`](app/api/routes.py)
-3. **New Models**: Add to [`app/api/models.py`](app/api/models.py)
-4. **New Analytics**: Extend [`app/utils/feedback/feedback_util.py`](app/utils/feedback/feedback_util.py)
+- The logger writes `/tmp/logs/app.log` and console at DEBUG, rotating at 5 MiB with five backups. `ENV=testing` does not switch to service-local logs; that alternative is commented out.
+- `/health` uses the in-memory registry and a fixed historical timestamp. It does not probe DynamoDB or RabbitMQ. Application import must succeed first, so startup can still fail before health is available.
+- Search accepts `has_feedback` but does not apply it. Use actual `feedback_type` filtering where appropriate; consult the contract before relying on nullable filters or sorting mixed records.
+- Storage-read failures can be logged and converted into an empty result, making summaries/search appear empty instead of unavailable. Summary `recent_interactions` sorts the first ten scanned records, not necessarily the newest ten overall.
+- Updates can leave derived metadata unchanged and are not an audit/version history. No HTTP authentication, record-ownership check or deletion/retention policy is implemented. CORS allows all origins and credentials; gateway access controls require separate verification.
+- Questions, AI output, user identity, comments and context can be persisted and included in notification messages. IAM authorizes outbound AWS calls; it does not authenticate incoming users. Encryption, backups/replication and lifecycle settings must be verified in infrastructure rather than inferred from README descriptions.
 
-### **Testing**
+The historical S3 implementation is not a supported fallback: it imports removed feedback models, and its upload helper imports a missing `S3` configuration symbol. Do not switch imports or install S3 settings just to satisfy old documentation.
 
-```bash
-# Manual testing via Swagger UI
-open http://localhost:8001/docs
+## Troubleshooting
 
-# API testing with curl
-curl -X POST http://localhost:8001/api/feedback \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "test@example.com",
-    "ai_output": "Test response",
-    "feedback_type": "positive",
-    "service_name": "test-service"
-  }'
-```
+| Symptom | Check |
+| --- | --- |
+| App fails before serving health | AWS region/identity, ENV suffix, table access and startup create/load behavior |
+| Data appears in an unexpected environment | `ENV` is interpolated literally; inspect the configured suffix, not the branch name |
+| Empty search/summary | Check scan errors and logs before assuming there are no records |
+| `has_feedback` search returns both kinds | The field is accepted but currently ignored |
+| Feedback update creates another ID | `update_mode=true` without interaction_id enters create path |
+| Comment-only update fails | Supply feedback_type with a known ID; the current expression-name argument can be None otherwise |
+| Notification missing after successful save | Check RabbitMQ/recipient configuration and worker independently; notification success is not part of the response contract |
+| Legacy S3 import fails | That path has stale config/model imports and is not active |
 
-## 🔮 **Future Enhancements**
+## Deployment and validation
 
-### **Planned Features**
+`Dockerfile` uses the Lambda Python 3.13 image, installs requirements into `LAMBDA_TASK_ROOT` and starts `main.handler`. It copies `.env` and then the full service context. Review build inputs and keep real credentials, exports and reporting artifacts out of images/commits. This is the actual container definition, not a generic Uvicorn container recipe.
 
-- **Database Migration**: Move from S3 to DynamoDB for better querying
-- **Real-time Dashboards**: Live monitoring interfaces
-- **Machine Learning Insights**: Automated feedback analysis
-- **Webhook Support**: Real-time notifications
-- **Multi-language Support**: International feedback collection
-- **Advanced Analytics**: Trend analysis and predictive insights
+The workflow `.github/workflows/jenkins-trigger-ai-feedback.yml` triggers the `feedback-service` Jenkins job on push/PR to **main-feedback** and manual dispatch. A push to dev-feedback does not match that workflow's branch filters. Follow task branch → dev-feedback → main-feedback → staging → main, checking the current filters and pipeline at each integration.
 
-### **Scalability Improvements**
-
-- **Batch Processing**: Bulk feedback submission
-- **Caching Layer**: Redis for frequently accessed data
-- **API Rate Limiting**: Prevent abuse and ensure fair usage
-- **Data Compression**: Optimize storage costs
-
-## 🤝 **Contributing**
-
-1. **Fork** the repository
-2. **Create** a feature branch: `git checkout -b feature/new-feature`
-3. **Commit** changes: `git commit -am 'Add new feature'`
-4. **Push** to branch: `git push origin feature/new-feature`
-5. **Submit** a Pull Request
-
-## 📄 **License**
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 📞 **Support**
-
-- **Documentation**: [http://localhost:8001/docs](http://localhost:8001/docs)
-- **Health Check**: [http://localhost:8001/health](http://localhost:8001/health)
-- **Issues**: Submit via repository issue tracker
-
-## 🏷️ **Version History**
-
-- **v1.0.0** - AI feedback service
-  - Multi-service support
-  - Auto-registration
-  - Comprehensive analytics
-  - AWS S3 storage
-  - FastAPI implementation
-
----
-
-**Built with ❤️ by the CGIAR AI Services Team**
-
-*Empowering AI improvement through comprehensive feedback collection*
+No dedicated service test suite is tracked. Offline checks can validate links/examples, models, fake-DynamoDB create/update/search/summary behavior and fake RabbitMQ payloads. Read imports first and block network before import: starting the app against real configuration can create tables, write records or queue notifications. Such checks do not validate real permissions, table data, broker delivery, deployed infrastructure or Jenkins.

@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "plugins": []
+  },
+  "include": ["open-next.config.ts", "s3AssetResolver.ts"],
+  "exclude": ["node_modules"]
+}

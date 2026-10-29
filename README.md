@@ -1,201 +1,125 @@
 # AI Services
 
-A comprehensive collection of AI-powered microservices for the CGIAR initiative, providing intelligent document processing, report generation, data analysis, and administrative capabilities.
+CGIAR monorepo for AI-assisted reporting, document extraction, project insights, institution matching, interaction tracking and administration. Services have separate applications, dependencies and development/service-main branches.
 
-## 🌟 Overview
+Use this README to find the right service. Follow its own guide for the current checkout's setup and contracts; there is no repository-wide install, build or test command. `main` is the consolidated reference after integration, while service branches can retain different files and environment settings.
 
-This repository hosts multiple AI microservices designed to enhance CGIAR's research and reporting capabilities through advanced machine learning and natural language processing technologies. Each service operates independently while sharing common infrastructure patterns and best practices.
+## Service index
 
-## 🏗️ Repository Structure
+| Service | Purpose | Start here |
+| --- | --- | --- |
+| Admin Module | Administration of projects, products, users and prompts | [Application](admin-module/), [package scripts](admin-module/package.json) |
+| AI Feedback | Record AI interactions and optional feedback in DynamoDB; queue negative-feedback notifications | [README](ai-feedback-service/README.md) |
+| AI Insights | Generate STAR project overviews and manage overview prompts | [README](ai-insights-service/README.md) |
+| AR Generator | Generate AICCRA indicator narratives, tables and challenges/lessons reports | [README](ar-generator-service/README.md) |
+| Chatbot | Query AICCRA reporting data through Bedrock Agents and a Knowledge Base | [README](chatbot-service/README.md) |
+| CLARISA-Agresso | Match institutions between Agresso and CLARISA | [README](clarisa-agresso-service/README.md) |
+| Fast Response | Apply a caller-supplied instruction to input text with Bedrock | [README](fast-response-service/README.md) |
+| Mapping | Resolve staff/institution names to catalog identifiers | [README](mapping-service/README.md) |
+| Partner Request Support | Match proposed institutions, review candidates and support CLARISA request decisions | [README](partner-request-support/README.md) |
+| QA | AI Review of PRMS metadata and Quality Assessment of W3/Bilateral results | [README](qa-service/README.md) |
+| Text Mining | STAR, PRMS, AICCRA and Bulk CapDev extraction, with a Bulk Upload frontend | [README](text-mining-service/README.md) |
 
-```
+For agent-assisted work, read the shared [AGENTS.md](AGENTS.md) and the service's nested instructions before editing. API, architecture and product guides are linked from each reviewed service README.
+
+## Repository structure
+
+```text
 ai-services/
-├── admin-module/                  # Next.js Admin Dashboard
-├── ai-feedback-service/           # AI Feedback Collection Service
-├── ar-generator-service/          # AICCRA Annual Report Generator
-├── chatbot-service/               # AICCRA Conversational AI Chatbot
-├── clarisa-agresso-service/       # Institution Mapping Service
-├── fast-response-service/         # General-Purpose LLM Response Service
-├── mapping-service/               # Staff & Institution Field Mapping Service
-├── partner-request-support/       # Partner Institution Matching System
-├── qa-service/                    # PRMS Metadata QA Service
-└── text-mining-service/           # Document Processing Service
+├── AGENTS.md                      # Shared working rules and branch workflow
+├── admin-module/                  # Next.js administration application
+├── ai-feedback-service/           # DynamoDB interaction/feedback API
+├── ai-insights-service/           # STAR overviews and Prompt Manager API
+├── ar-generator-service/          # AICCRA reports and static review interface
+├── chatbot-service/               # AICCRA Bedrock Agent API and HTML interface
+├── clarisa-agresso-service/       # Institution mapping scripts
+├── fast-response-service/         # General-purpose Bedrock text response API
+├── mapping-service/               # Staff/institution catalog matching API
+├── partner-request-support/       # Institution review API and Next.js frontend
+├── qa-service/                    # PRMS AI Review and Quality Assessment API
+└── text-mining-service/           # Extraction API/MCP and Bulk Upload frontend
 ```
 
-## 🚀 Available Services
+## Service capabilities
 
-### 🖥️ Admin Module ([`admin-module`](admin-module))
-A Next.js-based administration dashboard for managing all AI services in the platform. Provides:
-- Product and project management with DynamoDB backend
-- User registration and role management
-- Prompt management with access control
-- Authenticated admin interface with session handling
-- **Stack**: Next.js 15, TypeScript, Tailwind CSS, AWS DynamoDB
+### Admin Module
 
----
+A Next.js administration application with API routes for projects/products, users, prompt versions and prompt access. DynamoDB stores application records. Use its package manifest for the actual scripts/dependency versions and inspect configuration and access behavior before running it; no service README is currently included in this directory.
 
-### 📝 AI Feedback Service ([`ai-feedback-service`](ai-feedback-service))
-A service-agnostic feedback collection and analytics platform designed to gather and analyze user feedback across all AI services. Features:
-- Cross-service feedback collection with flexible metadata
-- Real-time performance monitoring and user satisfaction tracking
-- Auto-registration of new AI services
-- Secure storage on AWS S3 with future database migration support
-- **Stack**: FastAPI, Python 3.13, AWS S3, AWS Lambda (Mangum)
+### AI Feedback
 
----
+The active API records interactions through `POST /api/interactions` and can attach feedback later using the returned ID. DynamoDB is active storage; S3 files are a historical implementation. Negative feedback can attempt an email job through RabbitMQ. Search, summary, update and notification limits are documented in the [API guide](ai-feedback-service/docs/API.md). Importing the application can create its environment-specific table.
 
-### 📊 AR Generator Service ([`ar-generator-service`](ar-generator-service))
-An AI-powered service for generating comprehensive annual reports for AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa). Features include:
-- Automated report generation using AWS Bedrock Claude 3.7 Sonnet
-- Support for multiple performance indicators (IPI and PDO)
-- Vector database integration with OpenSearch
-- RESTful API with FastAPI
-- **Stack**: FastAPI, Python 3.13, AWS Bedrock, OpenSearch, AWS Lambda
+### AI Insights
 
----
+Generates project overviews from STAR project/results context, supported documents in S3 and optional caller text. It can retrieve saved overviews, delete selected project files and read/replace the managed overview prompt. Prompt replacement affects future generation, not cached results. The implementation is a backend API, with no frontend in this service tree. See the [backend guide](ai-insights-service/backend/README.md) and [API contract](ai-insights-service/docs/API_GUIDE.md).
 
-### 💬 Chatbot Service ([`chatbot-service`](chatbot-service))
-An intelligent conversational AI service for exploring AICCRA data and insights through natural language. Key capabilities:
-- AWS Bedrock Agents with persistent memory across sessions
-- Smart filtering by phase, indicator, and section
-- Rich citations linking to relevant documents and reports
-- Both REST API and Streamlit web interface
-- SQL Server / Microsoft Fabric Lakehouse integration
-- **Stack**: FastAPI, Streamlit, AWS Bedrock Agents, OpenSearch, SQL Server, AWS Lambda
+### AR Generator
 
----
+Produces AICCRA mid-year/annual indicator narratives, indicator tables and challenges/lessons reports. The service-main path uses SQL Server, Amazon S3 Vectors and Bedrock, with a static HTML review/download interface. Development has a different local data path; preserve that distinction when integrating. See the [production/local comparison](ar-generator-service/docs/BRANCH_DIFFERENCES.md).
 
-### 🔗 CLARISA-Agresso Service ([`clarisa-agresso-service`](clarisa-agresso-service))
-Institution mapping service that provides automated matching between Agresso and CLARISA institution databases. Features:
-- Vector-based semantic matching using AWS Bedrock embeddings
-- Support for multiple matching approaches (Supabase and OpenSearch)
-- Batch processing capabilities
-- Excel report generation
-- **Stack**: FastAPI, Python 3.13, AWS Bedrock, OpenSearch, Supabase
+### Chatbot
 
----
+FastAPI forwards questions, metadata filters and session/memory IDs to a configured Bedrock Agent and Knowledge Base. The HTML interface calls fixed chat/interaction destinations; serving it locally does not redirect those calls. Service-main includes Lambda packaging but no Streamlit entry point or local SQL/conversion tooling. Model selection and memory behavior depend on external agent settings. See the [interface guide](chatbot-service/interface/README.md).
 
-### ⚡ Fast Response Service ([`fast-response-service`](fast-response-service))
-A lightweight, general-purpose microservice that accepts any prompt and input text and returns an LLM-generated response. Ideal for:
-- Text summarization and rewriting
-- Writing improvement and style adaptation
-- Contextual automatic response generation
-- Any prompt-based text transformation task
-- **Stack**: FastAPI, Python 3.13, AWS Bedrock Claude, AWS Lambda (Mangum)
+### CLARISA-Agresso
 
----
+A Python institution-mapping application that reads Agresso records, retrieves CLARISA institutions and produces match reports. Its modules include Supabase embedding-based matching and direct CLARISA OpenSearch matching. Use the [service README](clarisa-agresso-service/README.md) and inspect the selected script/configuration before execution; this directory is not documented as a standalone FastAPI service.
 
-### 🗂️ Mapping Service ([`mapping-service`](mapping-service))
-A semantic field-mapping service that resolves free-text staff names and institution names to their canonical CLARISA/system IDs using vector search. Features:
-- Supports `staff` and `institution` entity types
-- OpenSearch-powered semantic matching
-- Environment-aware routing (test/prod)
-- **Stack**: FastAPI, Python 3.13, OpenSearch, AWS Lambda (Mangum)
+### Fast Response
 
----
+A caller supplies an instruction and input text; Bedrock generates the returned text. Typical tasks include summarization, rewriting, translation and drafting. There is no dedicated frontend, retrieval index or conversation store. See the [API guide](fast-response-service/docs/API_GUIDE.md).
 
-### 🤝 Partner Request Support ([`partner-request-support`](partner-request-support))
-A full-stack enterprise platform for validating and matching partner institution requests against the CLARISA database using hybrid AI search. Features:
-- Hybrid search combining AI semantic embeddings + fuzzy string matching + multilingual support
-- Excel file upload and direct CLARISA API integration
-- Automated web research fallback for unmatched institutions
-- Full approval workflow (accept/reject) with justification notes
-- Color-coded match quality dashboard (Excellent / Good / Fair / No Match)
-- **Stack**: FastAPI (backend), React/Next.js (frontend), AWS Bedrock, CLARISA API
+### Mapping
 
----
+Matches staff and institution names using text/fuzzy OpenSearch retrieval, followed by an external LLM API selecting or rejecting a candidate. Staff identifiers come from STAR's carnet field and institution identifiers from CLARISA codes. This is not an embedding/vector-search implementation. See the [API guide](mapping-service/docs/API_GUIDE.md).
 
-### 🔍 QA Service ([`qa-service`](qa-service))
-An LLM-powered quality assurance service for PRMS (Performance and Results Management System) result metadata. Key features:
-- Generates improved titles, descriptions, and short names using AWS Bedrock Claude
-- Intelligent prompt generation based on result type and level (Output, Outcome, Impact)
-- Optional interaction tracking for analytics
-- Slack notifications for processing events
-- **Stack**: FastAPI, Python 3.13, AWS Bedrock Claude, AWS S3, AWS Lambda
+### Partner Request Support
 
----
+A FastAPI backend and static-exported Next.js frontend support institution matching, manual review, web research and an optional automated decision flow. CLARISA authentication, cache selection and frontend destinations depend on the service branch/environment. See the [backend guide](partner-request-support/backend/README.md), [frontend guide](partner-request-support/frontend/README.md) and [API contract](partner-request-support/docs/API_GUIDE.md).
 
-### 🔎 Text Mining Service ([`text-mining-service`](text-mining-service))
-Intelligent document processing microservice that extracts structured information from various document formats. Key capabilities:
-- Document ingestion from S3 buckets
-- Semantic chunking and vector embeddings with LanceDB
-- AI-powered content analysis using Claude 3 Sonnet
-- Authentication via CLARISA credentials
-- Slack notifications for processing status
-- **Stack**: FastAPI, Python 3.13, AWS Bedrock, LanceDB, AWS S3
+### QA
 
----
+Two separate PRMS workflows share the service: **AI Review** at `POST /api/prms-qa` improves metadata and reviews impact-area scores; **Quality Assessment** at `POST /prms/quality-assessment` returns overall, section and evidence verdicts for W3/Bilateral results. Authentication differs between these routes. See the [API guide](qa-service/docs/API_GUIDE.md) rather than assuming one shared contract or access policy.
 
-## 🛠️ Common Technology Stack
+### Text Mining
 
-| Category | Technologies |
-|---|---|
-| **AI/ML** | AWS Bedrock, Claude 3.7 Sonnet, OpenAI API, Vector Embeddings |
-| **Databases** | OpenSearch, LanceDB, Supabase, MySQL, SQL Server, AWS DynamoDB |
-| **Cloud** | AWS S3, AWS Bedrock Knowledge Base, AWS Lambda |
-| **APIs** | FastAPI, Next.js API Routes, RESTful services |
-| **Frontend** | Next.js 15, React, Tailwind CSS, Streamlit |
-| **Data Processing** | Pandas, NumPy, Pydantic |
-| **Package Management** | uv (Python), pnpm (Node.js) |
-| **Authentication** | AWS IAM, CLARISA integration, NextAuth |
-| **Deployment** | AWS Lambda via Mangum, Docker |
+FastAPI and MCP implement four workflows: STAR document extraction, PRMS multisource extraction, AICCRA document extraction and STAR Bulk CapDev spreadsheet extraction. A separate Next.js Bulk Upload application supports review and submission to STAR, alongside the AICCRA static interface. Inputs, authentication and side effects differ by workflow. See the [API guide](text-mining-service/docs/API_GUIDE.md) and [Bulk Upload frontend guide](text-mining-service/frontend/README.md).
 
-## 📋 Prerequisites
+## Setup and technology choices
 
-- Python 3.13+ (backend services)
-- Node.js 20+ / pnpm (admin-module, partner-request-support frontend)
-- [uv](https://github.com/astral-sh/uv) package manager
-- AWS account with Bedrock access
-- Appropriate database connections (varies by service)
+| Area | Repository patterns; verify per service |
+| --- | --- |
+| Python APIs | FastAPI/Pydantic, Uvicorn locally and Mangum for applicable Lambda handlers |
+| Dependencies | Service-local requirements/pyproject; lockfiles exist only in some services. Inspect what Docker installs |
+| Models and retrieval | Bedrock, externally configured Agents/Knowledge Bases, S3 Vectors, OpenSearch, LanceDB and other service-specific providers |
+| Storage/integrations | S3, DynamoDB, SQL Server, MySQL, Supabase, STAR, PRMS, CLARISA and RabbitMQ as used by each application |
+| Frontends | Next.js/React applications and static HTML; package managers, Node versions and deployment modes differ |
+| Runtime/deployment | Python 3.13 is common; native drivers and frontend runtimes have separate requirements. Inspect each service guide and deployment definition |
 
-## 🚀 Quick Start
+Start from the selected service guide instead of installing everything at the repository root. For example, [Fast Response local setup](fast-response-service/README.md#quick-start) uses its own requirements and launcher, [AI Insights](ai-insights-service/backend/README.md) runs from backend/, and [Bulk Upload](text-mining-service/frontend/README.md) has its own Node/runtime checks. No single command covers all services.
 
-Each service can be run independently. Navigate to the specific service directory and follow its individual README for detailed setup instructions:
+## Branch and contribution workflow
 
-```bash
-# Example: Running a Python service
-cd fast-response-service
-uv venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
-python api_server.py
+The normal promotion path is:
 
-# Example: Running the admin module
-cd admin-module
-pnpm install
-pnpm dev
+```text
+task branch based on the service development branch
+    → dev-<service> → main-<service> → staging → main
 ```
 
-## 🔒 Security & Configuration
+Actual names are listed in [AGENTS.md](AGENTS.md#branch-and-integration-workflow); directory names do not always equal branch suffixes. A branch contains the entire monorepo snapshot, so inspect the complete diff before integration. The maintainer handles release merges unless explicitly delegated.
 
-All services follow consistent security practices:
-- Environment variable configuration (`.env` files, never committed)
-- AWS IAM-based authentication
-- Secure API endpoints with proper validation
-- No hardcoded credentials or sensitive data
+Keep service-specific documentation alongside its code. After a development-to-service-main merge, compare the complete service trees and adapt guides for files, routes and intentional production settings that differ. Shared navigation/rules can be updated in staging for consolidation into main; do not merge all of main into a service branch merely to obtain documentation.
 
-## 🤝 Contributing
+Read the current GitHub Actions branch/event filters before pushing or opening a PR. Some workflows invoke Jenkins even for documentation changes. An accumulated staging PR may include dependency, frontend or deployment changes as well as documentation; describe the actual diff and the validation it requires.
 
-Each service accepts contributions independently. Please:
+## Configuration, access and validation
 
-1. Navigate to the specific service directory
-2. Follow the individual service's contribution guidelines
-3. Create feature branches for new functionality
-4. Ensure proper testing and documentation
-5. Submit pull requests with clear descriptions
+Keep `.env`, credentials, generated exports/logs and real reporting data out of commits. Templates are examples; branch names do not automatically select environment variables or deployment destinations. Some interfaces have fixed API/analytics URLs that `.env` does not override.
 
-## 📊 Monitoring & Logging
+Inbound authentication differs by service and endpoint. AWS IAM authorizes outbound AWS access; it does not establish HTTP caller authentication. Consult the service contract for token/API-key/ownership checks and do not infer authorization from email entry or CORS.
 
-All services implement comprehensive logging:
-- Structured logging with rotating file handlers
-- Console and file output
-- Error tracking and debugging information
-- Performance monitoring capabilities
+Use the checks defined by the relevant service and inspect scripts/imports before running them. Starting Feedback can create a DynamoDB table, and other calls can invoke paid models, upload/delete data, submit records or queue notifications. Static health responses and offline tests do not establish live provider, pipeline or deployment availability.
 
-## 📞 Support
-
-For service-specific issues, refer to individual service documentation. For general repository questions or new service proposals, please open an issue in this repository.
-
----
-
-**IBD AI Services** - Empowering agricultural research through artificial intelligence.
+For service-specific support, use the linked README and implementation guides. For shared workflow questions or proposals, open a repository issue with the affected service, branch and reproducible context.

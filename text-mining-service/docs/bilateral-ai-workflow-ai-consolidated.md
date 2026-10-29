@@ -1,6 +1,8 @@
 # PRMS Bilateral Workflow: AI Scope Consolidation
 
-> **Source document:** [`bilateral-ai-workflow-spec.md`](bilateral-ai-workflow-spec.md)
+> Functional planning reference. Statements about future AI Review scope belong to this source document; AI Review and Quality Assessment are maintained separately in the monorepo QA service. For current Text Mining behavior, see the [product overview](PRODUCT_OVERVIEW.md) and [API guide](API_GUIDE.md).
+
+> **Source document:** `bilateral-ai-workflow-spec.md` (original source is not included in this checkout)
 >
 > **Epic:** P2-2965 - Bilateral module for centers
 >
