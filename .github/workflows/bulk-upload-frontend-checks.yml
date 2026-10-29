@@ -1,0 +1,43 @@
+name: Bulk Upload frontend checks
+
+on:
+  pull_request:
+    branches: [dev-text-mining, main-text-mining]
+    paths:
+      - 'text-mining-service/frontend/**'
+      - '.github/workflows/bulk-upload-frontend-checks.yml'
+  push:
+    branches: [dev-text-mining, main-text-mining]
+    paths:
+      - 'text-mining-service/frontend/**'
+      - '.github/workflows/bulk-upload-frontend-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bulk-frontend-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: text-mining-service/frontend
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: text-mining-service/frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: text-mining-service/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build:open-next
+      - run: npm run test:open-next

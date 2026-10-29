@@ -8,7 +8,7 @@ Package name: `text-mining-bulk-upload-frontend` (`package.json`).
 
 ## Project overview
 
-Next.js 15 + React 19 UI for **STAR Capacity Development bulk upload**. Users upload/select Excel sheets, review LLM-extracted CapDev records, track complete/failed status in DynamoDB (via the mining API), and submit approved rows to STAR.
+Next.js 16 + React 19 UI for **STAR Capacity Development bulk upload**. Users upload/select Excel sheets, review LLM-extracted CapDev records, track complete/failed status in DynamoDB (via the mining API), and submit approved rows to STAR.
 
 Deployment target: AWS via **SST** (`sst.aws.Nextjs`) and **OpenNext**. Same-origin `/api/*` BFF routes proxy to the Python mining service.
 
@@ -21,6 +21,8 @@ The legacy `../interface/bulk_upload/` files and Python `/bulk-upload` page are 
 - Always iterate with **`npm run dev`** (or `npm run sst:dev` when exercising SST). Hot reload depends on the Next.js `.next` development cache.
 - **Do not run `npm run build` or `npm run build:open-next` inside an interactive agent session** unless the user explicitly asks. Production builds rewrite `.next` / OpenNext assets and break HMR.
 - If the development server looks inconsistent after dependency or config changes, restart `npm run dev` rather than running a production build.
+- Use Node.js 22 (`.nvmrc`); install reproducibly with `npm ci`. Next/OpenNext versions are pinned in the manifest and lockfile.
+- `build:open-next` calls OpenNext once; it invokes the Webpack-based `build` script. SST must use this local command rather than its default adapter download.
 - After adding/updating dependencies, update `package-lock.json` and restart the dev server.
 - Env vars for local work typically include:
   - `NEXT_PUBLIC_MINING_API_BASE_URL` — FastAPI mining base URL
@@ -39,6 +41,8 @@ The legacy `../interface/bulk_upload/` files and Python `/bulk-upload` page are 
 | `npm install` | Install dependencies |
 | `npm run dev` | Next.js dev server with HMR |
 | `npm run lint` | ESLint |
+| `npm run typecheck` | Generate Next types and check app + OpenNext/S3 resolver |
+| `npm run test:open-next` | Offline smoke of the built Lambda handler; local HTTP upstreams only |
 | `npm run start` | Serve a previously built app |
 | `npm run sst:dev` / `sst:deploy` / `sst:remove` | SST lifecycle |
 | `npm run build` / `build:open-next` | Production / OpenNext — **not for agent iteration** |
@@ -84,8 +88,9 @@ frontend/
 
 ## Testing instructions
 
-- Run `npm run lint` after non-trivial TS/React changes.
-- Manually verify the wizard flow against a running mining API (`../` → `python -m app.mcp.client`).
+- Run `npm run lint` and `npm run typecheck` after non-trivial TS/React changes. The GitHub frontend check also validates the full OpenNext build on Node 22.
+- For an explicitly authorized migration/build check, verify `.open-next/server-functions/default/index.mjs`, static assets, and the three BFF routes. A local build does not prove the Lambda deployment or live integrations work.
+- Manually verify the wizard flow against a running mining API (`../` → `uv run python -m app.mcp.client`).
 - If you change the BFF contract, confirm `app/api/bulk-upload/route.ts` still posts multipart form data to `/star/mining-bulk-upload/capdev`.
 - Fix type/lint errors you introduce before finishing.
 
