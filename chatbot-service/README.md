@@ -1,521 +1,214 @@
 # AICCRA AI Chatbot Service
 
-An intelligent conversational AI service for exploring AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa) data and insights. This service provides an interactive chatbot interface that can answer questions about AICCRA's activities, deliverables, innovations, and performance indicators using natural language processing and vector search capabilities.
+Conversational access to AICCRA reporting data using Amazon Bedrock Agents and a configured Knowledge Base. Users can explore deliverables, contributions, innovations and Outcome Impact Case Reports (OICRs), with reporting-phase, indicator and section filters.
 
----
+This guide describes **`dev-chatbot`**: a FastAPI backend, a static browser interface and a separate Streamlit interface. Production packaging and destinations differ on `main-chatbot-service`; review the [branch comparison](docs/BRANCH_DIFFERENCES.md) before promotion.
 
-## 🌟 Features
+## Documentation
 
-- **💬 Conversational Interface**: Natural language interaction with AICCRA data
-- **🧠 Memory-Enabled**: Remembers conversation context across sessions
-- **🔍 Smart Filtering**: Apply filters by phase, indicator, and section
-- **📊 Data-Driven Insights**: Provides insights from real AICCRA reporting data
-- **🎯 Contextual Responses**: Builds upon previous questions for comprehensive answers
-- **🔗 Rich Citations**: Includes links to relevant documents and reports
-- **🌐 Multi-Interface**: Both REST API and Streamlit web interface
+| Need | Guide |
+| --- | --- |
+| Install and run | This README |
+| Integrate HTTP chat | [API contract](docs/API.md) |
+| Maintain backend modules | [Technical documentation](TECHNICAL_DOCUMENTATION.md) |
+| Understand system boundaries | [System architecture](docs/HIGH_LEVEL_SOFTWARE_DESIGN.md) |
+| Understand users and limitations | [Product overview](docs/PRODUCT_OVERVIEW.md) |
+| Maintain the HTML interface | [Interface guide](interface/README.md) |
+| Continue as an agent | [Service instructions](AGENTS.md) |
 
----
+## Quick start
 
-## 🏗️ Architecture
+Use Python 3.13 or newer and `uv`. Run from `chatbot-service/`: static files and auxiliary output depend on the working directory.
 
-The service consists of three main components:
-
-### 1. REST API Service (`app/api/`)
-- FastAPI-based REST API with OpenAPI documentation
-- HTTP endpoints for programmatic access
-- Request/response validation with Pydantic models
-- Comprehensive error handling and logging
-- CORS support for web applications
-
-### 2. Streamlit Web Interface (`chatbot.py`)
-- User-friendly web interface for direct interaction
-- Session management and conversation history
-- Dynamic filtering by phase, indicator, and section
-- Export conversation functionality
-- User feedback collection
-
-### 3. Core AI Engine
-- **AWS Bedrock Agents**: Advanced conversational AI with memory
-- **Knowledge Base Integration**: AWS Bedrock Knowledge Base for vector search
-- **Vector Processing**: OpenSearch integration for semantic search
-- **Database Connectivity**: SQL Server integration for structured data
-
----
-
-## 🛠️ Technology Stack
-
-- **REST API**: FastAPI, Uvicorn, Pydantic
-- **Web Interface**: Streamlit
-- **AI/ML**: AWS Bedrock Agents (Claude 3.7 Sonnet) with session memory
-- **Vector Database**: Amazon Bedrock Knowledge Base, OpenSearch
-- **Traditional Database**: SQL Server (Microsoft Fabric)
-- **Cloud Services**: AWS S3, AWS Bedrock, Amazon OpenSearch
-- **Data Processing**: Pandas, NumPy
-- **Authentication**: AWS4Auth
-- **Package Management**: uv
-- **Deployment**: Mangum (for AWS Lambda)
-
----
-
-## 📋 Prerequisites
-
-- Python 3.13+
-- [uv](https://github.com/astral-sh/uv) package manager
-- AWS account with Bedrock Agents and Knowledge Base access
-- SQL Server database or Microsoft Fabric Lakehouse connection
-- OpenSearch instance for vector search
-
----
-
-## 🚀 Installation
-
-### 1. Set up virtual environment
 ```bash
 cd chatbot-service
-python -m venv .venv/
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv sync --frozen
+cp .env.example .env
+# Fill in the chat configuration below before sending a message.
+uv run --frozen python api_server.py --host 127.0.0.1 --port 8000 --reload
 ```
 
-### 2. Install dependencies
-```bash
-pip install -r requirements.txt
-```
+Open `http://localhost:8000/chatbot-ui` for browser chat, `/docs` for OpenAPI or `/health` for HTTP availability. Health returns static capability labels; it does **not** probe AWS, ingestion or database connectivity. Some generated API descriptions still promise an inactive data-reload path; the [API guide](docs/API.md) describes the implementation.
 
----
+The HTML chat URL is fixed to `http://localhost:8000/api/chat`. Its interaction/feedback destination is a separate remote service; serving the page locally does not make tracking local. Review the [interface guide](interface/README.md) before submitting information.
 
-## ⚙️ Configuration
+`uv sync --frozen` uses the manifest and lockfile. This branch's `requirements.txt` has trailing commas on dependency lines and is not a valid equivalent pip installation path. The inherited project metadata says `aiccra-report-generator`; this application is the chatbot. Dependency reconciliation is outside this documentation change.
 
-Create a `.env` file in the service root directory with the following variables:
-
-```bash
-# AWS Bedrock Configuration
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID_BR=your_aws_access_key
-AWS_SECRET_ACCESS_KEY_BR=your_aws_secret_key
-
-# AWS S3 Configuration
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-BUCKET_NAME=your_bucket_name
-
-# OpenSearch Configuration
-AWS_ACCESS_KEY_ID_OS=your_opensearch_access_key
-AWS_SECRET_ACCESS_KEY_OS=your_opensearch_secret_key
-OPENSEARCH_HOST=your_opensearch_host
-OPENSEARCH_INDEX_NAME_CHATBOT=your_index_name
-
-# SQL Server Configuration (Microsoft Fabric)
-CLIENT_ID=your_client_id
-CLIENT_SECRET=your_client_secret
-SERVER=your_fabric_server_url
-DATABASE=your_lakehouse_name
-
-# Knowledge Base and Agents Configuration
-KNOWLEDGE_BASE_ID=your_knowledge_base_id
-AGENT_ID=your_agent_id
-AGENT_ALIAS_ID=your_agent_alias_id
-MEMORY_ID=your_memory_email
-```
-
----
-
-## 🎯 Usage
-
-### 1. Start the Streamlit Web Interface
+### Streamlit alternative
 
 ```bash
-streamlit run chatbot.py
+# From chatbot-service/, with the same .env
+uv run --frozen streamlit run chatbot.py
 ```
 
-The web interface will be available at `http://localhost:8501`.
+Open `http://localhost:8501`. Streamlit calls the agent directly, progressively displays output, keeps local conversation history in session state, exports a `.txt` conversation and sends interactions/feedback to `AI_FEEDBACK_URL`. It does not call the FastAPI chat endpoint.
 
-### 2. Start the REST API Server
+### First API request
 
-```bash
-python api_server.py
-```
-
-The API server will start on `http://localhost:8000` by default.
-
-### 3. Access API Documentation
-
-Visit `http://localhost:8000/docs` for interactive API documentation.
-
-### 4. Test the API
+This invokes the configured AWS agent and can incur provider charges. Use fictional identifiers for testing; reuse a session ID for follow-up questions.
 
 ```bash
 curl -X POST http://localhost:8000/api/chat \
-  -H "Content-Type: application/json" \
+  -H 'Content-Type: application/json' \
   -d '{
-    "message": "What progress has been made on IPI 1.1 in 2025?",
-    "phase": "Progress 2025",
-    "indicator": "IPI 1.1",
-    "section": "All sections",
-    "session_id": "550e8400-e29b-41d4-a716-446655440000",
-    "memory_id": "user@example.com"
+    "message": "What deliverables relate to climate information services?",
+    "phase": "AR 2025",
+    "indicator": "All indicators",
+    "section": "Deliverables",
+    "session_id": "baf542c1-e699-4b4e-9a61-1fe4794aa044",
+    "memory_id": "demo-user",
+    "insert_data": false
   }'
 ```
 
----
+The API joins agent chunks into one JSON response; it does not stream HTTP tokens.
 
-## 📋 API Endpoints
+## Configuration
 
-### `POST /api/chat`
+Copy [.env.example](.env.example) and populate the integrations you use. Never commit `.env` or credentials. [config_util.py](app/utils/config/config_util.py) loads these names through `python-dotenv`.
 
-Send a message to the AICCRA AI chatbot and receive an intelligent response.
+| Variables | Consumer / requirement |
+| --- | --- |
+| `AWS_REGION` | AWS client region |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Explicit arguments for development agent/S3 clients; separate `_BR` and `_OS` names are not read |
+| `AGENT_ID`, `AGENT_ALIAS_ID`, `KNOWLEDGE_BASE_ID` | Existing agent, alias and retrieval configuration for chat |
+| `AI_FEEDBACK_URL` | Streamlit interaction service base URL; does not configure HTML |
+| `BUCKET_NAME` | Auxiliary S3 uploads, not a direct dependency of an active chat request |
+| `SERVER`, `DATABASE`, `CLIENT_ID`, `CLIENT_SECRET` | Auxiliary SQL Server/Fabric extraction |
+| `OPENSEARCH_HOST`, `OPENSEARCH_INDEX_NAME_CHATBOT` | Auxiliary direct OpenSearch path |
+| `MEMORY_ID` | Read into configuration but not used to select active chat identity; callers supply `memory_id` |
+| `OPENAI_API_KEY`, `VECTOR_STORE_ID` | Only the independent `openai_chatbot.py` experiment |
 
-**Request Body:**
-```json
-{
-  "message": "What progress has been made on IPI 1.1 in 2025?",
-  "phase": "Progress 2025",
-  "indicator": "IPI 1.1", 
-  "section": "All sections",
-  "session_id": "550e8400-e29b-41d4-a716-446655440000",
-  "memory_id": "user@example.com"
-}
+The agent model, instructions, Knowledge Base ingestion, memory enablement and retention are AWS-side settings. Model names in auxiliary modules do not establish which model the agent alias uses. Configure resources and outbound AWS permissions separately; these do not establish inbound HTTP authentication.
+
+## System architecture
+
+```mermaid
+flowchart TD
+    Browser[Static HTML interface] -->|POST /api/chat| API[FastAPI / Uvicorn or Mangum]
+    API -->|Collect chunks| Agent[run_agent_chatbot]
+    Streamlit[Streamlit interface] -->|Direct call| Agent
+    Filters[Metadata filter builder] --> Agent
+    Agent -->|invoke_agent + session and memory IDs| Bedrock[Bedrock Agent / Alias]
+    Bedrock --> KB[Configured Knowledge Base]
+    Browser --> Feedback[External interactions / feedback API]
+    Streamlit --> Feedback
+    SQL[Auxiliary SQL extraction] -.-> S3[CSV and metadata uploads]
+    S3 -.-> Ingestion[Separately managed KB ingestion]
 ```
 
-**Parameters:**
-- `message` (string, required): Your question or message to the chatbot
-- `phase` (string, optional): Filter by reporting phase (default: "All phases")
-- `indicator` (string, optional): Filter by performance indicator (default: "All indicators")
-- `section` (string, optional): Filter by data section (default: "All sections")
-- `session_id` (string, required): Unique session identifier for conversation continuity
-- `memory_id` (string, required): User email address for personalized knowledge base access
+The active request uses `app/llm/agents.py`. It does not execute SQL, populate OpenSearch, upload documents or start Knowledge Base ingestion. Direct OpenSearch, direct model and direct Knowledge Base modules are separate paths. See the [architecture guide](docs/HIGH_LEVEL_SOFTWARE_DESIGN.md).
 
-**Response (200 OK):**
-```json
-{
-  "message": "Based on the latest data, AICCRA has achieved significant progress on IPI 1.1 in 2025...",
-  "session_id": "550e8400-e29b-41d4-a716-446655440000",
-  "filters_applied": {
-    "phase": "Progress 2025",
-    "indicator": "IPI 1.1",
-    "section": "All sections"
-  },
-  "status": "success"
-}
-```
+| Component | Implemented behavior |
+| --- | --- |
+| FastAPI | Validates input, forwards filters/identifiers, joins agent chunks and returns JSON |
+| HTML | Calls HTTP chat, manages local messages/filter controls, sends remote interactions/feedback |
+| Streamlit | Calls the agent directly, displays incremental output, exports history and submits remote feedback |
+| Bedrock agent | External orchestration, retrieval and generated answer; deployment controls model/memory |
 
-**Error Response (400/500):**
-```json
-{
-  "error": "Error message",
-  "status": "error", 
-  "details": "Additional error details"
-}
-```
+Answers may contain omissions or unsupported statements. Review citations and source records before official reporting. This repository establishes no response-time guarantee or data refresh schedule.
 
-### `GET /`
+## Questions and reporting filters
 
-Root endpoint providing comprehensive API information.
+Examples depend on indexed source data and agent configuration:
 
-### `GET /health`
+- Progress: “What progress has been made on IPI 1.1 in 2025?” or “How are clusters performing against targets?”
+- Deliverables: “What publications were released by the Kenya cluster?” or “Show research outputs related to climate information services.”
+- Innovations: “What innovations support climate-smart agriculture?” or “What readiness levels have been reported?”
+- Outcomes: “Show outcome case reports from Western Africa.” or “What evidence describes farmer livelihood impacts?”
 
-Health check endpoint with service status.
+| Control | Meaning |
+| --- | --- |
+| Phase / Cycle | UI choices include AWPB, Progress and AR for 2021–2025; HTTP field remains `phase`, e.g. `AR 2025` |
+| Indicator | Literal acronym such as `IPI 1.1` or `PDO Indicator 3`; UI options depend on year |
+| Section | `Deliverables`, `Contributions`, `Innovations`, `OICRs`, or `All sections` |
 
----
+AWPB means Annual Work Plan and Budget; Progress is the progress-report phase; AR means Annual Report. Deliverables cover outputs such as publications/tools/datasets, Contributions cover reporting narratives/questions, Innovations cover technology/practice records, and OICRs describe outcome impact cases.
 
-## 🗣️ What You Can Ask
+The API accepts strings rather than catalog enums. Use exact `All phases`, `All indicators` and `All sections` sentinels. Retrieval requests 30 HYBRID results. Contributions include both `contributions` and `questions` metadata. Phase name is applied only for Contributions; year applies to other sections too. See [filter details and null limitations](docs/API.md).
 
-### Progress & Achievements
-- "What progress has been made on IPI 1.1 in 2025?"
-- "How are clusters performing against their targets?"
-- "Show me achievements for PDO Indicator 3"
+## Sessions, access and feedback
 
-### Research & Deliverables
-- "What publications were released by the Kenya cluster?"
-- "Show me deliverables related to climate information services"
-- "What research outputs are available for Theme 2?"
+The API forwards caller-supplied `session_id` and `memory_id` to Bedrock. Both interfaces derive memory identity from the part of an entered or URL-provided email before `@`; email and ownership are not verified. Equal local parts from different domains can select the same memory ID. Starting a session changes the session ID and clears local history; it does not delete provider memory. The agent always sends `endSession=false`.
 
-### Innovations & Technology
-- "What innovations were developed for climate-smart agriculture?"
-- "Show me tools created for early warning systems"
-- "What is the readiness level of AICCRA innovations?"
+Python HTTP routes have no authentication dependency. CORS permits all origins and credentials. AWS IAM credentials authorize outbound calls; gateway controls must be checked separately. Email entry and CORS do not provide user authorization.
 
-### Impact & Outcomes
-- "What real-world impacts has AICCRA achieved?"
-- "Show me outcome case reports from Western Africa"
-- "How has AICCRA contributed to farmer livelihoods?"
+Interfaces send feedback to external `/api/interactions`. There is no local `/api/feedback` route. The unused `feedback_util.py` imports `FeedbackRequest` and `FeedbackResponse` classes absent from current models; it is not a supported alternative implementation.
 
----
+## Project structure
 
-## 🔧 Filtering Options
-
-Use filters to focus your queries:
-
-- **Phase**: Target specific reporting periods
-  - "All phases", "AWPB 2021-2025", "Progress 2021-2025", "AR 2021-2025"
-- **Indicator**: Focus on specific performance indicators
-  - "All indicators", "IPI 1.1-3.4", "PDO Indicator 1-5"
-- **Section**: Limit to specific data types
-  - "All sections", "Deliverables", "Contributions", "Innovations", "OICRs"
-
----
-
-## 📊 Supported Data Types
-
-### Performance Indicators
-- **IPI 1.1-1.4**: Climate information and early warning systems
-- **IPI 2.1-2.3**: Agricultural technologies and practices
-- **IPI 3.1-3.4**: Institutional capacity and partnerships
-- **PDO Indicator 1-5**: Project outcome and impact metrics
-
-### Data Sections
-- **Deliverables**: Research outputs, publications, tools, and datasets
-- **Contributions**: Cluster activities, milestone progress, and narratives
-- **Innovations**: Technology developments, platforms, and practices
-- **OICRs**: Outcome Impact Case Reports documenting real-world impacts
-
-### Reporting Phases
-- **AWPB**: Annual Work Plan and Budget (planning phase)
-- **Progress**: Mid-year progress reports
-- **AR**: Annual Reports (achievements and outcomes)
-
----
-
-## 🗂️ Project Structure
-
-```
+```text
 chatbot-service/
-├── chatbot.py                     # Streamlit web interface
-├── main.py                        # Lambda deployment entry point
-├── api_server.py                  # REST API server entry point
-├── pyproject.toml                 # Project dependencies
-├── uv.lock                        # Dependency lock file
-├── .env.example                   # Environment variables template
-├── app/
-│   ├── api/                       # REST API modules
-│   │   ├── __init__.py            # API package initialization
-│   │   ├── main.py                # FastAPI application
-│   │   ├── models.py              # Pydantic request/response models
-│   │   └── routes.py              # API endpoint routes
-│   ├── llm/                       # AI/ML processing modules
-│   │   ├── agents.py              # AWS Bedrock Agents integration
-│   │   ├── invoke_llm.py          # Direct LLM invocation
-│   │   ├── knowledge_base.py      # AWS Bedrock KB integration
-│   │   └── vectorize_os.py        # OpenSearch vector operations
-│   └── utils/                     # Utility modules
-│       ├── agents_utils/          # Agent-specific utilities
-│       ├── config/                # Configuration management
-│       ├── logger/                # Logging utilities
-│       ├── prompts/               # Prompt templates
-│       └── s3/                    # S3 integration
-├── data/logs/                     # Application logs
-└── db_conn/                       # Database connections
+├── README.md / AGENTS.md           # Onboarding and service working rules
+├── TECHNICAL_DOCUMENTATION.md      # Backend maintenance map
+├── docs/                          # Contract, architecture, product, branch differences
+├── api_server.py                   # Local Uvicorn launcher
+├── main.py                         # Mangum Lambda handler
+├── chatbot.py                      # Streamlit + direct agent + remote tracking
+├── interface/                      # Static HTML UI and guides
+├── app/api/                        # FastAPI app, route and Pydantic models
+├── app/llm/agents.py                # Active Bedrock Agent generator
+├── app/llm/                        # Also direct KB/model/OpenSearch auxiliary modules
+├── app/utils/agents_utils/          # Metadata filter construction
+├── app/utils/config/               # Environment loading
+├── app/utils/logger/               # Console + rotating local logs
+├── app/utils/prompts/              # Templates for auxiliary paths
+├── app/utils/s3/                   # Auxiliary export/upload helpers
+├── app/utils/feedback/             # Inactive helper; missing model imports
+├── db_conn/sql_connection.py       # Auxiliary SQL extraction + uploads
+├── openai_chatbot.py               # Independent OpenAI CLI experiment
+├── jsonl_to_json.py                # File conversion, executes on import
+└── pyproject.toml / uv.lock / requirements.txt
 ```
 
----
-
-## 💬 Example Usage
-
-### Python Example
+## Python integration example
 
 ```python
 import requests
 
-# Make API request
 response = requests.post(
     "http://localhost:8000/api/chat",
     json={
-        "message": "What innovations were developed for climate-smart agriculture?",
-        "phase": "All phases",
-        "indicator": "All indicators", 
-        "section": "Innovations",
-        "session_id": "my-session-123",
-        "memory_id": "researcher@cgiar.org"
-    }
-)
-
-if response.status_code == 200:
-    data = response.json()
-    print(f"Chatbot Response: {data['message']}")
-else:
-    print(f"Error: {response.json()}")
-```
-
-### JavaScript Example
-
-```javascript
-fetch('http://localhost:8000/api/chat', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',
+        "message": "Summarize deliverables for AR 2025",
+        "phase": "AR 2025",
+        "section": "Deliverables",
+        "session_id": "baf542c1-e699-4b4e-9a61-1fe4794aa044",
+        "memory_id": "demo-user",
+        "insert_data": False,
     },
-    body: JSON.stringify({
-        message: 'Show me deliverables from the Western Africa cluster',
-        phase: 'Progress 2025',
-        indicator: 'All indicators',
-        section: 'Deliverables',
-        session_id: 'web-session-456',
-        memory_id: 'user@example.com'
-    })
-})
-.then(response => response.json())
-.then(data => {
-    if (data.status === 'success') {
-        console.log(`Chatbot: ${data.message}`);
-    } else {
-        console.error(`Error: ${data.error}`);
-    }
-});
+    timeout=120,
+)
+response.raise_for_status()
+print(response.json()["message"])
 ```
 
----
+The timeout is a caller choice. Provider failures can become ordinary answer text with HTTP 200; see the [error contract](docs/API.md).
 
-## ⚡ Performance Notes
+## Development and validation
 
-- **Initial Response**: ~3-5 seconds for new sessions
-- **Follow-up Questions**: ~2-3 seconds with conversation memory
-- **Complex Queries**: May take longer for comprehensive analysis
-- **Vector Search**: Optimized for semantic similarity matching
-- **Session Memory**: Maintains context across conversation turns
+Update models, routes, both interfaces and examples together for contract changes. Coordinate metadata changes with retrieval filters and ingestion. `agents.py` sends both textual filters and actual retrieval configuration. Editing local prompt templates does not update externally configured agent instructions.
 
----
+Logs go to console and service-local `data/logs/app.log`, rotating at 5 MiB with five backups. Routes log message prefixes/identity, and the agent prints questions/answers and logs retrieval configuration. Keep reporting data, logs, generated exports and credentials out of commits.
 
-## 🔧 Development
+No dedicated service test suite is tracked here. Check documentation links, example syntax, model validation, filter construction and fake-agent API responses offline. Review imports before running auxiliary scripts: SQL extraction, S3 uploads, feedback and OpenAI calls can write data or invoke paid providers. See the [maintenance guide](TECHNICAL_DOCUMENTATION.md) for offline check boundaries.
 
-### Key Components
+## Troubleshooting
 
-1. **AWS Bedrock Agents** ([`app/llm/agents.py`](app/llm/agents.py)):
-   - Handles conversational AI with session memory
-   - Integrates with AWS Bedrock Knowledge Base
-   - Supports streaming responses and context retention
+| Symptom | Check |
+| --- | --- |
+| pip rejects requirements | Trailing commas exist; use the locked uv setup for this dev line |
+| Health succeeds but chat fails | Health is static; check region, agent/alias/KB IDs and AWS credentials/permissions |
+| UI calls an unexpected server | HTML constants are independent of `.env` |
+| Missing/broad results | Check metadata values/types, section mapping, HYBRID support and external ingestion |
+| Reload reports success but data stays old | Agent reload code is commented out; response flags/timings do not prove ingestion |
+| Null section fails with a selected phase | Builder may call `.lower()` on `None`; send a string such as `All sections` |
+| Feedback fails | Check separate interaction service URL, response and CORS |
+| SQL import fails | Auxiliary `pyodbc` is undeclared; it also requires ODBC Driver 18 and database access |
+| Static directory missing | Start from `chatbot-service/`, where `interface/` exists |
+| Context/timeout answer | Narrow the question or start a new session; some provider errors become friendly text |
 
-2. **Vector Search** ([`app/llm/vectorize_os.py`](app/llm/vectorize_os.py)):
-   - OpenSearch integration for semantic search
-   - Embedding generation and similarity matching
-   - Dynamic filtering by metadata
+## Deployment and promotion
 
-3. **Prompt Engineering** ([`app/utils/prompts/`](app/utils/prompts/)):
-   - Custom prompts for chatbot responses
-   - Knowledge base query optimization
-   - Context-aware response generation
+`main.py` exports `main.handler = Mangum(app)`. This development snapshot has **no Dockerfile**. Service-main has a Lambda Python 3.13 image installing `requirements.txt`, `/tmp/logs` and production frontend destinations. Recheck those after the local merge.
 
-4. **Database Integration** ([`db_conn/`](db_conn/)):
-   - SQL Server connectivity for structured data
-   - Data loading and preprocessing utilities
-   - View creation for optimized queries
-
-### Customizing Prompts
-
-Edit the prompt templates in [`app/utils/prompts/`](app/utils/prompts/):
-- [`chatbot_prompt.py`](app/utils/prompts/chatbot_prompt.py): Main chatbot response template
-- [`kb_generation_prompt.py`](app/utils/prompts/kb_generation_prompt.py): Knowledge base prompt template
-
----
-
-## 📝 Logging
-
-Logs are automatically generated in [`data/logs/app.log`](data/logs/app.log) with information about:
-- Chatbot conversations and responses
-- AWS Bedrock Agents interactions
-- Vector search operations
-- Database connections and queries
-- Error handling and debugging information
-
----
-
-## 🔒 Security
-
-- AWS credentials are managed through environment variables
-- Session IDs provide conversation isolation
-- User emails (memory_id) enable personalized access
-- Database connections use secure authentication
-- API keys are never logged or exposed
-- Follow AWS IAM best practices for service permissions
-
----
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **AWS Bedrock Agents Access Denied**
-   - Verify AWS credentials and region
-   - Ensure Bedrock Agents service is enabled in your AWS account
-   - Check IAM permissions for Bedrock Agents and Knowledge Base access
-
-2. **Knowledge Base Not Found**
-   - Verify `KNOWLEDGE_BASE_ID`, `AGENT_ID`, and `AGENT_ALIAS_ID`
-   - Ensure Knowledge Base is properly configured and synchronized
-   - Check vector index status in AWS console
-
-3. **Database Connection Errors**
-   - Verify SQL Server credentials and host accessibility
-   - Check network connectivity and firewall settings
-   - Ensure database exists and user has appropriate permissions
-
-4. **Vector Search Issues**
-   - Confirm OpenSearch endpoints and credentials
-   - Verify index exists and is properly configured
-   - Check vector dimensions and embedding model compatibility
-
-5. **Session Memory Problems**
-   - Ensure `memory_id` (user email) is valid and consistent
-   - Check session ID format and uniqueness
-   - Verify Bedrock Agents memory configuration
-
----
-
-## 📈 Performance Optimization
-
-- **Session Management**: Implement efficient session storage
-- **Vector Search**: Optimize index parameters and query filters
-- **Caching**: Cache frequent queries and responses
-- **Connection Pooling**: Use database connection pooling
-- **Memory Usage**: Monitor conversation memory limits
-
----
-
-## 🚀 Deployment
-
-### AWS Lambda Deployment
-
-The service is configured for AWS Lambda deployment using Mangum:
-
-```python
-# main.py
-from mangum import Mangum
-from app.api.main import app
-
-handler = Mangum(app)
-```
-
-### Docker Deployment
-
-```dockerfile
-FROM python:3.13-slim
-
-WORKDIR /app
-COPY . .
-
-RUN pip install uv
-RUN uv pip install -e .
-
-EXPOSE 8000
-CMD ["python", "api_server.py"]
-```
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/new-capability`)
-3. Make your changes
-4. Add tests if applicable
-5. Commit your changes (`git commit -m 'Add new chatbot capability'`)
-6. Push to the branch (`git push origin feature/new-capability`)
-7. Create a Pull Request
-
----
-
-## 🔄 Version History
-
-- **v1.0.0**: Initial release with AWS Bedrock Agents integration
-- **Features**: Conversational AI, session memory, vector search, multi-interface support
-- **In Development**: Enhanced analytics, multi-language support, advanced filtering
-
----
+Use `codex/docs-chatbot → dev-chatbot → main-chatbot-service → staging → main`. `dev-chatbot-service` is another existing line, not an interchangeable alias. This dev snapshot has no Chatbot-specific GitHub Actions workflow. The inspected service-main workflow triggers Jenkins on pushes/PRs to `main-chatbot-service`, despite its misleading QA display name. Documentation-only changes can trigger it. Pipeline completion and deployment need separate validation.
