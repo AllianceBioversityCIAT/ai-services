@@ -1,3 +1,5 @@
+> Reference status: retained business-rules context. For current executable routing, completeness behavior, and side effects, read the [API guide](../../docs/API_GUIDE.md#automated-evaluation). This document is not independent legal/policy verification; reconcile requirement changes with the policy owner and implementation.
+
 # CGIAR Institution Validation Rules
 
 ## 📋 Official Rules for Review Team
