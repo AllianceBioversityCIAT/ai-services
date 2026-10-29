@@ -186,3 +186,6 @@ chroma/
 .chroma/
 faiss/
 .faiss/
+
+# Archivos generados por OpenNext
+**/.open-next/
