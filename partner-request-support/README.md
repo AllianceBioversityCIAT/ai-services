@@ -1,896 +1,241 @@
-# CGIAR Partner Request Support System
+# Partner Request Support
 
-> AI-powered institutional matching platform for CGIAR partner validation and CLARISA database integration
+Partner Request Support compares proposed institutions with the CLARISA institution catalog and supports manual review, web research, and an optional automated decision flow. It contains a FastAPI backend and a Next.js frontend exported as static files.
 
-**A comprehensive full-stack application** that intelligently matches partner institution requests against the CLARISA institutional database using advanced hybrid search combining AI embeddings, fuzzy matching, and multilingual support with automated web research fallback.
+This documentation describes `main-partner-request-support`, the service-main branch. It selects the production cache table, CLARISA login host, and environment label; see [branch differences](docs/BRANCH_DIFFERENCES.md). Repository checks do not certify live CLARISA contracts, model accuracy, or deployment availability.
 
----
+## Start here
 
-## 📑 Table of Contents
+| Goal | Documentation |
+| --- | --- |
+| Start the application locally | [Quick start](#quick-start) |
+| Understand supported workflows | [Product overview](docs/PRODUCT_OVERVIEW.md) |
+| Run/configure the backend | [Backend README](backend/README.md) |
+| Run/configure the frontend | [Frontend README](frontend/README.md) |
+| Integrate API calls and understand side effects | [API guide](docs/API_GUIDE.md) |
+| Follow components and storage | [System architecture](#system-architecture), [high-level design](docs/HIGH_LEVEL_DESIGN.md) |
+| Understand matching scores | [How the search works](backend/docs/HOW%20THE%20SEARCH%20WORKS.md) |
+| Continue work with an agent | [Service guide](AGENTS.md), [frontend guide](frontend/AGENTS.md) |
+| Locate implementation files | [Project structure](#project-structure) |
+| Diagnose setup and workflow issues | [Troubleshooting](#troubleshooting) |
 
-- [Overview](#-overview)
-- [Key Features](#-key-features)
-- [Architecture](#-architecture)
-- [Quick Start](#-quick-start)
-- [Installation & Setup](#-installation--setup)
-- [Frontend Application](#-frontend-application)
-- [Backend API](#-backend-api)
-- [Hybrid Search Algorithm](#-hybrid-search-algorithm)
-- [Database Schema](#-database-schema)
-- [Configuration](#-configuration)
-- [Usage Examples](#-usage-examples)
-- [Development](#-development)
-- [Troubleshooting](#-troubleshooting)
-- [License](#-license)
+## Quick start
 
----
+You need Python 3.13, Node.js/npm compatible with the frontend lockfile, and access to the intended Supabase, CLARISA, AWS, and OpenAI resources. This branch retains production login/cache choices even when run locally; use `dev-partner-request-support` for the development defaults. Use an existing prepared database for the intended environment; first-time database provisioning is covered in the [backend setup guide](backend/README.md#database-and-operational-setup).
 
-## 🎯 Overview
+### 1. Prepare the backend
 
-The CGIAR Partner Request Support System is an enterprise-grade platform designed to streamline and automate the process of validating and matching partner institutions against the official CLARISA (CGIAR Platform for Big Data in Agriculture) institutional database.
-
-### **What It Does**
-
-- **Validates** partner institution requests from Excel files or API sources
-- **Matches** institutions using AI-powered hybrid search (semantic embeddings + fuzzy string matching)
-- **Researches** missing institutions via automated web search when no database match exists
-- **Manages** the complete approval workflow (accept/reject partner requests)
-- **Synchronizes** with the CLARISA API for real-time institutional data
-- **Provides** a modern web interface for managing the entire process
-
-### **Who It's For**
-
-- CGIAR institutional review teams
-- Partner validation coordinators
-- Research administrators managing institutional partnerships
-- Teams requiring accurate institutional matching and validation
-
----
-
-## ✨ Key Features
-
-### 🎨 **Frontend Capabilities**
-
-- **Dual Processing Modes**
-  - Excel file upload with template support
-  - Direct API integration with CLARISA partner requests
-  
-- **Interactive Results Dashboard**
-  - Color-coded match quality indicators (Excellent/Good/Fair/No Match)
-  - Real-time statistics with animated cards
-  - Search and filter capabilities
-  - Expandable detail views for each partner
-  
-- **Comprehensive Match Insights**
-  - CLARISA match details with detailed scoring breakdowns
-  - Top 5 candidate institutions with comparative analysis
-  - AI-generated web research reports in markdown format
-  - Manual web search trigger for quality improvement
-  
-- **Workflow Management**
-  - Accept/reject partner requests directly from the UI
-  - Optional rejection justification notes
-  - Real-time UI updates after actions
-  - Sync alerts for database changes
-  
-- **Professional Design**
-  - CGIAR institutional branding (Poppins font, official color palette)
-  - Smooth animations with Framer Motion
-  - Responsive layout for all screen sizes
-  - Accessibility-focused interface
-
-### 🔧 **Backend Capabilities**
-
-- **Hybrid Search Engine**
-  - AI embeddings using Amazon Bedrock Titan v2 (1024 dimensions)
-  - Fuzzy string matching with RapidFuzz
-  - Multi-factor scoring algorithm combining semantic and exact matching
-  - Configurable weights and thresholds
-  
-- **Multilingual Support**
-  - Automatic language detection (langdetect library)
-  - AWS Translate integration for non-English queries
-  - Dual-language search (original + translated)
-  
-- **Intelligent Caching**
-  - Partner-name-based caching to handle duplicates
-  - Automatic cache invalidation on database updates
-  - Persistent cache in PostgreSQL
-  
-- **Incremental Synchronization**
-  - Only processes new/modified CLARISA institutions
-  - Optional deletion of obsolete entries
-  - Batch processing for efficiency
-  
-- **Web Search Fallback**
-  - Two-phase AI approach: information gathering + analysis
-  - OpenAI GPT-4o-mini for cost-effective web research
-  - AWS Bedrock Claude Sonnet 4.5 for institutional analysis
-  - CGIAR institutional rules compliance validation
-  - Source tracking and citation
-  
-- **RESTful API**
-  - FastAPI framework with automatic OpenAPI documentation
-  - CORS-enabled for frontend integration
-  - Comprehensive error handling
-  - Request/response validation with Pydantic
-
----
-
-## 🏗️ Architecture
-
-### **Technology Stack**
-
-#### **Frontend**
-- **Framework**: Next.js 16.1.6 (App Router)
-- **Language**: TypeScript 5.9.3
-- **Styling**: Tailwind CSS 4 with PostCSS
-- **Animations**: Framer Motion 12.34.5
-- **Icons**: Lucide React 0.576.0
-- **HTTP Client**: Axios 1.13.6
-- **Markdown**: react-markdown 10.1.0 with GitHub Flavored Markdown support
-- **Runtime**: React 19.2.3
-
-#### **Backend**
-- **Framework**: FastAPI (Python 3.8+)
-- **Server**: Uvicorn (ASGI)
-- **AI/ML Services**:
-  - Amazon Bedrock (Titan Embed Text v2, Claude Sonnet 4.5)
-  - OpenAI API (GPT-4o-mini)
-  - AWS Translate
-- **Database**: Supabase (PostgreSQL 15 + pgvector)
-- **String Matching**: RapidFuzz
-- **Language Detection**: langdetect
-- **Data Processing**: Pandas, NumPy
-- **Excel**: openpyxl
-- **AWS SDK**: Boto3
-
-#### **Infrastructure**
-- **Vector Database**: Supabase with pgvector extension
-- **Storage**: AWS S3 (template files)
-- **Cloud Services**: AWS (Bedrock, Translate, S3)
-- **API Integration**: CLARISA REST API
-
-### **System Architecture**
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Frontend (Next.js 16 + React 19)             │
-│                                                                 │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  page.tsx (Main Orchestrator)                              │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                              ↓                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-│  │  Components  │  │ Custom Hooks │  │   Services   │           │
-│  │  (11 total)  │  │  (6 total)   │  │   (2 total)  │           │
-│  └──────────────┘  └──────────────┘  └──────────────┘           │
-│         ↓                  ↓                  ↓                 │
-│  LoginPage         useAuth          authService                 │
-│  Header            usePartnerProc.  partnerService              │
-│  UploadSection     useFileUpload                                │
-│  StatsCards        useApiSync                                   │
-│  PartnerTable      useModal                                     │
-│  QualityBadge      useWebSearch                                 │
-│  ...                                                            │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ HTTP/REST (Axios)
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Backend API (FastAPI)                      │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                    API Endpoints                         │   │
-│  │  /api/process-partners  /api/sync-clarisa-institutions   │   │
-│  │  /api/manual-web-search /api/respond-partner-request     │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │   Hybrid    │  │     Web     │  │   CLARISA   │              │ 
-│  │   Search    │  │   Search    │  │     API     │              │
-│  │   Engine    │  │   Module    │  │  Integration│              │
-│  └─────────────┘  └─────────────┘  └─────────────┘              │
-└────────────┬────────────────┬───────────────────────────────────┘
-             │                │
-             ▼                ▼
-┌──────────────────┐  ┌──────────────────┐
-│    Supabase      │  │   AWS Services   │
-│   PostgreSQL     │  │   - Bedrock      │
-│   + pgvector     │  │   - Translate    │
-│                  │  │   - S3           │
-│  ┌────────────┐  │  └──────────────────┘
-│  │Institutions│  │
-│  │   Table    │  │  ┌──────────────────┐
-│  └────────────┘  │  │   OpenAI API     │
-│  ┌────────────┐  │  │   - GPT-4o-mini  │
-│  │   Cache    │  │  │   - Web Search   │
-│  │   Table    │  │  └──────────────────┘
-│  └────────────┘  │
-└──────────────────┘
-```
-
----
-
-## 🚀 Quick Start
-
-### **Prerequisites**
-
-- **Python** 3.8 or higher
-- **Node.js** 18 or higher (for frontend)
-- **Supabase** account with a project created
-- **AWS Account** with Bedrock access enabled
-- **OpenAI API** key
-- **CLARISA API** access credentials
-
-### **Full Stack Setup (Recommended)**
+From the monorepo root:
 
 ```bash
-# 1. Clone the repository
-git clone <repository-url>
-cd partner-request-support
-
-# 2. Set up environment variables (see Configuration section)
-cp .env.example .env
-# Edit .env with your credentials
-
-# 3. Backend setup
-cd backend
-python -m venv ../.venv
-source ../.venv/bin/activate  # On Windows: ..\.venv\Scripts\activate
-pip install -r requirements.txt
-
-# 4. Initialize database
-# Execute sql/create_clarisa_vector_table.sql in Supabase SQL Editor
-# Execute sql/create_partner_cache_table.sql in Supabase SQL Editor
-
-# 5. Populate CLARISA database
-python src/populate_clarisa_db.py
-# This takes 10-15 minutes to generate embeddings for all institutions
-
-# 6. Start backend API
-python api.py
-# API runs on http://localhost:8000
-
-# 7. Frontend setup (new terminal)
-cd ../frontend
-npm install
-npm run dev
-# Frontend runs on http://localhost:3000
+cd partner-request-support/backend
+python3.13 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
-### **Environment URLs**
+Create `.env` in the backend directory using the [configuration example and variable table](backend/README.md#configuration). Supply values for the intended environment for Supabase, OpenAI, the CLARISA URLs, and AWS access. The selected cache table remains `partner_request_cache_prod`; `.env` does not switch that code constant. The URLs in the example are placeholders; provider clients are constructed during import, so configuration must be ready before starting the API.
 
-**Backend API:**
-- 🔧 **Development**: http://localhost:8000
-- 🧪 **Test**: https://hw4qszwcz55trf2n4xg7ujef7y0tgtya.lambda-url.us-east-1.on.aws
-- 🚀 **Production**: https://eff4b5tkftulww4nllaebunmri0cdwrf.lambda-url.us-east-1.on.aws
+### 2. Start the API
 
-**Frontend Application:**
-- 🔧 **Development**: http://localhost:3000
-- 🧪 **Test**: https://d27ujrreorxaxf.cloudfront.net
-- 🚀 **Production**: https://d27ujrreorxaxf.cloudfront.net
-
----
-
-## 🎨 Frontend Application
-
-### **Architecture & Design Patterns**
-
-The frontend follows modern React best practices with a **modular, scalable architecture**:
-
-#### **Component-Based Structure**
-- **11 Specialized Components**: Each component handles a single responsibility
-  - `LoginPage` - Authentication interface
-  - `Header` - Application header with branding and user info
-  - `AIDisclaimer` - AI usage disclaimer banner
-  - `UploadSection` - Dual-mode upload interface (Excel/API)
-  - `StatsCards` - Animated statistics dashboard
-  - `ResultsSection` - Complete results orchestrator
-  - `PartnerTable` - Results table container
-  - `PartnerRow` - Individual partner row with actions
-  - `QualityBadge` - Color-coded match quality indicator
-  - `SyncAlert` - Database sync notifications
-  - `ModalDialog` - Reusable modal component
-
-#### **Custom Hooks Pattern**
-- **6 Custom Hooks** for separation of concerns and reusability:
-  - `useAuth` - Authentication state and login/logout logic
-  - `usePartnerProcessing` - Partner processing orchestration
-  - `useApiSync` - API partner request synchronization
-  - `useFileUpload` - File upload state management
-  - `useModal` - Modal state and control
-  - `useWebSearch` - Manual web search execution
-
-#### **Service Layer**
-- **Centralized API Communication**:
-  - `authService` - CLARISA authentication API
-  - `partnerService` - Partner processing endpoints
-- Clean separation between UI logic and API calls
-- Consistent error handling and response formatting
-
-#### **Type System**
-- **Full TypeScript Coverage**:
-  - `partner.types` - Partner and match-related interfaces
-  - `api.types` - API request/response schemas
-  - `auth.types` - Authentication types
-- Type-safe props and state management
-- IntelliSense support throughout
-
-#### **Utility Helpers**
-- `qualityHelpers` - Match quality classification and badge rendering
-- `fileHelpers` - File validation and processing helpers
-
-### **Key Features**
-
-#### **Authentication**
-- Split-screen login interface with CGIAR branding
-- Email/password authentication via CLARISA API
-- Password visibility toggle and comprehensive error handling
-- Automatic session management
-
-#### **Processing Modes**
-
-**Excel Upload Mode:**
-- Drag-and-drop file upload (`.xlsx`, `.xls`)
-- Template download from S3
-- Real-time file validation
-- Option to create partner requests in CLARISA first
-
-**API Request Mode:**
-- Sync pending partner requests from CLARISA API
-- Auto-refresh capability
-- Displays request count and metadata
-
-#### **Results Dashboard**
-
-**Statistics Cards** (animated with Framer Motion):
-- Total Partners Processed
-- Successfully Matched
-- Excellent Matches (≥85% confidence)
-- Web Searches Performed
-
-**Results Table**:
-- Partner Name, Acronym, Country (with flag emoji)
-- Match Quality badge (color-coded)
-- Actions: CLARISA Match, Top Candidates, Web Search
-- Accept/Reject buttons (for API requests)
-- Search/filter capabilities
-
-**Match Quality Indicators**:
-- 🟢 **Excellent** (≥85%): High confidence, verified match
-- 🟡 **Good** (70-84%): Strong match, recommended for review
-- 🟠 **Fair** (60-69%): Moderate match, needs validation
-- ⚪ **No Match** (<60%): No suitable match found
-
-#### **Modal Interactions**
-
-- **CLARISA Match Modal**: Complete institution details with score breakdown
-- **Top Candidates Modal**: Ranked list of top 5 potential matches
-- **Web Search Modal**: AI-generated institutional research in markdown
-- **Accept/Reject Modals**: Confirmation dialogs with optional justification
-
-#### **Design System**
-
-**Color Palette:**
-- `#7AB800` - CGIAR Green (Primary)
-- `#0065BD` - CGIAR Blue (Secondary)
-- `#FFC84F` - CGIAR Yellow (Warning)
-- `#272F53` - CGIAR Navy (Dark text)
-- `#F5F7FA` - Light Gray (Background)
-
-**Typography:** Poppins font family (Google Fonts)
-
-### **State Management**
-
-- **React Hooks-Based**: No external state management library needed
-- **Custom Hooks** encapsulate complex state logic
-- **Service Layer** handles API state
-- **Local Component State** for UI-specific concerns
-- **Prop Drilling Minimization** through composition
-
----
-
-## 🔧 Backend API
-
-### **Core Endpoints**
-
-#### **`POST /api/process-partners`**
-Upload and process Excel file with partner requests
-- **Form Data**: file, user_email, user_name, auth_token, create_requests
-- **Returns**: JSON with partners array, statistics, cache info
-
-#### **`POST /api/process-api-partners`**
-Process partners from synced API requests
-- **Body**: a bare JSON array of partner request IDs, e.g. `[5723, 5751]` (optional)
-- **Default**: with no body, processes the 10 oldest pending requests
-- **Returns**: Same as process-partners
-
-#### **`GET /api/sync-partner-requests`**
-Fetch pending partner requests from CLARISA API
-- **Returns**: Array of partner request objects
-
-#### **`POST /api/sync-clarisa-institutions`**
-Manually trigger CLARISA database sync
-- **Body**: delete_obsolete (boolean)
-- **Returns**: Sync statistics (new_count, modified_count, deleted_count)
-
-#### **`POST /api/respond-partner-request`**
-Accept or reject a partner request in CLARISA
-- **Body**: request_id, user_id, accept, auth_token, reject_justification (if reject)
-- **Returns**: Success confirmation or error
-
-#### **`POST /api/manual-web-search`**
-Trigger manual web search for an institution
-- **Body**: partner_name (required), country, website (optional)
-- **Returns**: AI-generated institutional report in markdown
-- **Cost**: ~$0.02-0.03 per search
-
-#### **`GET /api/download-template`**
-Download Excel template from S3
-
-#### **`GET /health`**
-Health check endpoint
-
-### **API Documentation**
-
-**Development (localhost):**
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-
-**Test Environment:**
-- **Swagger UI**: https://hw4qszwcz55trf2n4xg7ujef7y0tgtya.lambda-url.us-east-1.on.aws/docs
-- **ReDoc**: https://hw4qszwcz55trf2n4xg7ujef7y0tgtya.lambda-url.us-east-1.on.aws/redoc
-
-**Production Environment:**
-- **Swagger UI**: https://eff4b5tkftulww4nllaebunmri0cdwrf.lambda-url.us-east-1.on.aws/docs
-- **ReDoc**: https://eff4b5tkftulww4nllaebunmri0cdwrf.lambda-url.us-east-1.on.aws/redoc
-
----
-
-## 🔍 Hybrid Search Algorithm
-
-### **Six-Step Process**
-
-```
-STEP 1: Generate Embeddings
-  → Amazon Bedrock Titan Embed Text v2 (1024 dimensions)
-  
-STEP 2: Dual-Language Support
-  → Detect language (langdetect)
-  → Translate to English if needed (AWS Translate)
-  → Generate embeddings for both versions
-  
-STEP 3: Vector Search (Top 5 Candidates)
-  → Cosine similarity on embeddings
-  → Combined score: 0.7×name + 0.3×acronym
-  → Threshold: 0.2 (pgvector IVFFlat index)
-  
-STEP 4: String Normalization & Fuzzy Matching
-  → Normalize: lowercase, remove accents
-  → RapidFuzz ratio for name and acronym
-  
-STEP 5: Final Scoring & Ranking
-  → final_score = 0.60×cosine + 0.30×fuzz_name + 0.10×fuzz_acronym
-  → Select candidate with highest score
-  
-STEP 6: Quality Classification
-  → Excellent: ≥0.85
-  → Good: 0.70-0.84
-  → Fair: 0.60-0.69
-  → No Match: <0.60 → triggers web search
-```
-
-### **Configuration Parameters**
-
-```python
-THRESHOLD_EMBEDDINGS = 0.2   # Vector search threshold
-THRESHOLD_FINAL = 0.6        # Minimum match score
-NAME_WEIGHT = 0.7            # Name embedding weight
-ACRONYM_WEIGHT = 0.3         # Acronym embedding weight
-COSINE_WEIGHT = 0.60         # Semantic similarity weight
-FUZZ_NAME_WEIGHT = 0.30      # Name fuzzy weight
-FUZZ_ACRONYM_WEIGHT = 0.10   # Acronym fuzzy weight
-```
-
-### **Why Hybrid?**
-
-**Vector Embeddings**: Excellent at semantic understanding, language-agnostic  
-**Fuzzy Matching**: Precise on exact character matches, handles typos  
-**Combined**: Achieves >90% accuracy by leveraging strengths of both
-
----
-
-## 🗄️ Database Schema
-
-### **Table: `clarisa_institutions_v2`**
-
-Stores all CLARISA institutions with pre-computed vector embeddings.
-
-```sql
-CREATE TABLE clarisa_institutions_v2 (
-    id SERIAL PRIMARY KEY,
-    clarisa_id INTEGER UNIQUE NOT NULL,
-    name TEXT NOT NULL,
-    acronym TEXT,
-    website TEXT,
-    countries TEXT[],
-    institution_type TEXT,
-    name_embedding vector(1024),
-    acronym_embedding vector(1024),
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Vector indexes (IVFFlat for approximate nearest neighbor search)
-CREATE INDEX idx_name_embedding ON clarisa_institutions_v2 
-    USING ivfflat (name_embedding vector_cosine_ops) WITH (lists = 100);
-```
-
-**Typical Row Count:** ~3,000-5,000 institutions
-
-### **Table: `partner_request_cache_prod`**
-
-Caches processing results to avoid redundant searches.
-
-```sql
-CREATE TABLE partner_request_cache_prod (
-    request_id BIGINT PRIMARY KEY,
-    partner_name TEXT NOT NULL,
-    match_found BOOLEAN,
-    match_quality TEXT,
-    clarisa_match JSONB,
-    top_candidates JSONB,
-    web_search JSONB,
-    api_data JSONB,
-    processed_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-**Cache Strategy:**
-- Caches by partner_name (lowercase normalized)
-- Handles duplicates with same name but different IDs
-- Invalidates automatically when CLARISA database updates
-
-### **RPC Functions**
-
-- `search_institution_by_name()` - Vector search by name embedding
-- `search_institution_combined()` - Combined name + acronym search with weights
-
----
-
-## ⚙️ Configuration
-
-### **Environment Variables**
-
-Create `.env` in `backend/` directory:
+In the same terminal, with the virtual environment active:
 
 ```bash
-# CLARISA API
-CLARISA_API_URL=clarisa-api-url
-CLARISA_PARTNER_REQUESTS_URL=clarisa-partner-requests-url
-CLARISA_CREATE_URL=clarisa-create-url
-CLARISA_RESPOND_URL=clarisa-respond-url
-CLARISA_COUNTRIES_URL=clarisa-countries-url
-CLARISA_INSTITUTION_TYPES_URL=clarisa-institution-types-url
-
-# Supabase
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-supabase-key
-
-# AWS (Bedrock and Translate)
-AWS_ACCESS_KEY_ID_BR=AKIA...
-AWS_SECRET_ACCESS_KEY_BR=your-secret-key
-AWS_REGION=us-east-1
-
-# OpenAI
-OPENAI_API_KEY=sk-proj-...
-
-# S3 (Template Storage)
-S3_TEMPLATE_BUCKET=cgiar-partner-templates
-S3_TEMPLATE_KEY=partner_request_template.xlsx
-
-# CORS (Frontend URLs)
-# Development, Test, and Production frontend URLs (comma-separated)
-CORS_ORIGINS=http://localhost:3000,https://d27ujrreorxaxf.cloudfront.net
+python -m uvicorn api:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-### **Frontend Configuration**
+The local entry point is `api:app`. `main.handler` is the separate Lambda entry point. API documentation is available at [Swagger UI](http://localhost:8000/docs) and [ReDoc](http://localhost:8000/redoc).
 
-Create `.env.local` in `frontend/`:
+### 3. Start the frontend
+
+Open another terminal at the monorepo root:
 
 ```bash
+cd partner-request-support/frontend
+npm ci
+```
+
+Create `.env.local` in this frontend directory with:
+
+```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-**Test:**
-```bash
-NEXT_PUBLIC_API_URL=https://hw4qszwcz55trf2n4xg7ujef7y0tgtya.lambda-url.us-east-1.on.aws
-```
-
-**Production:**
-```bash
-NEXT_PUBLIC_API_URL=https://eff4b5tkftulww4nllaebunmri0cdwrf.lambda-url.us-east-1.on.aws
-```
-
----
-
-## 📝 Usage Examples
-
-### **Excel File Processing**
-
-```python
-import requests
-
-# Choose your environment:
-# Dev: "http://localhost:8000"
-# Test: "https://hw4qszwcz55trf2n4xg7ujef7y0tgtya.lambda-url.us-east-1.on.aws"
-# Prod: "https://eff4b5tkftulww4nllaebunmri0cdwrf.lambda-url.us-east-1.on.aws"
-url = "http://localhost:8000/api/process-partners"
-with open("partners.xlsx", "rb") as f:
-    files = {"file": f}
-    data = {
-        "user_email": "user@cgiar.org",
-        "user_name": "John Doe",
-        "auth_token": "token",
-        "create_requests": "false"
-    }
-    response = requests.post(url, files=files, data=data)
-    results = response.json()
-```
-
-### **Manual Search**
-
-```python
-from backend.src.mapping_clarisa_comparison import hybrid_search_institution
-
-result = hybrid_search_institution(
-    partner_name="Wageningen University",
-    acronym="WUR",
-    country="Netherlands"
-)
-
-print(f"Match: {result['name']}")
-print(f"Score: {result['final_score']:.2f}")
-print(f"Quality: {result['match_quality']}")
-```
-
-### **Web Search**
-
-```python
-from backend.src.web_search import search_institution_info
-
-report = search_institution_info(
-    name="Stanford University",
-    country="United States",
-    website="https://www.stanford.edu"
-)
-```
-
----
-
-## 💻 Development
-
-### **Project Structure**
-
-```
-partner-request-support/
-├── frontend/
-│   ├── app/
-│   │   ├── page.tsx              # Main application (orchestrator)
-│   │   ├── layout.tsx            # Root layout
-│   │   ├── globals.css           # Global styles
-│   │   │
-│   │   ├── components/           # UI Components
-│   │   │   ├── LoginPage.tsx
-│   │   │   ├── Header.tsx
-│   │   │   ├── AIDisclaimer.tsx
-│   │   │   ├── UploadSection.tsx
-│   │   │   ├── StatsCards.tsx
-│   │   │   ├── ResultsSection.tsx
-│   │   │   ├── PartnerTable.tsx
-│   │   │   ├── PartnerRow.tsx
-│   │   │   ├── QualityBadge.tsx
-│   │   │   ├── SyncAlert.tsx
-│   │   │   ├── ModalDialog.tsx
-│   │   │   └── index.ts
-│   │   │
-│   │   ├── hooks/                # Custom Hooks
-│   │   │   ├── useAuth.ts
-│   │   │   ├── usePartnerProcessing.ts
-│   │   │   ├── useApiSync.ts
-│   │   │   ├── useFileUpload.ts
-│   │   │   ├── useModal.ts
-│   │   │   ├── useWebSearch.ts
-│   │   │   └── index.ts
-│   │   │
-│   │   ├── services/             # API Services
-│   │   │   ├── authService.ts
-│   │   │   ├── partnerService.ts
-│   │   │   └── index.ts
-│   │   │
-│   │   ├── types/                # TypeScript Types
-│   │   │   ├── partner.types.ts
-│   │   │   ├── api.types.ts
-│   │   │   ├── auth.types.ts
-│   │   │   └── index.ts
-│   │   │
-│   │   └── utils/                # Utility Helpers
-│   │       ├── qualityHelpers.tsx
-│   │       └── fileHelpers.ts
-│   │
-│   ├── public/
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── next.config.ts
-│   ├── tailwind.config.ts
-│   └── postcss.config.mjs
-│
-├── backend/
-│   ├── api.py                    # FastAPI entry point
-│   ├── main.py                   # CLI script
-│   ├── requirements.txt
-│   │
-│   ├── src/
-│   │   ├── __init__.py
-│   │   ├── mapping_clarisa_comparison.py  # Hybrid search engine
-│   │   ├── clarisa_api.py                 # CLARISA API client
-│   │   ├── embeddings.py                  # Embedding generation
-│   │   ├── supabase_client.py             # Database operations
-│   │   ├── utils.py                       # Utilities
-│   │   ├── web_search.py                  # Web search module
-│   │   └── populate_clarisa_db.py         # DB population
-│   │
-│   ├── config/
-│   │   └── config_util.py
-│   │
-│   ├── docs/
-│   │   ├── CGIAR_INSTITUTION_RULES.md
-│   │   ├── HOW THE SEARCH WORKS.md
-│   │   └── QUICKSTART.md
-│   │
-│   ├── sql/
-│   │   ├── create_clarisa_vector_table.sql
-│   │   └── create_partner_cache_table.sql
-│   │
-│   ├── test/
-│   │   ├── search_example.py
-│   │   └── web_search_test.py
-│   │
-│   └── logger/
-│       └── logger_util.py
-│
-├── .env
-├── .gitignore
-├── README.md
-└── skills-lock.json
-```
-
-### **Frontend Architecture Principles**
-
-**Component Organization:**
-- **Single Responsibility**: Each component handles one specific UI concern
-- **Composition Over Inheritance**: Complex UIs built from simple, reusable components
-- **Props Interface**: TypeScript interfaces for all component props
-
-**Custom Hooks Benefits:**
-- **Logic Reusability**: Share stateful logic across components
-- **Separation of Concerns**: UI components focus on rendering, hooks handle logic
-- **Testability**: Hooks can be tested independently
-- **Code Organization**: Complex state management extracted from components
-
-**Service Layer Pattern:**
-- **Centralized API Logic**: All HTTP requests in dedicated service files
-- **Error Handling**: Consistent error formatting across the app
-- **Type Safety**: Typed request/response with TypeScript
-- **Easier Mocking**: Services can be easily mocked for testing
-
-### **Development Commands**
+Then start the UI:
 
 ```bash
-# Backend with auto-reload
-cd backend
-uvicorn api:app --reload --host 0.0.0.0 --port 8000
-
-# Frontend with development mode
-cd frontend
 npm run dev
-
-# Frontend with Turbopack (faster)
-npm run dev --turbo
 ```
 
-### **Adding New Features**
+Open [the local application](http://localhost:3000). Login in this branch uses the production CLARISA authentication host independently of `NEXT_PUBLIC_API_URL`; see the [frontend setup guide](frontend/README.md).
 
-#### **Frontend: New Component**
+### 4. Check startup and choose a workflow
+
+From a third terminal:
+
 ```bash
-# 1. Create component file
-touch frontend/app/components/NewComponent.tsx
-
-# 2. Add to index.ts for centralized exports
-echo "export * from './NewComponent';" >> frontend/app/components/index.ts
-
-# 3. Import in page.tsx or other components
-# import { NewComponent } from './components';
+curl http://localhost:8000/health
 ```
 
-#### **Frontend: New Custom Hook**
-```bash
-# 1. Create hook file
-touch frontend/app/hooks/useNewFeature.ts
+The expected response is `{"status":"healthy"}`. This confirms that the API is running; it does not check its external dependencies. Sign in to the UI to use the review workflow. Before uploading or processing, read the [workflow effects](#workflows): Excel upload creates CLARISA requests by default, and processing can synchronize catalog records, write cache, and call models. These actions affect configured resources even when the app runs locally.
 
-# 2. Add to index.ts
-echo "export * from './useNewFeature';" >> frontend/app/hooks/index.ts
+## Project structure
 
-# 3. Use in components
-# import { useNewFeature } from './hooks';
+```text
+partner-request-support/
+├── README.md                 # Service entry point and local quick start
+├── AGENTS.md                 # Service working rules and implementation map
+├── docs/                     # API, workflows, architecture, branch differences
+├── backend/
+│   ├── README.md             # Backend setup and configuration
+│   ├── api.py                # HTTP routes and request orchestration
+│   ├── main.py               # Mangum Lambda handler
+│   ├── src/                  # Matching, CLARISA, storage, research, notifications
+│   ├── config/               # AWS and email configuration
+│   ├── sql/                  # Institution schema/RPCs and branch-specific cache
+│   ├── docs/                 # Search algorithm, quickstart, rules reference
+│   ├── test/                 # Examples that can call live systems
+│   ├── requirements.txt      # Dependencies installed by Docker
+│   ├── Dockerfile            # Lambda container
+│   └── template.yaml         # Backend SAM template
+└── frontend/
+    ├── README.md             # Frontend setup and workflow
+    ├── AGENTS.md             # Frontend working rules
+    ├── app/                  # Pages, components, hooks, services, types, utilities
+    ├── docs/                 # Historical refactoring note
+    ├── package.json          # Frontend dependencies and npm scripts
+    ├── next.config.ts        # Static-export configuration
+    └── template.yaml         # S3/CloudFront hosting template
 ```
 
-#### **Frontend: New Service Method**
-```typescript
-// In frontend/app/services/partnerService.ts
-async newMethod(params: Params): Promise<Response> {
-  const response = await axios.post(`${getApiUrl()}/api/new-endpoint`, params);
-  return response.data;
-}
+For individual modules and responsibilities, see the [service implementation map](AGENTS.md#implementation-map) and [frontend code map](frontend/README.md#code-map).
+
+## System architecture
+
+The browser application handles login, Excel upload, pending-request review, candidate inspection, and human decisions. Its service layer calls CLARISA authentication directly and sends processing requests to the Python API.
+
+```mermaid
+flowchart TB
+    subgraph Frontend["Browser: Next.js 16 / React 19"]
+        UI["page.tsx and UI components"]
+        Hooks["Custom hooks: session, uploads, processing, sync, modals"]
+        Services["authService and partnerService"]
+        UI --> Hooks --> Services
+    end
+
+    subgraph Backend["Backend: FastAPI"]
+        API["api.py: routes and workflow orchestration"]
+        Match["Hybrid matching: embeddings and fuzzy reranking"]
+        Research["Web research, rules and duplicate checks"]
+        Clarisa["Catalog sync and request create/respond integration"]
+        Notify["Manual-review notifications"]
+        API --> Match
+        API --> Research
+        Match -->|"No-match research fallback"| Research
+        API --> Clarisa
+        API --> Notify
+    end
+
+    Auth["CLARISA authentication"]
+    Requests["CLARISA institutions, requests and catalogs"]
+    DB[("Supabase: PostgreSQL + pgvector, institutions and match cache")]
+    Bedrock["AWS Bedrock: Titan embeddings and Claude models"]
+    Translate["AWS Translate"]
+    OpenAI["OpenAI Responses web search"]
+    S3["S3: Excel template"]
+    Email["RabbitMQ email microservice"]
+
+    Services -->|"Login"| Auth
+    Services -->|"HTTP: NEXT_PUBLIC_API_URL"| API
+    API -->|"Match cache"| DB
+    API -->|"Template download"| S3
+    Match -->|"Vector candidates"| DB
+    Match -->|"Embeddings"| Bedrock
+    Match --> Translate
+    Research --> OpenAI
+    Research -->|"Formatting and verification"| Bedrock
+    Clarisa --> Requests
+    Clarisa -->|"Institution snapshot"| DB
+    Clarisa -->|"Catalog embeddings"| Bedrock
+    Notify --> Email
 ```
 
-#### **Backend: New API Endpoint**
-```python
-# 1. Add route in api.py
-@app.post("/api/new-endpoint")
-async def new_endpoint(data: RequestModel):
-    # Implementation
-    return {"result": "..."}
+The frontend is exported as static files for S3/CloudFront hosting. The backend runs locally through Uvicorn; the SAM template defines an HTTP API/Lambda container path using Mangum's `main.handler`. These deployment definitions do not verify the currently deployed environment.
 
-# 2. Implement business logic in src/ modules
-# 3. OpenAPI docs update automatically
-# 4. Add corresponding method in frontend partnerService.ts
+Human review and automatic evaluation share matching/research modules but use different decision rules. The automatic endpoint can be called separately from the UI. Only configured manual-review notifications are published to the email microservice; CLARISA handles notifications for submitted accept/reject responses. See the [detailed design](docs/HIGH_LEVEL_DESIGN.md) for state boundaries, provider models, and the two processing pipelines.
+
+## Workflows
+
+| Workflow | Entry | Behavior |
+| --- | --- | --- |
+| Spreadsheet review | `POST /api/process-partners` | Synchronize institutions, optionally create CLARISA requests, match spreadsheet rows, and cache results |
+| Pending-request review | `GET /api/sync-partner-requests`, then `POST /api/process-api-partners` | Fetch pending CLARISA requests and process a default batch of ten, oldest first |
+| Human response | `POST /api/respond-partner-request` | Accept/reject an existing request in CLARISA with the supplied user/token |
+| Manual web research | `POST /api/manual-web-search` | Generate a research summary for a proposed institution |
+| Automated evaluation | `POST /api/auto-partner-request` | Classify duplicates or run web/rules review; optionally create/respond in CLARISA |
+| Catalog maintenance | `POST /api/sync-clarisa-institutions` | Update the Supabase institution snapshot/embeddings and optionally delete obsolete entries |
+
+Processing is not a read-only search. Spreadsheet and pending-request processing synchronize database contents and update cache. Spreadsheet creation defaults to enabled, and the frontend explicitly enables it. Automated evaluation can perform web/model calls and send manual-review notifications even with auto-response disabled.
+
+## Matching and decision boundaries
+
+Matching uses Titan Text Embeddings V2, Supabase/pgvector candidates, language translation where applicable, and RapidFuzz reranking. The manual-review score is `0.60 × semantic + 0.30 × fuzzy name + 0.10 × fuzzy acronym`. Manual quality tiers are excellent at 0.85+, good at 0.70+, fair at 0.60+, otherwise no match.
+
+Automated evaluation has its own tiers. An excellent score above 0.95 is treated as a duplicate and rejected; scores from 0.70 through 0.95 use a separate same-institution check. Unconfirmed duplicates, fair matches, and no-match cases proceed to web/rules evaluation, which returns ACCEPT or MANUAL_REVIEW. These tiers must not be interchanged with frontend review labels.
+
+Field completeness is returned as information in the current automatic web/rules path; it is not an independent acceptance gate there. A score, model decision, or successful HTTP response is not a guarantee of institutional eligibility or a confirmed upstream response. See [API semantics](docs/API_GUIDE.md#automated-evaluation).
+
+## Frontend and authentication
+
+The Next.js app supports Excel upload, pending-request synchronization, ten-request processing batches, candidate inspection, manual web search, and human accept/reject actions. React hooks keep login state and results; the UI calls the configured Python API directly.
+
+In this service-main branch, login targets `https://api.clarisa.cgiar.org/auth/login`, and the header displays Production Environment. The browser receives an access token and passes it as an internal `auth_token` value for creation/response operations. Those calls translate it to an upstream Bearer header.
+
+The local FastAPI routes do not define a general authentication dependency. A frontend login does not establish protection of every backend route. Confirm infrastructure access controls and external catalog/endpoint contracts for the target environment.
+
+## Storage and configuration
+
+Supabase stores `clarisa_institutions_v2` and, in this branch, the production cache table `partner_request_cache_prod`. Development uses `partner_request_cache_test`. The table is selected by a code constant and matching SQL, not an environment flag. Preserve that distinction during integration.
+
+Configuration includes Supabase access, CLARISA institution/pending/create/respond/catalog URLs, AWS Bedrock/Translate/S3 access, OpenAI, and optional RabbitMQ email settings. See the [backend configuration table](backend/README.md#configuration); no `.env.example` is included in the reviewed tree.
+
+Cached results can be reused by normalized partner name. The batch API reassigns current request IDs; other cached source metadata can remain from the earlier result. Catalog changes can clear cached matches. The pending queue is a process-local snapshot fetched by sync (or recovered when empty), not a shared queue service.
+
+## Runtime and integration
+
+Use Python 3.13 for the Lambda backend path. The backend runs locally from `backend/` with Uvicorn and deploys as a Lambda container through Mangum's `main.handler`. Docker installs `requirements.txt`. The frontend uses Next.js 16.1.6 / React 19.2.3, static export, and S3/CloudFront infrastructure.
+
+```text
+task branch from dev-partner-request-support
+    → dev-partner-request-support → main-partner-request-support → staging → main
 ```
 
-#### **Database Changes**
-1. Write migration SQL script in `backend/sql/`
-2. Test in Supabase SQL editor
-3. Document schema changes in README
-4. Update cache invalidation logic if needed
+After the maintainer's local service-main integration, compare cache constants/SQL, CORS, the frontend login host, and environment labels. Adapt service-main documentation before push rather than replacing production destinations with development values. Completed service updates accumulate in `staging` for the agreed consolidated PR to `main`.
 
----
+The GitHub workflows trigger Jenkins on pushes to the development and service-main branches. They do not exclude documentation-only changes. The infrastructure templates describe deployment inputs, not verified live settings.
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
-### **"relation clarisa_institutions_v2 does not exist"**
-Execute SQL scripts in Supabase SQL Editor:
-- `sql/create_clarisa_vector_table.sql`
-- `sql/create_partner_cache_table.sql`
+Start with the API terminal output and the browser's Network panel to identify which request failed. Local backend logs also rotate under `backend/data/logs/app.log`; Lambda uses stdout/CloudWatch. Remove tokens and requester data before sharing diagnostics.
 
-### **"embedding dimension mismatch"**
-Ensure using Amazon Bedrock Titan Embed Text **v2** (1024 dimensions):
-```python
-model_id = "amazon.titan-embed-text-v2:0"  # Not v1!
-```
+| Symptom | What to check |
+| --- | --- |
+| Backend fails during startup or reports a missing module | Activate the backend virtual environment and install its `requirements.txt` using that environment's Python. For provider configuration errors, check `backend/.env`, Supabase/OpenAI settings, and AWS credentials. Imports can fail before `/health` becomes available. |
+| Supabase reports a missing relation or RPC function | Confirm the database selected by `SUPABASE_URL`, the required schema/functions, and the `partner_request_cache_prod` table selected by this branch. Compare the [institution SQL](backend/sql/create_clarisa_vector_table.sql) and [cache SQL](backend/sql/create_partner_cache_table.sql) with that database before applying changes. |
+| Embedding dimension mismatch | Confirm Titan Text Embeddings V2 and the 1,024-dimensional columns/RPC parameters used by this service. Check the existing database schema before changing the model or regenerating vectors; see [matching details](backend/docs/HOW%20THE%20SEARCH%20WORKS.md). |
+| UI cannot reach the API or the browser reports CORS errors | Check that the API is running, `NEXT_PUBLIC_API_URL` uses the intended host/port, and `CORS_ORIGINS` includes the frontend's exact origin, including its port. Restart the frontend after changing `.env.local`; a static deployment requires rebuilding its assets. |
+| Login fails, or CLARISA rejects a create/respond call | Login uses the separate host in `frontend/app/services/authService.ts`. Confirm that the login environment, backend CLARISA URLs, user, and token belong to the intended environment. Changing the backend URL alone does not change the login host. |
+| Pending requests appear out of date or only ten are processed | Explicitly synchronize pending requests to refresh the in-memory snapshot. With no selected IDs, processing chooses its ten oldest entries; an existing nonempty snapshot is reused. See [pending-request processing](docs/API_GUIDE.md#pending-request-processing). |
+| Match results appear stale | Check whether the response reports a cache hit and whether catalog synchronization detected changes. Verify the branch-selected cache table before an intentional cache purge: `/api/clear-cache` deletes its contents. |
+| Excel template download fails | Check the configured S3 bucket/key and AWS access. The default key is `PartnerRequestTemplate_v1.xlsx`; the deployed object must exist at the selected location. |
+| `npm run lint` cannot find ESLint | Run `npm ci` from `frontend/` using a compatible Node.js version, then retry the defined npm script. This check is separate from starting or validating the backend. |
 
-### **"pgvector index error"**
-Rebuild vector indexes in Supabase:
-```sql
-DROP INDEX IF EXISTS idx_name_embedding;
-CREATE INDEX idx_name_embedding ON clarisa_institutions_v2 
-    USING ivfflat (name_embedding vector_cosine_ops) WITH (lists = 100);
-```
+For request-body errors, compare the [API guide](docs/API_GUIDE.md) with the request actually sent: `process-api-partners` takes a bare array, while `sync-clarisa-institutions` takes a bare boolean. Confirm the current environment and upstream state before retrying a creation/response operation that may already have partially succeeded.
 
-### **Slow embedding generation**
-- Use `us-east-1` region
-- Reduce batch size in `populate_clarisa_db.py`
-- Check AWS service quotas
+## Validation and references
 
-### **CORS errors**
-Ensure backend has CORS enabled in `api.py` for your frontend URLs:
-- Development: `http://localhost:3000`
-- Test: `https://d27ujrreorxaxf.cloudfront.net`
-- Production: `https://d27ujrreorxaxf.cloudfront.net`
+The files in `backend/test/` are live search examples, not an isolated regression suite; one runs web searches at import. Do not run them as routine documentation checks. Offline checks should stub Supabase, CLARISA, AWS/model calls, and notifications and block network connections.
 
-Check the `CORS_ORIGINS` environment variable in your `.env` file.
+Validate examples, route/body shapes, batch selection, score boundaries, and automatic-decision branches separately from live provider accuracy. Frontend lint may report existing code issues; do not treat a documentation update as a validated build or deployment.
 
-### **Cache not invalidating**
-Manually clear cache:
-```sql
-DELETE FROM partner_request_cache_prod;
-```
-
----
+The [institution rules reference](backend/docs/CGIAR_INSTITUTION_RULES.md) is retained business context. Current executable routing is described in the API guide; this repository review is not an independent policy/legal determination. The [frontend refactoring note](frontend/docs/REFACTORING.md) records earlier structural work.

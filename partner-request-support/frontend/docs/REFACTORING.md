@@ -1,3 +1,5 @@
+> Historical note: this document records an earlier refactoring. Use the [frontend README](../README.md) and [agent guide](../AGENTS.md) for maintained setup, current responsibilities, and validation constraints; verify file paths against the current branch.
+
 # Frontend Refactoring - Partner Request Support
 
 ## 📋 Summary
