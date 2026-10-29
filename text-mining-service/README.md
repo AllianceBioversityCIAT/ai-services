@@ -2,7 +2,7 @@
 
 FastAPI and MCP service for four extraction workflows: STAR document mining, PRMS multisource extraction, AICCRA document mining, and STAR Bulk CapDev. A separate Next.js application supports reviewing and submitting bulk records to STAR.
 
-This README describes the development tree based on `dev-text-mining`. Service-main has deliberate differences, including removal of the legacy bulk-upload interface. See [branch differences](docs/BRANCH_DIFFERENCES.md) before integration. Deployed availability and pipeline results require separate verification.
+This README describes `main-text-mining`. It includes the four extraction workflows, the AICCRA static interface, and the Next.js Bulk Upload application. The legacy `/bulk-upload` HTML interface is absent from this branch. See [branch differences](docs/BRANCH_DIFFERENCES.md) for preserved development/production differences. Deployed availability and pipeline results require separate verification.
 
 ## Start here
 
@@ -28,17 +28,17 @@ STAR and Bulk CapDev use a CLARISA `X-API-Key` at the HTTP layer and STAR token 
 
 ## Backend setup
 
-Use Python 3.13 and run from `text-mining-service/`. Install `uv` before these steps.
+Use Python 3.13 and run from `text-mining-service/`. The commands below use the same dependency input as the Lambda Dockerfile:
 
 ```bash
-uv venv
+python3.13 -m venv .venv
 source .venv/bin/activate
-uv pip install -r pyproject.toml
+python -m pip install -r requirements.txt
 ```
 
-This installs the local dependency declarations. For an environment based on the checked-in lockfile, use `uv sync --frozen` and then `uv run --frozen ...` consistently. Some optional local dependencies, such as `psycopg2`, may require system build libraries.
+This selects the dependency declarations used for Lambda packaging. It does not reproduce the entire Lambda runtime or prove a fresh installation/deployment works. `pyproject.toml` also contains optional local dependencies such as `psycopg2`, which may require system build libraries.
 
-The Lambda Dockerfile installs `requirements.txt` with pip. These dependency sources are currently different: the development lockfile contains LanceDB 0.21.2, while `requirements.txt` pins 0.36.0; `pyproject.toml` leaves LanceDB unpinned. Choose the environment deliberately and report which was tested. Updating documentation does not reconcile dependencies.
+`requirements.txt`, `pyproject.toml`, and `uv.lock` all select LanceDB 0.36.0. The lockfile is valid and passes `uv lock --check --offline` against `pyproject.toml`. Docker installs `requirements.txt` with pip; it does not use the uv lockfile to install dependencies. Other unpinned dependencies can still resolve differently between these workflows, so report the environment actually tested. The setup below follows the Lambda requirements; no fresh installation or Docker build was performed during this documentation review.
 
 ### Configuration
 
@@ -53,7 +53,7 @@ PRMS_BUCKET_KEY_NAME=prms/text-mining/files/test
 AICCRA_BUCKET_KEY_NAME=aiccra/text-mining/files/test
 ```
 
-The URL is a placeholder. AWS credentials must be available to boto3, such as through a profile or deployed role. The shared Bedrock provider also reads `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` when supplied.
+This is a local test configuration example, not a description of deployed production values. The URL is a placeholder. AWS credentials must be available to boto3, such as through a profile or deployed role. The shared Bedrock provider also reads `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` when supplied.
 
 | Setting | Purpose |
 | --- | --- |
@@ -74,7 +74,7 @@ The main Bedrock provider uses Claude Sonnet 4.6 (`us.anthropic.claude-sonnet-4-
 ### Start locally
 
 ```bash
-uv run python -m app.mcp.client
+python -m app.mcp.client
 ```
 
 Open [Swagger UI](http://localhost:8000/docs) or [ReDoc](http://localhost:8000/redoc). The module starts Uvicorn on port 8000. Run it from the service directory so relative static-interface paths resolve.
@@ -87,22 +87,23 @@ Importing the HTTP app attempts to verify/create the bulk-upload DynamoDB table.
 
 | Surface | Location / routes | Notes |
 | --- | --- | --- |
-| AICCRA static UI | `interface/aiccra_mining/`, `GET /ui` | Present in development and service-main snapshots |
-| Legacy Bulk Upload UI | `interface/bulk_upload/`, `GET /bulk-upload` | Present in development; absent in the reviewed service-main snapshot |
+| AICCRA static UI | `interface/aiccra_mining/`, `GET /ui` | Present in this branch; its JavaScript targets the service-main backend |
 | Next.js Bulk Upload | `frontend/` | Separate process/deployment; see its [README](frontend/README.md) |
 | Status tracking | `/dynamo/bulk-upload-records/...` | Reads/updates complete, failed, links, and record metadata |
 | Feedback | `POST /feedback`, `GET /feedback/{interaction_id}` | External interaction-service integration |
 | S3/UI helpers | `/list-s3-objects`, `/s3/list`, `/s3/download-template`, `/api/auth/token` | See the [API guide](docs/API_GUIDE.md#auxiliary-routes) for behavior and access distinctions |
 
+The legacy `/bulk-upload` route and `interface/bulk_upload/` assets are not available here; they remain development-only. The Next.js frontend and `/star/mining-bulk-upload/capdev` extraction endpoint are present. Its constants use `star/text-mining/files/prod/bulk_upload/` and production STAR result links; verify environment values before live work.
+
 DynamoDB tables are `bulk_upload_records` and `ai-requests-prod` when `IS_PROD=true`, otherwise `bulk_upload_records_test` and `ai-requests-testing`. The code does not establish authentication on every auxiliary route; do not infer access controls from the frontend login.
 
 ## Validation
 
-An automated PRMS suite exists under `tests/prms/`. With the development environment installed:
+An automated PRMS suite exists under `tests/prms/`. With the chosen virtual environment activated:
 
 ```bash
-uv run pytest tests/prms/unit -q
-uv run pytest tests/prms/api -q
+python -m pytest tests/prms/unit -q
+python -m pytest tests/prms/api -q
 ```
 
 Inspect tests and configuration before running them. Unit scenarios mock external work where needed. API tests import the application, whose startup can attempt DynamoDB access; mocking individual requests does not suppress that import-time behavior. Use isolated credentials and stub external clients for offline checks. These tests do not establish production model quality.
@@ -122,7 +123,7 @@ task branch from dev-text-mining
 
 The maintainer handles the development-to-service-main merge. After the local merge and before push, compare service files, route declarations, static interfaces, dependency inputs, and environment destinations. Adapt service-main documentation to its actual tree rather than assuming it matches development.
 
-Jenkins triggers depend on the workflow version in each branch. Development has a backend push trigger for `dev-text-mining` and a separate frontend trigger. The reviewed service-main backend workflow targets `main-text-mining`; an older workflow still mentions `dev-lambda` in development. See [branch differences](docs/BRANCH_DIFFERENCES.md) rather than copying workflow names between branches.
+In this branch, `.github/workflows/jenkins-trigger-ai-text-mining.yml` targets pushes and pull requests to `main-text-mining`. The separate frontend production workflow targets pushes to `main-text-mining`. The development-specific backend workflow is absent here. These triggers do not exclude documentation-only changes; inspect actual workflow contents before a push.
 
 ## Operations and maintenance
 
@@ -131,3 +132,12 @@ Logs write to the console and `/tmp/logs/app.log`, with 5 MB rotation and five b
 Model output and metadata can appear in logs. Static OpenAPI prose and some analytics labels still mention older model versions; inspect the shared provider for the current invoked model. This documentation update does not change those code paths.
 
 See [high-level design](docs/HIGH_LEVEL_DESIGN.md) for failure behavior and [branch differences](docs/BRANCH_DIFFERENCES.md) for the service-main review checklist.
+
+## Retained product references
+
+This branch also contains older STAR/AICCRA product and design documents. Their introductions identify them as historical references and link to the current guides; their model versions and performance descriptions should not be treated as verified runtime facts.
+
+- [AICCRA technical reference](docs/AICCRA_TEXT_MINING_DOCUMENTATION.md)
+- [AICCRA design reference](docs/AICCRA_Text_Mining_SDD.md)
+- [STAR product reference](docs/STAR_Text_Mining_Product_Overview.md)
+- [STAR design reference](docs/STAR_Text_Mining_SDD.md)

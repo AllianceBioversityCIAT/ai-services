@@ -1,6 +1,6 @@
 # STAR Bulk Upload frontend
 
-Next.js 15 / React 19 application for extracting Capacity Development candidates from spreadsheets, reviewing/editing them, and submitting records to STAR. It is a separate app from the Python Text Mining backend.
+The `main-text-mining` branch contains this Next.js 15 / React 19 application for extracting Capacity Development candidates from spreadsheets, reviewing/editing them, and submitting records to STAR. It is a separate app from the Python Text Mining backend.
 
 See the [service README](../README.md) for extraction workflows and [frontend AGENTS.md](AGENTS.md) for implementation conventions.
 
@@ -50,11 +50,11 @@ Other browser calls, including STAR submission and status/catalog requests, are 
 
 ## Branch-dependent destinations
 
-The development constants use the test bulk-upload S3 prefix. The reviewed service-main uses the production prefix. Generated STAR result links also use different hardcoded hosts between branches; changing environment variables alone does not update those literals.
+This branch uses `star/text-mining/files/prod/bulk_upload/` in `constants.ts` and the production STAR host for generated result links in `useBulkUploadApi.ts`. Development uses a test prefix and test result host. Changing environment variables alone does not update these literals; do not use production destinations for a local live test by assumption.
 
 Before promoting frontend changes, compare `components/BulkUpload/constants.ts`, `hooks/useBulkUploadApi.ts`, deployment environment values, and the [service branch comparison](../docs/BRANCH_DIFFERENCES.md). Preserve the target environment's destinations.
 
-The legacy HTML interface under `../interface/bulk_upload/` is separate from this Next.js app and exists only in the reviewed development snapshot. Its removal from service-main does not remove the Next.js app or the Python extraction endpoint.
+There is no `../interface/bulk_upload/` HTML interface or Python `/bulk-upload` page in this branch. Development retains that separate legacy interface. This Next.js app and the Python extraction endpoint remain present on service-main.
 
 ## Validation
 

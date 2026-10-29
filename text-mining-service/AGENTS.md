@@ -1,6 +1,6 @@
 # AGENTS.md — text-mining-service
 
-This file is a **README for coding agents**. Human-oriented docs live in [`README.md`](README.md). Follow the closest `AGENTS.md` to the files you edit; nested files override this one for that subtree. Explicit user prompts override everything.
+This is the **service-main copy** of the coding-agent guide for `main-text-mining`. Human-oriented docs live in [`README.md`](README.md). Follow the closest `AGENTS.md` to the files you edit; nested files override this one for that subtree. Explicit user prompts override everything.
 
 Read the [root agent guide](../AGENTS.md) for shared branch and change rules. This service is part of the CGIAR [`ai-services`](../README.md) monorepo. Work from `text-mining-service/` unless the task clearly spans other services.
 
@@ -24,7 +24,7 @@ LLM-powered microservice that extracts structured information from documents (PD
 Related surfaces:
 
 - **FastAPI + MCP**: `app/mcp/client.py` (HTTP) spawns `app/mcp/server.py` (stdio MCP tools).
-- **Legacy static UIs** (served by FastAPI): `interface/aiccra_mining/`, `interface/bulk_upload/` → `/ui`, `/bulk-upload`, `/static/*`.
+- **Static AICCRA UI**: `interface/aiccra_mining/` → `/ui` and `/static/*`. The development-only `interface/bulk_upload/` files and `/bulk-upload` route are absent from this branch; do not reintroduce them merely to match development.
 - **Next.js Bulk Upload UI**: `frontend/` (SST / OpenNext). See [`frontend/AGENTS.md`](frontend/AGENTS.md).
 - **DynamoDB** status tracking for bulk upload: table `bulk_upload_records` (prod) / `bulk_upload_records_test` (non-prod). Development has historical internal docs under `app/utils/dynamo/docs/`; these files are absent from the reviewed service-main snapshot. Current shared behavior is described in the [API guide](docs/API_GUIDE.md).
 - **Feedback / interactions**: `/feedback`, `/feedback/{interaction_id}`; interaction client in `app/utils/interactions/`.
@@ -66,7 +66,7 @@ Client → FastAPI (app/mcp/client.py)
        → Slack notification + optional interaction tracking
 ```
 
-- Local HTTP API: `uv run python -m app.mcp.client` → `http://localhost:8000` (`/docs`, `/redoc`).
+- Local HTTP API: `python -m app.mcp.client` → `http://localhost:8000` (`/docs`, `/redoc`).
 - Lambda: `main.handler` wraps the same FastAPI app via Mangum.
 - Do **not** treat `uv run python main.py` as the local API server; use the client module above.
 
@@ -74,16 +74,16 @@ Client → FastAPI (app/mcp/client.py)
 
 ## Setup commands
 
-Requires **Python 3.13+** and [`uv`](https://github.com/astral-sh/uv).
+Use **Python 3.13**. The explicit virtual environment below follows the Dockerfile dependency input. `requirements.txt`, `pyproject.toml`, and the valid, up-to-date `uv.lock` all select LanceDB 0.36.0. Docker installs from `requirements.txt`, not the lockfile; other dependency selections can still differ between pip and uv workflows.
 
 ```bash
 cd text-mining-service
-uv venv
+python3.13 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-uv pip install -r pyproject.toml   # or: uv sync if using lockfile workflow
+python -m pip install -r requirements.txt
 ```
 
-Create `.env` using the [README configuration](README.md#configuration); no `.env.example` template is included in the reviewed tree. The development lockfile and deployment requirements differ (including LanceDB versions); identify the environment being tested instead of silently changing dependencies. For lockfile-based work, use `uv sync --frozen` and frozen runs consistently.
+Create `.env` using the [README configuration](README.md#configuration); no `.env.example` template is included in this branch. `requirements.txt` is the Lambda packaging input. For an explicitly chosen lockfile workflow, use locked uv commands consistently in a separate environment; do not mix that dependency selection with the requirements-based environment or claim existing-environment tests cover the newly locked versions. Preserve the maintainer's lockfile changes and keep them separate from documentation edits in review.
 
 Frontend (separate Node app):
 
@@ -100,8 +100,8 @@ Never commit `.env`, credentials, or real AWS/CLARISA secrets.
 
 | Command | Purpose |
 |---|---|
-| `uv run python -m app.mcp.client` | Start FastAPI locally on port 8000 |
-| `uv run python app/mcp/server.py` | Run MCP server alone (usually spawned by the client) |
+| `python -m app.mcp.client` | Start FastAPI locally on port 8000 |
+| `python app/mcp/server.py` | Run MCP server alone (usually spawned by the client) |
 | `python app/utils/cronjob/setup_db_cleaner_cron.py install` | Install LanceDB temp cleanup cron |
 | `cd frontend && npm run dev` | Next.js Bulk Upload UI (HMR) |
 | `cd frontend && npm run lint` | ESLint for frontend |
@@ -139,9 +139,9 @@ Match that style when the user asks for a commit.
 
 ## Testing instructions
 
-- Interactive API checks: start `uv run python -m app.mcp.client`, then use `/docs` or curl against `/star/text-mining`, `/prms/text-mining`, `/aiccra/text-mining`, `/star/mining-bulk-upload/capdev`.
+- Interactive API checks: start `python -m app.mcp.client`, then use `/docs` or curl against `/star/text-mining`, `/prms/text-mining`, `/aiccra/text-mining`, `/star/mining-bulk-upload/capdev`.
 - Sample payloads / fixtures live under `tests/` (`test.json`, `test1.json`, `test2.json`) and `tests/prms/fixtures/`.
-- PRMS automated tests: `uv run pytest tests/prms/unit -q` and `uv run pytest tests/prms/api -q`. Prefer targeted coverage for multisource/auth/prompt changes. The HTTP module attempts to verify/create a DynamoDB table on import; stub that function before importing the app for offline API checks. Test fixtures alone do not suppress every import-time effect.
+- PRMS automated tests: `python -m pytest tests/prms/unit -q` and `python -m pytest tests/prms/api -q`. Prefer targeted coverage for multisource/auth/prompt changes. The HTTP module attempts to verify/create a DynamoDB table on import; stub that function before importing the app for offline API checks. Test fixtures alone do not suppress every import-time effect.
 - After import moves or API changes, ensure the MCP client still starts and OpenAPI at `/docs` reflects new routes.
 - Frontend: `cd frontend && npm run lint`. Prefer `npm run dev` over `npm run build` while iterating.
 
@@ -162,9 +162,8 @@ Match that style when the user asks for a commit.
 
 - **Container / Lambda**: `Dockerfile` → `CMD ["main.handler"]`.
 - **GitHub Actions** (monorepo `.github/workflows/`): pushes trigger Jenkins jobs, e.g.:
-  - `jenkins-trigger-ai-text-mining-dev.yml` → branch `dev-text-mining`
-  - `jenkins-trigger-ai-text-mining.yml` → legacy `dev-lambda` filter in development; `main-text-mining` push/PR filters in the reviewed service-main version
-  - Bulk upload frontend: `jenkins-trigger-ai-bulk-upload-dev.yml` / `…-dev-prod.yml`
+  - `jenkins-trigger-ai-text-mining.yml` → `main-text-mining` on pushes and pull requests
+  - Bulk Upload frontend: `jenkins-trigger-ai-bulk-upload-dev-prod.yml` → `main-text-mining` pushes; development has a separate frontend trigger
 - Frontend deploy tooling: SST (`sst.config.ts`) + OpenNext; see nested AGENTS.md. Documentation-only updates are not excluded from the reviewed Jenkins triggers. Verify actual filters in the branch being pushed.
 
 ---
@@ -181,7 +180,7 @@ Match that style when the user asks for a commit.
 
 ## Environment variables (high level)
 
-Backend `.env` (see README for examples): AWS credentials/region, CLARISA (`CLARISA_*`, `CLARISA_VALIDATE_URL`), `CLIENT_ID` / `CLIENT_SECRET`, bucket key prefixes (`STAR_BUCKET_KEY_NAME`, `PRMS_BUCKET_KEY_NAME`, `AICCRA_BUCKET_KEY_NAME`), `MAPPING_URL`, `SLACK_WEBHOOK_URL`, `IS_PROD`, `MS_NAME`. PRMS audio is disabled by default; enable it with `PRMS_AUDIO_TRANSCRIBER=amazon_transcribe` plus optional `PRMS_TRANSCRIBE_*` / `PRMS_MAX_AUDIO_SECONDS`. There is no fixed ten-minute duration limit unless configured. Optional Supabase vars apply to development-only alternate `vectorize_supabase.py` / `mining_supabase.py` paths, which are absent from the reviewed service-main tree.
+Backend `.env` (see README for examples): AWS credentials/region, CLARISA (`CLARISA_*`, `CLARISA_VALIDATE_URL`), `CLIENT_ID` / `CLIENT_SECRET`, bucket key prefixes (`STAR_BUCKET_KEY_NAME`, `PRMS_BUCKET_KEY_NAME`, `AICCRA_BUCKET_KEY_NAME`), `MAPPING_URL`, `SLACK_WEBHOOK_URL`, `IS_PROD`, `MS_NAME`. PRMS audio is disabled by default; enable it with `PRMS_AUDIO_TRANSCRIBER=amazon_transcribe` plus optional `PRMS_TRANSCRIBE_*` / `PRMS_MAX_AUDIO_SECONDS`. There is no fixed ten-minute duration limit unless configured. The alternate Supabase modules and older CLARISA connection helpers are absent here; do not add imports or setup requirements for them. STAR tokens come from requests, not the development-only `AUTH_TOKEN_STAR` configuration entry.
 
 See the [API guide](docs/API_GUIDE.md) for HTTP-vs-MCP response wrappers and the [high-level design](docs/HIGH_LEVEL_DESIGN.md) for active per-source PRMS extraction. Earlier draft specifications describe planning decisions, not guaranteed current behavior.
 
@@ -202,4 +201,4 @@ Frontend: `NEXT_PUBLIC_MINING_API_BASE_URL`, `NEXT_PUBLIC_STAR_API_BASE_URL`, `N
 | Auth | STAR: `app/middleware/star_auth_middleware.py`; PRMS/STAR HTTP: CLARISA via `validate_with_clarisa` in `client.py` |
 | Bulk upload status | `app/utils/dynamo/`, Dynamo routes in `client.py` |
 | Next.js Bulk Upload UX | `frontend/components/BulkUpload/` |
-| Legacy UIs | `interface/` |
+| AICCRA static UI | `interface/aiccra_mining/`; no legacy bulk-upload UI in this branch |

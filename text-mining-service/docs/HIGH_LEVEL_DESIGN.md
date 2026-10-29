@@ -2,7 +2,7 @@
 
 One FastAPI HTTP application dispatches four extraction workflows to MCP tools. STAR, PRMS, AICCRA, and Bulk CapDev share infrastructure helpers but retain separate orchestration, prompts, authentication, and output contracts. The Next.js Bulk Upload frontend is a separate application.
 
-This document describes the development implementation. See the [API guide](API_GUIDE.md) for contracts and [branch differences](BRANCH_DIFFERENCES.md) for the service-main comparison.
+This document describes the `main-text-mining` implementation. See the [API guide](API_GUIDE.md) for contracts and [branch differences](BRANCH_DIFFERENCES.md) for the service-main comparison.
 
 ## Component flow
 
@@ -91,7 +91,7 @@ Importing the HTTP module attempts to verify/create the bulk DynamoDB table. Mod
 
 `main.py` wraps the HTTP app with Mangum. The Dockerfile uses AWS Lambda Python 3.13, installs `requirements.txt`, copies configuration and the service tree, and runs `main.handler`. The local HTTP launcher is `python -m app.mcp.client` from the service directory. Frontend hosting uses SST/OpenNext and its own build lifecycle.
 
-Local manifests, the development lockfile, and Lambda requirements are not identical. The reviewed lockfile contains LanceDB 0.21.2 while deployment requirements pin 0.36.0. Do not describe an untested lockfile environment as equivalent to the Lambda image.
+The service-main `uv.lock` is valid TOML and passes uv's offline freshness check against `pyproject.toml`. LanceDB is aligned at 0.36.0 in the lockfile, project metadata, and Lambda requirements. The Dockerfile installs with pip from `requirements.txt`; it does not use uv for dependency installation. Other dependencies are not all pinned identically, so existing-environment tests do not validate every newly locked version, a fresh install, or a Lambda deployment.
 
 ## Access and validation boundaries
 

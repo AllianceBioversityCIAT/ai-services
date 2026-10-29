@@ -2,7 +2,7 @@
 
 Before pushing an integration to `main-text-mining`, compare its resulting tree with development and adapt its documentation. A completed merge does not mean the two branches should have identical files or environment destinations.
 
-This is a code comparison, not a deployment verification. Snapshot reviewed on 2026-10-28:
+This is a code comparison, not a deployment verification. The original pre-integration snapshot was reviewed on 2026-10-28:
 
 - Development base: `dev-text-mining` at `c6099953`.
 - Service-main base: `main-text-mining` at `742e6317`.
@@ -26,12 +26,12 @@ This is a code comparison, not a deployment verification. Snapshot reviewed on 2
 
 Main-only product documents in this snapshot:
 
-- `docs/AICCRA_TEXT_MINING_DOCUMENTATION.md`
-- `docs/AICCRA_Text_Mining_SDD.md`
-- `docs/STAR_Text_Mining_Product_Overview.md`
-- `docs/STAR_Text_Mining_SDD.md`
+- [AICCRA technical reference](AICCRA_TEXT_MINING_DOCUMENTATION.md)
+- [AICCRA design reference](AICCRA_Text_Mining_SDD.md)
+- [STAR product reference](STAR_Text_Mining_Product_Overview.md)
+- [STAR design reference](STAR_Text_Mining_SDD.md)
 
-The main-only documents above are listed as paths, not links, because they are absent from this development tree. The new overview/API/design guides cover the shared active workflows without depending on those files.
+These files are present in this service-main tree and absent from the reviewed development tree. They are retained with historical-reference notices because their bodies describe older models, layouts, or unverified performance. The new overview/API/design guides describe the active shared workflows.
 
 ## Workflows and configuration
 
@@ -51,3 +51,25 @@ The complete repository diff also includes changes outside Text Mining. This gui
 4. Adapt `README.md`, `AGENTS.md`, frontend documentation, and any affected API/design guide to the actual service-main tree. Do not restore a deliberately removed interface merely to satisfy a documentation link.
 5. Check documentation links and examples. Distinguish code comparison, offline tests, and live checks in the handoff.
 6. Leave the push and pipeline timing to the maintainer's instructions. Continue through `staging` and `main` after the service-main step is complete.
+
+## Local service-main review after integration
+
+Reviewed on 2026-10-28, before the service-main documentation adjustments:
+
+- Development reference: `origin/dev-text-mining` at `f24b79fd`.
+- Local service-main HEAD: `98f6a619`, with the two documentation patches present under service-main commit IDs.
+- Published service-main baseline: `742e6317`.
+
+The documentation patches are equivalent to the development commits even though the branch histories have different commit IDs. Content comparison confirms the four mining HTTP/MCP workflows and PRMS tests are present. The local integration changed documentation only relative to published service-main; existing code, dependencies, route removals, and production destinations were retained.
+
+The legacy bulk page is absent, and the active HTTP app defines 15 routes versus development's 16. The production S3 prefix, generated STAR links, AICCRA backend destination, analytics URL, and production-first Swagger server list are retained. Development-only Supabase/CLARISA helpers and the four Dynamo internal documents remain absent. The four service-main product/design references are preserved.
+
+The service-main README, API guide, implementation guide, product overview, agent guides, and frontend README were adapted to this tree. In particular, they no longer advertise the legacy bulk page as an available route.
+
+### Lockfile validation after maintainer repair
+
+The earlier published service-main baseline contained a duplicate package-name key and failed TOML parsing. The maintainer has since regenerated the working-tree `uv.lock`. The repaired file is valid TOML and `uv lock --check --offline` passes against the current `pyproject.toml`.
+
+The maintainer also pinned LanceDB to 0.36.0 in `pyproject.toml` and regenerated the lockfile to match `requirements.txt`. All three files now select 0.36.0, matching the existing local environment used for the 98 passing tests. Other dependency versions changed during regeneration; no fresh lockfile environment was installed, so those test results do not validate the entire regenerated graph.
+
+Service-main setup examples continue to use an explicit Python virtual environment and `requirements.txt`, matching the Dockerfile input. Keep the maintainer's lockfile change separate from documentation edits in review. Docker installs `requirements.txt` with pip rather than using uv. The Jenkins job implementation and deployment outcome have not been verified here.

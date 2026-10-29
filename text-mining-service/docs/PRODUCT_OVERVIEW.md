@@ -2,7 +2,7 @@
 
 Text Mining turns documents, spreadsheets, and PRMS text/audio inputs into candidate research-result records. Four workflows share one backend deployment while retaining distinct prompts, contracts, and authentication. A Next.js application supports the STAR bulk-review and submission process.
 
-This document describes the reviewed development code. It does not certify deployed availability, extraction accuracy, or a measured time saving.
+This document describes the reviewed `main-text-mining` code. It does not certify deployed availability, extraction accuracy, or a measured time saving.
 
 ## Workflows and users
 
@@ -35,7 +35,7 @@ The review table includes primary levers/research areas and strategic objectives
 
 DynamoDB records submitted/failed statuses and result links so previously handled rows can be recognized. This tracking is distinct from saving the result in STAR. The frontend's STAR submission calls and the backend's mining calls have separate responsibilities.
 
-The legacy static bulk-upload UI still exists in development but was removed from the reviewed service-main branch. Use the [branch comparison](BRANCH_DIFFERENCES.md) to distinguish interface availability from the extraction API.
+The legacy static bulk-upload UI and `/bulk-upload` route are absent from this branch and remain development-only; the Next.js frontend is present. Use the [branch comparison](BRANCH_DIFFERENCES.md) to distinguish interface availability from the extraction API.
 
 ## Access and dependencies
 

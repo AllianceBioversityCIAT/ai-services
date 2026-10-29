@@ -1,6 +1,6 @@
 # AGENTS.md — Bulk Upload frontend
 
-Nested agent guide for the Next.js app under `text-mining-service/frontend`. Start with the [frontend README](README.md) for setup, configuration, and user/API flow. For service-wide backend/MCP context, see the parent [`../AGENTS.md`](../AGENTS.md). The closest `AGENTS.md` wins for files in this directory.
+Service-main agent guide for the Next.js app under `text-mining-service/frontend`. Start with the [frontend README](README.md) for setup, configuration, and user/API flow. For service-wide backend/MCP context, see the parent [`../AGENTS.md`](../AGENTS.md). The closest `AGENTS.md` wins for files in this directory.
 
 Package name: `text-mining-bulk-upload-frontend` (`package.json`).
 
@@ -12,7 +12,7 @@ Next.js 15 + React 19 UI for **STAR Capacity Development bulk upload**. Users up
 
 Deployment target: AWS via **SST** (`sst.aws.Nextjs`) and **OpenNext**. Same-origin `/api/*` BFF routes proxy to the Python mining service.
 
-Legacy static bulk-upload UI exists at `../interface/bulk_upload/` in development (served by FastAPI), but is absent from the reviewed service-main tree. Prefer this Next.js app for new Bulk Upload work unless the task explicitly targets the legacy interface.
+The legacy `../interface/bulk_upload/` files and Python `/bulk-upload` page are absent here. Development retains that interface. Prefer this Next.js app for new Bulk Upload work unless the task explicitly targets the legacy interface.
 
 ---
 
@@ -28,7 +28,7 @@ Legacy static bulk-upload UI exists at `../interface/bulk_upload/` in developmen
   - `NEXT_PUBLIC_MANAGEMENT_API_BASE_URL`
   - `NEXT_PUBLIC_CLARISA_API_BASE_URL`
   - Server-only: `MINING_API_BASE_URL`, `BULK_UPLOAD_API_KEY`, `MANAGEMENT_API_BASE_URL`, `CLARISA_API_BASE_URL`, `CLARISA_PARTNER_REQUEST_CREATE_URL`, `CLARISA_VALIDATE_URL`, `CLARISA_API_KEY` (see `sst.config.ts`, `lib/clarisaApiKeyAuth.ts`, and `app/api/*`). SST forwards an explicit list and currently does not list the `MINING_API_BASE_URL` override; the mining BFF falls back to its public-base setting.
-- Before a service-main push, compare the test/prod S3 prefix in `constants.ts` and hardcoded STAR result links in `hooks/useBulkUploadApi.ts`. Environment variables alone do not override these literals. See [branch differences](../docs/BRANCH_DIFFERENCES.md).
+- This branch uses the production S3 prefix and production STAR result links. Before a service-main push, compare the test/prod S3 prefix in `constants.ts` and hardcoded STAR result links in `hooks/useBulkUploadApi.ts`. Environment variables alone do not override these literals. See [branch differences](../docs/BRANCH_DIFFERENCES.md).
 
 ---
 
@@ -85,7 +85,7 @@ frontend/
 ## Testing instructions
 
 - Run `npm run lint` after non-trivial TS/React changes.
-- Manually verify the wizard flow against a running mining API (`../` → `uv run python -m app.mcp.client`).
+- Manually verify the wizard flow against a running mining API (`../` → `python -m app.mcp.client`).
 - If you change the BFF contract, confirm `app/api/bulk-upload/route.ts` still posts multipart form data to `/star/mining-bulk-upload/capdev`.
 - Fix type/lint errors you introduce before finishing.
 

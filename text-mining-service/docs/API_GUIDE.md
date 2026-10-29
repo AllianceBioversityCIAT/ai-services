@@ -1,6 +1,6 @@
 # Text Mining API guide
 
-This guide covers the four mining workflows implemented in `app/mcp/client.py` and `app/mcp/server.py`. It describes application-level behavior in the development branch. Infrastructure controls and deployed URLs must be verified separately.
+This guide covers the four mining workflows implemented in `app/mcp/client.py` and `app/mcp/server.py`. It describes application-level behavior in `main-text-mining`. Infrastructure controls and deployed URLs must be verified separately.
 
 Run examples from a configured development environment. They use fictional keys and placeholders; mining calls can upload to S3 and invoke external services.
 
@@ -125,7 +125,6 @@ Consult the actual response and generated schemas for the installed MCP version;
 | Method | Path | Behavior |
 | --- | --- | --- |
 | GET | `/ui` | AICCRA static interface |
-| GET | `/bulk-upload` | Development-only legacy bulk interface; absent from reviewed service-main |
 | GET | `/aiccra/prompt` | Default AICCRA prompt |
 | POST | `/list-s3-objects` | JSON `bucket`, optional `prefix` / `max_items` |
 | GET | `/s3/list` | Query `bucket`, optional `prefix` / `max_items` |
@@ -136,6 +135,8 @@ Consult the actual response and generated schemas for the installed MCP version;
 | POST | `/dynamo/bulk-upload-records/batch` | Apply a group of updates to a file's status item |
 | POST | `/feedback` | Send feedback through the interaction service |
 | GET | `/feedback/{interaction_id}` | Read feedback/interaction information |
+
+The development-only `/bulk-upload` route and legacy HTML assets are absent here; the separate Next.js frontend and bulk extraction API are available in the source tree.
 
 The Dynamo update models are in `app/mcp/client.py`. Updates use `complete` or `failed` and can include links, title, contract, submission type, and year. A file item tracks lists and maps rather than a separate Dynamo row per extracted result. Writes use conditional-update retries to handle concurrent changes.
 
