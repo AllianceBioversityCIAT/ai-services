@@ -1,6 +1,6 @@
 # AICCRA Report Generator API
 
-This guide describes `dev-ar-generator`. Production's public report code is similar, but its imports, loader side effects, and Lambda entry point differ; read [branch differences](BRANCH_DIFFERENCES.md). Parameter schemas and executable code take precedence over older generated Swagger prose.
+This guide describes `main-ar-generator`, whose packaged entry point is `api_server.handler` and whose active structured loader is SQL Server. Development's local CSV/MySQL path differs; read [branch differences](BRANCH_DIFFERENCES.md). Parameter schemas and executable code take precedence over older generated Swagger prose.
 
 ## Application routes
 
@@ -15,7 +15,7 @@ This guide describes `dev-ar-generator`. Production's public report code is simi
 | `POST /api/generate-annual-tables` | Year, grouped table arrays, status |
 | `POST /api/generate-challenges` | Year, content, status |
 
-Swagger/ReDoc/OpenAPI are available at the standard configured paths. No `/api/update-chatbot-data` operation is implemented by these routes, despite a retained cron script using that URL. Production's EventBridge job dispatch is a Lambda-event interface, not that missing HTTP route.
+Swagger/ReDoc/OpenAPI are available at the standard configured paths. No `/api/update-chatbot-data` operation is implemented by these routes, despite a development cron script using that URL. Production's EventBridge job dispatch is a Lambda-event interface, not that missing HTTP route.
 
 No general FastAPI token/API-key dependency protects the report routes. CORS allows all origins/methods/headers with credentials enabled. Verify external controls separately; IAM permissions for outbound AWS calls do not establish caller authentication.
 
@@ -103,6 +103,14 @@ The app's separate global exception handler returns flat error/status/details/su
 
 On narrative endpoints only, insert_data:true recreates the entire configured S3 Vectors index and ingests five mid-year or six annual tables. It is not limited to the request's indicator/year. Both use the same resource configuration, with no transaction or documented lock around rebuild/query concurrency. The bucket must already exist.
 
-Generation with insert_data:false still loads structured data, queries AWS, and invokes models. Development writes local context JSON and logs; production's SQL loader can also alter views and export source files to S3. A timeout is not evidence that no effects occurred or that a durable background job completed.
+Generation with insert_data:false still loads structured data, queries AWS, and invokes models. This branch's SQL loader can alter views and export source files to S3 even without rebuilding vectors. It logs under /tmp and omits development's explicit context JSON dumps. A timeout is not evidence that no effects occurred or that a durable background job completed.
 
 The current routes call synchronous pipeline code directly. Annual code parallelizes selected model work using threads, but that does not make the HTTP request a durable asynchronous job. Offline mocks do not verify live service limits, provider timeouts, permissions, model accuracy, or deployment behavior.
+
+## Production startup and scheduler events
+
+The HTTP API eagerly imports the SQL loader/export stack, and the packaged hybrid handler also imports scheduled jobs and the annual pipeline. Missing pyodbc/native ODBC or import-time provider configuration can prevent startup before any health request. The process health body itself still does not query those dependencies.
+
+Report-source SQL transformations restrict several source families to 2025/2026 even though the public model accepts 2021–2026. Acceptance of a requested year does not guarantee available source rows. The CSV override applies only to load_data; chatbot load_full_data remains a SQL/export path.
+
+A job-only Lambda event such as `{"job":"sync_knowledge_base"}` is dispatched separately from HTTP. Recognized jobs are update_ar_data, update_chatbot_data, and sync_knowledge_base. Adding HTTP event keys routes to Mangum instead. This is not a public job-submission endpoint or a safe probe: jobs can rebuild vectors, alter/read SQL, export data, start KB ingestion, and send Slack notifications. See [operations](TECHNICAL_DOCUMENTATION.md#scheduled-operations).

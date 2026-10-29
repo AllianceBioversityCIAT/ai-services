@@ -1,6 +1,6 @@
 # AICCRA Report Generator design
 
-This is the implemented development design, with production boundaries called out explicitly. The [README diagram](../README.md#system-architecture) and [API guide](API_GUIDE.md) provide the call flow and public contract.
+This is the implemented production design on main-ar-generator, with the local-development boundary called out explicitly. The [README diagram](../README.md#system-architecture) and [API guide](API_GUIDE.md) provide the call flow and public contract.
 
 ## Purpose and components
 
@@ -9,21 +9,23 @@ The service converts AICCRA structured reporting evidence into indicator narrati
 | Component | Current responsibility |
 | --- | --- |
 | HTTP/UI | FastAPI route orchestration, request models, static mounting |
-| Source loader | Development prepared CSV/MySQL; production SQL Server/Fabric and exports |
+| Source loader | Active SQL Server/Fabric transformations/exports; optional prepared CSV override in load_data only |
 | Ingestion | Row chunks, Titan embeddings, metadata records, selected-index rebuild |
 | Vector retrieval | S3 Vectors semantic query with indicator/year/source-table filters |
 | Structured retrieval | DOI, question/contribution, and challenge evidence without vector similarity |
 | Business rules | Shared/cancelled/phase/question exclusions and DOI deduplication |
 | Generation | Claude narrative synthesis, cluster drafts/editorial passes, table overviews |
-| Ancillary operations | Reference backends, cron utilities, KB sync, Slack/S3 helpers |
+| Scheduled operations | Hybrid Lambda dispatcher, AR refresh/chatbot export/KB sync, Slack notifications |
 
-## Development data path
+## Production entry and data path
 
-`dev_server.py` loads dotenv and launches Uvicorn. API report functions lazily import active pipelines, allowing process health/static pages to be available without proving provider/data configuration.
+The Dockerfile installs ODBC/Python requirements, copies the production modules/assets, and starts api_server.handler. That hybrid entry point classifies HTTP-shaped events for Mangum and job-only events for the scheduler dispatcher. dev_server.py remains available in the checkout as an auxiliary local launcher but is not copied as the image entry point.
 
-`load_data` returns prepared CSVs directly when CSV mode is enabled. Otherwise it creates a SQLAlchemy MySQL engine, reads a source view, and applies development-specific renames/drops/grouping. These transformations are not equivalent to production's richer SQL Server labeling/export code. Missing inputs/errors can become empty DataFrames.
+FastAPI routes eagerly import the SQL/export stack; api_server additionally imports scheduled jobs and the annual pipeline. Lazy report function helpers do not make the packaged app independent of startup-time SQL/AWS dependencies.
 
-CSV paths default to app/; source fixtures must already carry the labels/fields required by retrieval and prompts. API year bounds do not prove that a fixture contains those years or indicator values.
+The SQL loader imports pyodbc, connects through ODBC Driver 18 with service-principal settings, creates/alters reporting views, reads source rows, and applies source-specific transforms/table_type labels. Several reporting tables are limited to 2025/2026. It writes report-source CSV/JSONL under /tmp and uploads to ordinary S3. load_full_data separately builds broader chatbot exports and per-record CSV/metadata files.
+
+A prepared-CSV branch exists only in load_data; it returns rows before SQL processing/export and does not remove import dependencies. load_full_data does not use that override. Development's MySQL/CSV implementation, alternate providers, cron/manual tools, and uv manifests are not part of this production tree.
 
 ## Vector storage and retrieval
 
@@ -37,7 +39,7 @@ Rebuild deletes/recreates the selected index and ingests all configured tables. 
 
 ### Mid-year
 
-Contribution totals use sums. The report combines semantic candidates from four source families with structured DOI rows, deduplicates by DOI/cluster/indicator, and excludes Shared deliverables/innovations. It saves a development context JSON file, builds a prompt, and generates one narrative. Oversized-input contingencies remove unsuitable deliverables and later cap selected context categories; non-input errors can be swallowed into a None pipeline result.
+Contribution totals use sums. The report combines semantic candidates from four source families with structured DOI rows, deduplicates by DOI/cluster/indicator, and excludes Shared deliverables/innovations. It builds a prompt without development's explicit context JSON save call, and generates one narrative. Oversized-input contingencies remove unsuitable deliverables and later cap selected context categories; non-input errors can be swallowed into a None pipeline result.
 
 ### Annual
 
@@ -61,17 +63,17 @@ Model/region/prompt/criteria changes are behavior changes. A model ID in a sourc
 
 The static UI currently sends generation to a fixed production Lambda base and analytics to a separately configured host. Serving it locally does not route those calls to the local API. Tracking can include identity parameters and generated output; the browser date badge is calculated, not an observed ingestion status.
 
-Development writes context JSON in the working directory and rotating logs under service-relative data/logs. Production suppresses those explicit context-dump calls and logs under /tmp/logs. Neither the HTTP API nor those files provide a durable job lifecycle or a validated reporting evidence database.
+This branch omits the explicit development context-dump calls and uses /tmp/logs/app.log plus stdout, with logger name ar-generator-service. SQL/export operations use /tmp for intermediate data and ordinary S3 for their configured destinations. Development instead writes context JSON and service-relative logs. Neither the HTTP API nor those files provide a durable job lifecycle or a validated reporting evidence database.
 
 The app has no general route authentication dependency. CORS and metadata descriptions do not establish infrastructure authorization. The API's metadata also contains historical technology/year/license statements; current source and the repository license file are separate evidence.
 
-## Production boundary and integration
+## Scheduling, packaging, and development boundary
 
-Production has a SQL Server/pyodbc loader, ODBC-enabled Lambda image, requirements file, .dockerignore, hybrid `api_server.handler`, scheduler job dispatcher, and export helper. Its loader can create/alter all reporting views, transform/filter data, and export CSV/JSONL to S3. A read-style generation call may therefore write external resources even with insert_data:false.
+The current tree contains the SQL Server/pyodbc loader, ODBC-enabled Lambda image, requirements file, .dockerignore, hybrid `api_server.handler`, scheduler job dispatcher, and export helper. Its loader can create/alter all reporting views, transform/filter data, and export CSV/JSONL to S3. A read-style generation call may therefore write external resources even with insert_data:false.
 
-The hybrid handler distinguishes supported scheduler events from HTTP-shaped events. Job implementations refresh AR data, export chatbot source data, or start KB ingestion; notifications may be sent to Slack. Local cron tools are not the same dispatcher, and several scripts point at production or a missing HTTP route. Do not run them as unit tests.
+The hybrid handler distinguishes supported scheduler events from HTTP-shaped events. Job implementations refresh AR data, export chatbot source data, or start KB ingestion; notifications may be sent to Slack. Those jobs are not the local host-cron tools retained only in development. Do not run real jobs as unit tests. Starting a KB ingestion job is distinct from verifying completion.
 
-The maintainer's workflow uses local testing rather than a separate test Lambda. Preserve the complete [branch matrix](BRANCH_DIFFERENCES.md) and adapt production documentation after the local merge. Repository code does not verify deployed schedules, infrastructure triggers, or running versions.
+The maintainer's workflow uses the separate development branch for local testing rather than a separate test Lambda. The production image excludes .env/local artifacts and uses explicitly selected copy instructions; live configuration belongs to deployment settings. Preserve the complete [branch matrix](BRANCH_DIFFERENCES.md) and adapt production documentation after the local merge. Repository code does not verify deployed schedules, infrastructure triggers, or running versions.
 
 ## Validation
 

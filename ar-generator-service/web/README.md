@@ -2,12 +2,12 @@
 
 Static HTML/CSS/JavaScript interface for generating and reviewing mid-year/annual indicator narratives, grouped summary tables, and challenges/lessons reports. The API serves it from `/web`; this directory has no npm build or separate frontend server.
 
-## Start locally
+## Serve the production UI
 
-From `ar-generator-service/`, with the development environment configured:
+The Lambda image copies this directory, and FastAPI serves it at /web. For optional local diagnostics from an ODBC-capable production checkout with requirements installed:
 
 ```bash
-uv run --frozen python dev_server.py --host 127.0.0.1 --reload
+python dev_server.py --host 127.0.0.1 --reload
 ```
 
 Open [the local page](http://localhost:8000/web). Static assets are mounted at `/static`; the HTML references `static/app.js`, so use the documented `/web` URL. This only serves the page locally; it does not switch the JavaScript API destination.
@@ -16,14 +16,14 @@ Open [the local page](http://localhost:8000/web). Static assets are mounted at `
 
 `app.js` currently has separate hardcoded constants:
 
-| Constant | Current development checkout |
+| Constant | Current production checkout |
 | --- | --- |
 | `API_BASE_URL` | Production Lambda base `https://qg53uhgrn7bpofn5eawcuvl62y0akymf.lambda-url.us-east-1.on.aws` |
-| `AI_FEEDBACK_URL` | `https://clv3b6bv9d.execute-api.us-east-1.amazonaws.com` |
+| `AI_FEEDBACK_URL` | `https://i8s5i8c21i.execute-api.us-east-1.amazonaws.com` |
 
 There is **no automatic local/production URL detection**. The commented localhost assignment does not execute. For deliberate local UI testing, change the API constant to the intended local server and review analytics routing as a separate choice; changing backend `.env` values or the page's host does not change either constant. No JavaScript destinations are changed by this documentation task.
 
-Service-main uses the same production API base but a different analytics host; preserve that intentional [branch difference](../docs/BRANCH_DIFFERENCES.md). The maintainer's workflow uses local testing and a production Lambda, with no separate test Lambda assumed.
+Development uses the same production API base but the separate clv3b6bv9d analytics host; preserve that intentional [branch difference](../docs/BRANCH_DIFFERENCES.md). This branch has no uv project/lockfile; pyodbc-free local UI/backend work belongs to dev-ar-generator. The maintainer uses local testing and a production Lambda, with no separate test Lambda assumed.
 
 A generation action also attempts interaction tracking. Payloads can include URL-provided `user_email`/`user`, request parameters, generated output, response time, and success/error metadata. These values do not authenticate a backend request. Tracking failures are logged and handled without intentionally failing the report action. Use fictional data and inspect/stub both destinations for offline browser work.
 

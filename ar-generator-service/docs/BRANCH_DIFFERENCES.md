@@ -8,7 +8,7 @@ The maintainer's deployment model is local development/testing and a production 
 
 | Area | Development | Production service-main |
 | --- | --- | --- |
-| Local startup | dev_server.py -> app.api.main:app | No dev_server.py; production container is the primary packaged path |
+| Local startup | dev_server.py with CSV/MySQL environment | Same tracked dev_server.py helper, but SQL/ODBC imports remain; container is the production packaged path |
 | Lambda adapter | main.handler, simple Mangum | Docker targets **api_server.handler**, HTTP plus EventBridge dispatch |
 | Source data | db_conn/mysql_connection.py, prepared CSV or MySQL | db_conn/sql_connection.py, pyodbc/ODBC 18 SQL Server/Fabric; CSV branch still imports pyodbc |
 | SQL processing | Development-specific transforms; CSV returned directly | View creation/alteration, richer transforms, selected year filtering, S3 exports |
@@ -20,7 +20,7 @@ The maintainer's deployment model is local development/testing and a production 
 | UI generation base | Fixed production Lambda URL | Same fixed production Lambda URL |
 | UI analytics host | clv3b6bv9d.execute-api.us-east-1.amazonaws.com | i8s5i8c21i.execute-api.us-east-1.amazonaws.com |
 | Retained alternatives/tools | OpenSearch/Supabase/KB modules, Streamlit, ODBC diagnostic | Different/absent reference tools; do not assume a deployment dependency |
-| Existing product/design/technical guides | Added/revised for local development in this task | Pre-existing guides require reconciliation with current S3 Vectors/production behavior |
+| Product/design/technical guides | Local workflow and shared reporting behavior | Reconciled with current SQL Server/Lambda/S3 Vectors production behavior |
 
 Current active S3 Vectors client, metadata schema, semantic/filter helpers, API models, and most reporting logic are shared. Active report imports differ because they point to different structured loaders. routes.py also eagerly imports load_full_data in production, pulling in SQL/export dependencies at app startup, unlike development's lighter route import path.
 
@@ -40,6 +40,16 @@ The four report routes and request schemas are broadly shared, including the 202
 Production's hybrid handler treats job-only events such as `{"job":"update_ar_data"}` as scheduler work only when HTTP event keys are absent. HTTP-shaped events go to Mangum. The three supported jobs are update_ar_data, update_chatbot_data, and sync_knowledge_base. The AR job uses fixed IPI 1.3/year 2025/rebuild settings in this snapshot; inspect actual source before any operational execution.
 
 The production-branch GitHub workflow targets push/PR base main-ar-generator and manual dispatch, invoking Jenkins job ar-generator-pro-lambda. That workflow is absent from development, where only a Text Mining workflow is currently tracked. Preserve production automation during integration; no live Jenkins or scheduler state is established by this review.
+
+## Local production integration review
+
+Reviewed local service-main `8e0ac988` against production base `2ca56cd1` and development documentation tip `2c0df941`. The documentation commits were applied on top of production as local commits rather than a two-parent merge, so ancestry equality with development is not the correctness criterion.
+
+- The incoming local commits change ten Markdown files, the configuration example, and the pre-existing root .gitignore change. No application, SQL loader, model, prompt, dependency, packaging, job, UI JavaScript, or workflow file changed relative to production base.
+- Production's Dockerfile, .dockerignore, requirements, api_server handler, scheduled jobs, SQL Server loader/export helpers, log configuration, analytics destination, and production workflow remain byte-for-byte identical to the production base.
+- Development-only MySQL/reference/cron/Streamlit/lakehouse/uv paths remain absent intentionally. dev_server.py and main.py were already shared tracked files and remain available as auxiliaries, distinct from the packaged api_server.handler.
+- Production READMEs, API/design/product/technical guides, agent instructions and .env.example are now aligned to the actual SQL/ODBC/dispatcher path. The example defaults to CSV disabled; no live environment was edited.
+- Offline checks use fake SQL/AWS/export/job clients and isolated filter/schema collection. They do not verify actual native-driver installation, source permissions, model quality, a running schedule, Jenkins, or deployment.
 
 ## Integration checklist
 

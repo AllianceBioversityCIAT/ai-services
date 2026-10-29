@@ -1,6 +1,6 @@
 # AICCRA Report Generator workflows
 
-The service assists reporting officers, program/M&E teams, and reviewers preparing AICCRA indicator reports. It assembles structured targets/achievements and retrieved evidence into drafts that users review before official use. This describes implemented assistance, not measured time savings or guaranteed reporting compliance.
+The service assists reporting officers, program/M&E teams, and reviewers preparing AICCRA indicator reports. It assembles structured targets/achievements and retrieved evidence into drafts that users review before official use. This guide describes main-ar-generator production assistance, not measured time savings or guaranteed reporting compliance.
 
 ## Inputs and report types
 
@@ -13,7 +13,7 @@ API callers supply an indicator, year, and optional rebuild flag. The browser pr
 | Indicator tables | Review target/achievement figures and generated group/cluster overviews |
 | Challenges and lessons | Summarize structured cross-cluster challenge/learning rows |
 
-Source categories include contributions, deliverables/DOIs, questions, OICRs, innovations, and challenges. Development reads prepared CSVs or MySQL; production reads/transforms SQL Server/Fabric data and can export it to S3. The active semantic store is S3 Vectors, with separate structured retrieval and business filtering.
+Source categories include contributions, deliverables/DOIs, questions, OICRs, innovations, and challenges. This branch reads/transforms SQL Server/Fabric data and can create/alter views and export source data to S3. Development's prepared CSV/MySQL path is separate; switching this branch to CSV does not remove ODBC import requirements. The active semantic store is S3 Vectors, with separate structured retrieval and business filtering.
 
 ## User journey and outputs
 
@@ -27,6 +27,6 @@ Browser analytics can send requester parameters, response data, and timing to an
 
 Use the [README](../README.md) for startup and architecture, [technical guide](TECHNICAL_DOCUMENTATION.md) for CSV/config/operations, and [agent guide](../AGENTS.md) for implementation constraints.
 
-The maintainer uses local development and a production Lambda rather than a separate test Lambda. Development-specific dependencies, loaders, cron tools, and debug artifacts must not replace production's ODBC/container/dispatcher behavior during integration. The [branch guide](BRANCH_DIFFERENCES.md) records that separation and the full initial inventory.
+The maintainer uses local development and a production Lambda rather than a separate test Lambda. The current production container dispatches HTTP and scheduled Lambda events; source exports, AR index refresh, and KB ingestion are supported operations with data effects. Development-specific dependencies, loaders, cron tools, and debug artifacts must not replace that ODBC/container/dispatcher behavior during integration. The [branch guide](BRANCH_DIFFERENCES.md) records that separation and the full initial inventory.
 
 Index rebuilds can delete and recreate shared vector contents. Local CSV mode still calls cloud services; production source loading can create/alter views and export data. Offline schema/unit checks do not validate live permissions, data quality, model accuracy, installed schedules, or pipeline health.

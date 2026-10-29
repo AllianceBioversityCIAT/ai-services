@@ -2,17 +2,17 @@
 
 The service produces AICCRA mid-year and annual indicator narratives, indicator summary tables, and challenges/lessons-learned reports. Active pipelines combine structured data, Amazon S3 Vectors retrieval, business filters, and AWS Bedrock generation. A static HTML/JavaScript interface supports review and browser-side downloads.
 
-This README describes **`dev-ar-generator` and its local CSV/MySQL execution path**. The maintainer uses local testing for development and a production Lambda from `main-ar-generator`; a separate test Lambda is not assumed. Production has different data loading, dependencies, entry points, jobs, logging, and packaging. Preserve those differences using the [branch guide](docs/BRANCH_DIFFERENCES.md).
+This README describes **`main-ar-generator` and its production SQL Server/Lambda path**. The maintainer uses `dev-ar-generator` for local CSV/MySQL testing without installing pyodbc, and a production Lambda from this branch; a separate test Lambda is not assumed. Preserve the intentional differences using the [branch guide](docs/BRANCH_DIFFERENCES.md).
 
 ## Start here
 
 | Goal | Documentation |
 | --- | --- |
-| Run locally without pyodbc/SQL Server | [Quick start](#quick-start-local-csv-path) |
+| Configure the production path or an ODBC-capable local checkout | [Quick start](#quick-start-production-path) |
 | Understand report workflows | [Product overview](docs/PRODUCT_OVERVIEW.md) |
 | Integrate endpoints and interpret failures | [API guide](docs/API_GUIDE.md) |
 | Follow components and retrieval | [Architecture](#system-architecture), [high-level design](docs/HIGH_LEVEL_DESIGN.md) |
-| Prepare CSVs, configuration, and operational checks | [Technical guide](docs/TECHNICAL_DOCUMENTATION.md) |
+| Review SQL/CSV loading, configuration, and operational checks | [Technical guide](docs/TECHNICAL_DOCUMENTATION.md) |
 | Work on the UI | [Web README](web/README.md), [web agent guide](web/AGENTS.md) |
 | Continue work with an agent | [Service guide](AGENTS.md) |
 | Compare development with production | [Branch differences](docs/BRANCH_DIFFERENCES.md) |
@@ -26,74 +26,70 @@ This README describes **`dev-ar-generator` and its local CSV/MySQL execution pat
 | Indicator tables | `POST /api/generate-annual-tables` | Structured contribution data and model-written overviews by group |
 | Challenges/lessons | `POST /api/generate-challenges` | Structured challenges rows and model synthesis |
 | Index rebuild | `insert_data=true` on narrative endpoints | Delete/recreate the selected index and ingest all configured source tables |
-| Local review interface | `GET /web` | Serve static UI; generation/analytics destinations are separate JavaScript constants |
+| Review interface | `GET /web` | Serve static UI; generation/analytics destinations are separate JavaScript constants |
 
 The browser UI currently hardcodes the production Lambda as its API base, even when served locally. Use the local API directly until the UI destination has been deliberately reviewed/changed for local work. Its analytics destination is also external and branch-specific; see the [web setup](web/README.md#destinations-and-local-testing).
 
-## Quick start: local CSV path
+## Quick start: production path
 
-### 1. Install the development environment
+### 1. Identify the runtime before installing
 
-From the monorepo root, use Python 3.13 and uv:
-
-### Local
+From the monorepo root:
 
 ```bash
 cd ar-generator-service
-uv sync --frozen --python 3.13
 ```
 
-Development uses `pyproject.toml` and `uv.lock`; it has no service-root `requirements.txt` or Dockerfile. The separate `lakehouse_integration/Dockerfile` is an ODBC diagnostic container, not the report API image. Production uses its own Dockerfile and requirements, described in the branch guide.
+The checked-in Dockerfile uses Lambda Python 3.13, unixODBC/Microsoft ODBC Driver 18, and `requirements.txt` including pyodbc. It starts **`api_server.handler`**. This branch has no `pyproject.toml` or `uv.lock`; development's uv/CSV instructions belong to `dev-ar-generator`.
 
-### 2. Configure local data and isolated AWS resources
+`dev_server.py` is also tracked here as a local Uvicorn helper, but it does not remove SQL Server/ODBC import dependencies and is not the container entry point. Use development for local work that cannot install those native dependencies.
 
-```bash
-cp .env.example .env
-```
+### 2. Review configuration
 
-Edit the copied file with credentials and a vector bucket/index intended for development. The example defaults to CSV data and uses placeholders; do not point a rebuild at an index that must be retained.
+The [.env.example](.env.example) contains placeholders for this branch's SQL Server/AWS configuration and defaults to `USE_CSV_DATA=false`. It is documentation, not the deployed Lambda environment. Do not overwrite live settings with a copied example.
 
 ```env
-USE_CSV_DATA=true
+AWS_ACCESS_KEY_ID_OS=YOUR_AWS_ACCESS_KEY
+AWS_SECRET_ACCESS_KEY_OS=YOUR_AWS_SECRET_KEY
 AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID_OS=YOUR_DEVELOPMENT_ACCESS_KEY
-AWS_SECRET_ACCESS_KEY_OS=YOUR_DEVELOPMENT_SECRET_KEY
-S3_VECTORS_BUCKET_NAME=YOUR_DEVELOPMENT_VECTOR_BUCKET
-S3_VECTORS_INDEX_NAME=YOUR_DEVELOPMENT_VECTOR_INDEX
+SERVER=YOUR_SQL_SERVER
+DATABASE=YOUR_DATABASE
+CLIENT_ID=YOUR_SERVICE_PRINCIPAL_ID
+CLIENT_SECRET=YOUR_SERVICE_PRINCIPAL_SECRET
+S3_VECTORS_BUCKET_NAME=YOUR_VECTOR_BUCKET
+S3_VECTORS_INDEX_NAME=YOUR_VECTOR_INDEX
+BUCKET_NAME=YOUR_EXPORT_BUCKET
+USE_CSV_DATA=false
 ```
 
-The active AWS dictionary reads `AWS_ACCESS_KEY_ID_OS` / `AWS_SECRET_ACCESS_KEY_OS`, not the older `*_BR` aliases. Bedrock initialization explicitly requires both values. S3 Vectors uses the same explicit key/secret and configured region. No model call or live credential check is established by this documentation.
+Bedrock and S3 Vectors use the explicit OS-named AWS key/secret dictionary. The ordinary S3 export client instead uses boto3's standard credential resolution; do not assume the custom OS-named keys configure it. SQL Server uses the configured service principal and ODBC Driver 18. The vector bucket must already exist.
 
-`USE_CSV_DATA=true` avoids MySQL/SQL Server connections in the active development loader. It does **not** make generation offline: model calls, semantic queries, and optional index writes still use AWS. Keep credentials and actual reporting CSVs out of Git.
+Optional scheduled operations also use `KNOWLEDGE_BASE_ID`, `DATA_SOURCE_ID`, and `SLACK_WEBHOOK_URL`. See [production configuration](docs/TECHNICAL_DOCUMENTATION.md#aws-and-production-configuration) for startup boundaries and side effects.
 
-### 3. Supply prepared CSV fixtures
+### 3. Understand the production build
 
-By default, CSV lookup is under **`ar-generator-service/app/`**, based on the current config's calculated path. Set `CSV_DATA_DIR` to another prepared directory if needed.
-
-| Source | Fixture filename |
-| --- | --- |
-| Contributions | `vw_ai_project_contribution_ar.csv` |
-| Questions | `vw_ai_questions_ar.csv` |
-| Deliverables | `vw_ai_deliverables_ar.csv` |
-| OICRs | `vw_ai_oicrs_ar.csv` |
-| Innovations | `vw_ai_innovations_ar.csv` |
-| Challenges | `vw_ai_challenges_ar.csv` |
-
-CSV mode reads these as already-processed tables and returns them without the MySQL transformation step. They need the fields consumed by totals, filters, and prompts, including appropriate `table_type` labels. They are not arbitrary raw exports. See [CSV preparation](docs/TECHNICAL_DOCUMENTATION.md#csv-inputs-and-data-loading).
-
-### 4. Run and check process health
+The service directory is the Docker build context:
 
 ```bash
-uv run --frozen python dev_server.py --host 127.0.0.1 --reload
+docker build -t ar-generator-service .
 ```
 
-The server defaults to port 8000; reload is enabled only with `--reload`. The launcher's docstring mentions `--no-reload`, but that option is not implemented. Direct Uvicorn is another local path:
+This is a deliberate build command, not a documentation check. The image installs native ODBC dependencies and Python requirements and copies `app/`, `db_conn/`, `web/`, and `api_server.py`. It does not copy the private `.env`, `main.py`, or `dev_server.py` as runtime entry files; `.dockerignore` excludes `.env` and other local artifacts. Production configuration must be supplied by the deployment environment. No image is built or deployed by this documentation update.
+
+### 4. Optional ODBC-capable local diagnostics
+
+Only on a machine with Python 3.13 and compatible native ODBC prerequisites already available:
 
 ```bash
-uv run --frozen python -m uvicorn app.api.main:app --host 127.0.0.1 --port 8000 --reload
+python3.13 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python dev_server.py --host 127.0.0.1 --reload
 ```
 
-In another terminal:
+Equivalent direct app target is `app.api.main:app`. The helper defaults to port 8000 and enables reload only with `--reload`. Its docstring's `--no-reload` example is stale. Run from this service directory because static assets use relative `web/` paths.
+
+This does not reproduce Lambda/EventBridge dispatch. The route module eagerly imports the SQL loader, which imports pyodbc and S3 export code even when testing with CSVs. A successful local health response does not validate those services.
 
 ```bash
 curl http://localhost:8000/health
@@ -105,18 +101,16 @@ Expected response:
 {"status":"healthy","service":"AICCRA Report Generator API","version":"1.0.0"}
 ```
 
-Health does not test AWS, source data, model access, or a populated index. Report pipelines are lazily imported. Run from the service directory because static assets use relative `web/` paths.
-
-| Local resource | URL |
+| Local diagnostic resource | URL |
 | --- | --- |
 | Process metadata | [Root](http://localhost:8000/) |
 | Swagger UI | [API docs](http://localhost:8000/docs) |
 | ReDoc | [API reference](http://localhost:8000/redoc) |
 | Web page | [UI](http://localhost:8000/web) |
 
-### 5. Generate deliberately against the local API
+### 5. Generate only in the intended environment
 
-With a suitable existing development index and prepared source data:
+On an intentionally configured local diagnostic API:
 
 ```bash
 curl -X POST http://localhost:8000/api/generate-annual \
@@ -124,15 +118,20 @@ curl -X POST http://localhost:8000/api/generate-annual \
   -d '{"indicator":"IPI 1.3","year":2025,"insert_data":false}'
 ```
 
-This invokes configured providers and may incur charges. HTTP 200 does not always mean a usable report: check `status` and `content` as described in the [API guide](docs/API_GUIDE.md#responses-and-failure-semantics).
+This can invoke AWS, create/alter SQL views, and export structured data to S3 even with `insert_data:false`. HTTP 200 is not always a usable report: check status/content and [failure semantics](docs/API_GUIDE.md#responses-and-failure-semantics). For pyodbc-free local experiments, use the development branch instead of replacing production imports.
 
 ## System architecture
 
 ```mermaid
 flowchart TB
     Caller["API caller or static web interface"]
-    API["FastAPI report routes"]
-    Data["Development loader: prepared CSV or MySQL"]
+    Handler["api_server.handler: HTTP / EventBridge dispatch"]
+    Scheduler["Scheduler event"]
+    Jobs["Production scheduled jobs"]
+    KB["Bedrock Knowledge Base ingestion"]
+    API["FastAPI report routes through Mangum"]
+    Data["SQL Server loader: views, transformations and source data"]
+    Exports["Ordinary S3: report/chatbot source exports"]
     Rebuild["Optional full index rebuild and ingestion"]
     Vectors["Amazon S3 Vectors: metadata and serialized chunks"]
     Retrieval["Semantic retrieval plus structured DOI/questions/challenges"]
@@ -140,8 +139,13 @@ flowchart TB
     Model["AWS Bedrock: Titan embeddings and Claude generation"]
     Output["JSON narrative or table result"]
 
-    Caller --> API
+    Caller --> Handler --> API
+    Scheduler --> Handler --> Jobs
+    Jobs --> Data
+    Jobs -->|"AR refresh"| Rebuild
+    Jobs -->|"KB sync"| KB
     API --> Data
+    Data --> Exports
     API -->|"Narrative insert_data=true"| Rebuild
     Data --> Rebuild --> Vectors
     Rebuild -->|"Embedding requests"| Model
@@ -153,17 +157,17 @@ flowchart TB
     Filters --> Model --> Output --> Caller
 ```
 
-This diagram describes development's active CSV/MySQL path. Production uses SQL Server/Fabric through `db_conn/sql_connection.py`, a hybrid HTTP/EventBridge Lambda handler, and production packaging. Its loader can create/alter SQL views and export files to S3. A local CSV run is not a validation of those production effects.
+This diagram describes the production branch. HTTP events go through Mangum; scheduler events go through the supported job dispatcher. The source loader can create/alter SQL views and export files to S3. Development's CSV/MySQL path and local cron tools are separate, as recorded in the branch guide.
 
-Active API imports use `app/llm/vectorize.py` and `vectorize_annual.py`, backed by **S3 Vectors**. The retained OpenSearch, Supabase, and Knowledge Base modules are alternatives/reference code with unresolved imports/configuration assumptions; they are not verified drop-in rollback paths. See [technical details](docs/TECHNICAL_DOCUMENTATION.md#active-and-retained-modules).
+Active API imports use `app/llm/vectorize.py` and `vectorize_annual.py`, backed by **S3 Vectors**. Development retains alternate OpenSearch/Supabase/Knowledge Base modules that are absent from this production tree; they are not active production rollback switches. See [technical details](docs/TECHNICAL_DOCUMENTATION.md#active-and-retained-modules).
 
 ## Technology and models
 
 | Layer | Current implementation |
 | --- | --- |
 | API/local server | FastAPI, Uvicorn, Python 3.13 |
-| Development dependency management | uv, pyproject, lockfile |
-| Development source data | CSV fixtures or SQLAlchemy/MySQL connector |
+| Production dependencies | requirements.txt and native ODBC installation in Docker; no tracked lockfile |
+| Production source data | SQL Server/Fabric through pyodbc and ODBC Driver 18 |
 | Semantic retrieval | boto3 S3 Vectors client; 1,024-dimensional cosine index |
 | Embeddings | `amazon.titan-embed-text-v2:0` |
 | Active generation | `us.anthropic.claude-sonnet-4-5-20250929-v1:0`, temperature 0.1, max tokens 8000 |
@@ -174,20 +178,18 @@ The generation client consumes a Bedrock response stream internally and returns 
 
 ## Configuration
 
-The maintained local template is [.env.example](.env.example). Configure only the integrations needed for the chosen path.
+The maintained production-path example is [.env.example](.env.example). Configure actual deployment settings independently and review which credential source each client consumes.
 
 | Setting | Purpose |
 | --- | --- |
 | `AWS_ACCESS_KEY_ID_OS`, `AWS_SECRET_ACCESS_KEY_OS` | Active shared AWS key/secret configuration |
 | `AWS_REGION` | Region used by active Bedrock, S3 Vectors, and export clients; default `us-east-1` |
 | `S3_VECTORS_BUCKET_NAME`, `S3_VECTORS_INDEX_NAME` | Existing vector bucket and selected index; the code does not create a vector bucket |
-| `USE_CSV_DATA` | Development loader selector; true/1/yes enables CSV; code default is false |
-| `CSV_DATA_DIR` | Prepared CSV directory; default resolves to `app/` |
-| `MYSQL_DATABASE_URL` | Used by development when CSV mode is disabled |
+| `USE_CSV_DATA` | Optional CSV override in load_data; default false. It does not remove pyodbc/S3 import dependencies and does not switch load_full_data to CSV. |
+| `CSV_DATA_DIR` | Optional prepared-CSV directory; default resolves to `app/` |
 | `BUCKET_NAME` | Ordinary S3 exports used by ancillary/production data paths |
-| `SERVER`, `DATABASE`, `CLIENT_ID`, `CLIENT_SECRET` | SQL Server/Fabric configuration for the production/diagnostic path |
+| `SERVER`, `DATABASE`, `CLIENT_ID`, `CLIENT_SECRET` | Active SQL Server/Fabric service-principal connection configuration |
 | `KNOWLEDGE_BASE_ID`, `DATA_SOURCE_ID` | Ancillary KB synchronization settings |
-| `SUPABASE_URL`, `COLLECTION_NAME` | Retained Supabase configuration; not the active API pipeline |
 | `SLACK_WEBHOOK_URL` | Optional notification destination in job/cron utilities |
 
 Use separate development resources for local experiments. The request's year/indicator and `USE_CSV_DATA` do not select an isolated vector index, change the UI's hardcoded production URL, or create a test Lambda.
@@ -210,30 +212,29 @@ Tables and challenges reuse `ChatRequest` but only consume its year; their route
 
 ```text
 ar-generator-service/
-├── README.md, AGENTS.md       # Service entry point and continuation rules
-├── dev_server.py             # Local Uvicorn launcher
-├── main.py                   # Simple Mangum adapter in development
-├── pyproject.toml, uv.lock   # Development dependencies
-├── .env.example              # Local setup template; actual .env is private
-├── docs/                     # Product, design, API, operations, branch comparison
+├── README.md, AGENTS.md       # Production entry point and working rules
+├── Dockerfile, .dockerignore # ODBC-enabled Lambda packaging
+├── requirements.txt          # Python dependencies installed by Docker
+├── api_server.py             # Packaged HTTP/EventBridge handler
+├── dev_server.py             # Auxiliary local Uvicorn launcher
+├── main.py                   # Simple adapter; not Docker's handler
+├── .env.example              # Production-path placeholders, no real secrets
+├── docs/                     # API, design, data/operations and branch guides
 ├── app/
-│   ├── api/                  # Routes, request/response models, static mounting
-│   ├── llm/
-│   │   ├── vectorize.py, vectorize_annual.py  # Active report pipelines
-│   │   ├── invoke_llm.py      # Bedrock embeddings and generation
-│   │   ├── opensearch/, supabase/ # Retained alternatives
-│   │   └── knowledge_base.py # Separate reference integration
-│   ├── s3_vectors/           # Client, metadata schema, index ingestion
-│   ├── retrieval/            # Semantic and structured retrieval, filters
-│   ├── utils/                # Prompts, config, logs, exports, notifications, cron
-│   └── vw_ai_*_ar.csv         # Local fixtures, untracked
-├── db_conn/mysql_connection.py # Development CSV/MySQL loader
-├── tests/                    # Pure unit tests and separate Streamlit tool
-├── web/                      # Static review interface and its own guide
-└── lakehouse_integration/    # Separate ODBC diagnostic container
+│   ├── api/                  # Routes/models, static mounting, eager SQL import
+│   ├── llm/                  # Active report pipelines and Bedrock invocation
+│   ├── s3_vectors/           # Vector client, ingestion, metadata
+│   ├── retrieval/            # Semantic/structured retrieval and filters
+│   └── utils/
+│       ├── jobs/             # Production scheduled-job dispatcher
+│       ├── s3/               # Source exports and chatbot-file splitting
+│       └── ...               # Prompts, configuration, logs, notifications
+├── db_conn/sql_connection.py # Active SQL Server loader and exports
+├── tests/                    # Shared filter/schema assertions
+└── web/                      # Static interface; production analytics destination
 ```
 
-Production additionally has its own Dockerfile, requirements, `api_server.py`, SQL Server loader/export helper, and job dispatcher. Its pre-existing design/product/technical documents must be reconciled with the development guides added here. The [complete branch inventory](docs/BRANCH_DIFFERENCES.md#initial-file-inventory) identifies files to retain or adapt during integration.
+Development-only MySQL/CSV plumbing, alternate backends, cron utilities, Streamlit/lakehouse tools, pyproject and lockfile are not present in this production tree. The [initial branch inventory](docs/BRANCH_DIFFERENCES.md#initial-file-inventory) records the intentional differences before documentation integration.
 
 ## Branch and deployment workflow
 
@@ -242,28 +243,46 @@ task branch from dev-ar-generator
     → dev-ar-generator → main-ar-generator → staging → main
 ```
 
-Do not make the service trees identical by replacing production's SQL Server loader with local CSV/MySQL plumbing. Production's Docker command targets **`api_server.handler`**, which routes HTTP to Mangum and supported scheduler events to job functions. Development's `main.handler` does not implement that dispatcher.
+Do not make the service trees identical by replacing production's SQL Server loader with local CSV/MySQL plumbing. Production's Docker command targets **`api_server.handler`**, which routes HTTP to Mangum and supported scheduler events to job functions. The tracked `main.handler` adapter also does not implement that dispatcher and is not selected by this Dockerfile.
 
-The production-branch workflow targets pushes/PRs to `main-ar-generator` and manual dispatch, invoking the production Lambda Jenkins job. That workflow is absent from this development snapshot. This does not establish external triggers or live pipeline status. The maintainer supervises release merges and pushes; after the local service-main merge, compare all files and adapt production docs before push. Completed service updates accumulate in staging for the agreed consolidated PR to main.
+The production-branch workflow targets pushes/PRs to `main-ar-generator` and manual dispatch, invoking the production Lambda Jenkins job. That workflow is present in this production branch and has no documentation path exclusion. Its file does not establish external triggers or live pipeline status. The maintainer supervises release merges and pushes; after the local service-main merge, compare all files and adapt production docs before push. Completed service updates accumulate in staging for the agreed consolidated PR to main.
+
+## Scheduled operations
+
+The packaged handler distinguishes job-only events from HTTP-shaped events. An example scheduler body is:
+
+```json
+{"job":"sync_knowledge_base"}
+```
+
+This is a Lambda-event interface, not a public POST endpoint or a safe health probe. Supported job names are:
+
+| Job | Current implementation |
+| --- | --- |
+| update_ar_data | Calls annual pipeline with fixed IPI 1.3/year 2025/insert_data:true |
+| update_chatbot_data | Loads/exports five source tables and generates per-record chatbot files |
+| sync_knowledge_base | Starts Bedrock KB ingestion; a started job is not confirmed completion |
+
+Jobs can send Slack notifications. No scheduler installation, deployed schedule, real job, source export, or KB ingestion is performed by documentation checks. See [operations](docs/TECHNICAL_DOCUMENTATION.md#scheduled-operations) before deliberate execution.
 
 ## Validation and troubleshooting
 
 The six existing checks in `tests/test_retrieval.py` and `tests/test_vector_store_schemas.py` target filtering/metadata functions. Normal collection also imports `app.s3_vectors.__init__`, which eagerly loads ingestion/data/provider dependencies. They are not isolated from application initialization by default.
 
-For documentation checks, use the [offline unit bootstrap](docs/TECHNICAL_DOCUMENTATION.md#offline-unit-checks), which loads the actual schema/filter modules while bypassing package initialization and blocking network. Pytest is not declared in the development project dependencies; use a suitable test environment. Do not treat a successful isolated run as a live SQL/AWS/Lambda check. `tests/streamlit/generator.py`, cron scripts, ingestion helpers, and the lakehouse diagnostic are separate tools that may invoke providers, modify resources, or expose data in output.
+For documentation checks, use the [offline unit bootstrap](docs/TECHNICAL_DOCUMENTATION.md#offline-unit-checks), which loads the actual schema/filter modules while bypassing package initialization and blocking network. Pytest is not included in this branch's requirements; use a suitable test environment. Do not treat a successful isolated run as a live SQL/AWS/Lambda check. Streamlit, host-cron and lakehouse diagnostic tools belong to the development branch and are absent here; production jobs/ingestion helpers can modify resources and are not unit-test entry points.
 
 | Symptom | Check |
 | --- | --- |
-| pyodbc/ODBC installation blocks local setup | Use this development branch's uv environment and CSV loader; the active local path does not require pyodbc. Production's container provides ODBC separately. |
-| `GET /health` works but generation fails | Pipelines import lazily. Check active `*_OS` credentials, data columns, vector configuration, model access, and logs. |
+| pyodbc/ODBC installation blocks local setup | Production intentionally needs the native stack provided by its Dockerfile. For pyodbc-free local work use dev-ar-generator; do not remove production imports to match a local machine. |
+| `GET /health` works but generation fails | Health does not query sources/providers. Check OS-named Bedrock/vector keys, the separate S3 credential source, SQL service principal/views, data, and logs. |
 | CSV is missing or totals are empty | Verify `CSV_DATA_DIR`, filenames, prepared column names/types, and the requested indicator/year. Loader errors can become empty DataFrames. |
 | UI served locally still uses production | Inspect `API_BASE_URL` and `AI_FEEDBACK_URL` in `web/app.js`; they are fixed constants, not inferred from the page URL. |
 | Wrong AWS credentials despite editing `*_BR` | The active config reads `*_OS`. Restart after changing configuration. |
 | S3 Vectors SDK/permission/query failure | Check installed SDK support, the selected resource/account, request settings, and IAM access. Do not rebuild production merely to diagnose retrieval. |
 | Report is empty or weak | Inspect data, retrieval logs and error/status content. Missing context can result from swallowed data/provider errors; a rebuild is not automatically the remedy. |
-| Generated context files appear locally | Development writes `context_<indicator>_<year>.json` in the current directory. Treat contents as reporting evidence and keep them untracked. |
-| Crons report success after timeout | Some retained scripts interpret timeouts as accepted work. This is not evidence of a completed background job or durable processing. |
+| Generated context files appear in a production checkout | Explicit context-save calls are absent from active production pipelines. Check the executed branch/path and preserve that separation from development. |
+| A scheduled operation fails or appears incomplete | Inspect its Lambda response, job status, logs and target resources. A timeout or started KB ingestion is not a completed durable job. |
 
-Development logs rotate under `data/logs/app.log` (5 MiB, five backups, DEBUG logger). Production uses `/tmp/logs/app.log` and a different logger name. Generated context files, CSV exports, and logs may contain real reporting data; do not commit them.
+This branch logs under `/tmp/logs/app.log` (5 MiB, five backups, DEBUG logger `ar-generator-service`), plus stdout. Development uses a service-relative directory and different logger name. Generated context files, CSV exports, and logs may contain real reporting data; do not commit them.
 
 The repository [LICENSE](../LICENSE) contains Apache 2.0, while API metadata labels MIT. This documentation records that existing mismatch without changing licensing metadata or runtime behavior.

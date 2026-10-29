@@ -1,59 +1,58 @@
-# AICCRA Report Generator: agent guide
+# AICCRA production Report Generator: agent guide
 
-Read the [root instructions](../AGENTS.md), [README](README.md), and relevant source before editing. For browser work also read [web instructions](web/AGENTS.md). This guide describes development's local CSV/MySQL path, not a production-equivalent Lambda environment.
+Read the [root instructions](../AGENTS.md), [README](README.md), and relevant source before editing. For browser work read [web instructions](web/AGENTS.md). This guide describes **main-ar-generator**, including SQL Server, production Lambda packaging, and scheduled operations.
 
-## Branch and scope rules
+## Scope and integration
 
-- Development is `dev-ar-generator`; production service-main is `main-ar-generator`. The maintainer uses local development and a production Lambda; do not invent a separate test Lambda or infer deployed inventory from files.
-- Preserve local user commits. This documentation branch started from local development `ec875c50`, which includes an existing root `.gitignore` commit beyond remote development. Do not reset or silently drop it.
-- The service trees intentionally differ substantially. Read [branch differences](docs/BRANCH_DIFFERENCES.md) before integration. Do not make them identical by copying the local loader, launcher, dependencies, debug files, or cron scripts into production paths.
-- Production's Docker command uses `api_server.handler`, including HTTP/EventBridge dispatch. Development's `main.handler` is only a simple Mangum adapter. Preserve production's dispatcher, scheduled jobs, ODBC image, SQL Server loader/export helper, requirements, logger, workflow, and analytics destination unless separately asked to change them.
-- After the maintainer's local development-to-service-main merge, compare the complete incoming diff, preserve intentional differences, and adapt main-specific docs as part of the already-authorized review. Keep commits/pushes within the user's requested scope.
-- Shared guide changes belong in separable commits. Do not change other services, prompt behavior, model settings, dependencies, or deployment configuration as a documentation cleanup.
+- Development is dev-ar-generator; service-main is main-ar-generator. The maintainer uses local CSV/MySQL development and one production Lambda rather than a separate test Lambda.
+- Preserve intentional branch differences in the [branch matrix](docs/BRANCH_DIFFERENCES.md). Do not make production match a local machine by removing pyodbc, changing structured-loader imports, replacing the Lambda dispatcher, or copying local debug/cron paths into production execution.
+- The Docker command is api_server.handler, not main.handler. Keep the ODBC-enabled image, requirements, .dockerignore, SQL Server loader/exports, job dispatcher, workflow, production logger and analytics host unless a separate behavior/deployment change is requested.
+- Compare the complete incoming diff after maintainer integration, including root/shared files and other services. Keep the existing root ignore changes and user commits intact. Adapt production docs as part of the authorized review; leave commit/push within the user's requested scope.
+- Shared guide work should remain separable in commits/review. Do not change prompts, model settings, dependencies, logging, API behavior, or deployment configuration merely to simplify documentation.
 
 ## Implementation map
 
 | Path | Responsibility |
 | --- | --- |
-| `dev_server.py` | Local Uvicorn launcher, dotenv before app import |
-| `main.py` | Simple development Mangum adapter |
-| `app/api/main.py`, `routes.py`, `models.py` | FastAPI app, lazy report imports, complete JSON responses, static UI, validation |
-| `app/llm/vectorize.py` | Active mid-year pipeline, summary, semantic/DOI merge, context debug file |
-| `app/llm/vectorize_annual.py` | Annual summary/cluster drafting, tables, challenges, context debug file |
-| `app/llm/invoke_llm.py` | Titan embeddings and accumulated Claude stream |
-| `app/s3_vectors/` | SDK client, index rebuild, ingestion, metadata/chunk serialization |
-| `app/retrieval/` | Semantic queries, structured evidence, business filters |
-| `db_conn/mysql_connection.py` | Development CSV/MySQL loader; no active pyodbc import |
-| `app/utils/prompts/` | Reporting and disaggregation instructions; behavior, not incidental copy |
-| `app/utils/cronjob/` | Retained host-cron setup and scripts, some calling production |
-| `web/` | Static UI with fixed API/analytics destinations |
-| `tests/test_retrieval.py`, `test_vector_store_schemas.py` | Six filter/schema assertions; package imports need isolation |
-| `tests/streamlit/`, `lakehouse_integration/` | Separate potentially live diagnostic/manual tools |
+| Dockerfile, .dockerignore, requirements.txt | Production Lambda Python 3.13 image, ODBC 18 and Python dependencies |
+| api_server.py | HTTP/EventBridge detection, Mangum adapter, scheduled-job dispatch |
+| dev_server.py | Auxiliary local Uvicorn launcher; still needs this branch's native/import stack |
+| main.py | Simple alternate Mangum adapter; not Docker's selected handler |
+| app/api/main.py, routes.py, models.py | App, eager SQL-loader import, lazy report functions, complete JSON, UI, schema validation |
+| db_conn/sql_connection.py | SQL views, source transforms, prepared CSV override in load_data, S3 exports, load_full_data |
+| app/llm/vectorize.py, vectorize_annual.py | Active S3 Vectors report pipelines; no development context-dump calls |
+| app/llm/invoke_llm.py | Titan embeddings and accumulated Claude stream |
+| app/s3_vectors/, app/retrieval/ | Index operations, ingestion/schema, semantic/structured retrieval and filters |
+| app/utils/jobs/scheduled_jobs.py | Production AR refresh, chatbot export and KB synchronization |
+| app/utils/s3/ | Ordinary S3 upload client and per-record chatbot CSV/metadata splitting |
+| app/utils/prompts/, config/, logger/, notification/ | Report behavior, environment values, /tmp logs, optional Slack |
+| web/ | Static UI, fixed production API/analytics destinations and browser downloads |
+| tests/test_retrieval.py, test_vector_store_schemas.py | Six filter/schema assertions; isolate package initialization for offline collection |
 
-## Contracts and effects
+## Contracts and external effects
 
-- API bodies use `ChatRequest`: required free-text indicator and year 2021–2026, optional insert_data default false. Tables/challenges require the same body but consume only year; do not describe them as per-indicator rebuild operations.
-- The public report API returns complete JSON. Bedrock streaming is internal; synchronous generation is not a persistent job or client token stream. Do not infer successful background processing from a timeout.
-- `insert_data=true` on narratives deletes/recreates the entire configured S3 Vectors index, not only one indicator/year. Mid-year and annual rebuild the same index with different table sets. Ingestion can skip rows/failures and is not transactional.
-- `insert_data=false` still invokes AWS and reads structured data. CSV mode avoids database connections only in development's active loader; it is not an offline mode.
-- Active AWS configuration uses `AWS_ACCESS_KEY_ID_OS` / `AWS_SECRET_ACCESS_KEY_OS` and AWS_REGION. The old BR aliases do not configure the active client. Bedrock requires explicit keys; do not promise Lambda-role fallback for that path.
-- Development's current loader reads prepared CSVs directly or transforms MySQL data. Production imports `pyodbc` and a different SQL Server loader; even its CSV branch does not remove the import dependency. Production SQL reads can create/alter views and export to S3.
-- CSV lookup defaults to `app/`. The source's missing-file message saying service root is stale. Prepared `table_type`, year, and business fields matter; do not assume arbitrary raw CSVs match production processing.
-- Routes have no general token/API-key dependency. CORS and infrastructure descriptions do not establish deployed authorization. Generated metadata still contains historical OpenSearch/model/year statements.
-- HTTP 200 can contain status:error or error prose; mid-year, annual, and challenges have different failure handling. Use [API guide](docs/API_GUIDE.md#responses-and-failure-semantics), then check executable branches.
+- All four POST report routes use ChatRequest: required free-text indicator, year 2021–2026, nullable insert_data default false. Tables/challenges consume only year at route level and do not forward the rebuild flag.
+- Public reports are complete JSON, not streamed tokens or durable background jobs. HTTP 200 can contain status:error or error prose. Read [API semantics](docs/API_GUIDE.md#responses-and-failure-semantics) and preserve the route-specific differences.
+- Narrative insert_data:true deletes/recreates the whole configured S3 Vectors index and ingests five/six source tables. Mid-year and annual share that configured index; there is no documented rebuild transaction/lock or per-year index isolation.
+- Even insert_data:false can alter SQL views and export files to ordinary S3 through load_data. Reads are not necessarily side-effect-free. Loader/retrieval/ingestion errors can become empty structures/zero counts and allow incomplete downstream generation.
+- SQL Server uses pyodbc/ODBC 18 and service-principal configuration. Several report-source transforms restrict rows to 2025/2026 despite the API's wider year range. Preserve transforms, table_type labels, exports, cleanup, and data semantics during changes.
+- USE_CSV_DATA affects load_data only, not load_full_data, and does not remove import-time pyodbc/S3 dependencies. Default is false; CSV lookup resolves to app/ and expects prepared rows. Use development for pyodbc-free local work.
+- Bedrock/S3 Vectors use explicit OS-named keys and configured region. The ordinary S3 export client instead uses boto3's standard credential chain. Do not promise identical credential resolution across clients.
+- API routes have no general token/API-key dependency. CORS and outbound IAM permissions do not establish caller authorization; infrastructure controls require separate verification.
+- api_server imports scheduled jobs/annual pipeline at startup; FastAPI routes also import SQL/export code eagerly. Health returning static metadata does not establish generation configuration or provider access.
 
-## UI and retained tools
+## Scheduler and browser boundaries
 
-Serving `/web` locally does not make API requests local. Inspect `API_BASE_URL` and `AI_FEEDBACK_URL` before browser work; production and development retain different analytics URLs. UI tracking can send generated content and requester identity. Stub both endpoints for offline tests.
+The hybrid handler accepts job-only events with a string job name only when HTTP event keys are absent. Preserve requestContext/rawPath/body/httpMethod discrimination and Mangum handling. Supported job names are update_ar_data, update_chatbot_data, and sync_knowledge_base. The AR job currently uses IPI 1.3/year 2025/rebuild true. KB start success is not ingestion completion.
 
-The OpenSearch, Supabase, and KB modules are reference paths with missing imports/config assumptions in this checkout, not validated rollback switches. Cron setup can modify the host crontab; cron/update scripts can rebuild production data, synchronize KBs, send Slack notifications, or call an absent public endpoint. Do not run them as tests.
+The UI targets the production Lambda even when served locally. Production analytics is i8s5i8c21i.execute-api.us-east-1.amazonaws.com, distinct from development. Inspect/stub both destinations before browser checks. Tracking may include identity parameters/generated output; it is not authentication. The date badge calculates a Sunday rather than querying ingestion state.
 
-## Setup and verification
+## Run and verify
 
-Use Python 3.13, `uv sync --frozen --python 3.13`, and `uv run --frozen python dev_server.py --host 127.0.0.1 --reload` from this service. Production requirements/Docker are different and not present here. Do not add pyodbc to local development merely to match production packaging.
+Production installs requirements.txt in the ODBC-enabled Docker image and starts api_server.handler. There is no tracked pyproject/uv lockfile here. Local diagnostics can use dev_server.py or app.api.main:app only in a suitable Python 3.13/ODBC environment; uv/CSV-only startup belongs to development. Do not build/publish merely to check docs.
 
-Read tests and package initializers before running them. The two named files target filter/schema behavior, but normal collection eagerly imports data/provider modules through app.s3_vectors.__init__. Use the documented offline bootstrap to isolate that initializer and block network; pytest must be available in the selected environment and is not declared in pyproject. Streamlit/cron/lakehouse tools are separate from those six assertions.
+Read package initializers as well as test functions. app.s3_vectors.__init__ imports ingestion/data/provider code during normal collection, including production pyodbc dependencies. The technical guide's offline bootstrap runs the six actual filter/schema assertions without that initializer and blocks network; it does not validate startup.
 
-For documentation checks, validate links, example bodies, commands, branch inventory, and source claims. For offline API/data/provider checks, block network, prevent real dotenv loading, stub logger/clients before import, use fictional temporary CSVs, and never rebuild a real index. Preserve generated context/log/CSV artifacts outside commits.
+For offline API/loader/provider/handler checks, block network, prevent real dotenv loading, stub logger/pyodbc/providers before import, use synthetic temporary data, and capture exports/rebuilds/jobs only in fakes. Never call SQL, rebuild an actual index, invoke a real job, or send Slack/analytics as a documentation check.
 
-Report local/offline results separately from AWS, SQL Server, model-quality, Jenkins, or deployment checks. The development `.env.example` intentionally enables CSV; adapt the production template separately during service-main review rather than changing live environment settings.
+Report checks separately from real ODBC installation, AWS/SQL credentials, model quality, Jenkins, or deployment. Only docs and the example template are adjusted by this production-alignment task; actual Lambda environment values remain outside its scope.
