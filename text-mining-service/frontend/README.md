@@ -131,11 +131,9 @@ previous server artifact and matching assets available for rollback.
 
 ## Dependency maintenance
 
-Dependabot proposes weekly npm updates against `dev-text-mining`, grouping Next,
-its lint packages, and OpenNext together and React with React DOM/types. Review and test
-those PRs; they do not auto-merge or deploy. GitHub security alerts/security-update
-settings are managed separately, and custom-target version updates do not replace
-security monitoring of the default branch. Apply urgent security patches promptly.
+Dependency upgrades are managed manually. The Node 22 migration does not enable
+scheduled dependency-update branches or pull requests. Propose additional package
+upgrades only when requested, and validate them separately from this runtime update.
 
 Update Next and `eslint-config-next` together, and React and React DOM together.
 For each adapter or framework upgrade, repeat the Node 22 checks and the development
