@@ -1,222 +1,65 @@
-# AICCRA Chatbot Service – Technical Documentation
+# Chatbot backend maintenance
 
----
+This guide maps `dev-chatbot-service`. See the [README](README.md) for setup and [API contract](docs/API.md) for payloads.
 
-## Service Overview
+## Request flow
 
-The AICCRA Chatbot Service is an AI-powered conversational interface designed to provide natural language access to AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa) program data. The service enables stakeholders to query and explore project information including deliverables, contributions, innovations, outcome reports, and performance indicators through an intuitive chat interface.
+1. `api_server.py` launches `app.api.main:app`; `main.py` wraps the same app with Mangum.
+2. `app/api/main.py` mounts `interface/`, serves `/chatbot-ui`, exposes static metadata/health and includes the chat router.
+3. `ChatRequest` validates message length and identifiers. The route lazily imports the agent and forwards all request fields.
+4. `run_agent_chatbot` builds metadata filters, includes applied filters in the input text and invokes the configured Bedrock agent/alias.
+5. Completion chunks are decoded as UTF-8. FastAPI joins them into JSON; Streamlit progressively displays them.
 
-**Primary Use Cases within MARLO-AICCRA:**
-- **Progress monitoring** – Track cluster performance against annual targets and milestones
-- **Data exploration** – Query deliverables, innovations, and outcomes across reporting phases
-- **Impact assessment** – Retrieve outcome case reports and real-world impact evidence
-- **Performance insights** – Analyze indicator progress and contribution narratives
-- **Knowledge retrieval** – Access research outputs, publications, and technical documentation with citations
+Filters are constructed before the generator's provider-call exception handler. Trace output is disabled. The API exposes no structured citation field; citations generated in text remain part of `message`.
 
----
+## Change map
 
-## Data Sources
+| Module | Responsibility |
+| --- | --- |
+| `app/api/models.py` | Request/response validation; coordinate callers and examples |
+| `app/api/routes.py` | Lazy import, aggregation, nested HTTP errors and reload metadata |
+| `app/llm/agents.py` | Active AWS clients, invocation payload and generator errors |
+| `app/utils/agents_utils/filter_builder.py` | KB metadata filter structure |
+| `app/utils/config/config_util.py` | Environment names and configuration dictionaries |
+| `chatbot.py` | Direct-agent Streamlit UI and external interaction tracking |
+| `interface/chatbot_interface.html` | HTTP UI, fixed URLs and external tracking |
+| `app/utils/logger/logger_util.py` | Console and file logging |
 
-**Primary Data Repository:**  
-Microsoft SQL Server database (Microsoft Fabric Lakehouse) serves as the single source of truth for all AICCRA program data.
+## Auxiliary paths and side effects
 
-**Data Types Processed:**
-- **Structured program data** – Performance indicators, milestones, targets, and reported values
-- **Narrative text** – Contribution narratives, questions, and progress descriptions
-- **Deliverable metadata** – Publications, reports, tools, and research outputs with DOI links
-- **Innovation records** – Technologies, platforms, practices, and readiness assessments
-- **Outcome case reports (OICRs)** – Impact stories and real-world application evidence
-- **Institutional metadata** – Clusters, indicators, phases, categories, and classifications
+These modules are not part of an active agent chat request:
 
-**Data Organization:**  
-Data is organized by:
-- **Reporting phases** – AWPB (Annual Work Plan & Budget), Progress (mid-year), AR (Annual Report)
-- **Performance indicators** – IPI (Intermediate Performance Indicators) and PDO (Project Development Objective indicators)
-- **Clusters** – Country-based, regional, and thematic organizational units
-- **Years** – Calendar year-based tracking (2021-2025+)
+| Path | Behavior and prerequisites |
+| --- | --- |
+| `app/llm/knowledge_base.py` | Direct `retrieve_and_generate_stream`; hardcoded inference-profile account/region/model need review before reuse |
+| `app/llm/invoke_llm.py` | Titan v2 embeddings and direct Claude 3.7 invocation; does not set the Agent's model |
+| `app/llm/vectorize_os.py` | Direct OpenSearch indexing/retrieval and LLM helpers; imports SQL loader and creates clients on import |
+| `db_conn/sql_connection.py` | Uses pyodbc/ODBC Driver 18, can create/alter views, writes JSONL/CSV and invokes splitting/uploads; catches errors and can return an empty DataFrame |
+| `app/utils/s3/divide_jsonl_files.py` | Creates per-record CSV and metadata, uploads both under `aiccra/chatbot/knowledge_base/`, deletes per-record files; logs/continues on line errors |
+| `app/utils/s3/upload_file_to_s3.py` | S3 existence/upload helpers with explicit development AWS credentials |
+| `app/utils/conversion/jsonl_to_json_*.py` | Five scripts for contributions, deliverables, innovations, OICRs and questions; read/write hardcoded working-directory paths at import, so they are not inert libraries |
+| `openai_chatbot.py` | Independent interactive OpenAI vector-store search and Responses experiment |
+| `app/utils/feedback/feedback_util.py` | Unused local-file/S3 helper with missing feedback model imports |
 
----
+SQL extraction and S3 upload do not establish that KB ingestion completed. The active agent accepts `insert_data` but contains no reload implementation. API `insert_data=true` metadata does not demonstrate database or ingestion activity. `pyodbc` is not declared here; do not make auxiliary SQL a prerequisite of normal chat setup.
 
-## Data Collection & Ingestion
+The conversion scripts read the corresponding `vw_ai_*.jsonl` file and write `vw_ai_*_openai.json`; the contributions script uses `vw_ai_project_contribution`. They do not upload the converted output or establish that it is indexed. Inspect input/output paths before running a script from the service directory.
 
-**Data Extraction:**  
-The service extracts data from multiple database views that consolidate AICCRA program information from the MARLO-AICCRA system. Each view represents a specific data domain (contributions, deliverables, innovations, outcomes, questions).
+## Client lifecycle and configuration
 
-**Data Access Method:**  
-- SQL Server connection via authenticated client credentials
-- Query execution against predefined database views
-- Pandas-based data processing for transformation and structuring
+Configuration loads on import. The active agent constructs `bedrock-agent` and `bedrock-agent-runtime` clients; requests invoke the runtime. Development passes access/secret keys explicitly and does not explicitly forward a session token. Review actual credential-provider behavior before adopting temporary credentials. Service-main uses the SDK credential chain for these clients.
 
-**Preprocessing Steps:**
-1. **Data retrieval** – Query database views and load results into dataframes
-2. **Format transformation** – Convert structured records into JSONL format for knowledge base ingestion
-3. **Metadata enrichment** – Add classification fields (phase, year, indicator, table type) to enable filtering
-4. **File generation** – Produce JSONL files where each line represents a single data record
-5. **File segmentation** – Divide large JSONL files into smaller chunks to optimize vector processing
+API agent import is lazy; health/docs can work even if agent import would fail. Streamlit imports the agent at startup. Editing a prompt file does not change external agent instructions or its model.
 
-**Optional Data Refresh:**  
-Users can trigger a data reload operation that re-ingests fresh data from the database, processes it, and synchronizes the knowledge base. This operation takes several minutes due to the volume of records processed.
+## Offline verification
 
----
+There is no dedicated tracked service test suite in this snapshot. Useful checks:
 
-## AI Processing Pipeline
+- Resolve local documentation links and parse fenced JSON, Python and shell examples.
+- Exercise Pydantic models and pure filter construction with fictional values.
+- Replace the agent generator before testing API aggregation/errors.
+- Replace `boto3.client` before importing the agent to inspect invocation arguments with fake completion events.
+- Block network and replace logging to avoid generated repository files.
+- Extract the HTML script for syntax checking without executing fetch calls.
 
-**High-Level Processing Flow:**
-
-1. **User query submission** – User submits a natural language question with optional filters (phase, indicator, section)
-
-2. **Filter application** – User-specified filters are translated into metadata query constraints that limit the knowledge base search scope
-
-3. **Session management** – Each conversation is tracked via a unique session ID to maintain context across multiple messages
-
-4. **Vector-based retrieval** – The user question is processed to retrieve semantically relevant documents from the knowledge base using similarity search
-
-5. **Context assembly** – Retrieved documents are provided as context to the language model along with the user's question and filter information
-
-6. **AI response generation** – The language model generates a contextual answer grounded in the retrieved evidence
-
-7. **Streaming response delivery** – The answer is streamed back to the user in real-time, token-by-token
-
-**Key Processing Mechanisms:**
-
-- **Semantic search** – User questions are matched against pre-indexed knowledge base content using vector similarity
-- **Metadata filtering** – Dynamic filters (phase, indicator, section) narrow the retrieval scope before semantic matching
-- **Memory integration** – Conversation history is maintained across sessions to enable follow-up questions and context awareness
-- **Response grounding** – The model is instructed to answer only using retrieved content and to cite sources with hyperlinks
-
----
-
-## Models & AI Technologies
-
-**Language Model:**  
-Amazon Bedrock Agents with **Claude 3.7 Sonnet** foundation model.
-
-**Role:** Conversational AI that interprets user queries, processes context, and generates natural language responses. The model is configured with custom instructions tailored to AICCRA domain knowledge, ensuring accurate interpretation of indicators, clusters, and reporting phases.
-
-**Embedding Model:**  
-Amazon Bedrock Knowledge Base uses its default embedding model for vectorization.
-
-**Role:** Converts text documents into dense vector representations that enable semantic similarity search. Text chunks from AICCRA data are embedded and indexed in a vector database.
-
-**Agent Architecture:**  
-AWS Bedrock Agents orchestrates the complete interaction flow including session management, knowledge base retrieval, and response generation. The agent maintains conversation memory and applies retrieval filters dynamically based on user inputs.
-
----
-
-## Supporting Technologies & Architecture
-
-**Cloud Infrastructure:**
-- **AWS Bedrock** – Managed AI service for agents, knowledge bases, and foundation models
-- **AWS S3** – Object storage for JSONL data files that feed the knowledge base
-- **Amazon OpenSearch** – Vector database backend for knowledge base indexing and similarity search
-
-**Application Layer:**
-- **FastAPI** – REST API framework providing HTTP endpoints for programmatic access
-- **HTML/JavaScript** – Web-based user interface for interactive chatbot sessions
-- **Uvicorn** – ASGI server for running the FastAPI application
-- **Mangum** – AWS Lambda adapter for serverless deployment
-
-**Data Processing:**
-- **Pandas** – Data transformation and JSONL generation from database queries
-- **SQLAlchemy** – Database connectivity and query execution
-- **Boto3** – AWS SDK for S3 uploads and Bedrock service integration
-
-**Conceptual Interaction Flow:**
-
-1. User interacts via REST API or HTML web interface
-2. User query + filters → FastAPI endpoint → Bedrock Agent
-3. Bedrock Agent applies metadata filters → queries Knowledge Base
-4. Knowledge Base retrieves relevant chunks from OpenSearch vector index
-5. Claude 3.7 Sonnet generates response using retrieved context
-6. Response streamed back through API → displayed to user
-
----
-
-## Front-End & User Interaction
-
-**Access Methods:**
-
-**1. REST API**  
-Programmatic access via HTTP POST requests to `/api/chat` endpoint. Suitable for integration with external applications, dashboards, or custom interfaces.
-
-**2. HTML Web Interface**  
-Interactive browser-based chat interface with conversation history, dynamic filter controls, and modern UI design. Suitable for direct human interaction.
-
-**User Inputs:**
-
-- **Message (required)** – Natural language question or query about AICCRA data
-- **Session ID (required)** – Unique identifier to maintain conversation continuity across multiple messages
-- **Memory ID (required)** – User email address for personalized access control
-- **Phase (optional)** – Filter by reporting phase (AWPB, Progress, AR) and year
-- **Indicator (optional)** – Filter by specific performance indicator (e.g., IPI 1.1, PDO Indicator 3)
-- **Section (optional)** – Filter by data type (Deliverables, Innovations, OICRs, Contributions)
-- **Insert Data (optional)** – Boolean flag to trigger fresh data reload from database
-
-**User Interaction Flow:**
-
-1. User formulates a question (e.g., "What innovations were developed for climate-smart agriculture in 2025?")
-2. User optionally applies filters to narrow the scope
-3. System processes query and retrieves relevant information
-4. AI generates a response with citations and hyperlinks to source documents
-5. User can ask follow-up questions that build on previous context
-6. Conversation history is preserved throughout the session
-
-**Example Questions:**
-- "What progress has been made on IPI 1.1 in 2025?"
-- "Show me deliverables from the Kenya cluster related to climate information services"
-- "What is the readiness level of innovations developed by Theme 2?"
-- "How has AICCRA contributed to farmer livelihoods in Western Africa?"
-
----
-
-## Outputs & Value
-
-**Service Outputs:**
-
-**1. Natural Language Responses**  
-Conversational answers to user questions, generated in real-time and grounded in retrieved AICCRA data. Responses include explanations, data summaries, and contextual information.
-
-**2. Citations & Links**  
-Hyperlinks to source documents including:
-- DOI links to publications
-- MARLO project pages with detailed contribution narratives
-- PDF links to innovation descriptions and outcome reports
-
-**3. Data Summaries**  
-Aggregated insights across multiple records, clusters, or indicators. For example, summarizing deliverables across all clusters or progress across multiple years.
-
-**4. Contextual Recommendations**  
-Suggestions for refining queries or exploring related information when results are insufficient or ambiguous.
-
-**Value to AICCRA Stakeholders:**
-
-**For Program Managers:**
-- Rapid access to performance data without navigating complex database views
-- On-demand progress tracking against targets and milestones
-- Quick identification of high-performing clusters and lagging indicators
-
-**For Researchers & Technical Staff:**
-- Efficient discovery of relevant publications and research outputs
-- Easy exploration of innovations and their readiness levels
-- Quick access to outcome case reports demonstrating real-world impact
-
-**For Reporting & Compliance:**
-- Simplified data extraction for report generation
-- Quick validation of indicator contributions and narratives
-- Easy compilation of evidence for specific themes or regions
-
-**For Decision-Making:**
-- Informed strategic planning based on historical performance patterns
-- Identification of gaps in deliverables or contributions
-- Evidence-based resource allocation across clusters and themes
-
-**Overall Impact:**  
-The service democratizes access to AICCRA program data by removing technical barriers and enabling natural language interaction with complex structured information. It accelerates decision-making, reduces time spent on data retrieval, and improves the discoverability of insights that would otherwise require manual database queries or report review.
-
----
-
-## Summary
-
-The AICCRA Chatbot Service transforms how stakeholders interact with program data by providing an intelligent, conversational interface powered by advanced AI technologies. By combining semantic search, session memory, and domain-tailored language models, the service delivers accurate, contextual, and actionable insights directly from AICCRA's reporting infrastructure.
-
-The system's architecture leverages cloud-native AWS services for scalability, reliability, and performance while maintaining a clean separation between data sources, AI processing, and user-facing interfaces. This design ensures the service can scale with AICCRA's growing data volumes and evolving user needs.
+Offline checks do not validate credentials, deployed resources/models, metadata compatibility, freshness, feedback, SQL/ODBC, Lambda or Jenkins. Inspect the [branch inventory](docs/BRANCH_DIFFERENCES.md) and compare complete trees again after the local service-main merge, preserving production choices.
