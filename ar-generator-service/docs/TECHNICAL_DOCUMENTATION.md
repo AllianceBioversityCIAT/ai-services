@@ -1,241 +1,111 @@
-# AICCRA Reports Generator Service – Technical Documentation
+# AICCRA local data and operations guide
 
-## Service Overview
+This guide describes development's actual local execution path and the production differences that must be respected. Use the [README](../README.md) for commands and the [API guide](API_GUIDE.md) for request semantics.
 
-### Purpose
-The AICCRA Reports Generator Service is an AI-powered application that automates the generation of comprehensive progress reports for the AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa) initiative. The service transforms structured project data from MARLO-AICCRA into narrative reports using advanced language models and vector search capabilities.
+## CSV inputs and data loading
 
-### Main Use Cases
-- **Mid-Year Progress Reports**: Generate interim reports tracking progress achieved from January to mid-year for specific performance indicators.
-- **Annual Reports**: Produce comprehensive year-end reports covering full-year achievements, impact assessments, and detailed cluster contributions.
-- **Disaggregated Target Analysis**: Generate detailed breakdowns of indicator performance by demographics, geography, and technology type.
-- **Challenges & Lessons Learned**: Compile cross-cluster analyses of implementation challenges and strategic recommendations.
-- **Indicator Tables**: Create structured summaries of quantitative achievements across multiple indicators and time periods.
+The development loader is `db_conn/mysql_connection.py`. When USE_CSV_DATA is true/1/yes, it reads a filename from TABLE_CSV_FILES under CSV_DATA_DIR and immediately returns the DataFrame. It does not run the MySQL rename/drop/grouping logic on those CSVs. The current default directory resolves to service app/; the missing-file message's reference to service root is stale.
 
----
+| Source view | Prepared CSV |
+| --- | --- |
+| vw_ai_project_contribution | vw_ai_project_contribution_ar.csv |
+| vw_ai_questions | vw_ai_questions_ar.csv |
+| vw_ai_deliverables | vw_ai_deliverables_ar.csv |
+| vw_ai_oicrs | vw_ai_oicrs_ar.csv |
+| vw_ai_innovations | vw_ai_innovations_ar.csv |
+| vw_ai_challenges | vw_ai_challenges_ar.csv |
 
-## Data Sources
+Prepare source-appropriate fields rather than copying arbitrary raw database exports. Important consumers include:
 
-### Primary Data Source
-The service retrieves data from a **SQL Server database** (AICCRA Lakehouse) that stores structured information collected through the MARLO-AICCRA reporting platform. This database contains real-time project data submitted by cluster coordinators and project teams across Africa.
+| Consumer | Fields/expectations |
+| --- | --- |
+| Summary/tables | indicator_acronym, numeric year, Milestone expected value, Milestone reported value; table overviews also use indicator_title, cluster_acronym, Milestone achieved narrative |
+| Semantic metadata | source table supplied by ingestion, year string metadata, indicator_acronym, table_type, applicable role/status/phase fields |
+| DOI retrieval | indicator_acronym, year, doi; metadata used to retain/deduplicate the evidence |
+| Questions/disaggregation | Prepared question/contribution rows with indicator/year and the question/phase/table labels needed by filters/prompts |
+| Challenges | Prepared challenge/lesson fields; current fetch helper loads all rows rather than filtering year |
+| Business filters | table_type labels such as contributions/deliverables/questions/oicrs/innovations; exact status/role/phase values consumed in code |
 
-### Data Categories
-1. **Project Contributions**: Quantitative progress data, milestone tracking, narrative descriptions, and cluster-specific achievements.
-2. **Deliverables**: Research outputs including publications, datasets, tools, and policy briefs with DOI links and metadata.
-3. **Outcome Impact Case Reports (OICRs)**: Documented case studies demonstrating real-world impact of AICCRA interventions.
-4. **Innovations**: Climate-relevant technologies, platforms, and practices developed or validated by AICCRA.
-5. **Questionnaire Responses**: Detailed answers to indicator-specific disaggregation questions.
+Summary functions compare DataFrame year directly to the integer request; structured retrieval normalizes year to strings. Incorrect CSV types can therefore affect paths differently. A successful CSV read is not proof that summaries or filters have adequate fields/data.
 
-### Data Structure
-The system processes data filtered by:
-- **Indicator**: Performance indicators (IPI 1.1-3.4, PDO Indicator 1-5)
-- **Year**: Target reporting year (2021-2025)
-- **Cluster**: Regional or thematic cluster (Ghana, Mali, Kenya, Western Africa, Theme 1, etc.)
+When CSV mode is disabled, development uses MYSQL_DATABASE_URL and SQLAlchemy/MySQL connector. Its transformations differ from production and do not add every label provided by the SQL Server path. Load errors are logged and return an empty DataFrame, so a missing file/schema/column may manifest later as empty context or a pipeline error.
 
----
+Production has a separate `db_conn/sql_connection.py` with pyodbc imported at module load. Its CSV branch exists, but does not remove the import/system-driver dependency. Its SQL path can create/alter views, transform/filter rows, write temporary exports, and upload to S3. Do not run that loader as a harmless read-only check.
 
-## Data Collection & Ingestion
+## AWS and local configuration
 
-### Data Extraction Process
-1. **Database Views Creation**: The service dynamically creates or updates SQL views that join dimensional and fact tables, enriching data with cluster names, indicator descriptions, institutional affiliations, and geographic information.
+The active shared AWS dictionary reads the OS-named key/secret and AWS_REGION. Both values are explicitly required by Bedrock initialization. Older BR aliases in historical examples do not configure that path. The updated development [.env.example](../.env.example) uses placeholders and CSV mode; it is not a production runtime configuration file.
 
-2. **Data Retrieval**: Executes parameterized SQL queries against five primary views:
-   - `vw_ai_project_contribution`: Progress metrics and narrative contributions
-   - `vw_ai_deliverables`: Research outputs with DOIs and dissemination formats
-   - `vw_ai_oicrs`: Impact case reports with evidence links
-   - `vw_ai_innovations`: Technology readiness and innovation metadata
-   - `vw_ai_questions`: Disaggregated target responses
+S3_VECTORS_BUCKET_NAME and S3_VECTORS_INDEX_NAME must select intended resources. Client creation is lazy for the vector store; the bucket/index are validated when requested. The bucket is not created by the application. Index creation uses dimension 1024, cosine, float32, and non-filterable chunk_json metadata.
 
-3. **Authentication**: Uses Azure Active Directory Service Principal authentication for secure database access.
+The locked SDK versions are recorded in uv.lock; do not replace them with an unverified minimum-version recommendation. Check installed support/request behavior deliberately if an SDK operation fails. No documentation review certifies live query limits, IAM permissions, or provider availability.
 
-### Data Preprocessing
-1. **Column Standardization**: Renames columns for consistency and drops unnecessary fields (IDs, internal codes).
-2. **Data Cleaning**: Removes empty columns and null values to reduce noise in AI processing.
-3. **Aggregation**: Groups deliverables, OICRs, and innovations by unique identifiers to consolidate related data.
-4. **Type Labeling**: Adds a `table_type` field to distinguish data sources during AI generation.
-5. **Serialization**: Converts cleaned dataframes to JSON format for downstream vectorization.
+Ordinary S3, KB, Slack, Supabase, and SQL Server settings serve ancillary or alternate paths and are not all needed to serve health. API pipeline imports are lazy; process startup can pass even when generation configuration is missing. Restart after configuration changes because module dictionaries/cache clients retain values.
 
----
+## Rebuild and ingestion
 
-## AI Processing Pipeline
+The two narrative pipelines conditionally call recreate_index, which deletes then creates the configured index. Mid-year ingests five views; annual adds challenges. Ingestion serializes row chunks, invokes embeddings, skips empty/failed embeddings, and writes vectors in batches. Some failures return zero rather than raising.
 
-### Step 1: Document Chunking
-Each database record is converted into a JSON-formatted text chunk representing a single semantic unit (one contribution, one deliverable, etc.). This preserves all relevant metadata while creating meaningful retrieval units.
+This is a full selected-index rebuild, with no transaction or verified concurrency guard. It is not limited to the request year/indicator. Do not use rebuild as routine health validation, or infer success from an ingestion-completed log without checking counts and the intended resource state. No rebuild or provider write is required to verify documentation.
 
-### Step 2: Text Vectorization
-- **Embedding Model**: Amazon Titan Text Embeddings v2
-- **Process**: Each text chunk is converted into a 1024-dimensional vector that captures semantic meaning.
-- **Purpose**: Enables similarity-based retrieval of contextually relevant information.
+## Active and retained modules
 
-### Step 3: Vector Storage & Indexing
-- **Index Creation**: Creates an OpenSearch index with k-NN (k-nearest neighbors) configuration.
-- **Index Structure**: 
-  - Vector field using HNSW (Hierarchical Navigable Small World) algorithm with cosine similarity
-  - Metadata fields for filtering (indicator, year, source table)
-- **Storage**: Each document is indexed with its embedding and original chunk data.
+| Path | Status in the current development checkout |
+| --- | --- |
+| app/llm/vectorize.py, vectorize_annual.py | Active API pipelines, S3 Vectors |
+| app/llm/opensearch/ | Retained source; imports OPENSEARCH config not currently defined by config_util.py |
+| app/llm/supabase/ | Retained source; includes a missing report_generation_prompt module reference |
+| app/llm/knowledge_base.py | Separate reference; expects config/prompt imports not provided by the current active config/layout |
+| tests/streamlit/generator.py | Manual UI invoking generation; not an isolated regression test |
+| lakehouse_integration/ | Separate Python 3.10 ODBC diagnostic image/script; not the FastAPI production image |
 
-### Step 4: Contextual Retrieval
-- **Query Vectorization**: User query (indicator + year + report prompt) is converted to a vector.
-- **Hybrid Search**: Combines vector similarity search with metadata filtering to retrieve top-k most relevant documents.
-- **Filtering Strategy**: Applies boolean filters to ensure retrieved documents match the exact indicator, year, and relevant data sources.
+These are not verified rollback/feature switches. Review their actual imports, dependencies, provider settings, and effects before any separately scoped execution or restoration.
 
-### Step 5: Report Generation
-- **Prompt Engineering**: Constructs specialized prompts based on report type. Each prompt contains:
-  - **Context Section**: Explains AICCRA's structure, clusters, and indicator definitions
-  - **Role Definition**: Establishes the AI as a specialized AICCRA reporting assistant
-  - **Objective**: Specifies the exact narrative requirements and evidence standards
-  - **Input Schema**: Describes the structure of retrieved data (table types, fields, filtering rules)
-  - **Output Requirements**: Defines format, word limits, number of required evidence links, and citation style
-  - **Style Guidelines**: Sets tone, vocabulary, and formatting rules aligned with World Bank standards
-  - Prompts are dynamically customized with indicator-specific instructions, year parameters, and quantitative summaries
-- **Context Assembly**: Retrieved documents are formatted as structured context for the language model.
-- **LLM Invocation**: Sends prompt + context to the language model with parameters optimized for factual reporting.
-- **Response Streaming**: Processes model responses in real-time to provide progressive feedback.
+## Jobs and ancillary effects
 
----
+Development retains host-cron setup scripts that can modify crontab and call live services. `update_ar_data.py` targets the production annual endpoint with insert_data enabled; `update_chatbot_data.py` references an HTTP route absent from current report routes. Some scripts treat long waits/timeouts as acceptance; this does not prove durable background execution or successful completion.
 
-## Models & AI Technologies
+KB synchronization starts an AWS ingestion job and may send Slack notifications. Lakehouse diagnostics connect to SQL Server and print connection context. Do not run these tools as documentation/unit checks, and do not infer that a schedule is installed from a setup script or the browser's calculated Sunday badge.
 
-### Language Model
-- **Model**: Claude 3.7 Sonnet (Anthropic) via AWS Bedrock
-- **Purpose**: Generates coherent, evidence-based narrative reports from structured data.
-- **Parameters**: 
-  - Temperature: 0.1 (for factual consistency)
-  - Max tokens: 8000 (to accommodate comprehensive reports)
-  - Top-p: 0.999 (for controlled randomness)
-- **Role**: Synthesizes retrieved context into structured narratives following AICCRA reporting standards.
+Production replaces the local cron approach with `api_server.handler` plus `app/utils/jobs/scheduled_jobs.py`, supporting update_ar_data, update_chatbot_data, and sync_knowledge_base. The AR job currently fixes indicator IPI 1.3/year 2025 and enables rebuild; verify such constants before any intended operational change. The dispatcher is part of production behavior, not present in development's simple Mangum adapter.
 
-### Embedding Model
-- **Model**: Amazon Titan Text Embeddings v2
-- **Purpose**: Converts text into high-dimensional vectors for semantic similarity search.
-- **Dimension**: 1024-dimensional embeddings
-- **Role**: Enables intelligent retrieval of contextually relevant information from thousands of database records.
+## Files, logs, and testing
 
----
+Development explicitly writes context_<indicator>_<year>.json in the current directory from narrative pipelines, in addition to rotating logs under data/logs. CSV mode does not suppress those files or cloud model calls. Production suppresses the explicit context-dump calls and uses /tmp/logs.
 
-## Supporting Technologies & Architecture
+The six existing test functions target filtering/metadata behavior, but importing the S3 Vectors package normally also imports ingestion/data/provider dependencies. Their assertions do not validate SQL Server, MySQL connectivity, AWS, browser downloads, cron installation, real report quality, or deployment. Offline extension checks should block network, use temporary synthetic CSVs, and replace provider/data/logging dependencies before import.
 
-### Core Infrastructure
-- **API Framework**: FastAPI for high-performance REST endpoints with automatic OpenAPI documentation.
-- **Vector Database**: Amazon OpenSearch Service with k-NN capabilities for semantic search at scale.
-- **Relational Database**: SQL Server with Azure Active Directory authentication for structured data storage.
-- **Cloud Platform**: AWS services for AI models, vector storage, and object storage.
+The existing API/UI metadata and older production design documents contain historical OpenSearch/model/year claims. During service-main integration, update those guides to the resulting production tree while preserving useful architecture/onboarding content. Root repository licensing text is separate from API metadata; no licensing/runtime change is made by these guides.
 
-### Key Technologies
-- **AWS Bedrock**: Managed service for accessing foundation models (Claude 3.7 Sonnet, Titan Embeddings).
-- **OpenSearch**: Distributed search engine with vector search support using HNSW indexing.
-- **Boto3**: AWS SDK for Python enabling programmatic access to Bedrock and S3.
-- **PyODBC**: Database connectivity driver for SQL Server integration.
-- **Pandas**: Data manipulation and transformation library.
-- **Requests AWS4Auth**: AWS Signature Version 4 authentication for OpenSearch HTTP requests.
+## Offline unit checks
 
-### Conceptual Architecture
-```
-┌─────────────────┐
-│   MARLO-AICCRA  │ (User Input)
-│   Web Interface │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  FastAPI Server │ (API Layer)
-└────────┬────────┘
-         │
-         ├─────────────────────────┐
-         ▼                         ▼
-┌──────────────────┐      ┌─────────────────┐
-│  SQL Server      │      │  OpenSearch     │
-│  (Raw Data)      │      │  (Vector Index) │
-└────────┬─────────┘      └────────┬────────┘
-         │                         │
-         │  Data Extraction        │  Retrieval
-         ▼                         │
-┌──────────────────┐              │
-│  Data Processing │              │
-│  & Vectorization │──────────────┘
-└──────────────────┘
-         │
-         ▼
-┌──────────────────┐
-│   AWS Bedrock    │
-│ (Claude 3.7 +    │
-│  Titan Embed)    │
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│  Generated Report│ (Output)
-└──────────────────┘
+From ar-generator-service/, in an environment with pytest and the schema dependencies (including pandas), this bootstrap runs the six existing assertions without executing the S3 Vectors package initializer. It preserves the actual filter/schema function code under test and blocks network connections. It does not validate package startup or provider imports.
+
+```bash
+python - <<'PY'
+from pathlib import Path
+import socket
+import sys
+import types
+from unittest.mock import patch
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path.cwd()))
+import pytest
+
+package = types.ModuleType("app.s3_vectors")
+package.__path__ = [str(Path("app/s3_vectors").resolve())]
+sys.modules["app.s3_vectors"] = package
+
+def offline(*args, **kwargs):
+    raise RuntimeError("Network blocked during isolated unit checks")
+
+with patch.object(socket.socket, "connect", offline), patch.object(socket.socket, "connect_ex", offline):
+    raise SystemExit(pytest.main([
+        "-q", "-o", "cache_dir=/tmp/ar-generator-unit-cache",
+        "tests/test_retrieval.py", "tests/test_vector_store_schemas.py",
+    ]))
+PY
 ```
 
----
-
-## Front-End & User Interaction
-
-### Access Methods
-
-**1. Web Interface** (`/web/`)
-- Browser-based UI hosted within the service
-- Interactive forms for selecting report type, indicator, and year
-- Real-time progress indicators during report generation
-- Display of formatted markdown reports with copy-to-clipboard functionality
-- Accessible to MARLO-AICCRA users without API knowledge
-
-**2. REST API** (`/api/generate`, `/api/generate-annual`, etc.)
-- Programmatic access for system integration
-- JSON request/response format
-- Can be called from MARLO-AICCRA backend for automated report generation
-- Supports both synchronous and streaming response modes
-
-### User Inputs
-Users specify three primary parameters:
-1. **Indicator**: The performance metric to report on (e.g., "IPI 1.1", "PDO Indicator 2")
-2. **Year**: The reporting year (2021-2025)
-3. **Data Refresh Flag** (optional): Whether to reload fresh data from the database into the vector index
-
-### Interaction Flow
-1. User selects report type (Mid-Year or Annual) via tabs
-2. User enters indicator, year, and data refresh preference
-3. System validates inputs and initiates processing
-4. Progress indicators show current stage (data retrieval, vectorization, AI generation)
-5. Generated report appears in markdown format with active hyperlinks
-6. User can copy report to clipboard for integration into MARLO-AICCRA
-
----
-
-## Outputs & Value
-
-### Generated Reports
-The service produces structured narrative reports in markdown format containing:
-- **Quantitative Summaries**: Total expected vs. achieved values with progress percentages
-- **Cluster-Specific Narratives**: Individual achievement descriptions for each contributing cluster
-- **Evidence Links**: Active hyperlinks to deliverables (DOIs), OICR PDFs, and innovation documentation
-- **Cross-Cutting Themes**: Gender, youth engagement, and social inclusion highlights
-- **Geographic Context**: Country and regional scope of activities
-
-### Output Formats
-- **Mid-Year Reports**: Concise single-paragraph summaries (≤250 words) with minimum 5 evidence links
-- **Annual Reports**: Multi-section comprehensive reports including executive summary, cluster narratives, and disaggregated targets
-- **Indicator Tables**: Structured HTML tables with quantitative achievement data
-- **Challenges Reports**: Cross-cluster analysis of implementation difficulties and lessons learned
-
-### Value Proposition
-1. **Time Efficiency**: Reduces report writing from hours to minutes, enabling coordinators to focus on strategic activities.
-2. **Consistency**: Ensures uniform report structure and terminology across all clusters and indicators.
-3. **Evidence-Based**: Automatically incorporates DOI links and validated data, strengthening report credibility.
-4. **Comprehensive Coverage**: Analyzes thousands of data points to identify relevant achievements across multiple sources.
-5. **Real-Time Insights**: Generates reports from current database state, providing up-to-date progress tracking.
-6. **Quality Assurance**: AI-powered synthesis reduces human error and omissions in narrative construction.
-
-### Downstream Impact
-- **Donor Reporting**: Supports World Bank reporting requirements with evidence-based narratives
-- **Strategic Planning**: Enables data-driven decision-making through comprehensive progress visibility
-- **Knowledge Management**: Preserves institutional memory by documenting achievements systematically
-- **Performance Monitoring**: Facilitates real-time tracking of indicator progress against targets
-- **Stakeholder Communication**: Provides polished narratives for external communications and impact stories
-
----
-
-## Summary
-
-The AICCRA Reports Generator Service represents a sophisticated application of generative AI and semantic search technologies to automate evidence-based reporting. By combining structured data from MARLO-AICCRA with advanced language models and vector retrieval, the service transforms fragmented project information into coherent, professional narratives that meet donor reporting standards. The system's modular architecture—separating data ingestion, vectorization, retrieval, and generation—ensures scalability and maintainability while delivering significant value to AICCRA coordinators and stakeholders through time savings, consistency, and comprehensive evidence integration.
+Ordinary pytest collection remains dependent on the application's eager imports unless separately configured; a missing SQLAlchemy/provider configuration error during collection is distinct from a failed filter/schema assertion. No application/test implementation is changed by this documentation bootstrap.

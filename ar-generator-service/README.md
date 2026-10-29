@@ -1,575 +1,269 @@
 # AICCRA Annual Report Generator Service
 
-AI-powered service for generating AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa) mid-year and annual reports. In production, the service runs on **AWS Lambda**, reads structured data from **SQL Server (AICCRA Lakehouse)**, retrieves context with **Amazon S3 Vectors**, and generates narratives with **AWS Bedrock** (Titan embeddings + Claude Sonnet 4.5).
+The service produces AICCRA mid-year and annual indicator narratives, indicator summary tables, and challenges/lessons-learned reports. Active pipelines combine structured data, Amazon S3 Vectors retrieval, business filters, and AWS Bedrock generation. A static HTML/JavaScript interface supports review and browser-side downloads.
 
-For deeper design notes, see [`docs/TECHNICAL_DOCUMENTATION.md`](docs/TECHNICAL_DOCUMENTATION.md), [`docs/HIGH_LEVEL_DESIGN.md`](docs/HIGH_LEVEL_DESIGN.md), and [`docs/PRODUCT_OVERVIEW.md`](docs/PRODUCT_OVERVIEW.md).
+This README describes **`dev-ar-generator` and its local CSV/MySQL execution path**. The maintainer uses local testing for development and a production Lambda from `main-ar-generator`; a separate test Lambda is not assumed. Production has different data loading, dependencies, entry points, jobs, logging, and packaging. Preserve those differences using the [branch guide](docs/BRANCH_DIFFERENCES.md).
 
----
+## Start here
 
-## Features
+| Goal | Documentation |
+| --- | --- |
+| Run locally without pyodbc/SQL Server | [Quick start](#quick-start-local-csv-path) |
+| Understand report workflows | [Product overview](docs/PRODUCT_OVERVIEW.md) |
+| Integrate endpoints and interpret failures | [API guide](docs/API_GUIDE.md) |
+| Follow components and retrieval | [Architecture](#system-architecture), [high-level design](docs/HIGH_LEVEL_DESIGN.md) |
+| Prepare CSVs, configuration, and operational checks | [Technical guide](docs/TECHNICAL_DOCUMENTATION.md) |
+| Work on the UI | [Web README](web/README.md), [web agent guide](web/AGENTS.md) |
+| Continue work with an agent | [Service guide](AGENTS.md) |
+| Compare development with production | [Branch differences](docs/BRANCH_DIFFERENCES.md) |
 
-- **Automated report generation** for IPI and PDO indicators (mid-year and annual)
-- **Web UI** at `/web` for interactive report generation and exports
-- **Semantic retrieval** with Amazon S3 Vectors (production vector backend)
-- **Hybrid retrieval**: vector search for semantic context + SQL Server for filter-only queries (DOI, questions, challenges)
-- **Multi-report types**: mid-year progress, annual reports, summary tables, challenges & lessons learned
-- **Data refresh** via `insert_data=true` (full S3 Vectors index rebuild)
-- **Scheduled jobs** via EventBridge (`update_ar_data`, `update_chatbot_data`, `sync_knowledge_base`)
-- **S3 exports** of processed datasets for reports and chatbot knowledge base
-- **Slack notifications** for scheduled job outcomes (optional)
+## Supported workflows
 
----
+| Workflow | Entry | Data and effects |
+| --- | --- | --- |
+| Mid-year narrative | `POST /api/generate` | Contribution totals, semantic/DOI retrieval, business filters, Bedrock narrative |
+| Annual narrative | `POST /api/generate-annual` | Totals, retrieved cluster evidence, parallel cluster drafts/editorial passes, optional disaggregation |
+| Indicator tables | `POST /api/generate-annual-tables` | Structured contribution data and model-written overviews by group |
+| Challenges/lessons | `POST /api/generate-challenges` | Structured challenges rows and model synthesis |
+| Index rebuild | `insert_data=true` on narrative endpoints | Delete/recreate the selected index and ingest all configured source tables |
+| Local review interface | `GET /web` | Serve static UI; generation/analytics destinations are separate JavaScript constants |
 
-## Quick Start (local)
+The browser UI currently hardcodes the production Lambda as its API base, even when served locally. Use the local API directly until the UI destination has been deliberately reviewed/changed for local work. Its analytics destination is also external and branch-specific; see the [web setup](web/README.md#destinations-and-local-testing).
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # fill in credentials
-python dev_server.py --reload
-```
+## Quick start: local CSV path
 
-| Resource | URL |
-|---|---|
-| Web UI | http://localhost:8000/web |
-| Swagger UI | http://localhost:8000/docs |
-| ReDoc | http://localhost:8000/redoc |
-| Health check | http://localhost:8000/health |
+### 1. Install the development environment
 
----
-
-## Supported indicators
-
-**Intermediate Performance Indicators (IPI)**
-
-- IPI 1.1 – IPI 1.4: Climate information and early warning systems
-- IPI 2.1 – IPI 2.3: Agricultural technologies and practices
-- IPI 3.1 – IPI 3.4: Institutional capacity and partnerships
-
-**Project Development Objective (PDO)**
-
-- PDO Indicator 1 – PDO Indicator 5: Project outcome and impact metrics
-
-Supported years: **2021–2026**
-
----
-
-## Production overview
-
-| Layer | Technology |
-|---|---|
-| Runtime | AWS Lambda (Python 3.13, container image) |
-| API | FastAPI + Mangum (`api_server.handler`) |
-| Structured data | SQL Server via ODBC + Azure AD Service Principal |
-| Vector search | Amazon S3 Vectors (`boto3` client `s3vectors`) |
-| LLM | AWS Bedrock — Titan Text Embeddings v2 (1024d), Claude Sonnet 4.5 |
-| File exports | Amazon S3 (`BUCKET_NAME`) |
-| Scheduling | AWS EventBridge Scheduler → Lambda job events |
-| Notifications | Slack webhook (optional) |
-
-### Architecture
-
-```text
-SQL Server (Lakehouse)
-        │
-        ▼
-  load_data() / load_full_data()
-        │
-        ├──► Bedrock Titan (embeddings)
-        │           │
-        │           ▼
-        │    S3 Vectors (PutVectors / QueryVectors)
-        │
-        └──► SQL retrieval (DOI, questions, challenges)
-                      │
-                      ▼
-              Post-filters (Python business rules)
-                      │
-                      ▼
-              Bedrock Claude (report generation)
-                      │
-                      ▼
-              API response / S3 exports
-```
-
-### Main components
-
-| Component | Path | Role |
-|---|---|---|
-| REST API | `app/api/` | FastAPI routes, validation, web static files |
-| Mid-year pipeline | `app/llm/vectorize.py` | Ingest + mid-year report generation |
-| Annual pipeline | `app/llm/vectorize_annual.py` | Annual reports, tables, challenges |
-| Vector store | `app/s3_vectors/` | S3 Vectors client, ingestion, schemas |
-| Retrieval | `app/retrieval/` | Semantic search, SQL retrieval, post-filters |
-| LLM | `app/llm/invoke_llm.py` | Bedrock embeddings and Claude invocation |
-| Data layer | `db_conn/sql_connection.py` | `load_data()` / `load_full_data()` from SQL Server |
-| Scheduled jobs | `app/utils/jobs/scheduled_jobs.py` | EventBridge job handlers |
-| Lambda handler | `api_server.py` | HTTP (Mangum) + EventBridge job routing |
-
----
-
-## Technology stack
-
-- **API**: FastAPI, Uvicorn (local), Mangum (Lambda)
-- **AI**: AWS Bedrock — Titan Text Embeddings v2 (1024d), Claude Sonnet 4.5
-- **Vector database**: Amazon S3 Vectors (`boto3` client `s3vectors`)
-- **Structured data**: SQL Server (pyodbc, ODBC Driver 18, Azure AD Service Principal)
-- **Object storage**: AWS S3 (report/chatbot file exports)
-- **Scheduling**: AWS EventBridge Scheduler
-- **Frontend**: HTML/CSS/JavaScript (`web/`)
-- **Dependencies**: `requirements.txt` (Lambda Docker build)
-
----
-
-## Prerequisites
-
-### Production (AWS Lambda)
-
-- AWS account with:
-  - **Bedrock** access (Titan embeddings + Claude Sonnet 4.5)
-  - **S3 Vectors** vector bucket + index in target region (e.g. `us-east-1`)
-  - **S3** bucket for file exports (`BUCKET_NAME`)
-  - **Lambda** execution role with `s3vectors:*`, Bedrock invoke, and S3 write permissions
-  - **EventBridge Scheduler** (optional, for automated data refresh)
-- SQL Server access to AICCRA Lakehouse via **Azure AD Service Principal**
-- Microsoft **ODBC Driver 18 for SQL Server** (included in the Lambda Docker image)
-- Python **3.13** (Lambda runtime)
-
-### Local development
-
-- Python 3.13+
-- ODBC Driver 18 for SQL Server (macOS/Windows) if connecting to Lakehouse directly
-- Valid `.env` with the same variables as Lambda (see [Configuration](#configuration))
-- Optional: pre-exported CSV fixtures + `USE_CSV_DATA=true` to skip SQL Server locally
-
----
-
-## Installation
+From the monorepo root, use Python 3.13 and uv:
 
 ### Local
 
 ```bash
 cd ar-generator-service
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+uv sync --frozen --python 3.13
+```
+
+Development uses `pyproject.toml` and `uv.lock`; it has no service-root `requirements.txt` or Dockerfile. The separate `lakehouse_integration/Dockerfile` is an ODBC diagnostic container, not the report API image. Production uses its own Dockerfile and requirements, described in the branch guide.
+
+### 2. Configure local data and isolated AWS resources
+
+```bash
 cp .env.example .env
 ```
 
-### Production (Lambda container)
+Edit the copied file with credentials and a vector bucket/index intended for development. The example defaults to CSV data and uses placeholders; do not point a rebuild at an index that must be retained.
 
-```bash
-docker build -t ar-generator-service .
-# Push to ECR and deploy to Lambda with handler: api_server.handler
+```env
+USE_CSV_DATA=true
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID_OS=YOUR_DEVELOPMENT_ACCESS_KEY
+AWS_SECRET_ACCESS_KEY_OS=YOUR_DEVELOPMENT_SECRET_KEY
+S3_VECTORS_BUCKET_NAME=YOUR_DEVELOPMENT_VECTOR_BUCKET
+S3_VECTORS_INDEX_NAME=YOUR_DEVELOPMENT_VECTOR_INDEX
 ```
 
-The Dockerfile installs ODBC Driver 18 and copies `app/`, `db_conn/`, `web/`, and `api_server.py`.
+The active AWS dictionary reads `AWS_ACCESS_KEY_ID_OS` / `AWS_SECRET_ACCESS_KEY_OS`, not the older `*_BR` aliases. Bedrock initialization explicitly requires both values. S3 Vectors uses the same explicit key/secret and configured region. No model call or live credential check is established by this documentation.
 
----
+`USE_CSV_DATA=true` avoids MySQL/SQL Server connections in the active development loader. It does **not** make generation offline: model calls, semantic queries, and optional index writes still use AWS. Keep credentials and actual reporting CSVs out of Git.
+
+### 3. Supply prepared CSV fixtures
+
+By default, CSV lookup is under **`ar-generator-service/app/`**, based on the current config's calculated path. Set `CSV_DATA_DIR` to another prepared directory if needed.
+
+| Source | Fixture filename |
+| --- | --- |
+| Contributions | `vw_ai_project_contribution_ar.csv` |
+| Questions | `vw_ai_questions_ar.csv` |
+| Deliverables | `vw_ai_deliverables_ar.csv` |
+| OICRs | `vw_ai_oicrs_ar.csv` |
+| Innovations | `vw_ai_innovations_ar.csv` |
+| Challenges | `vw_ai_challenges_ar.csv` |
+
+CSV mode reads these as already-processed tables and returns them without the MySQL transformation step. They need the fields consumed by totals, filters, and prompts, including appropriate `table_type` labels. They are not arbitrary raw exports. See [CSV preparation](docs/TECHNICAL_DOCUMENTATION.md#csv-inputs-and-data-loading).
+
+### 4. Run and check process health
+
+```bash
+uv run --frozen python dev_server.py --host 127.0.0.1 --reload
+```
+
+The server defaults to port 8000; reload is enabled only with `--reload`. The launcher's docstring mentions `--no-reload`, but that option is not implemented. Direct Uvicorn is another local path:
+
+```bash
+uv run --frozen python -m uvicorn app.api.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+In another terminal:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Expected response:
+
+```json
+{"status":"healthy","service":"AICCRA Report Generator API","version":"1.0.0"}
+```
+
+Health does not test AWS, source data, model access, or a populated index. Report pipelines are lazily imported. Run from the service directory because static assets use relative `web/` paths.
+
+| Local resource | URL |
+| --- | --- |
+| Process metadata | [Root](http://localhost:8000/) |
+| Swagger UI | [API docs](http://localhost:8000/docs) |
+| ReDoc | [API reference](http://localhost:8000/redoc) |
+| Web page | [UI](http://localhost:8000/web) |
+
+### 5. Generate deliberately against the local API
+
+With a suitable existing development index and prepared source data:
+
+```bash
+curl -X POST http://localhost:8000/api/generate-annual \
+  -H 'Content-Type: application/json' \
+  -d '{"indicator":"IPI 1.3","year":2025,"insert_data":false}'
+```
+
+This invokes configured providers and may incur charges. HTTP 200 does not always mean a usable report: check `status` and `content` as described in the [API guide](docs/API_GUIDE.md#responses-and-failure-semantics).
+
+## System architecture
+
+```mermaid
+flowchart TB
+    Caller["API caller or static web interface"]
+    API["FastAPI report routes"]
+    Data["Development loader: prepared CSV or MySQL"]
+    Rebuild["Optional full index rebuild and ingestion"]
+    Vectors["Amazon S3 Vectors: metadata and serialized chunks"]
+    Retrieval["Semantic retrieval plus structured DOI/questions/challenges"]
+    Filters["Post-filters and summary calculations"]
+    Model["AWS Bedrock: Titan embeddings and Claude generation"]
+    Output["JSON narrative or table result"]
+
+    Caller --> API
+    API --> Data
+    API -->|"Narrative insert_data=true"| Rebuild
+    Data --> Rebuild --> Vectors
+    Rebuild -->|"Embedding requests"| Model
+    API --> Retrieval
+    Data -->|"Structured evidence"| Retrieval
+    Retrieval -->|"Query embedding"| Model
+    Vectors --> Retrieval --> Filters
+    Data -->|"Totals and table rows"| Filters
+    Filters --> Model --> Output --> Caller
+```
+
+This diagram describes development's active CSV/MySQL path. Production uses SQL Server/Fabric through `db_conn/sql_connection.py`, a hybrid HTTP/EventBridge Lambda handler, and production packaging. Its loader can create/alter SQL views and export files to S3. A local CSV run is not a validation of those production effects.
+
+Active API imports use `app/llm/vectorize.py` and `vectorize_annual.py`, backed by **S3 Vectors**. The retained OpenSearch, Supabase, and Knowledge Base modules are alternatives/reference code with unresolved imports/configuration assumptions; they are not verified drop-in rollback paths. See [technical details](docs/TECHNICAL_DOCUMENTATION.md#active-and-retained-modules).
+
+## Technology and models
+
+| Layer | Current implementation |
+| --- | --- |
+| API/local server | FastAPI, Uvicorn, Python 3.13 |
+| Development dependency management | uv, pyproject, lockfile |
+| Development source data | CSV fixtures or SQLAlchemy/MySQL connector |
+| Semantic retrieval | boto3 S3 Vectors client; 1,024-dimensional cosine index |
+| Embeddings | `amazon.titan-embed-text-v2:0` |
+| Active generation | `us.anthropic.claude-sonnet-4-5-20250929-v1:0`, temperature 0.1, max tokens 8000 |
+| Browser UI | Static HTML/CSS/JavaScript, browser DOCX and CSV exports |
+| Production path | SQL Server/pyodbc/ODBC 18, Lambda container, HTTP/EventBridge dispatch |
+
+The generation client consumes a Bedrock response stream internally and returns accumulated text. The public report endpoints return complete JSON responses, not token streams or background job IDs. Older Swagger/root descriptions mentioning OpenSearch, Claude 3.7, or older year limits do not describe the current active pipeline.
 
 ## Configuration
 
-Copy `.env.example` to `.env` for local runs. In production, set the same variables as **Lambda environment variables**.
-
-### AWS Bedrock (required)
-
-Used explicitly by `invoke_llm.py` for embeddings and report generation.
-
-```bash
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID_BR=your_aws_access_key
-AWS_SECRET_ACCESS_KEY_BR=your_aws_secret_key
-```
-
-### S3 Vectors (required)
-
-```bash
-S3_VECTORS_BUCKET_NAME=your_vector_bucket_name
-S3_VECTORS_INDEX_NAME=aiccra-chunks
-```
-
-The `s3vectors` client uses the same explicit credentials as the rest of the service (`AWS_ACCESS_KEY_ID_OS` / `AWS_SECRET_ACCESS_KEY_OS`). It does **not** fall back to the Lambda execution role: `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` are reserved names in Lambda and cannot be set as function environment variables.
-
-### SQL Server / AICCRA Lakehouse (required in production)
-
-```bash
-SERVER=your_server_here
-DATABASE=your_database_here
-CLIENT_ID=your_client_id_here
-CLIENT_SECRET=your_client_secret_here
-```
-
-Authentication uses **Azure AD Service Principal** via ODBC Driver 18.
-
-### S3 file exports (required)
-
-```bash
-BUCKET_NAME=your_bucket_name_here
-```
-
-Upload paths:
-
-- Reports: `aiccra/reports_generation/files/`
-- Chatbot: `aiccra/chatbot/files/`
-
-S3 uploads use the **default AWS credential chain** (Lambda execution role).
-
-### Bedrock Knowledge Base (scheduled chatbot sync)
-
-```bash
-KNOWLEDGE_BASE_ID=your_knowledge_base_id_here
-DATA_SOURCE_ID=your_data_source_id_here
-```
-
-Required only for the `sync_knowledge_base` scheduled job.
-
-### Slack notifications (optional)
-
-```bash
-SLACK_WEBHOOK_URL=your_slack_webhook_url_here
-```
-
-### Local CSV fallback (development only)
-
-```bash
-USE_CSV_DATA=true
-# Optional: directory containing vw_ai_*_ar.csv (default: service root)
-# CSV_DATA_DIR=/path/to/ar-generator-service
-```
-
-CSV fixtures (when `USE_CSV_DATA=true`):
-
-- `vw_ai_project_contribution_ar.csv`
-- `vw_ai_questions_ar.csv`
-- `vw_ai_deliverables_ar.csv`
-- `vw_ai_oicrs_ar.csv`
-- `vw_ai_innovations_ar.csv`
-- `vw_ai_challenges_ar.csv`
-
----
-
-## Deployment (AWS Lambda)
-
-The Lambda handler is **`api_server.handler`**. It supports:
-
-1. **HTTP / Function URL / API Gateway** — FastAPI via Mangum
-2. **EventBridge Scheduler jobs** — direct async job execution (`{"job": "update_ar_data"}`)
-
-`main.py` provides a minimal Mangum wrapper for alternate deployments; the Docker image uses `api_server.py`.
-
-### Credential model
-
-| Service | Credentials |
-|---|---|
-| Bedrock (embeddings + Claude) | `AWS_ACCESS_KEY_ID_BR` / `AWS_SECRET_ACCESS_KEY_BR` |
-| S3 Vectors | Default AWS credential chain (Lambda execution role) |
-| S3 file uploads | Default AWS credential chain (Lambda execution role) |
-| SQL Server | `SERVER`, `DATABASE`, `CLIENT_ID`, `CLIENT_SECRET` |
-
-### S3 Vectors setup (one-time)
-
-Before the first report run:
-
-1. Create a **vector bucket** in your target region (the app does not create the bucket).
-2. Set `S3_VECTORS_BUCKET_NAME` and `S3_VECTORS_INDEX_NAME` on Lambda.
-3. Attach IAM permissions: `CreateIndex`, `DeleteIndex`, `PutVectors`, `QueryVectors`, `GetVectors`, etc.
-4. Trigger a full ingest once with `insert_data=true` (see [Data refresh](#data-refresh-insert_datatrue)).
-
-The application creates and recreates the **index** automatically (1024 dimensions, cosine, non-filterable metadata key `chunk_json`).
-
----
-
-## Usage
-
-### Start the server (local)
-
-```bash
-python dev_server.py --reload
-# Options: --host, --port, --reload, --log-level
-```
-
-### Deploy (Lambda)
-
-```bash
-docker build -t ar-generator-service .
-# Deploy to Lambda with handler api_server.handler
-# Configure environment variables (see Configuration)
-# Recommended: timeout 15 min, memory 2048 MB+ for report generation
-```
-
-### Data refresh (`insert_data=true`)
-
-When `insert_data` is `true`, the service performs a **full rebuild** of the S3 Vectors index:
-
-1. Delete index `S3_VECTORS_INDEX_NAME` (if exists)
-2. Create index (1024 dims, cosine, non-filterable metadata key `chunk_json`)
-3. Re-ingest all tables from SQL Server with fresh Bedrock embeddings
-
-| Pipeline | Tables ingested |
-|---|---|
-| Mid-year (`vectorize.py`) | 5 tables (deliverables, contributions, questions, oicrs, innovations) |
-| Annual (`vectorize_annual.py`) | 6 tables (above + challenges) |
-
-During ingest, processed snapshots are also uploaded to S3 under `aiccra/reports_generation/files/`.
-
-**Warning:** Full rebuilds can take 30–60 minutes. Lambda timeout is 15 minutes max — use the `update_ar_data` scheduled job or a dedicated invocation for initial loads.
-
----
-
-## API endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/` | API metadata and endpoint list |
-| `GET` | `/web` | Web UI |
-| `GET` | `/docs` | Swagger UI |
-| `GET` | `/redoc` | ReDoc |
-| `GET` | `/health` | Health check |
-| `POST` | `/api/generate` | Mid-year progress report |
-| `POST` | `/api/generate-annual` | Annual report |
-| `POST` | `/api/generate-annual-tables` | Summary tables by indicator group |
-| `POST` | `/api/generate-challenges` | Challenges & lessons learned |
-
-### Request body (report endpoints)
-
-```json
-{
-  "indicator": "IPI 1.1",
-  "year": 2025,
-  "insert_data": false
-}
-```
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `indicator` | string | Yes (reports) | e.g. `"IPI 1.3"`, `"PDO Indicator 1"` |
-| `year` | int | Yes | 2021–2026 |
-| `insert_data` | bool | No (default `false`) | `true` = rebuild S3 Vectors index before generating |
-
-- `insert_data=false` — query existing S3 Vectors index (typical production path)
-- `insert_data=true` — delete/recreate index and reload all vectors (slow; use for scheduled refresh)
-
-Annual tables and challenges endpoints only require `year`.
-
-### Example: mid-year report
-
-```bash
-curl -X POST https://<lambda-function-url>/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "indicator": "IPI 1.3",
-    "year": 2025,
-    "insert_data": false
-  }'
-```
-
-**Response:**
-
-```json
-{
-  "indicator": "IPI 1.3",
-  "year": 2025,
-  "content": "## Mid-Year Progress Report - IPI 1.3\n\nBy mid-year 2025, AICCRA had achieved...",
-  "status": "success"
-}
-```
-
-### Example: rebuild vectors + report
-
-```bash
-curl -X POST https://<lambda-function-url>/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "indicator": "IPI 1.3",
-    "year": 2025,
-    "insert_data": true
-  }'
-```
-
-### Example: annual report
-
-```bash
-curl -X POST https://<lambda-function-url>/api/generate-annual \
-  -H "Content-Type: application/json" \
-  -d '{
-    "indicator": "PDO Indicator 1",
-    "year": 2024,
-    "insert_data": false
-  }'
-```
-
-### Example: annual indicator summary tables
-
-```bash
-curl -X POST https://<lambda-function-url>/api/generate-annual-tables \
-  -H "Content-Type: application/json" \
-  -d '{"year": 2025}'
-```
-
-**Response:**
-
-```json
-{
-  "year": 2025,
-  "tables": {
-    "PDO": [
-      {
-        "Indicator statement": "PDO Indicator 1: ...",
-        "End-year target 2025": 1200,
-        "Projected targets for 2025 (Mid-year report 2025)": "",
-        "Achieved in 2025": 1350,
-        "Brief overviews": "Kenya: Successfully trained 450 farmers..."
-      }
-    ],
-    "IPI 1.x": [],
-    "IPI 2.x": [],
-    "IPI 3.x": []
-  },
-  "status": "success"
-}
-```
-
-### Example: challenges & lessons learned
-
-```bash
-curl -X POST https://<lambda-function-url>/api/generate-challenges \
-  -H "Content-Type: application/json" \
-  -d '{"year": 2024}'
-```
-
-**Response:**
-
-```json
-{
-  "year": 2024,
-  "content": "# Challenges and Lessons Learned Report 2024\n\n## Executive Summary\n\n...",
-  "status": "success"
-}
-```
-
-### Performance (approximate)
-
-| Operation | Duration |
-|---|---|
-| Mid-year report (`insert_data=false`) | 10–30 seconds |
-| Annual report (`insert_data=false`) | 15–45 seconds |
-| Report with `insert_data=true` | 30–60 minutes (full re-ingest) |
-| Annual tables | 2–5 minutes |
-| Challenges report | 3–7 minutes |
-
-### Error responses
-
-| HTTP status | Meaning |
-|---|---|
-| `400` | Invalid request parameters |
-| `403` | Access denied (AWS / SQL credentials) |
-| `422` | Validation error in request body |
-| `500` | Internal server error |
-
-```json
-{
-  "error": "Invalid request parameters",
-  "details": "...",
-  "status": "error"
-}
-```
-
----
-
-## Scheduled jobs (EventBridge)
-
-EventBridge Scheduler invokes Lambda with:
-
-```json
-{"job": "update_ar_data"}
-```
-
-| Job | Purpose |
-|---|---|
-| `update_ar_data` | Rebuilds S3 Vectors index via annual pipeline (`insert_data=true`) |
-| `update_chatbot_data` | Exports chatbot source tables to S3 via `load_full_data()` |
-| `sync_knowledge_base` | Starts Bedrock Knowledge Base ingestion job |
-
-See `app/utils/jobs/scheduled_jobs.py` for implementation details.
-
----
-
-## Retrieval design (S3 Vectors)
-
-| Query type | Engine | Notes |
-|---|---|---|
-| Semantic k-NN + indicator/year/table filters | S3 Vectors `QueryVectors` | Primary context retrieval |
-| DOI lookup (mid-year) | SQL Server via `sql_retrieval` | Filter-only, not vector search |
-| Questions (annual) | SQL Server | Filter-only |
-| Challenges | SQL Server | Filter-only |
-| Business rules (Shared, Cancelled, AWPB, etc.) | Python `post_filters.py` | Applied after retrieval |
-
----
+The maintained local template is [.env.example](.env.example). Configure only the integrations needed for the chosen path.
+
+| Setting | Purpose |
+| --- | --- |
+| `AWS_ACCESS_KEY_ID_OS`, `AWS_SECRET_ACCESS_KEY_OS` | Active shared AWS key/secret configuration |
+| `AWS_REGION` | Region used by active Bedrock, S3 Vectors, and export clients; default `us-east-1` |
+| `S3_VECTORS_BUCKET_NAME`, `S3_VECTORS_INDEX_NAME` | Existing vector bucket and selected index; the code does not create a vector bucket |
+| `USE_CSV_DATA` | Development loader selector; true/1/yes enables CSV; code default is false |
+| `CSV_DATA_DIR` | Prepared CSV directory; default resolves to `app/` |
+| `MYSQL_DATABASE_URL` | Used by development when CSV mode is disabled |
+| `BUCKET_NAME` | Ordinary S3 exports used by ancillary/production data paths |
+| `SERVER`, `DATABASE`, `CLIENT_ID`, `CLIENT_SECRET` | SQL Server/Fabric configuration for the production/diagnostic path |
+| `KNOWLEDGE_BASE_ID`, `DATA_SOURCE_ID` | Ancillary KB synchronization settings |
+| `SUPABASE_URL`, `COLLECTION_NAME` | Retained Supabase configuration; not the active API pipeline |
+| `SLACK_WEBHOOK_URL` | Optional notification destination in job/cron utilities |
+
+Use separate development resources for local experiments. The request's year/indicator and `USE_CSV_DATA` do not select an isolated vector index, change the UI's hardcoded production URL, or create a test Lambda.
+
+## Retrieval and refresh behavior
+
+| Query | Current path |
+| --- | --- |
+| Semantic indicator/year/table context | Titan query embedding and S3 Vectors metadata filtering |
+| Mid-year DOI evidence | Structured deliverables rows merged with semantic chunks, deduplicated by DOI/cluster/indicator |
+| Annual questions/disaggregation | Structured question/contribution rows and Python filters |
+| Challenges | Structured challenges rows; current helper does not apply a year filter |
+| Shared/cancelled/AWPB/Progress rules | Python `post_filters.py`; behavior depends on correct table labels/fields |
+
+`insert_data=true` on a narrative request **deletes and recreates the configured index**, then re-embeds all selected source tables. It is not a year-only refresh. Mid-year ingests five tables; annual adds challenges as a sixth. Both use the same configured index, so the two rebuild paths are not independent stores. Missing rows/embedding failures may be skipped; successful completion logs alone do not establish a complete populated index.
+
+Tables and challenges reuse `ChatRequest` but only consume its year; their route implementations do not forward `insert_data`. Keep the flag false in routine generation examples. Index provisioning/rebuilds, real model checks, and data exports need deliberate operational scope.
 
 ## Project structure
 
 ```text
 ar-generator-service/
-├── api_server.py              # Lambda handler (HTTP + EventBridge jobs)
-├── dev_server.py              # Local uvicorn entry point
-├── main.py                    # Alternate Mangum handler
-├── Dockerfile                 # Lambda container (Python 3.13 + ODBC 18)
-├── requirements.txt           # Production dependencies
-├── .env.example
-├── tests/
-│   ├── test_retrieval.py
-│   └── test_vector_store_schemas.py
+├── README.md, AGENTS.md       # Service entry point and continuation rules
+├── dev_server.py             # Local Uvicorn launcher
+├── main.py                   # Simple Mangum adapter in development
+├── pyproject.toml, uv.lock   # Development dependencies
+├── .env.example              # Local setup template; actual .env is private
+├── docs/                     # Product, design, API, operations, branch comparison
 ├── app/
-│   ├── api/                   # FastAPI routes and models
+│   ├── api/                  # Routes, request/response models, static mounting
 │   ├── llm/
-│   │   ├── vectorize.py       # Mid-year pipeline (S3 Vectors)
-│   │   ├── vectorize_annual.py# Annual pipeline (S3 Vectors)
-│   │   └── invoke_llm.py      # Bedrock embeddings + Claude
-│   ├── s3_vectors/          # S3 Vectors client, ingestion, schemas
-│   ├── retrieval/             # Semantic search, SQL retrieval, filters
-│   └── utils/                 # Config, prompts, S3, jobs, logging, notifications
-├── db_conn/
-│   └── sql_connection.py      # SQL Server + optional CSV fallback
-├── web/                       # Web UI
-└── docs/                      # Technical and product documentation
+│   │   ├── vectorize.py, vectorize_annual.py  # Active report pipelines
+│   │   ├── invoke_llm.py      # Bedrock embeddings and generation
+│   │   ├── opensearch/, supabase/ # Retained alternatives
+│   │   └── knowledge_base.py # Separate reference integration
+│   ├── s3_vectors/           # Client, metadata schema, index ingestion
+│   ├── retrieval/            # Semantic and structured retrieval, filters
+│   ├── utils/                # Prompts, config, logs, exports, notifications, cron
+│   └── vw_ai_*_ar.csv         # Local fixtures, untracked
+├── db_conn/mysql_connection.py # Development CSV/MySQL loader
+├── tests/                    # Pure unit tests and separate Streamlit tool
+├── web/                      # Static review interface and its own guide
+└── lakehouse_integration/    # Separate ODBC diagnostic container
 ```
 
----
+Production additionally has its own Dockerfile, requirements, `api_server.py`, SQL Server loader/export helper, and job dispatcher. Its pre-existing design/product/technical documents must be reconciled with the development guides added here. The [complete branch inventory](docs/BRANCH_DIFFERENCES.md#initial-file-inventory) identifies files to retain or adapt during integration.
 
-## Logging
+## Branch and deployment workflow
 
-Logs are written to `data/logs/app.log` (API calls, ingestion, retrieval, scheduled jobs, errors).
+```text
+task branch from dev-ar-generator
+    → dev-ar-generator → main-ar-generator → staging → main
+```
 
----
+Do not make the service trees identical by replacing production's SQL Server loader with local CSV/MySQL plumbing. Production's Docker command targets **`api_server.handler`**, which routes HTTP to Mangum and supported scheduler events to job functions. Development's `main.handler` does not implement that dispatcher.
 
-## Troubleshooting
+The production-branch workflow targets pushes/PRs to `main-ar-generator` and manual dispatch, invoking the production Lambda Jenkins job. That workflow is absent from this development snapshot. This does not establish external triggers or live pipeline status. The maintainer supervises release merges and pushes; after the local service-main merge, compare all files and adapt production docs before push. Completed service updates accumulate in staging for the agreed consolidated PR to main.
 
-| Issue | Check |
-|---|---|
-| `S3_VECTORS_BUCKET_NAME environment variable is required` | Set S3 Vectors env vars on Lambda |
-| `AWS_ACCESS_KEY_ID_BR environment variable is required` | Set Bedrock credentials on Lambda |
-| `AccessDenied` on `s3vectors:*` | Lambda execution role IAM policy |
-| `Unknown service: s3vectors` | Upgrade `boto3` (≥ 1.35; 1.43+ recommended) |
-| ODBC / SQL connection errors | ODBC Driver 18 in container; verify Service Principal vars |
-| Empty or poor reports with `insert_data=false` | Index empty — run `insert_data=true` or `update_ar_data` job |
-| Lambda timeout on rebuild | Increase timeout to 15 min max, or run ingest as dedicated job |
-| Slack notifications skipped | `SLACK_WEBHOOK_URL` not configured (non-blocking) |
-| `CSV file not found` (local) | Set `CSV_DATA_DIR` or place `vw_ai_*_ar.csv` in service root |
+## Validation and troubleshooting
 
----
+The six existing checks in `tests/test_retrieval.py` and `tests/test_vector_store_schemas.py` target filtering/metadata functions. Normal collection also imports `app.s3_vectors.__init__`, which eagerly loads ingestion/data/provider dependencies. They are not isolated from application initialization by default.
 
-## Security
+For documentation checks, use the [offline unit bootstrap](docs/TECHNICAL_DOCUMENTATION.md#offline-unit-checks), which loads the actual schema/filter modules while bypassing package initialization and blocking network. Pytest is not declared in the development project dependencies; use a suitable test environment. Do not treat a successful isolated run as a live SQL/AWS/Lambda check. `tests/streamlit/generator.py`, cron scripts, ingestion helpers, and the lakehouse diagnostic are separate tools that may invoke providers, modify resources, or expose data in output.
 
-- Store credentials in Lambda environment variables or AWS Secrets Manager; never commit `.env`
-- Use least-privilege IAM for Bedrock, S3 Vectors, S3, and SQL Server access
-- Rotate Azure AD Service Principal credentials on a regular schedule
-- Restrict Function URL / API Gateway access appropriately in production
-- Never commit CSV exports or logs containing sensitive project data
+| Symptom | Check |
+| --- | --- |
+| pyodbc/ODBC installation blocks local setup | Use this development branch's uv environment and CSV loader; the active local path does not require pyodbc. Production's container provides ODBC separately. |
+| `GET /health` works but generation fails | Pipelines import lazily. Check active `*_OS` credentials, data columns, vector configuration, model access, and logs. |
+| CSV is missing or totals are empty | Verify `CSV_DATA_DIR`, filenames, prepared column names/types, and the requested indicator/year. Loader errors can become empty DataFrames. |
+| UI served locally still uses production | Inspect `API_BASE_URL` and `AI_FEEDBACK_URL` in `web/app.js`; they are fixed constants, not inferred from the page URL. |
+| Wrong AWS credentials despite editing `*_BR` | The active config reads `*_OS`. Restart after changing configuration. |
+| S3 Vectors SDK/permission/query failure | Check installed SDK support, the selected resource/account, request settings, and IAM access. Do not rebuild production merely to diagnose retrieval. |
+| Report is empty or weak | Inspect data, retrieval logs and error/status content. Missing context can result from swallowed data/provider errors; a rebuild is not automatically the remedy. |
+| Generated context files appear locally | Development writes `context_<indicator>_<year>.json` in the current directory. Treat contents as reporting evidence and keep them untracked. |
+| Crons report success after timeout | Some retained scripts interpret timeouts as accepted work. This is not evidence of a completed background job or durable processing. |
 
----
+Development logs rotate under `data/logs/app.log` (5 MiB, five backups, DEBUG logger). Production uses `/tmp/logs/app.log` and a different logger name. Generated context files, CSV exports, and logs may contain real reporting data; do not commit them.
 
-## Version history
-
-- **Current (production)**: S3 Vectors migration — active pipelines are `vectorize.py` and `vectorize_annual.py` with `app/s3_vectors/` and `app/retrieval/`
-- **Previous**: OpenSearch-based retrieval (removed from active code paths)
+The repository [LICENSE](../LICENSE) contains Apache 2.0, while API metadata labels MIT. This documentation records that existing mismatch without changing licensing metadata or runtime behavior.
