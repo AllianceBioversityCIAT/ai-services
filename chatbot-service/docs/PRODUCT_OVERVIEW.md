@@ -1,6 +1,6 @@
 # AICCRA chatbot product overview
 
-The chatbot helps AICCRA reporting users explore indexed reporting records through natural-language questions. It offers a browser interface, Streamlit interface and HTTP API for another caller.
+The chatbot helps AICCRA reporting users explore indexed reporting records through natural-language questions. This service-main version offers a browser interface and HTTP API for another caller.
 
 ## User workflow
 
@@ -10,7 +10,7 @@ The chatbot helps AICCRA reporting users explore indexed reporting records throu
 4. Review the answer against source evidence before reporting or external communication.
 5. Provide feedback through the separate interaction service, or start a new local session.
 
-Streamlit also exports the local conversation as text. Interface email entry personalizes identity; it does not verify email or authorize access.
+The browser interface can export its local conversation as a text file. Interface email entry personalizes identity; it does not verify email or authorize access.
 
 ## Data and limits
 

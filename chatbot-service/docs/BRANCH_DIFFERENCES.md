@@ -1,63 +1,57 @@
 # Chatbot development and service-main
 
-The maintained integration path is `dev-chatbot-service → main-chatbot-service → staging → main`. Prepare focused tasks from the development branch and let the maintainer handle release merges unless explicitly delegated.
+The maintained integration path is `dev-chatbot-service → main-chatbot-service → staging → main`. Prepare development work from its development branch; service-main documentation must reflect the production tree that survives integration.
 
-This comparison was inspected on 2026-10-29 against `main-chatbot-service` at `e9cc2474`. It describes the development tree after the documentation commits were brought in, before the next service-main merge. Re-run it after integration; it is not a claim of deployment success or post-merge parity.
+## Local merge review
 
-## Runtime differences to preserve or review
+Compared on 2026-10-29 after merge `eda96e5c`, with development at `b24399bc`. All development commits are included in the merge history, while 20 service paths differ in the resulting trees. These differences already existed on service-main; the merge did not reintroduce its absent local tools or replace its runtime settings.
+
+The API, models, metadata filter builder, local launcher and Lambda handler match development. The resulting application code, HTML, Dockerfile and requirements also match `origin/main-chatbot-service` as inspected before push. Documentation required adaptation; runtime equality with development is neither assumed nor required.
+
+## Runtime differences preserved
 
 | Area | dev-chatbot-service | main-chatbot-service |
 | --- | --- | --- |
-| Dependencies | pyproject/uv.lock; comma-suffixed pip requirements including openai | No pyproject/uv.lock; newline-separated requirements used by Docker |
-| Packaging | No Dockerfile; local Uvicorn launcher and Mangum handler | Lambda Python 3.13 Dockerfile installs requirements and copies `.env` plus full context; inspect packaging without exposing credentials |
-| AWS agent/S3 clients | Explicit access/secret arguments from common AWS config | Standard SDK credential chain for these clients |
+| Dependencies | pyproject/uv.lock; comma-suffixed requirements | No pyproject/uv.lock; valid newline-separated requirements used by Docker |
+| Packaging | No Dockerfile | Lambda Python 3.13 Dockerfile installs requirements and copies `.env` plus full context |
+| AWS agent/S3 clients | Explicit access/secret arguments | Standard SDK credential chain |
 | Logs | Service-local `data/logs` | `/tmp/logs` |
-| HTML chat | `https://lvurhov4wryn4pygqxf6tp54uq0jdpgs.lambda-url.us-east-1.on.aws/api/chat` | Same fixed Lambda URL |
+| HTML chat | Fixed Lambda URL | Same fixed Lambda URL |
 | HTML interactions | `https://clv3b6bv9d.execute-api.us-east-1.amazonaws.com` | `https://i8s5i8c21i.execute-api.us-east-1.amazonaws.com` |
-| HTML labels/errors | Phase label and detailed nested/flat HTTP error handling | Same label and handling |
-| Auxiliary tools | Streamlit, SQL extraction, five conversion scripts, OpenAI experiment and direct KB/LLM/OpenSearch modules | Several auxiliary/local files absent |
+| HTML labels/errors | Phase and detailed nested/flat error parsing | Same label and handling |
+| Local tools | Streamlit, SQL, five converters, OpenAI CLI, direct KB/LLM/OpenSearch modules and full chatbot prompt | These files are absent; retained S3 helpers/templates do not replace them |
 
-Both active chat paths use Bedrock Agents. Neither implements an agent data reload for `insert_data=true`; route flags/timings do not establish freshness. Opening the development HTML page locally still calls the fixed Lambda URL, not the local backend. Local API examples remain useful for testing Uvicorn independently.
+Both active agent paths use Bedrock Agents and implement no reload for `insert_data=true`. Both HTML pages call the fixed Lambda chat URL even when served locally. Their interaction destinations differ intentionally. Keep packaging, credentials, logs and production destinations intact when adapting documentation.
 
-## Complete service file inventory
+## Complete initial tree comparison after merge
 
-Direction: `git diff --name-status main-chatbot-service HEAD -- chatbot-service`, run from the repository root on the development branch after bringing in documentation. `A` means present only in development, `D` present only in service-main, and `M` modified. Documentation edits and later merges can change this inventory.
+Direction: `git diff --name-status dev-chatbot-service HEAD -- chatbot-service`, run on service-main immediately after the local merge, before adapting documentation. `A` means main-only, `D` development-only, and `M` modified. Subsequent documentation edits add further differences; the following inventory records the 20 initial runtime/tooling differences.
 
 | Status | Service-relative path |
 | --- | --- |
-| M | `.env.example` |
-| A | `AGENTS.md` |
-| D | `Dockerfile` |
-| M | `README.md` |
-| M | `TECHNICAL_DOCUMENTATION.md` |
+| A | `Dockerfile` |
 | M | `app/llm/agents.py` |
-| A | `app/llm/invoke_llm.py` |
-| A | `app/llm/knowledge_base.py` |
-| A | `app/llm/vectorize_os.py` |
-| A | `app/utils/conversion/jsonl_to_json_contributions.py` |
-| A | `app/utils/conversion/jsonl_to_json_deliverables.py` |
-| A | `app/utils/conversion/jsonl_to_json_innovations.py` |
-| A | `app/utils/conversion/jsonl_to_json_oicrs.py` |
-| A | `app/utils/conversion/jsonl_to_json_questions.py` |
+| D | `app/llm/invoke_llm.py` |
+| D | `app/llm/knowledge_base.py` |
+| D | `app/llm/vectorize_os.py` |
+| D | `app/utils/conversion/jsonl_to_json_contributions.py` |
+| D | `app/utils/conversion/jsonl_to_json_deliverables.py` |
+| D | `app/utils/conversion/jsonl_to_json_innovations.py` |
+| D | `app/utils/conversion/jsonl_to_json_oicrs.py` |
+| D | `app/utils/conversion/jsonl_to_json_questions.py` |
 | M | `app/utils/logger/logger_util.py` |
-| A | `app/utils/prompts/chatbot_prompt_full.py` |
+| D | `app/utils/prompts/chatbot_prompt_full.py` |
 | M | `app/utils/s3/upload_file_to_s3.py` |
-| A | `chatbot.py` |
-| A | `db_conn/sql_connection.py` |
-| A | `docs/API.md` |
-| A | `docs/BRANCH_DIFFERENCES.md` |
-| M | `docs/HIGH_LEVEL_SOFTWARE_DESIGN.md` |
-| M | `docs/PRODUCT_OVERVIEW.md` |
-| A | `interface/AGENTS.md` |
-| A | `interface/README.md` |
+| D | `chatbot.py` |
+| D | `db_conn/sql_connection.py` |
 | M | `interface/chatbot_interface.html` |
-| A | `openai_chatbot.py` |
-| A | `pyproject.toml` |
+| D | `openai_chatbot.py` |
+| D | `pyproject.toml` |
 | M | `requirements.txt` |
-| A | `uv.lock` |
+| D | `uv.lock` |
 
-## After the local merge
+## Checks before promotion
 
-Compare the entire resulting service tree with development, including missing interfaces, auxiliary files, dependency declarations and conflict resolutions. Adapt main's README and agent guides to the files actually retained, runtime credentials, log paths, UI destinations and packaging. Preserve intentional production choices instead of forcing exact equality.
+Review the final documentation diff and complete repository integration scope. The merge also includes existing ignored-file commits outside Chatbot; do not treat all incoming commits as service documentation. Those inherited changes are left intact.
 
-The development workflow snapshot has no Chatbot-specific workflow. Main's `.github/workflows/jenkins-trigger-chatbot-service-prod.yml` runs on push/PR to main-chatbot-service and manual dispatch, invoking the chatbot-service Jenkins job. Its QA-oriented display name is misleading. Review current event filters again before pushing. Local documentation checks do not establish pipeline completion or deployment success.
+The workflow `.github/workflows/jenkins-trigger-chatbot-service-prod.yml` runs on push/PR to main-chatbot-service and manual dispatch, invoking the chatbot-service Jenkins job despite a misleading QA display name. Wait for the relevant pipeline before promoting to staging. Offline checks do not validate live AWS resources, feedback, image deployment or Jenkins.

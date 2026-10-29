@@ -1,35 +1,34 @@
 # Chatbot service: agent guide
 
-Read the [root instructions](../AGENTS.md), [README](README.md) and relevant [technical guide](TECHNICAL_DOCUMENTATION.md) before editing. These instructions describe `dev-chatbot-service`; verify the current branch and tree every time.
+Read the [root instructions](../AGENTS.md), [README](README.md) and [technical guide](TECHNICAL_DOCUMENTATION.md). These instructions describe `main-chatbot-service`; verify the current branch/tree before editing.
 
 ## Branch scope
 
-Prepare work from `dev-chatbot-service`, using a focused task branch when appropriate, and preserve existing user commits. Normal promotion is dev-chatbot-service → main-chatbot-service → staging → main. The maintainer performs release merges unless explicitly delegated. Commit and push are separate operations.
+Normal work starts from `dev-chatbot-service` in a focused task branch when appropriate. Promotion is dev-chatbot-service → main-chatbot-service → staging → main. When the maintainer requests review after a local service-main merge, adapt documentation on that service-main to the actual tree. The maintainer performs release merges unless delegated; commit and push remain separate operations.
 
-Read [branch differences](docs/BRANCH_DIFFERENCES.md) before integration. After a maintainer's local merge into service-main, inspect complete trees and adapt docs to actual production packaging, credentials, log paths and interface destinations. Do not equate merging documentation with development/production parity.
+Read the [branch comparison](docs/BRANCH_DIFFERENCES.md). Preserve service-main's Docker/requirements installation, SDK credential chain, `/tmp/logs` and production interaction URL. Do not restore development-only files simply to match trees.
 
 ## Implementation map
 
-- HTTP entry: `api_server.py` → `app.api.main:app`; Lambda adapter: `main.handler`.
-- Contract: `app/api/models.py`, `routes.py`; active chat: `app/llm/agents.py`.
+- Local HTTP: `api_server.py` → `app.api.main:app`; Lambda: `main.handler` via Docker's Python 3.13 image.
+- Contract: `app/api/models.py` and `routes.py`; active chat: `app/llm/agents.py`.
 - Retrieval settings: `app/utils/agents_utils/filter_builder.py`.
-- Two UIs: `chatbot.py` calls the generator directly; `interface/chatbot_interface.html` calls HTTP. Read [nested interface instructions](interface/AGENTS.md) for HTML edits.
-- SQL, direct OpenSearch, direct KB/model calls, S3 exports, OpenAI CLI and the five scripts under `app/utils/conversion/` are auxiliary. They can create clients at import, write data or incur charges.
+- UI: `interface/chatbot_interface.html`; read its [nested instructions](interface/AGENTS.md).
+- S3 helpers are retained but not called by chat; the inactive feedback helper imports missing models.
 
-Run from `chatbot-service/`. Use `pyproject.toml`/`uv.lock` for this dev snapshot (`uv sync --frozen`). Its pip requirements have trailing commas; do not fix manifests or deploy configuration as an incidental docs change. Auxiliary SQL requires undeclared pyodbc and native ODBC Driver 18.
+Install from `requirements.txt` in the service directory. There is no pyproject/uv lock, Streamlit entry point, SQL loader, converter suite or direct OpenSearch/LLM/KB module here. Dependency names or residual config dictionaries are not proof those tools exist.
 
-## Constraints to preserve
+## Behavior constraints
 
-- Coordinate contract changes with both UIs, examples and [API documentation](docs/API.md).
-- Treat prompts, model IDs, retrieval filters, identity and authentication as behavior changes.
-- Agent instructions/model/memory live externally; local prompt edits do not update them.
-- `insert_data` is not used to execute a reload by the agent, despite route metadata. Health is static.
-- No route authentication or memory ownership check is implemented; email identifiers and CORS are not authorization.
-- HTML fixed URLs and Streamlit `.env` tracking URL are separate configuration surfaces. The HTML page calls the configured Lambda chat endpoint even when served locally; use the local API examples to test the local backend.
-- Do not import the inactive feedback helper as a supported API; its models are missing.
+- Coordinate models/routes, HTML callers, examples and [API contract](docs/API.md).
+- Treat prompts, model IDs, retrieval filters, identity and authentication as behavior changes. Agent model/instructions/memory are externally configured; local template edits do not update them.
+- `insert_data` does not execute reload here; route metadata can still claim it. Health is static.
+- No route authentication or memory ownership check exists. Email identifiers and CORS are not authorization.
+- The HTML calls fixed Lambda and production interaction URLs even when served locally; Python `.env` does not override them.
+- The Dockerfile copies `.env` and full context. Keep real credentials and reporting artifacts out of commits/images; do not change deployment configuration incidentally during docs work.
 
 ## Checks and reporting
 
-No dedicated service test suite is tracked here. For docs, resolve local links, parse examples and verify claims against implementation. For offline API checks, replace the generator; for agent checks, replace boto3 before import, use fictional events and block network. Replace logging to avoid generated files. Syntax-check extracted HTML JavaScript without executing fetch.
+No dedicated service test suite is tracked. Validate links/examples and implementation consistency. Use fake generators for API tests, fake boto3 before agent import, blocked network and replaced logging. Syntax-check extracted JavaScript without executing fetch. Retained S3 helpers can write to AWS; inspect them before execution.
 
-Read SQL/S3/CLI scripts before execution: some run at import or contact live systems. Do not run interfaces against external providers merely to validate prose. Never claim deployment, feedback, ingestion or credentials work based on stubs. Report branch, changed scope, checks, limits and commit/push state. Keep real `.env`, logs, exports, databases and reporting data out of commits.
+Do not infer live deployment, credentials, ingestion or feedback success from stubs. Report branch, scope, checks/limits and commit/push state. Preserve user changes and avoid adding logs, exports, local databases, credentials or generated output.

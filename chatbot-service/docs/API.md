@@ -1,6 +1,6 @@
 # HTTP API contract
 
-Implemented by [models](../app/api/models.py), [routes](../app/api/routes.py) and the [application](../app/api/main.py) on `dev-chatbot-service`. Generated descriptions include historical reload/model claims; use the behavior below when integrating.
+Implemented by [models](../app/api/models.py), [routes](../app/api/routes.py) and the [application](../app/api/main.py) on `main-chatbot-service`. Generated descriptions include historical reload/model claims; use the behavior below when integrating.
 
 ## Routes
 
@@ -13,7 +13,7 @@ Implemented by [models](../app/api/models.py), [routes](../app/api/routes.py) an
 | `/static/` | Mounted `interface/` files |
 | `/docs`, `/redoc`, `/openapi.json` | Generated API documentation/schema |
 
-There is no local feedback, ingestion, session deletion or authentication endpoint. Interfaces call an external `/api/interactions` API for tracking/feedback.
+There is no local feedback, ingestion, session deletion or authentication endpoint. The HTML interface calls an external `/api/interactions` API for tracking/feedback.
 
 ## Chat request
 
@@ -103,4 +103,4 @@ The agent converts some timeout, context-limit and InvokeAgent/internal-server e
 
 ## Session and access boundaries
 
-Identifiers are forwarded to Bedrock with `endSession=false`; the API does not store a local transcript or expose memory deletion. External agent memory settings determine persistence. There is no Python route authentication or identity ownership check. Both interfaces use the email local part as memory ID, which can collide across domains. Gateway access controls need separate verification.
+Identifiers are forwarded to Bedrock with `endSession=false`; the API does not store a local transcript or expose memory deletion. External agent memory settings determine persistence. There is no Python route authentication or identity ownership check. The HTML interface uses the email local part as memory ID, which can collide across domains. Gateway access controls need separate verification.

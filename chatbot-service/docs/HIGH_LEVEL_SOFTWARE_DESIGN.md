@@ -1,6 +1,6 @@
 # Chatbot system architecture
 
-The active `dev-chatbot-service` path delegates conversation and retrieval to an externally configured Bedrock Agent. It does not run the auxiliary SQL/OpenSearch ingestion pipeline for each query.
+The active `main-chatbot-service` path delegates conversation and retrieval to an externally configured Bedrock Agent. SQL/OpenSearch ingestion and local development tools are absent from this tree; the request uses the externally configured Knowledge Base.
 
 ## Runtime boundaries
 
@@ -22,7 +22,7 @@ sequenceDiagram
     API-->>UI: One JSON message
 ```
 
-Streamlit replaces the HTTP boundary with a direct generator call and progressively displays output. HTML and Streamlit separately submit interaction/feedback records to an external service; tracking failure is independent of chat availability.
+The HTML page calls the fixed Lambda chat endpoint even when served locally. It separately submits interaction/feedback records to the production interaction service; tracking failure is independent of chat availability. There is no Streamlit entry point in this branch.
 
 ## Ownership
 
@@ -32,18 +32,18 @@ Streamlit replaces the HTTP boundary with a direct generator call and progressiv
 | Runtime adapter | Uvicorn launcher, Mangum handler | Lambda/image/deployment environment |
 | Conversation | Generator payload, caller IDs, chunk/error handling | Agent/alias configuration, model, memory policy |
 | Retrieval | Metadata filter builder | KB association, index, metadata types, ingestion and HYBRID support |
-| Interface | HTML/JS and Streamlit | Feedback service, browser network/CORS |
-| Auxiliary preparation | SQL exports, S3 helpers, OpenSearch path | Database permissions, native ODBC, AWS resources |
+| Interface | HTML/JS | Feedback service, browser network/CORS |
+| Auxiliary uploads | Retained S3 helpers, not called by chat | Bucket permissions and separately managed ingestion |
 
 ## Data preparation is separate
 
-`db_conn/sql_connection.py` contains view definitions and can execute CREATE OR ALTER VIEW before extraction. It transforms tables, writes JSONL/CSV and calls a helper that creates per-record CSV/metadata files and uploads them to S3. It can log failures and return an empty DataFrame; per-record upload failures can be logged while processing continues. Successful script completion alone does not prove complete ingestion.
+The SQL loader, direct OpenSearch/LLM/KB modules and converter suite are not present here. Retained S3 helpers can create per-record CSV/metadata and upload them, but the active agent does not call them or start KB synchronization. Per-record errors may be logged while processing continues, so helper completion is not evidence of complete ingestion.
 
-The repository's active agent does not run this pipeline or start KB synchronization. The route still reports reload metadata when requested, so its `data_reloaded` field is not a freshness signal. The direct OpenSearch/embedding/LLM modules are auxiliary implementations, not proof of the agent's deployed model or vector storage.
+The route still reports reload metadata when requested; `data_reloaded` is not a freshness signal. The deployed agent's model, knowledge sources and memory are externally configured.
 
 ## State, privacy and operational constraints
 
-- UI history is local browser/Streamlit state; the API forwards IDs to AWS without storing a transcript locally.
+- UI history is local browser state; the API forwards IDs to AWS without storing a transcript locally.
 - Provider memory behavior depends on external settings. New local sessions do not delete it.
 - Email entry does not authenticate users, and local-part memory IDs can collide.
 - Logs/standard output can contain question/answer text and identifiers; external interaction tracking also transfers content.

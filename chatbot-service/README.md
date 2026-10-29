@@ -2,7 +2,7 @@
 
 Conversational access to AICCRA reporting data using Amazon Bedrock Agents and a configured Knowledge Base. Users can explore deliverables, contributions, innovations and Outcome Impact Case Reports (OICRs), with reporting-phase, indicator and section filters.
 
-This guide describes **`dev-chatbot-service`**: a FastAPI backend, a static browser interface and a separate Streamlit interface. Production packaging and destinations differ on `main-chatbot-service`; review the [branch comparison](docs/BRANCH_DIFFERENCES.md) before promotion.
+This guide describes **`main-chatbot-service`**: the FastAPI backend, static browser interface and Lambda container packaging. This branch has no Streamlit entry point, SQL loader, conversion scripts or direct OpenSearch/model clients. See the [development comparison](docs/BRANCH_DIFFERENCES.md) for intentional branch differences.
 
 ## Documentation
 
@@ -18,30 +18,22 @@ This guide describes **`dev-chatbot-service`**: a FastAPI backend, a static brow
 
 ## Quick start
 
-Use Python 3.13 or newer and `uv`. Run from `chatbot-service/`: static files and auxiliary output depend on the working directory.
+Use Python 3.13 to match the Lambda base image. Run from `chatbot-service/`: static serving expects the `interface/` directory in the working directory.
 
 ```bash
 cd chatbot-service
-uv sync --frozen
+python3.13 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 cp .env.example .env
 # Fill in the chat configuration below before sending a message.
-uv run --frozen python api_server.py --host 127.0.0.1 --port 8000 --reload
+.venv/bin/python api_server.py --host 127.0.0.1 --port 8000 --reload
 ```
 
 Open `http://localhost:8000/chatbot-ui` for browser chat, `/docs` for OpenAPI or `/health` for HTTP availability. Health returns static capability labels; it does **not** probe AWS, ingestion or database connectivity. Some generated API descriptions still promise an inactive data-reload path; the [API guide](docs/API.md) describes the implementation.
 
 The HTML page calls the fixed Lambda endpoint `https://lvurhov4wryn4pygqxf6tp54uq0jdpgs.lambda-url.us-east-1.on.aws/api/chat`, even when opened at localhost. It also sends interaction/feedback records to a separate remote service. Opening `/chatbot-ui` therefore does not test the local chat backend. Use the local curl/Python examples below to test it. Pointing the page at a local API would require an explicit change to its JavaScript constant; `.env` does not override it. See the [interface guide](interface/README.md).
 
-`uv sync --frozen` uses the manifest and lockfile. This branch's `requirements.txt` has trailing commas on dependency lines and is not a valid equivalent pip installation path. The inherited project metadata says `aiccra-report-generator`; this application is the chatbot. Dependency reconciliation is outside this documentation change.
-
-### Streamlit alternative
-
-```bash
-# From chatbot-service/, with the same .env
-uv run --frozen streamlit run chatbot.py
-```
-
-Open `http://localhost:8501`. Streamlit calls the agent directly, progressively displays output, keeps local conversation history in session state, exports a `.txt` conversation and sends interactions/feedback to `AI_FEEDBACK_URL`. It does not call the FastAPI chat endpoint.
+The Dockerfile and local setup both install `requirements.txt`. This branch has no `pyproject.toml` or `uv.lock`; requirements are unpinned, so installation is not reproducible from a lockfile. The presence of Streamlit or OpenAI packages in requirements does not establish a runnable interface or client for them here.
 
 ### First API request
 
@@ -70,16 +62,14 @@ Copy [.env.example](.env.example) and populate the integrations you use. Never c
 | Variables | Consumer / requirement |
 | --- | --- |
 | `AWS_REGION` | AWS client region |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Explicit arguments for development agent/S3 clients; separate `_BR` and `_OS` names are not read |
+| AWS credentials | Standard SDK credential chain: deployment role or a configured local profile/environment; clients do not pass access/secret keys explicitly |
 | `AGENT_ID`, `AGENT_ALIAS_ID`, `KNOWLEDGE_BASE_ID` | Existing agent, alias and retrieval configuration for chat |
-| `AI_FEEDBACK_URL` | Streamlit interaction service base URL; does not configure HTML |
-| `BUCKET_NAME` | Auxiliary S3 uploads, not a direct dependency of an active chat request |
-| `SERVER`, `DATABASE`, `CLIENT_ID`, `CLIENT_SECRET` | Auxiliary SQL Server/Fabric extraction |
-| `OPENSEARCH_HOST`, `OPENSEARCH_INDEX_NAME_CHATBOT` | Auxiliary direct OpenSearch path |
-| `MEMORY_ID` | Read into configuration but not used to select active chat identity; callers supply `memory_id` |
-| `OPENAI_API_KEY`, `VECTOR_STORE_ID` | Only the independent `openai_chatbot.py` experiment |
+| `BUCKET_NAME` | Optional auxiliary S3 uploads; not a direct dependency of normal chat |
+| `AI_FEEDBACK_URL` | Read into config but not used by the active backend; HTML uses a fixed constant |
+| `MEMORY_ID` | Read into config but not used for active chat identity; callers supply `memory_id` |
+| SQL/OpenSearch settings in config | Residual configuration dictionaries; their local implementations are absent from this branch |
 
-The agent model, instructions, Knowledge Base ingestion, memory enablement and retention are AWS-side settings. Model names in auxiliary modules do not establish which model the agent alias uses. Configure resources and outbound AWS permissions separately; these do not establish inbound HTTP authentication.
+The agent model, instructions, Knowledge Base ingestion, memory enablement and retention are AWS-side settings. Historical model names in generated API descriptions do not establish which model the agent alias uses. Configure resources and outbound AWS permissions separately; these do not establish inbound HTTP authentication.
 
 ## System architecture
 
@@ -87,23 +77,18 @@ The agent model, instructions, Knowledge Base ingestion, memory enablement and r
 flowchart TD
     Browser[Static HTML interface] -->|POST /api/chat| API[FastAPI / Uvicorn or Mangum]
     API -->|Collect chunks| Agent[run_agent_chatbot]
-    Streamlit[Streamlit interface] -->|Direct call| Agent
     Filters[Metadata filter builder] --> Agent
     Agent -->|invoke_agent + session and memory IDs| Bedrock[Bedrock Agent / Alias]
     Bedrock --> KB[Configured Knowledge Base]
     Browser --> Feedback[External interactions / feedback API]
-    Streamlit --> Feedback
-    SQL[Auxiliary SQL extraction] -.-> S3[CSV and metadata uploads]
-    S3 -.-> Ingestion[Separately managed KB ingestion]
 ```
 
-The active request uses `app/llm/agents.py`. It does not execute SQL, populate OpenSearch, upload documents or start Knowledge Base ingestion. Direct OpenSearch, direct model and direct Knowledge Base modules are separate paths. See the [architecture guide](docs/HIGH_LEVEL_SOFTWARE_DESIGN.md).
+The active request uses `app/llm/agents.py`. It does not execute SQL, populate OpenSearch, upload documents or start Knowledge Base ingestion. Those resources and ingestion are managed outside this request path; their development scripts are not present here. See the [architecture guide](docs/HIGH_LEVEL_SOFTWARE_DESIGN.md).
 
 | Component | Implemented behavior |
 | --- | --- |
 | FastAPI | Validates input, forwards filters/identifiers, joins agent chunks and returns JSON |
 | HTML | Calls HTTP chat, manages local messages/filter controls, sends remote interactions/feedback |
-| Streamlit | Calls the agent directly, displays incremental output, exports history and submits remote feedback |
 | Bedrock agent | External orchestration, retrieval and generated answer; deployment controls model/memory |
 
 Answers may contain omissions or unsupported statements. Review citations and source records before official reporting. This repository establishes no response-time guarantee or data refresh schedule.
@@ -129,11 +114,11 @@ The API accepts strings rather than catalog enums. Use exact `All phases`, `All 
 
 ## Sessions, access and feedback
 
-The API forwards caller-supplied `session_id` and `memory_id` to Bedrock. Both interfaces derive memory identity from the part of an entered or URL-provided email before `@`; email and ownership are not verified. Equal local parts from different domains can select the same memory ID. Starting a session changes the session ID and clears local history; it does not delete provider memory. The agent always sends `endSession=false`.
+The API forwards caller-supplied `session_id` and `memory_id` to Bedrock. The HTML interface derives memory identity from the part of an entered or URL-provided email before `@`; email and ownership are not verified. Equal local parts from different domains can select the same memory ID. Starting a session changes the session ID and clears local history; it does not delete provider memory. The agent always sends `endSession=false`.
 
 Python HTTP routes have no authentication dependency. CORS permits all origins and credentials. AWS IAM credentials authorize outbound calls; gateway controls must be checked separately. Email entry and CORS do not provide user authorization.
 
-Interfaces send feedback to external `/api/interactions`. There is no local `/api/feedback` route. The unused `feedback_util.py` imports `FeedbackRequest` and `FeedbackResponse` classes absent from current models; it is not a supported alternative implementation.
+The HTML interface sends feedback to external `/api/interactions`. There is no local `/api/feedback` route. The unused `feedback_util.py` imports `FeedbackRequest` and `FeedbackResponse` classes absent from current models; it is not a supported alternative implementation.
 
 ## Project structure
 
@@ -144,21 +129,17 @@ chatbot-service/
 ├── docs/                          # Contract, architecture, product, branch differences
 ├── api_server.py                   # Local Uvicorn launcher
 ├── main.py                         # Mangum Lambda handler
-├── chatbot.py                      # Streamlit + direct agent + remote tracking
 ├── interface/                      # Static HTML UI and guides
 ├── app/api/                        # FastAPI app, route and Pydantic models
 ├── app/llm/agents.py                # Active Bedrock Agent generator
-├── app/llm/                        # Also direct KB/model/OpenSearch auxiliary modules
 ├── app/utils/agents_utils/          # Metadata filter construction
 ├── app/utils/config/               # Environment loading
 ├── app/utils/logger/               # Console + rotating local logs
-├── app/utils/prompts/              # Templates for auxiliary paths
+├── app/utils/prompts/              # Retained templates, not loaded by active agent
 ├── app/utils/s3/                   # Auxiliary export/upload helpers
 ├── app/utils/feedback/             # Inactive helper; missing model imports
-├── app/utils/conversion/           # Five JSONL-to-OpenAI JSON conversion scripts
-├── db_conn/sql_connection.py       # Auxiliary SQL extraction + uploads
-├── openai_chatbot.py               # Independent OpenAI CLI experiment
-└── pyproject.toml / uv.lock / requirements.txt
+├── Dockerfile                     # Lambda Python 3.13 image
+└── requirements.txt               # Actual Docker/local install input
 ```
 
 ## Python integration example
@@ -186,29 +167,29 @@ The timeout is a caller choice. Provider failures can become ordinary answer tex
 
 ## Development and validation
 
-Update models, routes, both interfaces and examples together for contract changes. Coordinate metadata changes with retrieval filters and ingestion. `agents.py` sends both textual filters and actual retrieval configuration. Editing local prompt templates does not update externally configured agent instructions.
+Update models, routes, the HTML interface and examples together for contract changes. Coordinate metadata changes with retrieval filters and ingestion. `agents.py` sends both textual filters and actual retrieval configuration. Editing local prompt templates does not update externally configured agent instructions.
 
-Logs go to console and service-local `data/logs/app.log`, rotating at 5 MiB with five backups. Routes log message prefixes/identity, and the agent prints questions/answers and logs retrieval configuration. Keep reporting data, logs, generated exports and credentials out of commits.
+Logs go to console and `/tmp/logs/app.log`, rotating at 5 MiB with five backups. Routes log message prefixes/identity, and the agent prints questions/answers and logs retrieval configuration. Keep reporting data, logs, generated exports and credentials out of commits.
 
-No dedicated service test suite is tracked here. Check documentation links, example syntax, model validation, filter construction and fake-agent API responses offline. Review imports before running auxiliary scripts: SQL extraction, S3 uploads, feedback and OpenAI calls can write data or invoke paid providers. See the [maintenance guide](TECHNICAL_DOCUMENTATION.md) for offline check boundaries.
+No dedicated service test suite is tracked here. Check documentation links, example syntax, model validation, filter construction and fake-agent API responses offline. Review imports before running retained helpers: S3 utilities can upload data and construct AWS clients at import. The inactive feedback helper has missing model imports. See the [maintenance guide](TECHNICAL_DOCUMENTATION.md) for offline check boundaries.
 
 ## Troubleshooting
 
 | Symptom | Check |
 | --- | --- |
-| pip rejects requirements | Trailing commas exist; use the locked uv setup for this dev line |
+| Installation fails | Use Python 3.13 and this branch's requirements; verify package/network compatibility without substituting a development lockfile |
 | Health succeeds but chat fails | Health is static; check region, agent/alias/KB IDs and AWS credentials/permissions |
 | UI calls an unexpected server | HTML constants are independent of `.env` |
 | Missing/broad results | Check metadata values/types, section mapping, HYBRID support and external ingestion |
 | Reload reports success but data stays old | The agent does not implement reload; response flags/timings do not prove ingestion |
 | Null section fails with a selected phase | Builder may call `.lower()` on `None`; send a string such as `All sections` |
 | Feedback fails | Check separate interaction service URL, response and CORS |
-| SQL import fails | Auxiliary `pyodbc` is undeclared; it also requires ODBC Driver 18 and database access |
+| Development tool is missing | Streamlit entry point, SQL loader, converters and direct model clients are absent here; use development for that work |
 | Static directory missing | Start from `chatbot-service/`, where `interface/` exists |
 | Context/timeout answer | Narrow the question or start a new session; some provider errors become friendly text |
 
 ## Deployment and promotion
 
-`main.py` exports `main.handler = Mangum(app)`. This development snapshot has **no Dockerfile**. Service-main has a Lambda Python 3.13 image installing `requirements.txt`, `/tmp/logs` and production frontend destinations. Recheck those after the local merge.
+`main.py` exports `main.handler = Mangum(app)`. The checked-in Dockerfile uses `public.ecr.aws/lambda/python:3.13`, installs `requirements.txt` and sets `CMD ["main.handler"]`. It explicitly copies `.env` and then the full service context; a build requires that file. Keep real credentials out of image contents and review the build context before packaging. This documentation update does not change that Docker behavior.
 
-Prepare tasks from `dev-chatbot-service`, then promote through `dev-chatbot-service → main-chatbot-service → staging → main`. This dev snapshot has no Chatbot-specific GitHub Actions workflow. The inspected service-main workflow triggers Jenkins on pushes/PRs to `main-chatbot-service`, despite its misleading QA display name. Documentation-only changes can trigger it. Pipeline completion and deployment need separate validation.
+Prepare tasks from `dev-chatbot-service`, then promote through `dev-chatbot-service → main-chatbot-service → staging → main`. The workflow `.github/workflows/jenkins-trigger-chatbot-service-prod.yml` triggers Jenkins on pushes/PRs to `main-chatbot-service` and manual dispatch, despite its misleading QA display name. Documentation-only changes can trigger it. Pipeline completion and Lambda deployment require separate validation.
