@@ -10,7 +10,7 @@ account for every expected job and the field shows "not available" rather than s
 
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -25,12 +25,11 @@ from app.contract.items import (
 from app.contract.messages import AiJobMessage, UnavailableReason
 from app.evidence.extractor import EvidenceExtractor, EvidenceOutcome
 from app.llm.provider import Effort, LlmProvider, LlmUsage, RetryableLlmError
-from app.prompts.builder import ResultContext, build_request
+from app.prompts.builder import ResultContext
 from app.prompts.loader import PromptSpec, UnknownPromptVersion, get_prompt
-from app.signal.quote import is_quote_in_evidence
-from app.signal.signal import SignalInput, compute_signal
 from app.utils.logger.logger_util import get_logger
 from app.worker.snapshot import SnapshotReader, read_field_input
+from app.worker.suggest import SuggestParams, suggest
 from app.worker.store import Counter, SuggestionStore
 
 logger = get_logger()
@@ -115,61 +114,33 @@ def record_failure(msg: AiJobMessage, deps: JobDeps, detail: str) -> JobReport:
 
 def _suggest(job, prompt: PromptSpec, spec, fi, evidence: EvidenceOutcome, final_attempt: bool) -> JobReport:
     deps = job.deps
-    built = build_request(prompt, ResultContext(fi.title, fi.description), evidence.sources, deps.effort, deps.max_tokens)
-    usage: list[LlmUsage] = []
+    params = SuggestParams(deps.effort, deps.max_tokens, deps.max_tokens_retry)
     try:
-        result = deps.provider.suggest(built.request)
-        usage.append(result.usage)
-        if result.kind == "truncated":
-            retry = replace(built.request, max_tokens=deps.max_tokens_retry)
-            result = deps.provider.suggest(retry)
-            usage.append(result.usage)
+        out = suggest(deps.provider, prompt, spec, ResultContext(fi.title, fi.description), fi.reported, evidence, params)
     except RetryableLlmError as err:
         if not final_attempt:
             raise RetryLater(f"llm_retryable_{err.status}") from err
-        return job.unavailable("failed", detail="llm_retryable_exhausted", usage=usage)
+        return job.unavailable("failed", detail="llm_retryable_exhausted")
 
-    if result.kind == "refusal":
-        return job.unavailable("model_declined", modelId=result.model_id, usage=usage)
-    if result.kind != "ok" or result.output is None:
-        return job.unavailable("invalid_output", modelId=result.model_id, usage=usage)
-
-    norm = result.output.normalized()
-    verified = is_quote_in_evidence(norm.evidence_quote, built.evidence_text)
-    try:
-        signal = compute_signal(
-            SignalInput(spec, fi.reported, norm.value, verified, evidence.partial)
-        )
-    except ValueError:
-        return job.unavailable("invalid_output", modelId=result.model_id, usage=usage)
-
-    source_index, source_url = _quote_source(norm.evidence_source_index, norm.evidence_quote, evidence)
+    if out.kind != "ok" or out.output is None:
+        return job.unavailable(out.kind if out.kind != "ok" else "invalid_output", modelId=out.model_id, usage=out.usage)
+    norm = out.output
     item = job.item(
         status="available",
-        signal=signal,
+        signal=out.signal,
         explanation=norm.explanation,
         evidenceQuote=norm.evidence_quote,
-        evidenceSource=source_url,
-        evidenceSourceIndex=source_index,
+        evidenceSource=out.source_url,
+        evidenceSourceIndex=out.source_index,
         suggestedValue=norm.value,
         reportedValue=fi.reported,
-        quoteVerified=verified,
+        quoteVerified=out.quote_verified,
         partialEvidence=evidence.partial,
-        modelId=result.model_id,
+        modelId=out.model_id,
         evidenceHash=evidence.evidence_hash,
     )
     written = deps.store.write(item, "produced", job.replaces_failed)
-    return JobReport("produced" if written else "duplicate", signal=signal, usage=usage)
-
-
-def _quote_source(index: int | None, quote: str, evidence: EvidenceOutcome) -> tuple[int | None, str | None]:
-    by_index = {s.index: s for s in evidence.sources}
-    if index is not None and index in by_index:
-        return index, by_index[index].url
-    for s in evidence.sources:
-        if s.status == "text" and s.text and is_quote_in_evidence(quote, s.text):
-            return s.index, s.url
-    return None, None
+    return JobReport("produced" if written else "duplicate", signal=out.signal or "", usage=out.usage)
 
 
 class _Job:

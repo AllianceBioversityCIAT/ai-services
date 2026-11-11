@@ -37,10 +37,12 @@ class BedrockMantleProvider:
         max_retries: int = 3,
         timeout_s: float = 90.0,
         client: Any | None = None,
+        aws_profile: str | None = None,
     ):
+        """``aws_profile`` is for local runs (the offline comparison); the Lambda uses its role."""
         self._model_id = model_id
         self._client = client or AnthropicBedrockMantle(
-            aws_region=aws_region, max_retries=max_retries, timeout=timeout_s
+            aws_region=aws_region, aws_profile=aws_profile, max_retries=max_retries, timeout=timeout_s
         )
 
     def suggest(self, request: SuggestionRequest[OutputT]) -> SuggestionResult[OutputT]:

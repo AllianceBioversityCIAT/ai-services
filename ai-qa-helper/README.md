@@ -60,6 +60,7 @@ The tests use `FakeLlmProvider` and a fake Anthropic client ([`tests/fakes.py`](
 | `app/worker/` | One job (`process.py`), snapshot reader, DynamoDB store |
 | `app/prompts/`, `prompts/` | Prompt loader and request builder; prompt texts and manifest |
 | `app/utils/` | Logger and configuration, same interface as `qa-service` |
+| `eval/` | v1 vs v2 comparison on the 2025 sample; data in `eval/.data/` (gitignored) |
 | `contract/` | Generated JSON Schema and example items for the `onecgiar_qa` contract test |
 
 ## Contract with onecgiar_qa
@@ -159,4 +160,4 @@ Both versions run on the same 2025 sample. The December batch uses whichever ver
 
 | Done | Pending |
 | --- | --- |
-| Python port: contract (Pydantic + JSON Schema), evidence extraction (from `qa-service`, no browser), signal mapping, quote verification, LLM provider port and Bedrock Mantle adapter, prompts v1 and v2 loaded by version, worker handler (idempotent writes, partial batch failures, run counters), smoke handler, Lambda build (unit-tested, no live call yet) | Smoke test (waiting for the execution role ARN), control-list id maps (Reporting), v1 vs v2 comparison on a 2025 sample |
+| Python port: contract (Pydantic + JSON Schema), evidence extraction (from `qa-service`, no browser), signal mapping, quote verification, LLM provider port and Bedrock Mantle adapter, prompts v1 and v2 loaded by version, worker handler (idempotent writes, partial batch failures, run counters), v1 vs v2 comparison tooling ([`eval/`](eval/README.md): sample, estimate, budget-capped run, report), smoke handler, Lambda build (unit-tested, no live call yet) | Smoke test (waiting for the execution role ARN), control-list id maps (Reporting), running the v1 vs v2 comparison (waiting for the 2025 export and Bedrock access for the deployer) |
