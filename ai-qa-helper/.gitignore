@@ -16,3 +16,5 @@ dist/
 
 # Eval data (never commit real reporting data)
 eval/.data/
+tfplan
+*.tfplan
