@@ -11,7 +11,7 @@ dependencies = [
     # Evidence extraction (same libraries as qa-service/app/web_scraping, minus Playwright and pandas)
     "requests>=2.32",
     "beautifulsoup4>=4.13",
-    "pymupdf>=1.26",
+    "pymupdf>=1.26,<2",  # 2.x pulls onnxruntime/numpy (layout models) we do not use
 ]
 
 [dependency-groups]
@@ -27,3 +27,4 @@ package = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+filterwarnings = ["ignore:builtin type .* has no __module__ attribute:DeprecationWarning"]

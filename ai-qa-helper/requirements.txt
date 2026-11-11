@@ -23,8 +23,6 @@ charset-normalizer==3.5.2
     # via requests
 docstring-parser==0.18.0
     # via anthropic
-flatbuffers==25.12.19
-    # via onnxruntime
 h11==0.16.0 ; sys_platform != 'emscripten'
     # via httpcore2
 httpcore2==2.16.0 ; sys_platform != 'emscripten'
@@ -44,47 +42,20 @@ jmespath==1.1.0
     # via
     #   boto3
     #   botocore
-networkx==3.7
-    # via pymupdf
-numpy==2.5.4
-    # via
-    #   onnxruntime
-    #   pymupdf
-onnxruntime==1.31.1
-    # via pymupdf
 opentelemetry-api==1.45.2
     # via anthropic
-packaging==26.3
-    # via onnxruntime
-protobuf==7.36.2
-    # via onnxruntime
-psutil==7.2.2
-    # via pymupdf
 pydantic==2.14.2
     # via
     #   ai-qa-helper
     #   anthropic
 pydantic-core==2.50.2
     # via pydantic
-pymupdf==2.1
-    # via
-    #   ai-qa-helper
-    #   pymupdf-layout
-    #   pymupdf4llm
-pymupdf-layout==2.1
-    # via
-    #   pymupdf
-    #   pymupdf4llm
-pymupdf4llm==2.1
-    # via
-    #   pymupdf
-    #   pymupdf-layout
+pymupdf==1.28.2
+    # via ai-qa-helper
 python-dateutil==2.9.0.post0
     # via botocore
 python-dotenv==1.2.4
     # via ai-qa-helper
-pyyaml==6.0.3
-    # via pymupdf
 requests==2.34.2
     # via ai-qa-helper
 s3transfer==0.19.3
@@ -95,8 +66,6 @@ sniffio==1.3.1
     # via anthropic
 soupsieve==4.0.1
     # via beautifulsoup4
-tabulate==0.10.0
-    # via pymupdf
 truststore==0.10.5 ; sys_platform != 'emscripten'
     # via
     #   httpcore2

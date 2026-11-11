@@ -55,6 +55,7 @@ The tests use `FakeLlmProvider` and a fake Anthropic client ([`tests/fakes.py`](
 | `app/contract/` | Job message, API view and event models; DynamoDB items and key builders |
 | `app/signal/` | Deterministic signal and quote verification |
 | `app/llm/` | `LlmProvider` port, Bedrock Mantle adapter, v1/v2 output schemas |
+| `app/evidence/` | Evidence extraction copied from `qa-service` without the browser paths, plus the SSRF guard and the OCR fallback |
 | `app/handlers/` | Lambda handlers (`smoke.handler`; the worker handler is pending) |
 | `app/utils/` | Logger and configuration, same interface as `qa-service` |
 | `contract/` | Generated JSON Schema and example items for the `onecgiar_qa` contract test |
@@ -75,6 +76,17 @@ Proposed entity definitions for `onecgiar_qa` (same pattern as its `resultSnapsh
 | `aiRun` | `{entity: 'aiRun', version: '1', service: 'qa'}` | `AIRUN#${runId}` | `RUN` |
 
 Every key uses `field: 'pk'` / `'sk'` and `casing: 'none'`. `fieldKey` and `promptVersion` never contain `#`, so a `begins_with` query on `AI#${snapKey}#` returns exactly one snapshot's suggestions. The `onecgiar_qa` contract test should load `contract/examples/*.json` through its entities and validate its API responses against `contract/schema/ai-suggestion-view.schema.json`.
+
+## Evidence extraction
+
+`app/evidence/scraper.py` is a copy of `qa-service/app/web_scraping/` (branch `dev-qa`, commit `4959345`), not a shared package: each service is promoted through its own branches, and this copy has to differ anyway. The module docstring lists what was kept and what changed. The main differences:
+
+- **No Playwright.** The worker is a zip Lambda and Chromium does not fit. Web and DOI landing pages are fetched over plain HTTP, so pages that need JavaScript end up `unreadable`. The v1 vs v2 comparison measures how often this happens.
+- **Guarded HTTP.** Each redirect hop passes an SSRF check (public addresses, default ports, http/https only). Downloads are capped at 25 MB and 45 s, and nothing is written to disk.
+- **OCR fallback.** A PDF without a text layer is sent to the model as a `document` block when it is 10 MB or smaller.
+- **Private links.** 401/403 responses and Microsoft or Google login pages count as private.
+
+The extractor gives each link one of five statuses: `text`, `pdf_ocr`, `private`, `unreadable` or `error`. Transient errors are not cached, so a retry fetches them again. When no link is readable, the job stores `unavailable` without calling the model: the reason is `private_link` if any link was private, otherwise `no_readable_evidence`.
 
 ## Infrastructure
 
@@ -120,4 +132,4 @@ Both versions run on the same 2025 sample. The December batch uses whichever ver
 
 | Done | Pending |
 | --- | --- |
-| Python port: contract (Pydantic + JSON Schema), signal mapping, quote verification, LLM provider port and Bedrock Mantle adapter, smoke handler, Lambda build (unit-tested, no live call yet) | Smoke test (waiting for the execution role ARN), evidence extraction (reusing `qa-service`), prompts v1 and v2, worker handler, v1 vs v2 comparison on a 2025 sample |
+| Python port: contract (Pydantic + JSON Schema), evidence extraction (from `qa-service`, no browser), signal mapping, quote verification, LLM provider port and Bedrock Mantle adapter, smoke handler, Lambda build (unit-tested, no live call yet) | Smoke test (waiting for the execution role ARN), prompts v1 and v2, worker handler, v1 vs v2 comparison on a 2025 sample |
