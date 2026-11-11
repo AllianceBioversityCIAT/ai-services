@@ -2,7 +2,7 @@ provider "aws" {
   region = "us-east-1"
   default_tags {
     tags = {
-      project     = "qa-ai"
+      Project     = "qa-ai" # infra tracking tag (key is case-sensitive)
       environment = "test"
       managed_by  = "terraform"
       ticket      = "P2-3918"
