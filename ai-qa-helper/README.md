@@ -123,8 +123,10 @@ The scoring criteria in the previous AI QA Helper's prompts (scales, definitions
 
 | Version | What it is |
 | --- | --- |
-| `v1` | The previous helper's nine prompts, verbatim. This is the baseline. |
-| `v2` | Our rewrite with the same criteria. It drops the gpt-5 framing and the hand-written JSON instructions, separates the instructions from the evidence, asks for a verbatim evidence quote, and uses structured output. |
+| `v1-1.0.0` | The previous helper's seven AI-input prompts (01–05, 07, 08), byte for byte, sent the way its code sent them (`Context: <JSON>\n\n<prompt>`, empty placeholders included). Only the mechanics differ: no temperature, structured output with its own keys plus `Evidence Quote`. This is the baseline. |
+| `v2-1.0.0` | The same criteria in a common frame: the rubric is a cached system prompt, the evidence is tagged by source, the quote must be verbatim, and the explanation has at most 50 words. The input and output instructions and the contradictions of the old prompts are removed. |
+
+Neither version sends the reported value to the model. Every prompt file is pinned by sha256 in [`prompts/manifest.json`](prompts/manifest.json), so a released version cannot change. Details of the differences: [`prompts/README.md`](prompts/README.md).
 
 Both versions run on the same 2025 sample. The December batch uses whichever version scores better against the final QA values. Changes to the criteria themselves are proposed after the batch, based on its data, and validated with the QA coordinator before use (February 2027 cycle).
 
@@ -132,4 +134,4 @@ Both versions run on the same 2025 sample. The December batch uses whichever ver
 
 | Done | Pending |
 | --- | --- |
-| Python port: contract (Pydantic + JSON Schema), evidence extraction (from `qa-service`, no browser), signal mapping, quote verification, LLM provider port and Bedrock Mantle adapter, smoke handler, Lambda build (unit-tested, no live call yet) | Smoke test (waiting for the execution role ARN), prompts v1 and v2, worker handler, v1 vs v2 comparison on a 2025 sample |
+| Python port: contract (Pydantic + JSON Schema), evidence extraction (from `qa-service`, no browser), signal mapping, quote verification, LLM provider port and Bedrock Mantle adapter, prompts v1 and v2 loaded by version, smoke handler, Lambda build (unit-tested, no live call yet) | Smoke test (waiting for the execution role ARN), worker handler, v1 vs v2 comparison on a 2025 sample |

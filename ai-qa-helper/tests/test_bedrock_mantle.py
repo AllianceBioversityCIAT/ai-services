@@ -3,8 +3,8 @@ import pytest
 import anthropic
 
 from app.llm.bedrock_mantle import BedrockMantleProvider
-from app.llm.output_schema import SuggestionOutputV1, SuggestionOutputV2, normalize
-from app.llm.provider import PdfEvidence, RetryableLlmError, SuggestionRequest, TextEvidence
+from app.llm.output_schema import SuggestionOutputV2, V1ImpactAreaOutput, normalize
+from app.llm.provider import PdfEvidence, RetryableLlmError, SuggestionRequest, TextPart
 from tests.fakes import fake_client, fake_message
 
 V2_JSON = (
@@ -13,14 +13,14 @@ V2_JSON = (
 )
 
 
-def request(model=SuggestionOutputV2):
+def request(model=SuggestionOutputV2, cache_system=True):
     return SuggestionRequest(
-        system_prefix="RUBRIC",
-        task="TASK",
-        evidence=[TextEvidence(0, 'a "b"', "text"), PdfEvidence(1, "scan.pdf", "JVBERi0=")],
+        system="RUBRIC",
+        content=[TextPart("EVIDENCE"), PdfEvidence(1, "scan.pdf", "JVBERi0="), TextPart("TASK")],
         output_model=model,
         effort="medium",
         max_tokens=4000,
+        cache_system=cache_system,
     )
 
 
@@ -37,9 +37,26 @@ def test_builds_cached_prefix_structured_output_and_no_temperature():
     assert call["output_config"]["effort"] == "medium"
     assert call["output_config"]["format"]["type"] == "json_schema"
     content = call["messages"][0]["content"]
-    assert content[0]["text"].startswith('<evidence index="0" source="a &quot;b&quot;">')
-    assert content[1]["type"] == "document" and content[-1]["text"] == "TASK"
+    assert [c["type"] for c in content] == ["text", "document", "text"]
+    assert content[0]["text"] == "EVIDENCE" and content[-1]["text"] == "TASK"
     assert res.kind == "ok" and res.output.value == 2 and res.usage.cache_read_input_tokens == 900
+
+
+def test_system_without_cache_breakpoint_when_not_requested():
+    client = fake_client(fake_message(V2_JSON))
+    provider(client).suggest(request(cache_system=False))
+    assert client.messages.calls[0]["system"] == [{"type": "text", "text": "RUBRIC"}]
+
+
+def test_v1_schema_uses_the_previous_helper_keys():
+    client = fake_client(fake_message(
+        '{"Reasoning":"r","Short Justification":"Because.","Score":1,"Component (if Score = 2)":"N/A",'
+        '"Evidence Quote":"q"}'
+    ))
+    res = provider(client).suggest(request(model=V1ImpactAreaOutput))
+    props = client.messages.calls[0]["output_config"]["format"]["schema"]["properties"]
+    assert list(props) == ["Reasoning", "Short Justification", "Score", "Component (if Score = 2)", "Evidence Quote"]
+    assert res.kind == "ok" and normalize(res.output).component is None
 
 
 @pytest.mark.parametrize(("stop", "kind"), [("refusal", "refusal"), ("max_tokens", "truncated")])
@@ -68,7 +85,7 @@ def test_throttling_and_5xx_are_retryable_but_400_is_not():
 
 
 def test_v1_and_v2_map_to_the_same_view():
-    v1 = SuggestionOutputV1(reasoning="r", short_justification="Because.", score=2, component="Principal", evidence_quote="q")
+    v1 = V1ImpactAreaOutput(reasoning="r", short_justification="Because.", score=2, component="Principal", evidence_quote="q")
     v2 = SuggestionOutputV2.model_validate_json(V2_JSON)
     a, b = normalize(v1), normalize(v2)
     assert (a.value, a.explanation, a.component) == (b.value, b.explanation, b.component)

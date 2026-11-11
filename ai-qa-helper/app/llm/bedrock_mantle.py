@@ -25,7 +25,7 @@ from app.llm.provider import (
     RetryableLlmError,
     SuggestionRequest,
     SuggestionResult,
-    TextEvidence,
+    TextPart,
 )
 
 
@@ -45,15 +45,9 @@ class BedrockMantleProvider:
 
     def suggest(self, request: SuggestionRequest[OutputT]) -> SuggestionResult[OutputT]:
         content: list[dict[str, Any]] = []
-        for part in request.evidence:
-            if isinstance(part, TextEvidence):
-                content.append(
-                    {
-                        "type": "text",
-                        "text": f'<evidence index="{part.source_index}" source="{_attr(part.label)}">\n'
-                        f"{part.text}\n</evidence>",
-                    }
-                )
+        for part in request.content:
+            if isinstance(part, TextPart):
+                content.append({"type": "text", "text": part.text})
             elif isinstance(part, PdfEvidence):
                 content.append(
                     {
@@ -62,14 +56,16 @@ class BedrockMantleProvider:
                         "title": f"evidence {part.source_index}: {part.label}",
                     }
                 )
-        content.append({"type": "text", "text": request.task})
+        system: dict[str, Any] = {"type": "text", "text": request.system}
+        if request.cache_system:
+            system["cache_control"] = {"type": "ephemeral"}
 
         schema = anthropic.transform_schema(request.output_model.model_json_schema())
         try:
             message = self._client.messages.create(
                 model=self._model_id,
                 max_tokens=request.max_tokens,
-                system=[{"type": "text", "text": request.system_prefix, "cache_control": {"type": "ephemeral"}}],
+                system=[system],
                 messages=[{"role": "user", "content": content}],
                 output_config={"effort": request.effort, "format": {"type": "json_schema", "schema": schema}},
             )
@@ -102,6 +98,3 @@ def _usage(u: Any) -> LlmUsage:
         cache_creation_input_tokens=getattr(u, "cache_creation_input_tokens", None) or 0,
     )
 
-
-def _attr(value: str) -> str:
-    return value.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")

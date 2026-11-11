@@ -10,9 +10,7 @@ OutputT = TypeVar("OutputT", bound=BaseModel)
 
 
 @dataclass(frozen=True)
-class TextEvidence:
-    source_index: int
-    label: str
+class TextPart:
     text: str
 
 
@@ -25,19 +23,21 @@ class PdfEvidence:
     data_base64: str
 
 
-EvidencePart = TextEvidence | PdfEvidence
+ContentPart = TextPart | PdfEvidence
 
 
 @dataclass(frozen=True)
 class SuggestionRequest(Generic[OutputT]):
-    system_prefix: str
-    """Fixed prefix (rubric + guide). Identical across calls of a field so it can be cached."""
-    task: str
-    """Variable part: field, reported value, result context."""
-    evidence: list[EvidencePart]
+    """One model call. The prompt builder of each version decides the layout (see app/prompts)."""
+
+    system: str
+    content: list[ContentPart]
+    """User turn, in order."""
     output_model: type[OutputT]
     effort: Effort
     max_tokens: int
+    cache_system: bool = True
+    """Mark the system prompt as a cache breakpoint (v2: the fixed rubric)."""
 
 
 @dataclass(frozen=True)

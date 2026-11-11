@@ -1,0 +1,146 @@
+{
+  "versions": {
+    "v1-1.0.0": {
+      "family": "v1",
+      "description": "Previous helper's production prompts (final run 8-9 Mar 2026), verbatim. See prompts/README.md.",
+      "fields": {
+        "impact_area_gender": {
+          "file": "impact_area_gender/v1.txt",
+          "sha256": "405500fec7af63fb54c2e11cec16d0ae7f077841c8c2eb9413baa2e2062ca636",
+          "output": "v1_impact_area",
+          "label": "Gender equality, youth and social inclusion (Impact Area tag)",
+          "source": "01-gender.md (Gender (variant B) v4)"
+        },
+        "impact_area_climate": {
+          "file": "impact_area_climate/v1.txt",
+          "sha256": "438545f9bbf0c695d7aaad1965b4229e5f20bcab15204c1eefaeba8c307351e8",
+          "output": "v1_impact_area",
+          "label": "Climate adaptation and mitigation (Impact Area tag)",
+          "source": "02-climate.md (Climate (variant B) (V3 Copy) v1)"
+        },
+        "impact_area_nutrition": {
+          "file": "impact_area_nutrition/v1.txt",
+          "sha256": "3a94e32a264b5f838626915b30756c11bb748ed17a722c80e1358df9c430cedc",
+          "output": "v1_impact_area",
+          "label": "Nutrition, health and food security (Impact Area tag)",
+          "source": "03-nutrition.md (Nutrition Prompt v4)"
+        },
+        "impact_area_poverty": {
+          "file": "impact_area_poverty/v1.txt",
+          "sha256": "9ac84853ee177a7cf1434dc0a10f20c6ef2bd9b16b6f928121e17e44ca9d5d6b",
+          "output": "v1_impact_area",
+          "label": "Poverty reduction, livelihoods and jobs (Impact Area tag)",
+          "source": "04-poverty.md (Poverty (variant B) v1)"
+        },
+        "impact_area_environment": {
+          "file": "impact_area_environment/v1.txt",
+          "sha256": "4367ab44ff89f3c4fc3ba05a9ce95182a6098dbabc9e3f43d9de0b16ea6f8578",
+          "output": "v1_impact_area",
+          "label": "Environmental health and biodiversity (Impact Area tag)",
+          "source": "05-environment-biodiversity.md (Environment Prompt v2)"
+        },
+        "innovation_readiness_level": {
+          "file": "innovation_readiness_level/v1.txt",
+          "sha256": "8f7f84f2168e9e33984aad310347e7f2584e650441b91becbdbf736d76153c19",
+          "output": "v1_readiness_level",
+          "label": "Innovation Readiness Level",
+          "source": "07-innovation-readiness-level.md (Innovation Readiness (expert-revised variant) v3)"
+        },
+        "innovation_use_level": {
+          "file": "innovation_use_level/v1.txt",
+          "sha256": "f0fdb2aa6e85a66ee24112d66cd15f47865ac0b1e422d70a8a6e06dacdb3d862",
+          "output": "v1_use_level",
+          "label": "Innovation Use Level",
+          "source": "08-innovation-use-level.md (Innovation Use Level (variant J) v5)"
+        }
+      }
+    },
+    "v2-1.0.0": {
+      "family": "v2",
+      "description": "Same criteria; common frame, evidence tagged by source, verifiable quote, no reported value.",
+      "system": {
+        "file": "common/v2.system.md",
+        "sha256": "4fe6e88c643495d7fbcdb08ddf4997a6a9231a50872b9af86def8addb10c2d9a"
+      },
+      "fields": {
+        "impact_area_gender": {
+          "file": "impact_area_gender/v2.criteria.md",
+          "sha256": "7d89eb24197c4a612352ee93363d75f8084965f9203e6552c48ca32025207ac1",
+          "output": "v2",
+          "label": "Gender equality, youth and social inclusion (Impact Area tag)",
+          "scale": "0 = NOT TARGETED, 1 = SIGNIFICANT, 2 = PRINCIPAL.",
+          "component": "only when the value is 2, the component(s) the result primarily addresses, from: Gender Equality; Youth; Social Inclusion (separate several with \"; \"). Otherwise null.",
+          "explanation": "Reference specific aspects of the result, say why the value fits and briefly why the other two values do not."
+        },
+        "impact_area_climate": {
+          "file": "impact_area_climate/v2.criteria.md",
+          "sha256": "b990136887fd2063266b120e573175c6e52757eff74081d4951cdd74e5b7ceb2",
+          "output": "v2",
+          "label": "Climate adaptation and mitigation (Impact Area tag)",
+          "scale": "0 = NOT TARGETED, 1 = SIGNIFICANT, 2 = PRINCIPAL.",
+          "component": "only when the value is 2, the component(s) the result primarily addresses, from: Adaptation; Mitigation (separate several with \"; \"). Otherwise null.",
+          "explanation": "Reference specific aspects of the result, say why the value fits and briefly why the other two values do not."
+        },
+        "impact_area_nutrition": {
+          "file": "impact_area_nutrition/v2.criteria.md",
+          "sha256": "110d7c0af79202209f3260a7a3f885393d3bc59213422ac217a8e1bf140ea758",
+          "output": "v2",
+          "label": "Nutrition, health and food security (Impact Area tag)",
+          "scale": "0 = NOT TARGETED, 1 = SIGNIFICANT, 2 = PRINCIPAL.",
+          "component": "only when the value is 2, the component(s) the result primarily addresses, from: Nutrition; Health; Food Security (separate several with \"; \"). Otherwise null.",
+          "explanation": "Reference specific aspects of the result, say why the value fits and briefly why the other two values do not."
+        },
+        "impact_area_poverty": {
+          "file": "impact_area_poverty/v2.criteria.md",
+          "sha256": "4ae887efaa624ac1b63009c4f19d9de606b62eec2733c269d0dc5162d0630d47",
+          "output": "v2",
+          "label": "Poverty reduction, livelihoods and jobs (Impact Area tag)",
+          "scale": "0 = NOT TARGETED, 1 = SIGNIFICANT, 2 = PRINCIPAL.",
+          "component": "only when the value is 2, the component(s) the result primarily addresses, from: Poverty Reduction; Livelihoods; Jobs (separate several with \"; \"). Otherwise null.",
+          "explanation": "Reference specific aspects of the result, say why the value fits and briefly why the other two values do not."
+        },
+        "impact_area_environment": {
+          "file": "impact_area_environment/v2.criteria.md",
+          "sha256": "3503b47f191a5df9397b3df345ac12bda08c948dafedc351df3443fe4a3727ab",
+          "output": "v2",
+          "label": "Environmental health and biodiversity (Impact Area tag)",
+          "scale": "0 = NOT TARGETED, 1 = SIGNIFICANT, 2 = PRINCIPAL.",
+          "component": "only when the value is 2, the component(s) the result primarily addresses, from: Environmental Health; Biodiversity (separate several with \"; \"). Otherwise null.",
+          "explanation": "Reference specific aspects of the result, say why the value fits and briefly why the other two values do not."
+        },
+        "innovation_readiness_level": {
+          "file": "innovation_readiness_level/v2.criteria.md",
+          "sha256": "5bc63d2f61d4ea811ab90011fda43495b6d576a6ca6800969c035ea542099066",
+          "output": "v2",
+          "label": "Innovation Readiness Level",
+          "scale": "Innovation Readiness Level from 0 to 9.",
+          "component": "a one-line description of the prime innovation assessed.",
+          "explanation": "Reference the concrete evidence (document title and page or section when available), say why the level fits and what critical evidence is missing for a higher level."
+        },
+        "innovation_use_level": {
+          "file": "innovation_use_level/v2.criteria.md",
+          "sha256": "d4de2b34e3031de0374a1543bd4da6f47a68c0d532a1866abc1091a5188a5c04",
+          "output": "v2",
+          "label": "Innovation Use Level",
+          "scale": "Innovation Use Level from 0 to 9.",
+          "component": "a one-line description of the prime innovation assessed.",
+          "explanation": "Reference the concrete evidence (document title and page or section when available), say why the level fits and what critical evidence is missing for a higher level."
+        }
+      }
+    }
+  },
+  "inactive": {
+    "is_innovation": {
+      "file": "inactive/is_innovation.v1.txt",
+      "sha256": "fc99c8c942edaaac8af2df8874a1090d7262c3afb7a1dedba8717cd4a7979c87",
+      "source": "06-is-innovation.md",
+      "note": "Not an AI-input field in the December 2026 batch; kept for reference only."
+    },
+    "innovation_use_numbers": {
+      "file": "inactive/innovation_use_numbers.v1.txt",
+      "sha256": "4c0627324ad929d3648058bc97c9e2ca92328dcd06f206e0e8ac6a99df815b4f",
+      "source": "09-innovation-use-numbers.md",
+      "note": "Not an AI-input field in the December 2026 batch; kept for reference only."
+    }
+  }
+}

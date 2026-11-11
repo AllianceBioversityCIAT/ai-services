@@ -1,0 +1,2 @@
+# Prompt texts are pinned by sha256 (prompts/manifest.json): never normalise line endings.
+prompts/** -text

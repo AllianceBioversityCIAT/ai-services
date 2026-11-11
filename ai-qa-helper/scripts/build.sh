@@ -19,6 +19,7 @@ uv pip install --quiet --no-deps --only-binary :all: \
   --target "$BUILD" -r requirements.txt
 
 cp -R app "$BUILD/app"
+cp -R prompts "$BUILD/prompts"
 find "$BUILD" -type d -name __pycache__ -prune -exec rm -rf {} +
 
 (cd "$BUILD" && zip -qr -X "../../$OUT" .)
