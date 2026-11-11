@@ -11,7 +11,8 @@ dependencies = [
     # Evidence extraction (same libraries as qa-service/app/web_scraping, minus Playwright and pandas)
     "requests>=2.32",
     "beautifulsoup4>=4.13",
-    "pymupdf>=1.26,<2",  # 2.x pulls onnxruntime/numpy (layout models) we do not use
+    "pymupdf>=1.26,<2", # 2.x pulls onnxruntime/numpy (layout models) we do not use
+    "boto3>=1.40,<2",
 ]
 
 [dependency-groups]

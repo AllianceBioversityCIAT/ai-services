@@ -37,8 +37,11 @@ resource "aws_lambda_function" "worker" {
 
   environment {
     variables = {
-      MODEL_ID = var.model_id
-      ENV_NAME = var.env
+      MODEL_ID          = var.model_id
+      ENV_NAME          = var.env
+      TABLE_NAME        = coalesce(var.dynamodb_table_name, "cgiar-qa-${var.env}")
+      LLM_EFFORT        = var.llm_effort
+      MAX_RECEIVE_COUNT = tostring(var.max_receive_count)
     }
   }
 

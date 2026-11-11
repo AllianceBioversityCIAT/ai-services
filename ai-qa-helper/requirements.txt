@@ -11,7 +11,9 @@ anyio==4.16.0
 beautifulsoup4==4.15.0
     # via ai-qa-helper
 boto3==1.43.124
-    # via anthropic
+    # via
+    #   ai-qa-helper
+    #   anthropic
 botocore==1.43.124
     # via
     #   anthropic

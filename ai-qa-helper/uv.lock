@@ -12,6 +12,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "anthropic", extra = ["bedrock"] },
     { name = "beautifulsoup4" },
+    { name = "boto3" },
     { name = "pydantic" },
     { name = "pymupdf" },
     { name = "python-dotenv" },
@@ -27,6 +28,7 @@ dev = [
 requires-dist = [
     { name = "anthropic", extras = ["bedrock"], specifier = "==2.5.0" },
     { name = "beautifulsoup4", specifier = ">=4.13" },
+    { name = "boto3", specifier = ">=1.40,<2" },
     { name = "pydantic", specifier = ">=2.11,<3" },
     { name = "pymupdf", specifier = ">=1.26,<2" },
     { name = "python-dotenv", specifier = ">=1.1" },

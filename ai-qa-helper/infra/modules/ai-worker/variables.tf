@@ -49,8 +49,9 @@ variable "worker_package_path" {
 }
 
 variable "worker_timeout_seconds" {
-  type    = number
-  default = 120
+  description = "One job: up to 5 evidence links x 45 s plus the model call (with one retry if truncated)."
+  type        = number
+  default     = 420
 }
 
 variable "worker_memory_mb" {
@@ -65,8 +66,25 @@ variable "worker_max_concurrency" {
 }
 
 variable "worker_batch_size" {
-  type    = number
-  default = 5
+  description = "1: each job gets the whole timeout; throughput is set by worker_max_concurrency."
+  type        = number
+  default     = 1
+}
+
+variable "dynamodb_table_name" {
+  description = "QA table the worker reads snapshots from and writes suggestions to. null = cgiar-qa-<env>."
+  type        = string
+  default     = null
+}
+
+variable "llm_effort" {
+  description = "output_config.effort for Claude (low | medium | high). Set from the v1/v2 comparison."
+  type        = string
+  default     = "medium"
+  validation {
+    condition     = contains(["low", "medium", "high"], var.llm_effort)
+    error_message = "llm_effort must be low, medium or high."
+  }
 }
 
 variable "max_receive_count" {

@@ -56,7 +56,9 @@ The tests use `FakeLlmProvider` and a fake Anthropic client ([`tests/fakes.py`](
 | `app/signal/` | Deterministic signal and quote verification |
 | `app/llm/` | `LlmProvider` port, Bedrock Mantle adapter, v1/v2 output schemas |
 | `app/evidence/` | Evidence extraction copied from `qa-service` without the browser paths, plus the SSRF guard and the OCR fallback |
-| `app/handlers/` | Lambda handlers (`smoke.handler`; the worker handler is pending) |
+| `app/handlers/` | Lambda handlers: `smoke.handler`, `worker.handler` |
+| `app/worker/` | One job (`process.py`), snapshot reader, DynamoDB store |
+| `app/prompts/`, `prompts/` | Prompt loader and request builder; prompt texts and manifest |
 | `app/utils/` | Logger and configuration, same interface as `qa-service` |
 | `contract/` | Generated JSON Schema and example items for the `onecgiar_qa` contract test |
 
@@ -87,6 +89,29 @@ Every key uses `field: 'pk'` / `'sk'` and `casing: 'none'`. `fieldKey` and `prom
 - **Private links.** 401/403 responses and Microsoft or Google login pages count as private.
 
 The extractor gives each link one of five statuses: `text`, `pdf_ocr`, `private`, `unreadable` or `error`. Transient errors are not cached, so a retry fetches them again. When no link is readable, the job stores `unavailable` without calling the model: the reason is `private_link` if any link was private, otherwise `no_readable_evidence`.
+
+## Worker
+
+Handler: `app.handlers.worker.handler` (SQS, batch size 1, partial batch failures). Each job is
+one (snapshot, field, promptVersion):
+
+1. **Already stored?** The job is skipped, with no model call. A duplicate SQS delivery never counts twice.
+2. **Criteria.** A field without a prompt in that version is stored as `no_criteria_for_field`.
+3. **Snapshot.** `RESULT#<code>` / `SNAP#<snapKey>`, written by `onecgiar_qa`. The worker reads the title, the description, the reported value and the evidence links ([`app/worker/snapshot.py`](app/worker/snapshot.py)). It uses the links flagged for the field (`evidence.items[].<area>_related`); if none are flagged, it uses all of the result's links, up to 5.
+4. **Evidence.** Nothing readable means `unavailable` with its reason, and no model call.
+5. **Model.** A truncated answer is retried once with a higher cap. A refusal is stored as `model_declined`; invalid JSON or an out-of-range value as `invalid_output`.
+6. **Signal and write.** One DynamoDB transaction puts the suggestion, conditional on the key, and adds 1 to the `AiRun` counter.
+
+Transient errors (throttling, 5xx, timeouts, a snapshot not found yet) are retried by SQS. On the
+last delivery (`MAX_RECEIVE_COUNT`, the same value as the queue's redrive) the job is stored as
+`unavailable/failed`, so every expected job is accounted for. A `failed` item is the only one that
+can be replaced: re-enqueuing the job overwrites it and moves its count from `failed`. Only
+messages that cannot be parsed or recorded reach the DLQ.
+
+**To confirm with Reporting:** how a `single_select` value appears in `values` (bare id or
+`{"value": id}`; both are accepted), and the id → level maps in `LEVEL_MAPS`. `tag_levels` is
+assumed to be 1/2/3 → 0/1/2. `readiness_levels` and `innovation_use_levels` stay empty until
+confirmed, so the reported IRL/IUL counts as "not reported" (amber) rather than a guess.
 
 ## Infrastructure
 
@@ -134,4 +159,4 @@ Both versions run on the same 2025 sample. The December batch uses whichever ver
 
 | Done | Pending |
 | --- | --- |
-| Python port: contract (Pydantic + JSON Schema), evidence extraction (from `qa-service`, no browser), signal mapping, quote verification, LLM provider port and Bedrock Mantle adapter, prompts v1 and v2 loaded by version, smoke handler, Lambda build (unit-tested, no live call yet) | Smoke test (waiting for the execution role ARN), worker handler, v1 vs v2 comparison on a 2025 sample |
+| Python port: contract (Pydantic + JSON Schema), evidence extraction (from `qa-service`, no browser), signal mapping, quote verification, LLM provider port and Bedrock Mantle adapter, prompts v1 and v2 loaded by version, worker handler (idempotent writes, partial batch failures, run counters), smoke handler, Lambda build (unit-tested, no live call yet) | Smoke test (waiting for the execution role ARN), control-list id maps (Reporting), v1 vs v2 comparison on a 2025 sample |
