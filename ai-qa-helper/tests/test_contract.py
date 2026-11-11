@@ -8,7 +8,7 @@ VIEW = TypeAdapter(AiSuggestionView)
 
 
 def test_job_message_parses_and_rejects_missing_field():
-    msg = {"runId": "r1", "resultCode": "1234", "snapKey": "s1", "fieldKey": "impact_area_gender", "promptVersion": "v1"}
+    msg = {"runId": "r1", "resultCode": "1234", "snapKey": "s1", "fieldKey": "general.gender_tag", "promptVersion": "v1"}
     assert AiJobMessage.model_validate(msg).model_dump() == msg
     with pytest.raises(ValidationError):
         AiJobMessage.model_validate({k: v for k, v in msg.items() if k != "fieldKey"})
@@ -21,7 +21,7 @@ def test_unavailable_requires_a_reason():
 
 
 def test_knows_which_fields_have_criteria():
-    assert field_spec("impact_area_climate").max == 2
-    assert field_spec("innovation_use_level").max == 9
+    assert field_spec("general.climate_tag").max == 2
+    assert field_spec("innovation_use.use_level.innovation_use_level").max == 9
     assert field_spec("__class__") is None
     assert field_spec("unknown_field") is None

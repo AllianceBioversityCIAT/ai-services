@@ -3,8 +3,8 @@ import pytest
 from app.contract.fields import AI_FIELDS
 from app.signal.signal import SignalInput, compute_signal
 
-IA = AI_FIELDS["impact_area_gender"]
-IRL = AI_FIELDS["innovation_readiness_level"]
+IA = AI_FIELDS["general.gender_tag"]
+IRL = AI_FIELDS["innovation_dev.readiness_level"]
 
 
 def sig(spec, reported, suggested, quote_verified=True, partial_evidence=False):

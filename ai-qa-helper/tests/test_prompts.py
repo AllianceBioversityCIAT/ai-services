@@ -42,23 +42,23 @@ def test_both_versions_cover_every_ai_field():
 
 
 def test_v1_keeps_the_previous_helper_text_and_its_empty_placeholders():
-    gender = get_prompt("v1-1.0.0", "impact_area_gender").text
+    gender = get_prompt("v1-1.0.0", "general.gender_tag").text
     assert gender.startswith("You are an AI assistant tasked with evaluating research results from CGIAR")
     assert '"Component (if Score = 2)": "Gender Equality | Youth | Social Inclusion | N/A"}' in gender
-    assert "{core_innovation}" in get_prompt("v1-1.0.0", "innovation_use_level").text
+    assert "{core_innovation}" in get_prompt("v1-1.0.0", "innovation_use.use_level.innovation_use_level").text
     # The climate prompt was stored with literal backslash-n sequences and escaped quotes.
-    assert "\\n\\nYour role is advisory" in get_prompt("v1-1.0.0", "impact_area_climate").text
+    assert "\\n\\nYour role is advisory" in get_prompt("v1-1.0.0", "general.climate_tag").text
 
 
 def test_v1_output_models_follow_the_prompt_keys():
-    assert get_prompt("v1-1.0.0", "impact_area_poverty").output_model is V1ImpactAreaOutput
-    assert get_prompt("v1-1.0.0", "innovation_readiness_level").output_model is V1ReadinessOutput
-    assert get_prompt("v1-1.0.0", "innovation_use_level").output_model is V1UseOutput
-    assert get_prompt("v2-1.0.0", "innovation_use_level").output_model is SuggestionOutputV2
+    assert get_prompt("v1-1.0.0", "general.poverty_tag").output_model is V1ImpactAreaOutput
+    assert get_prompt("v1-1.0.0", "innovation_dev.readiness_level").output_model is V1ReadinessOutput
+    assert get_prompt("v1-1.0.0", "innovation_use.use_level.innovation_use_level").output_model is V1UseOutput
+    assert get_prompt("v2-1.0.0", "innovation_use.use_level.innovation_use_level").output_model is SuggestionOutputV2
 
 
 def test_v1_request_reproduces_the_previous_input_layout():
-    spec = get_prompt("v1-1.0.0", "impact_area_gender")
+    spec = get_prompt("v1-1.0.0", "general.gender_tag")
     built = build_request(spec, RESULT, sources(), "medium", 4000)
     req = built.request
     assert req.system == V1_SYSTEM and req.cache_system is False
@@ -80,12 +80,12 @@ def test_v1_context_matches_json_stringify_and_drops_empty_values():
 
 def test_v1_content_is_capped_like_the_excel_cell():
     long = [EvidenceSource(0, "u", "text", text="a" * 40_000)]
-    built = build_request(get_prompt("v1-1.0.0", "impact_area_gender"), RESULT, long, "low", 4000)
+    built = build_request(get_prompt("v1-1.0.0", "general.gender_tag"), RESULT, long, "low", 4000)
     assert len(built.evidence_text) == V1_CONTENT_CAP
 
 
 def test_v2_request_has_cached_rubric_tagged_evidence_and_no_reported_value():
-    spec = get_prompt("v2-1.0.0", "impact_area_gender")
+    spec = get_prompt("v2-1.0.0", "general.gender_tag")
     assert "{{" not in spec.text and "<criteria>" in spec.text and "Gender Equality; Youth" in spec.text
     built = build_request(spec, RESULT, sources(), "medium", 4000)
     req = built.request
@@ -108,7 +108,7 @@ def test_v2_criteria_drop_the_previous_input_and_output_instructions():
 
 def test_unknown_version_and_missing_field():
     with pytest.raises(UnknownPromptVersion):
-        get_prompt("v9-0.0.0", "impact_area_gender")
+        get_prompt("v9-0.0.0", "general.gender_tag")
     assert get_prompt("v1-1.0.0", "is_this_an_innovation") is None
 
 
@@ -120,6 +120,6 @@ def test_tampered_prompt_is_rejected(tmp_path):
     _manifest.cache_clear()
     try:
         with pytest.raises(PromptIntegrityError):
-            get_prompt("v1-1.0.0", "impact_area_gender", prompts_dir=copy)
+            get_prompt("v1-1.0.0", "general.gender_tag", prompts_dir=copy)
     finally:
         _manifest.cache_clear()

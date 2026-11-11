@@ -33,12 +33,12 @@ def test_item_dumps_electrodb_identifiers():
     item = AiSuggestionItem.model_validate(
         {
             "pk": suggestion_pk(4521),
-            "sk": suggestion_sk(SNAP, "impact_area_gender", "v1"),
+            "sk": suggestion_sk(SNAP, "general.gender_tag", "v1"),
             "__edb_e__": "aiSuggestion",
             "__edb_v__": "1",
             "resultCode": 4521,
             "snapKey": SNAP,
-            "fieldKey": "impact_area_gender",
+            "fieldKey": "general.gender_tag",
             "promptVersion": "v1",
             "suggestionId": "s-1",
             "runId": "R-1",

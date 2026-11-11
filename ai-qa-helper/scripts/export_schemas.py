@@ -28,12 +28,12 @@ EXAMPLES = {
     "ai-suggestion-item.available": AiSuggestionItem.model_validate(
         {
             "pk": suggestion_pk(1001),
-            "sk": suggestion_sk(_SNAP, "impact_area_gender", "v2-1.0.0"),
+            "sk": suggestion_sk(_SNAP, "general.gender_tag", "v2-1.0.0"),
             "__edb_e__": "aiSuggestion",
             "__edb_v__": "1",
             "resultCode": 1001,
             "snapKey": _SNAP,
-            "fieldKey": "impact_area_gender",
+            "fieldKey": "general.gender_tag",
             "promptVersion": "v2-1.0.0",
             "suggestionId": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
             "runId": "run-example",
@@ -55,12 +55,12 @@ EXAMPLES = {
     "ai-suggestion-item.unavailable": AiSuggestionItem.model_validate(
         {
             "pk": suggestion_pk(1001),
-            "sk": suggestion_sk(_SNAP, "innovation_use_level", "v2-1.0.0"),
+            "sk": suggestion_sk(_SNAP, "innovation_use.use_level.innovation_use_level", "v2-1.0.0"),
             "__edb_e__": "aiSuggestion",
             "__edb_v__": "1",
             "resultCode": 1001,
             "snapKey": _SNAP,
-            "fieldKey": "innovation_use_level",
+            "fieldKey": "innovation_use.use_level.innovation_use_level",
             "promptVersion": "v2-1.0.0",
             "suggestionId": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
             "runId": "run-example",
