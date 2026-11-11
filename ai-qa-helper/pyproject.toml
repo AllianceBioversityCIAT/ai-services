@@ -1,0 +1,29 @@
+[project]
+name = "ai-qa-helper"
+version = "0.1.0"
+description = "P2-3918 AI suggestion worker for the OneCGIAR QA platform (SQS -> Claude on Bedrock -> DynamoDB)."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "anthropic[bedrock]==2.5.0",
+    "pydantic>=2.11,<3",
+    "python-dotenv>=1.1",
+    # Evidence extraction (same libraries as qa-service/app/web_scraping, minus Playwright and pandas)
+    "requests>=2.32",
+    "beautifulsoup4>=4.13",
+    "pymupdf>=1.26",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4",
+]
+
+[tool.uv]
+# Supply-chain guard: only resolve releases at least a week old at lock time.
+exclude-newer = "2026-11-05T00:00:00Z"
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

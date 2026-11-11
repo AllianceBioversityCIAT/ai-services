@@ -1,0 +1,34 @@
+{
+  "$id": "ai-suggestion-event.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "``POST /ai-suggestions/:suggestionId/events``. Whether the comment was edited is computed server-side.",
+  "properties": {
+    "action": {
+      "enum": [
+        "shown",
+        "copied",
+        "comment_saved"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "commentId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Commentid"
+    }
+  },
+  "required": [
+    "action"
+  ],
+  "title": "AiSuggestionEvent",
+  "type": "object"
+}

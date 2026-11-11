@@ -1,0 +1,5 @@
+# Copy to terraform.tfvars (gitignored) and fill in. Never commit real ARNs.
+execution_role_arn = "arn:aws:iam::<ACCOUNT_ID>:role/<execution-role-name>"
+enable_smoke       = true # S0 only
+enable_worker      = false
+# lambda_package_path = "../../../dist/ai-qa-helper-lambda.zip"   # default; build with scripts/build.sh
