@@ -4,7 +4,7 @@
 resource "aws_lambda_function" "smoke" {
   count            = var.enable_smoke ? 1 : 0
   function_name    = local.smoke_name
-  description      = "P2-3918 S0: one Haiku 5.5 call via Bedrock Mantle. Remove after S2."
+  description      = "P2-3918 S0: one Haiku 5.5 call via Bedrock. Remove after S2."
   role             = var.execution_role_arn
   runtime          = "python3.13"
   architectures    = ["arm64"]
@@ -15,7 +15,7 @@ resource "aws_lambda_function" "smoke" {
   memory_size      = 256
 
   environment {
-    variables = { MODEL_ID = var.model_id }
+    variables = { MODEL_ID = local.model_id, BEDROCK_API = var.bedrock_api }
   }
 
   depends_on = [aws_cloudwatch_log_group.smoke]
@@ -37,7 +37,8 @@ resource "aws_lambda_function" "worker" {
 
   environment {
     variables = {
-      MODEL_ID          = var.model_id
+      MODEL_ID          = local.model_id
+      BEDROCK_API       = var.bedrock_api
       ENV_NAME          = var.env
       TABLE_NAME        = coalesce(var.dynamodb_table_name, "cgiar-qa-${var.env}")
       LLM_EFFORT        = var.llm_effort

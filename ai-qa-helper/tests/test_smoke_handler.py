@@ -7,9 +7,13 @@ def test_smoke_returns_only_model_stop_usage_text():
     out = handler(client=client)
     assert out == {
         "ok": True,
+        "api": "runtime",
         "model": "anthropic.claude-haiku-5-5",
         "stop_reason": "end_turn",
         "usage": {"input_tokens": 1200, "output_tokens": 300},
         "text": "OK",
     }
-    assert "temperature" not in client.messages.calls[0]
+    call = client.messages.calls[0]
+    assert "temperature" not in call
+    assert call["model"] == "us.anthropic.claude-haiku-5-5"
+    assert call["extra_body"] == {"anthropic_version": "bedrock-2023-05-31"}

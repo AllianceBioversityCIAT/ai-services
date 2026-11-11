@@ -18,10 +18,20 @@ variable "execution_role_arn" {
   type        = string
 }
 
-variable "model_id" {
-  description = "Bedrock (Mantle) model ID."
+variable "bedrock_api" {
+  description = "runtime = Bedrock Runtime InvokeModel (bedrock:InvokeModel); mantle = Claude in Amazon Bedrock (bedrock-mantle:CreateInference)."
   type        = string
-  default     = "anthropic.claude-haiku-5-5"
+  default     = "runtime"
+  validation {
+    condition     = contains(["runtime", "mantle"], var.bedrock_api)
+    error_message = "bedrock_api must be runtime or mantle."
+  }
+}
+
+variable "model_id" {
+  description = "Model or inference profile ID. null = us.anthropic.claude-haiku-5-5 (runtime) or anthropic.claude-haiku-5-5 (mantle)."
+  type        = string
+  default     = null
 }
 
 variable "log_retention_days" {

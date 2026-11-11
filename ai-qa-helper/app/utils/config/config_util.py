@@ -14,8 +14,14 @@ AWS = {
     "aws_region": os.getenv("AWS_REGION", "us-east-1"),
 }
 
+_BEDROCK_API = os.getenv("BEDROCK_API", "runtime")
+"""``runtime`` (Bedrock Runtime InvokeModel) or ``mantle`` (Claude in Amazon Bedrock). See app/llm/bedrock.py."""
+
 LLM = {
-    "model_id": os.getenv("MODEL_ID", "anthropic.claude-haiku-5-5"),
+    "bedrock_api": _BEDROCK_API,
+    "model_id": os.getenv(
+        "MODEL_ID", "us.anthropic.claude-haiku-5-5" if _BEDROCK_API == "runtime" else "anthropic.claude-haiku-5-5"
+    ),
     "effort": os.getenv("LLM_EFFORT", "medium"),
     "max_tokens": int(os.getenv("LLM_MAX_TOKENS", "4000")),
 }

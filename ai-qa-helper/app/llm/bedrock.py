@@ -1,8 +1,16 @@
-"""Claude in Amazon Bedrock (Mantle) adapter for the LlmProvider port.
+"""Bedrock adapter for the LlmProvider port, on either of the two Bedrock APIs for Claude.
 
-Client: ``anthropic.lib.bedrock.AnthropicBedrockMantle`` (package ``anthropic[bedrock]``), endpoint
-``https://bedrock-mantle.<region>.api.aws/anthropic``. Auth: the Lambda execution role through the
-default AWS credential chain (SigV4). IAM action: ``bedrock-mantle:CreateInference``.
+- ``runtime`` (default): Amazon Bedrock Runtime InvokeModel, client ``anthropic.lib.bedrock.AnthropicBedrock``,
+  endpoint ``https://bedrock-runtime.<region>.amazonaws.com/model/<id>/invoke``, model = inference profile
+  ``us.anthropic.claude-haiku-5-5``. IAM: ``bedrock:InvokeModel`` on the profile and the model.
+- ``mantle``: Claude in Amazon Bedrock, client ``AnthropicBedrockMantle``, endpoint
+  ``https://bedrock-mantle.<region>.api.aws/anthropic``, model ``anthropic.claude-haiku-5-5``.
+  IAM: ``bedrock-mantle:CreateInference``. In the TEST account it answers 404 for Haiku 5.5 (2026-11-11).
+
+Both take the same Messages body; AWS documents ``output_config.format`` (structured outputs),
+``output_config.effort`` and explicit ``cache_control`` for Haiku 5.5 on InvokeModel. The runtime body
+carries ``anthropic_version = bedrock-2023-05-31`` as in the AWS examples (the SDK default would be the
+newer ``2026-10-21``). Auth: the default AWS credential chain (SigV4).
 
 Claude Haiku 5.5 constraints honoured here: no temperature/top_p/top_k, no assistant prefill,
 adaptive thinking counts toward max_tokens, refusals handled client-side.
@@ -12,10 +20,10 @@ adaptive thinking counts toward max_tokens, refusals handled client-side.
 call are lost. Here every outcome keeps its usage.
 """
 
-from typing import Any
+from typing import Any, Literal
 
 import anthropic
-from anthropic.lib.bedrock import AnthropicBedrockMantle
+from anthropic.lib.bedrock import AnthropicBedrock, AnthropicBedrockMantle
 from pydantic import ValidationError
 
 from app.llm.provider import (
@@ -29,21 +37,41 @@ from app.llm.provider import (
 )
 
 
-class BedrockMantleProvider:
+BedrockApi = Literal["runtime", "mantle"]
+RUNTIME_ANTHROPIC_VERSION = "bedrock-2023-05-31"
+DEFAULT_MODEL_IDS: dict[str, str] = {
+    "runtime": "us.anthropic.claude-haiku-5-5",
+    "mantle": "anthropic.claude-haiku-5-5",
+}
+
+
+def make_client(
+    api: BedrockApi, aws_region: str, aws_profile: str | None = None, max_retries: int = 3, timeout_s: float = 150.0
+) -> Any:
+    """``timeout_s``: AWS recommends at least 120 s, since a new output schema can take ~90 s to compile."""
+    cls = AnthropicBedrock if api == "runtime" else AnthropicBedrockMantle
+    return cls(aws_region=aws_region, aws_profile=aws_profile, max_retries=max_retries, timeout=timeout_s)
+
+
+def extra_body(api: BedrockApi) -> dict[str, Any] | None:
+    return {"anthropic_version": RUNTIME_ANTHROPIC_VERSION} if api == "runtime" else None
+
+
+class BedrockProvider:
     def __init__(
         self,
         model_id: str,
         aws_region: str,
-        max_retries: int = 3,
-        timeout_s: float = 90.0,
+        api: BedrockApi = "runtime",
         client: Any | None = None,
         aws_profile: str | None = None,
     ):
         """``aws_profile`` is for local runs (the offline comparison); the Lambda uses its role."""
+        if api not in DEFAULT_MODEL_IDS:
+            raise ValueError(f"unknown Bedrock API {api!r}")
         self._model_id = model_id
-        self._client = client or AnthropicBedrockMantle(
-            aws_region=aws_region, aws_profile=aws_profile, max_retries=max_retries, timeout=timeout_s
-        )
+        self._extra_body = extra_body(api)
+        self._client = client or make_client(api, aws_region, aws_profile)
 
     def suggest(self, request: SuggestionRequest[OutputT]) -> SuggestionResult[OutputT]:
         content: list[dict[str, Any]] = []
@@ -70,6 +98,7 @@ class BedrockMantleProvider:
                 system=[system],
                 messages=[{"role": "user", "content": content}],
                 output_config={"effort": request.effort, "format": {"type": "json_schema", "schema": schema}},
+                **({"extra_body": self._extra_body} if self._extra_body else {}),
             )
         except (anthropic.RateLimitError, anthropic.InternalServerError, anthropic.APIConnectionError) as err:
             raise RetryableLlmError(str(err), getattr(err, "status_code", None)) from err

@@ -2,7 +2,7 @@ import httpx2 as httpx
 import pytest
 import anthropic
 
-from app.llm.bedrock_mantle import BedrockMantleProvider
+from app.llm.bedrock import BedrockProvider
 from app.llm.output_schema import SuggestionOutputV2, V1ImpactAreaOutput, normalize
 from app.llm.provider import PdfEvidence, RetryableLlmError, SuggestionRequest, TextPart
 from tests.fakes import fake_client, fake_message
@@ -24,8 +24,28 @@ def request(model=SuggestionOutputV2, cache_system=True):
     )
 
 
-def provider(client):
-    return BedrockMantleProvider("anthropic.claude-haiku-5-5", "us-east-1", client=client)
+def provider(client, api="mantle"):
+    return BedrockProvider("anthropic.claude-haiku-5-5", "us-east-1", api=api, client=client)
+
+
+def test_runtime_api_pins_the_bedrock_anthropic_version_and_mantle_does_not():
+    runtime, mantle = fake_client(fake_message(V2_JSON)), fake_client(fake_message(V2_JSON))
+    provider(runtime, api="runtime").suggest(request())
+    provider(mantle, api="mantle").suggest(request())
+    assert runtime.messages.calls[0]["extra_body"] == {"anthropic_version": "bedrock-2023-05-31"}
+    assert "extra_body" not in mantle.messages.calls[0]
+    assert runtime.messages.calls[0]["output_config"]["format"]["type"] == "json_schema"
+
+
+def test_make_client_targets_each_endpoint(monkeypatch):
+    from app.llm.bedrock import make_client
+
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "x")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "x")
+    assert str(make_client("runtime", "us-east-1").base_url).startswith("https://bedrock-runtime.us-east-1.amazonaws.com")
+    assert str(make_client("mantle", "us-east-1").base_url).startswith("https://bedrock-mantle.us-east-1.api.aws/anthropic")
+    with pytest.raises(ValueError):
+        BedrockProvider("m", "us-east-1", api="other")
 
 
 def test_builds_cached_prefix_structured_output_and_no_temperature():

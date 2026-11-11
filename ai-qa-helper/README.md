@@ -8,10 +8,10 @@ For each AI-input field of a result snapshot, this service proposes a value with
 | --- | --- |
 | Development branch | `dev-ai-qa-helper` |
 | Runtime | AWS Lambda, Python 3.13 (arm64), triggered by SQS |
-| Model | Claude Haiku 5.5 through Claude in Amazon Bedrock (Mantle), `anthropic.claude-haiku-5-5` |
+| Model | Claude Haiku 5.5 through Bedrock Runtime InvokeModel, inference profile `us.anthropic.claude-haiku-5-5` (`BEDROCK_API=runtime`). Claude in Amazon Bedrock (Mantle, `anthropic.claude-haiku-5-5`) stays selectable with `BEDROCK_API=mantle`; in the TEST account it answered 404 for Haiku 5.5 on 2026-11-11 |
 | Infrastructure | Terraform in [`infra/`](infra/) (prefix `qa-ai-`, region us-east-1) |
 | Package manager | uv (`pyproject.toml`, `uv.lock`); `requirements.txt` is exported from the lock for the Lambda build |
-| Claude client | `anthropic.lib.bedrock.AnthropicBedrockMantle` from `anthropic[bedrock]` (pinned) |
+| Claude client | `anthropic.lib.bedrock.AnthropicBedrock` (runtime) or `AnthropicBedrockMantle` (mantle) from `anthropic[bedrock]` (pinned) |
 
 ## Where the code lives
 
@@ -46,7 +46,7 @@ uv run python -m scripts.export_schemas   # regenerate contract/ after changing 
 scripts/build.sh                          # dist/ai-qa-helper-lambda.zip (Linux arm64 wheels)
 ```
 
-The tests use `FakeLlmProvider` and a fake Anthropic client ([`tests/fakes.py`](tests/fakes.py)). The [`BedrockMantleProvider`](app/llm/bedrock_mantle.py) calls a paid model and is exercised only through the smoke test and the eval, each run with prior approval.
+The tests use `FakeLlmProvider` and a fake Anthropic client ([`tests/fakes.py`](tests/fakes.py)). The [`BedrockProvider`](app/llm/bedrock.py) calls a paid model and is exercised only through the smoke test and the eval, each run with prior approval.
 
 `pyproject.toml` sets `[tool.uv] exclude-newer` so the lock only resolves releases at least a week old. Move the date forward deliberately when upgrading.
 
@@ -54,7 +54,7 @@ The tests use `FakeLlmProvider` and a fake Anthropic client ([`tests/fakes.py`](
 | --- | --- |
 | `app/contract/` | Job message, API view and event models; DynamoDB items and key builders |
 | `app/signal/` | Deterministic signal and quote verification |
-| `app/llm/` | `LlmProvider` port, Bedrock Mantle adapter, v1/v2 output schemas |
+| `app/llm/` | `LlmProvider` port, Bedrock adapter (runtime or Mantle), v1/v2 output schemas |
 | `app/evidence/` | Evidence extraction copied from `qa-service` without the browser paths, plus the SSRF guard and the OCR fallback |
 | `app/handlers/` | Lambda handlers: `smoke.handler`, `worker.handler` |
 | `app/worker/` | One job (`process.py`), snapshot reader, DynamoDB store |
@@ -160,4 +160,4 @@ Both versions run on the same 2025 sample. The December batch uses whichever ver
 
 | Done | Pending |
 | --- | --- |
-| Python port: contract (Pydantic + JSON Schema), evidence extraction (from `qa-service`, no browser), signal mapping, quote verification, LLM provider port and Bedrock Mantle adapter, prompts v1 and v2 loaded by version, worker handler (idempotent writes, partial batch failures, run counters), v1 vs v2 comparison tooling ([`eval/`](eval/README.md): sample, estimate, budget-capped run, report), smoke handler, Lambda build (unit-tested, no live call yet) | Smoke test (waiting for the execution role ARN), control-list id maps (Reporting), running the v1 vs v2 comparison (waiting for the 2025 export and Bedrock access for the deployer) |
+| Python port: contract (Pydantic + JSON Schema), evidence extraction (from `qa-service`, no browser), signal mapping, quote verification, LLM provider port and Bedrock adapter, prompts v1 and v2 loaded by version, worker handler (idempotent writes, partial batch failures, run counters), v1 vs v2 comparison tooling ([`eval/`](eval/README.md): sample, estimate, budget-capped run, report), smoke handler, Lambda build (unit-tested, no live call yet) | Smoke test (waiting for the execution role ARN), control-list id maps (Reporting), running the v1 vs v2 comparison (waiting for the 2025 export and Bedrock access for the deployer) |

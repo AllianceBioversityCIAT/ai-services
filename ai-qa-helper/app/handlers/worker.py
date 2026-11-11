@@ -1,7 +1,7 @@
 """SQS -> worker Lambda. Partial batch failures: only the failed messages are redelivered.
 
 Requires ``function_response_types = ["ReportBatchItemFailures"]`` on the event source mapping.
-Environment: TABLE_NAME, MODEL_ID, LLM_EFFORT, LLM_MAX_TOKENS, MAX_RECEIVE_COUNT (same value as the
+Environment: TABLE_NAME, BEDROCK_API, MODEL_ID, LLM_EFFORT, LLM_MAX_TOKENS, MAX_RECEIVE_COUNT (same value as the
 queue's redrive ``maxReceiveCount``). Logs carry identifiers, outcomes, reasons and token counts only:
 never evidence text, prompts or model output.
 """
@@ -35,7 +35,7 @@ replaced by re-enqueuing the job once the cause is fixed."""
 def build_deps() -> JobDeps:  # pragma: no cover - wiring of real clients
     import boto3
 
-    from app.llm.bedrock_mantle import BedrockMantleProvider
+    from app.llm.bedrock import BedrockProvider
     from app.worker.snapshot import DynamoSnapshotReader
     from app.worker.store import DynamoSuggestionStore
 
@@ -45,7 +45,7 @@ def build_deps() -> JobDeps:  # pragma: no cover - wiring of real clients
         snapshots=DynamoSnapshotReader(table, ddb),
         store=DynamoSuggestionStore(table, ddb),
         extractor=EvidenceExtractor(EvidenceScraper(GuardedHttp()), MemoryEvidenceCache()),
-        provider=BedrockMantleProvider(LLM["model_id"], AWS["aws_region"]),
+        provider=BedrockProvider(LLM["model_id"], AWS["aws_region"], api=LLM["bedrock_api"]),
         effort=LLM["effort"],
         max_tokens=LLM["max_tokens"],
     )

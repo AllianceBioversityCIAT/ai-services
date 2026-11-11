@@ -97,9 +97,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     provider = None
     if not dry:
-        from app.llm.bedrock_mantle import BedrockMantleProvider
+        from app.llm.bedrock import BedrockProvider
 
-        provider = BedrockMantleProvider(LLM["model_id"], AWS["aws_region"], aws_profile=a.profile)
+        provider = BedrockProvider(LLM["model_id"], AWS["aws_region"], api=LLM["bedrock_api"], aws_profile=a.profile)
 
     summary = run(sample, cfg, out, extractor, provider, progress=lambda m: print(m, file=sys.stderr))
     records = load_records(out)
