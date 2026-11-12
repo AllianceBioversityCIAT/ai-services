@@ -127,9 +127,13 @@ def test_without_flagged_links_all_result_links_are_used():
     assert fi.reported is None  # not reported
 
 
-def test_unmapped_control_list_ids_are_not_guessed():
-    values = {"innovation_dev.readiness_level": {"value": 7}}
-    fi = read_field_input(values, "innovation_dev.readiness_level", AI_FIELDS["innovation_dev.readiness_level"])
+def test_control_list_ids_map_to_levels_and_unknown_ids_are_not_guessed():
+    irl, iul = "innovation_dev.readiness_level", "innovation_use.use_level.innovation_use_level"
+    assert read_field_input({irl: {"value": 11}}, irl, AI_FIELDS[irl]).reported == 0
+    assert read_field_input({irl: 20}, irl, AI_FIELDS[irl]).reported == 9
+    assert read_field_input({iul: {"value": 1}}, iul, AI_FIELDS[iul]).reported == 0
+    assert read_field_input({iul: {"value": 10}}, iul, AI_FIELDS[iul]).reported == 9
+    fi = read_field_input({irl: {"value": 7}}, irl, AI_FIELDS[irl])  # 7 is not a readiness_levels id
     assert fi.reported is None and fi.links == [] and fi.evidence_scope == "none"
 
 

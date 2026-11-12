@@ -87,6 +87,8 @@ def test_allocation_is_proportional_with_one_per_stratum():
     assert allocate({"a": 97, "b": 2, "c": 1}, 10) == {"a": 8, "b": 1, "c": 1}
     assert sum(allocate({"a": 1, "b": 1, "c": 98}, 10).values()) == 10
     assert allocate({"a": 3, "b": 2}, 40) == {"a": 3, "b": 2}
+    alloc = allocate({"a": 900, "b": 90, "c": 10}, 40, minimum=8)
+    assert alloc["c"] == 8 and alloc["b"] >= 8 and sum(alloc.values()) == 40
 
 
 def test_stratified_sample_is_deterministic_and_skips_rows_without_final(export):
@@ -94,7 +96,21 @@ def test_stratified_sample_is_deterministic_and_skips_rows_without_final(export)
     a, b = stratified_sample(rows, 12), stratified_sample(rows, 12)
     assert [r.key for r in a] == [r.key for r in b] and len(a) == 12
     assert all(r.final is not None for r in a)
-    assert {(r.final, r.evidence_status) for r in a} == {(r.final, r.evidence_status) for r in rows if r.final is not None}
+    assert {r.final for r in a} == {r.final for r in rows if r.final is not None}
+
+
+def test_sample_keeps_a_minimum_per_final_class_and_type_shares():
+    from eval.dataset import EvalRow
+
+    rows = [
+        EvalRow(i, "poverty", "Knowledge product" if i % 2 else "Innovation development",
+                None, 2 if i < 10 else i % 2, "t", "d", ("https://e.org/a",), ("https://e.org/a",))
+        for i in range(400)
+    ]
+    s = stratified_sample(rows, 40)
+    assert len(s) == 40 and sum(r.final == 2 for r in s) >= 8
+    kp = sum(r.result_type == "Knowledge product" for r in s)
+    assert 16 <= kp <= 24  # about half, like the population
 
 
 def test_pricing_uses_the_short_and_long_rate_cards():
@@ -183,3 +199,33 @@ def test_disk_cache_round_trip(tmp_path):
     cache.put(src.url, src)
     assert cache.get(src.url) == src and cache.get("https://example.org/other") is None
     assert json.loads(next((tmp_path / "c").iterdir()).read_text())["url"] == src.url
+
+
+def test_fill_reported_from_the_pre_qa_reference(export, tmp_path, capsys):
+    ref = tmp_path / "reference.csv"
+    with ref.open("w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["Result Code", "Gender Tag Level", "Climate Tag Level", "Nutrition Tag Level",
+                    "Environment and/or biodiversity Tag Level", "Poverty Tag Level", "Readiness Level",
+                    "Innovation Use Level"])
+        w.writerow([1001, "Principal", "Significant", "", "", "", "", ""])
+        w.writerow([1002, "Not Targeted", "", "", "", "", "", ""])
+        w.writerow([2000, "", "", "", "", "", "7", ""])
+        w.writerow([5555, "Significant", "", "", "", "", "", ""])  # not in the export
+    data = export.parent
+    # the export used here has reported values; blank them to exercise the merge
+    text = export.read_text().splitlines()
+    rows = list(csv.reader(text))
+    for r in rows[1:]:
+        r[3] = ""
+    with export.open("w", newline="", encoding="utf-8") as f:
+        csv.writer(f).writerows(rows)
+
+    assert main(["--data", str(data), "fill-reported", "--reference", str(ref)]) == 0
+    out = capsys.readouterr().out
+    assert "3 of 31 export rows matched" in out
+    from eval.dataset import read_reported
+    merged = load_rows(export, read_reported(data / "reported_2025.csv"))
+    by_key = {r.key: r.reported for r in merged}
+    assert by_key["1001|gender"] == 2 and by_key["1002|gender"] == 0
+    assert by_key["2000|innovation_readiness_level"] == 7 and by_key["1003|gender"] is None

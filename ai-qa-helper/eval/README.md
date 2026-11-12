@@ -26,13 +26,16 @@ run files. Only the aggregate report may be copied out of it.
 ## Steps
 
 ```bash
-uv run python -m eval.compare sample --per-field 40     # stratified: field x final value x evidence status
+uv run python -m eval.compare fill-reported --reference <pre-QA 2025 labels CSV>  # when reported_value is empty
+uv run python -m eval.compare sample --per-field 40     # per field: final value (min per class), then evidence x result type
 uv run python -m eval.compare estimate --no-fetch        # cost from row counts, instant
 uv run python -m eval.compare estimate                   # reads the evidence (public links), no model call
 uv run python -m eval.compare run --max-usd 3 --profile qa-ai-deployer
 uv run python -m eval.compare report --jose-csv <previous helper production_ai_outputs CSV>
 ```
 
+- **Reported value.** If the export leaves `reported_value` empty, `fill-reported` takes it by Result Code from the previous helper's pre-QA 2025 labels (`reported_2025.csv`, gitignored), and prints how many rows match. Rows without it still count for agreement with the final value, but not for the signal metrics.
+- **Sample.** For each field, the sample keeps at least 8 rows per final value for Impact Areas and 2 for IRL/IUL, so every class can be measured. Result types keep their population share. Because classes are balanced, pooled accuracy over the sample is not the population accuracy. Compare versions on the same rows.
 - **Cost.** `run` needs `--max-usd`, which has no default. It stops before a call that would go over it. Running the same command again resumes where it stopped, and nothing is paid twice.
 - **Shared evidence.** Each sampled row's evidence is read once and cached on disk. v1 and v2 get the same evidence, and re-runs don't fetch it again.
 - **Model ID.** `MODEL_ID` (default `anthropic.claude-haiku-5-5`) and `AWS_REGION` come from the environment, the same as in the worker.

@@ -6,8 +6,8 @@ as a string or, above 256 KB, gzipped in ``valuesGz``.
 
 Value shapes are not documented in onecgiar_qa beyond the catalog ``type``; the only fixture shows
 a single_select as ``{"value": 4, "degree": 2}``. ``scalar`` therefore accepts a bare value or an
-object with ``value``/``id``. The control-list id -> level maps below are ASSUMPTIONS TO CONFIRM with
-Reporting; an unmapped id is treated as "not reported" (signal amber), never guessed.
+object with ``value``/``id``. An id outside the control-list maps below is treated as "not reported"
+(signal amber), never guessed.
 """
 
 import gzip
@@ -18,11 +18,11 @@ from typing import Any, Literal, Protocol
 from app.contract.fields import FieldSpec
 
 LEVEL_MAPS: dict[str, dict[int, int]] = {
-    # PRMS impact-area tag levels: 1 Not targeted, 2 Significant, 3 Principal (to confirm).
+    # Confirmed by Reporting (2026-11-12): tag_levels from the Reporting code; the other two from
+    # its control-list export (level_maps.csv).
     "tag_levels": {1: 0, 2: 1, 3: 2},
-    # Pending confirmation from Reporting: id -> level 0-9.
-    "readiness_levels": {},
-    "innovation_use_levels": {},
+    "readiness_levels": {11 + level: level for level in range(10)},  # 11 Idea ... 20 Proven Innovation
+    "innovation_use_levels": {1 + level: level for level in range(10)},  # 1 No use ... 10 End-user
 }
 
 MAX_LINKS = 5

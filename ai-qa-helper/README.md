@@ -109,10 +109,10 @@ last delivery (`MAX_RECEIVE_COUNT`, the same value as the queue's redrive) the j
 can be replaced: re-enqueuing the job overwrites it and moves its count from `failed`. Only
 messages that cannot be parsed or recorded reach the DLQ.
 
-**To confirm with Reporting:** how a `single_select` value appears in `values` (bare id or
-`{"value": id}`; both are accepted), and the id → level maps in `LEVEL_MAPS`. `tag_levels` is
-assumed to be 1/2/3 → 0/1/2. `readiness_levels` and `innovation_use_levels` stay empty until
-confirmed, so the reported IRL/IUL counts as "not reported" (amber) rather than a guess.
+**Control-list ids → levels** (`LEVEL_MAPS`, confirmed by Reporting on 2026-11-12):
+`tag_levels` 1/2/3 → 0/1/2; `readiness_levels` 11–20 → 0–9; `innovation_use_levels` 1–10 → 0–9.
+An id outside these maps counts as "not reported" (amber), never guessed. A `single_select` may
+come as a bare id or as `{"value": id}`; both are accepted.
 
 ## Infrastructure
 
@@ -160,4 +160,4 @@ Both versions run on the same 2025 sample. The December batch uses whichever ver
 
 | Done | Pending |
 | --- | --- |
-| Python port: contract (Pydantic + JSON Schema), evidence extraction (from `qa-service`, no browser), signal mapping, quote verification, LLM provider port and Bedrock adapter, prompts v1 and v2 loaded by version, worker handler (idempotent writes, partial batch failures, run counters), v1 vs v2 comparison tooling ([`eval/`](eval/README.md): sample, estimate, budget-capped run, report), smoke handler, Lambda build (unit-tested, no live call yet) | Smoke test (waiting for the execution role ARN), control-list id maps (Reporting), running the v1 vs v2 comparison (waiting for the 2025 export and Bedrock access for the deployer) |
+| Python port: contract (Pydantic + JSON Schema), evidence extraction (from `qa-service`, no browser), signal mapping, quote verification, LLM provider port and Bedrock adapter, prompts v1 and v2 loaded by version, worker handler (idempotent writes, partial batch failures, run counters), v1 vs v2 comparison tooling ([`eval/`](eval/README.md): sample, estimate, budget-capped run, report), smoke handler, Lambda build (unit-tested, no live call yet) | End-to-end test in TEST (waiting for table write access), running the v1 vs v2 comparison (waiting for the 2025 export and Bedrock access for the deployer) |

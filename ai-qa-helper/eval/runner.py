@@ -195,6 +195,7 @@ def _base(row: EvalRow, version: str, cfg: RunConfig, evidence: EvidenceOutcome)
         "key": f"{row.key}|{version}",
         "result_code": row.result_code,
         "field": row.field,
+        "result_type": row.result_type,
         "version": version,
         "effort": cfg.effort,
         "reported": row.reported,

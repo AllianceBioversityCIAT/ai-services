@@ -64,6 +64,8 @@ class Cell:
     signals: Counter = field(default_factory=Counter)
     signal_vs_final: Counter = field(default_factory=Counter)
     """(signal, 'kept' | 'changed'): did QA keep the reported value?"""
+    by_group: dict[str, Agreement] = field(default_factory=lambda: defaultdict(Agreement))
+    """Model agreement split into 'Knowledge product' and 'Other types'."""
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read: int = 0
@@ -119,6 +121,8 @@ def compute(
         if final is None:
             continue
         cell.model.add(rec["value"], final)
+        group = "Knowledge product" if rec.get("result_type") == "Knowledge product" else "Other types"
+        cell.by_group[group].add(rec["value"], final)
         if rec["field"] in majority:
             cell.majority.add(majority[rec["field"]], final)
         if reported is not None:
@@ -152,6 +156,17 @@ def render(cells: dict[tuple[str, str], Cell], title: str, notes: list[str]) -> 
                 f"| {f} | {v} | {c.answered} / {c.sample} | {m.pct(m.exact)} | {m.pct(m.within1)} | {m.mae} "
                 f"| {c.majority.pct(c.majority.exact)} | {c.submitter.pct(c.submitter.exact)} | {jose} |"
             )
+
+    lines += ["", "## Knowledge products vs other result types", "",
+              "Model agreement with the final QA value on each group (exact % / ±1 % / n).", "",
+              "| Field | Version | Knowledge product | Other types |", "|---|---|---|---|"]
+    for f in fields:
+        for v in versions:
+            c = cells.get((f, v))
+            if not c:
+                continue
+            g = [c.by_group.get(k, Agreement()) for k in ("Knowledge product", "Other types")]
+            lines.append(f"| {f} | {v} | " + " | ".join(f"{a.pct(a.exact)} / {a.pct(a.within1)} / {a.n}" for a in g) + " |")
 
     lines += ["", "## Coverage, quotes and signal", "",
               "| Field | Version | Unavailable (reason: n) | Errors | Verified quotes | Green | Amber | Red |",
