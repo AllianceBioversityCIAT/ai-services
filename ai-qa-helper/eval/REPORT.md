@@ -9,7 +9,7 @@ Run of 2026-11-12 in TEST: Claude Haiku 5.5 through Bedrock Runtime (`us.anthrop
    - Its quotes are verified much more often: 87.9 % against 50.3 %. A verified quote is what lets the signal turn green or red instead of amber.
    - It costs 22 % less, thanks to the cached rubric.
    - It drops the contradictions of the old prompts.
-2. **IRL and IUL are not ready.**
+2. **IRL and IUL are not ready.** The diagnosis below finds no technical defect: both versions, and the previous helper on its final batch, underestimate by about 2 levels compared with QA practice.
    - Both versions underestimate the level by about 2: the mean suggested-minus-final difference is −1.7 to −1.9 for IRL, and −0.7 (v1) or −1.9 (v2) for IUL.
    - Both score below the majority class: 6 % exact and a MAE of 2.5 to 3.8.
    - The suggestion for these two fields should not be shown in December until this is fixed. That is a decision for the PO.
@@ -21,6 +21,60 @@ Run of 2026-11-12 in TEST: Claude Haiku 5.5 through Bedrock Runtime (`us.anthrop
    - 40 rows had only private links, mostly CGIAR SharePoint files that need a login.
    - 18 rows had no readable evidence.
    - Read-only access to those SharePoint files is the largest coverage gain available. It is a decision for after the batch.
+
+## Reading the signal (v2)
+
+- **Green is reliable.** In 33 of the 35 green rows that had a reported value, QA kept that value.
+- **Red is mostly a false alarm.** In 23 of the 28 red rows, QA kept the reported value; QA changed it in only 5.
+  - Most red rows are IRL and IUL, where the model underestimates (see below).
+- **Proposal for the chip text:**
+  - Red reads **"Review"** ("revisar"), never "incorrect". It means "look at the evidence before validating", not "the reported value is wrong".
+  - Green and amber keep their meaning: consistent with the evidence, and check.
+  - The wording lives in `onecgiar_qa` (`review-ai-note.ts`); the contract only carries `signal`.
+
+## IRL and IUL: diagnosis
+
+The question was why v1 does not reproduce the previous helper's figures (IRL 21 % exact, MAE 1.9) and why both versions come out about 2 levels low. The data below cost nothing: it comes from the run above and the previous helper's own published figures.
+
+- **v1 does reproduce the previous helper.**
+  - Its 21.1 % / MAE 1.92 pools 512 innovations from all its production pushes, including earlier prompt versions.
+  - For its final batch (V25, the same prompts as our v1), its own figures against the final value are 18.8 % exact, MAE 2.48 and a signed error of −1.94 (n = 48).
+  - Our v1 gets MAE 2.45 and −1.92 when weighted by population. The exact rate differs (6.5 % against 18.8 %), but with 2 of 31 rows the 95 % interval is 1.8–20.7 %, so the two overlap.
+  - On the 34 IRL rows its batch shares with this export, the previous helper got 11.8 % exact, MAE 3.06 and −2.53.
+- **The scales are consistent.**
+  - The final value, the reported value and the model output all use levels 0–9; none uses control-list ids or 1–9.
+  - The reported value equals the final value in 691 of 832 IRL rows and 157 of 169 IUL rows of the export.
+  - The model's suggestions span 0–9 (v1) and 1–8 (v2).
+- **The balancing does not explain it.** Weighted by the population's level distribution, the figures hardly change.
+
+  | Field | Version | Exact | ±1 | MAE | Bias |
+  |---|---|---|---|---|---|
+  | IRL | v1 | 6.2 % | 36.8 % | 2.45 | −1.92 |
+  | IRL | v2 | 7.4 % | 32.1 % | 2.72 | −2.14 |
+  | IUL | v1 | 5.7 % | 25.5 % | 3.51 | −0.45 |
+  | IUL | v2 | 6.1 % | 17.4 % | 3.83 | −1.63 |
+
+  The majority class is level 9: 20.6 % of IRL and 17.1 % of IUL.
+- **Confusion matrices** (rows: final value; columns: suggested value).
+  - For IRL, final values 6 to 9 are mostly suggested as 2 to 6.
+  - For IUL, the errors go both ways: final 3 and 5 are often suggested as 8, and final 8 and 9 as 0 or 2. The spread, not only the bias, drives its MAE.
+  - Full matrices: `eval/.data/` diagnosis output (not versioned).
+- **The worst underestimations come from little or indirect evidence.** Among the 5 per field and version:
+  - CGSpace records with metadata only (381 characters), LinkedIn posts, short web pages (317 characters), spreadsheets;
+  - SharePoint files that are partly private, or long PDFs that do not state the maturity explicitly.
+
+  None failed because of a technical error.
+- **JavaScript-only pages are a minor factor.**
+  - 10 of the 17 web pages read for IRL, and 5 of 16 for IUL, have fewer than 1,500 characters. Some are probably pages that only render with JavaScript.
+  - IRL: the bias stays about the same with 8,000 or more characters of evidence (−1.8 for v1, −2.0 for v2) as with less (−1.7, −1.8). More text does not remove it.
+  - IUL: the bias depends on the amount of evidence (−0.3 / −1.0 with rich evidence, −2.0 / −4.6 with thin evidence), but the MAE stays above 3 either way.
+- **Root cause: the criteria versus QA practice.**
+  - The prompts tell the model to assign the lowest level the evidence explicitly supports, and to ignore plans and ambition.
+  - QA mostly accepts the level the submitter claims: it kept the reported level in 18 of 28 sampled IRL rows and 17 of 17 IUL rows. The previous helper's metrics show the same, 86 % and 95 %.
+  - The model suggests below the reported level in 21–22 of 28 IRL rows and 11–14 of 17 IUL rows.
+  - This is a disagreement about criteria, not a defect. It needs expert input on how strict the levels should be, and a prompt revision validated against the final values.
+
+**Proposal to the PO:** do not show IRL and IUL suggestions in the December batch; they would show as "not available: no criteria for this field". Review the IRL and IUL criteria with the innovation experts before the February 2027 cycle.
 
 ## Method and limits
 
