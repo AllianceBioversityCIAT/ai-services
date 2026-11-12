@@ -58,7 +58,7 @@ The question was why v1 does not reproduce the previous helper's figures (IRL 21
 - **Confusion matrices** (rows: final value; columns: suggested value).
   - For IRL, final values 6 to 9 are mostly suggested as 2 to 6.
   - For IUL, the errors go both ways: final 3 and 5 are often suggested as 8, and final 8 and 9 as 0 or 2. The spread, not only the bias, drives its MAE.
-  - Full matrices: `eval/.data/` diagnosis output (not versioned).
+  - Full matrices: `eval/.data/irl-iul-diagnosis.txt` (not versioned).
 - **The worst underestimations come from little or indirect evidence.** Among the 5 per field and version:
   - CGSpace records with metadata only (381 characters), LinkedIn posts, short web pages (317 characters), spreadsheets;
   - SharePoint files that are partly private, or long PDFs that do not state the maturity explicitly.
