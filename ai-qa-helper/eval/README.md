@@ -38,7 +38,7 @@ uv run python -m eval.compare report --jose-csv <previous helper production_ai_o
 - **Sample.** For each field, the sample keeps at least 8 rows per final value for Impact Areas and 2 for IRL/IUL, so every class can be measured. Result types keep their population share. Because classes are balanced, pooled accuracy over the sample is not the population accuracy. Compare versions on the same rows.
 - **Cost.** `run` needs `--max-usd`, which has no default. It stops before a call that would go over it. Running the same command again resumes where it stopped, and nothing is paid twice.
 - **Shared evidence.** Each sampled row's evidence is read once and cached on disk. v1 and v2 get the same evidence, and re-runs don't fetch it again.
-- **Model ID.** `MODEL_ID` (default `anthropic.claude-haiku-5-5`) and `AWS_REGION` come from the environment, the same as in the worker.
+- **Model.** `BEDROCK_API` (default `runtime`), `MODEL_ID` (default `us.anthropic.claude-haiku-5-5`) and `AWS_REGION` come from the environment, the same as in the worker. The profile passed with `--profile` needs `bedrock:InvokeModel` on that inference profile.
 
 ## Report
 
