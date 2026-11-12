@@ -125,7 +125,9 @@ def main(argv: list[str] | None = None) -> int:
             if code == FIXTURE_CODE:
                 ddb.delete_item(TableName=table, Key={"pk": {"S": suggestion_pk(code)}, "sk": {"S": suggestion_sk(snap, field, a.prompt_version)}})
         ddb.delete_item(TableName=table, Key={"pk": {"S": f"RESULT#{FIXTURE_CODE}"}, "sk": {"S": f"SNAP#{FIXTURE_SNAP}"}})
-        print("fixture items deleted")
+        if all(code == FIXTURE_CODE for code, _, _ in jobs):
+            ddb.delete_item(TableName=table, Key={"pk": {"S": run_pk(run_id)}, "sk": {"S": "RUN"}})
+        print("fixture items deleted (snapshot, suggestions and run counters)")
     return 0 if complete else 1
 
 
