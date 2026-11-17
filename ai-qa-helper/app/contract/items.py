@@ -29,6 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.contract.messages import (
     Signal,
     SuggestedValue,
+    SuggestionId,
     UnavailableReason,
     ValueKind,
     check_value_kind,
@@ -76,7 +77,7 @@ class AiSuggestionItem(BaseModel):
     snapKey: str
     fieldKey: str = Field(pattern=r"^[^#]+$")
     promptVersion: str = Field(pattern=r"^[^#]+$")
-    suggestionId: str
+    suggestionId: SuggestionId
     runId: str
     status: Literal["available", "unavailable"]
     signal: Signal | None = None

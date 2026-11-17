@@ -1,5 +1,6 @@
 import gzip
 import json
+import re
 from datetime import UTC, datetime
 
 import boto3
@@ -180,6 +181,7 @@ def test_suggestion_id_is_deterministic():
     process_job(job(), a, False)
     process_job(job(), b, False)
     assert stored(a).suggestionId == stored(b).suggestionId
+    assert re.fullmatch(r"[0-9a-f]{32}", stored(a).suggestionId)
 
 
 def test_unverified_quote_is_amber():
@@ -416,7 +418,7 @@ def _client():
 def _item(**over):
     base = dict(
         pk="RESULT#1001", sk=suggestion_sk(SNAP, GENDER, "v2-1.0.0"), resultCode=1001, snapKey=SNAP,
-        fieldKey=GENDER, promptVersion="v2-1.0.0", suggestionId="s", runId="run-1",
+        fieldKey=GENDER, promptVersion="v2-1.0.0", suggestionId="0" * 32, runId="run-1",
         status="unavailable", unavailableReason="no_readable_evidence", createdAt="2026-11-20T12:00:00Z",
     )
     base.update(over)

@@ -8,9 +8,13 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-CONTRACT_VERSION = "2.0.0"
-"""2.0.0 (2026-11-17): indicative fields (result category, innovation use numbers), ``valueKind``,
+CONTRACT_VERSION = "2.0.1"
+"""2.0.1 (2026-11-17): ``suggestionId`` pattern (32 lowercase hex, no hyphens).
+2.0.0 (2026-11-17): indicative fields (result category, innovation use numbers), ``valueKind``,
 typed ``suggestedValue``, ``coversFieldKeys`` and signal ``indicative``. 1.x had levels only."""
+
+SuggestionId = Annotated[str, Field(pattern=r"^[0-9a-f]{32}$")]
+"""uuid5 of ``pk|sk`` as 32 lowercase hex characters (QA stores it as char(32))."""
 
 Signal = Literal["green", "amber", "red", "indicative"]
 """green/amber/red: scored fields (Impact Areas, IRL, IUL). indicative: no colour, the value is shown
@@ -105,7 +109,7 @@ class AvailableSuggestionView(_Strict):
     """
     status: Literal["available"]
     fieldKey: str
-    suggestionId: str
+    suggestionId: SuggestionId
     signal: Signal
     """``indicative`` exactly when the field is indicative (result category, innovation use numbers)."""
     valueKind: ValueKind

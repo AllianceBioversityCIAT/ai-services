@@ -32,7 +32,7 @@ EVENT = TypeAdapter(AiSuggestionEvent)
 
 
 def test_available_view_carries_the_level_and_quote_flag():
-    base = {"status": "available", "fieldKey": "innovation_dev.readiness_level", "suggestionId": "s",
+    base = {"status": "available", "fieldKey": "innovation_dev.readiness_level", "suggestionId": "00000000000000000000000000000000",
             "signal": "amber", "explanation": "e", "evidenceQuote": "q", "evidenceSource": None,
             "promptVersion": "v2-1.0.0", "modelId": "m", "quoteVerified": True, "valueKind": "level"}
     with pytest.raises(ValidationError):
@@ -77,7 +77,7 @@ def test_production_versions_per_field():
 ROW = {"user": "actors", "user_type": "Researchers", "user_subtype": None, "quantity": 12, "women": 5,
        "youth_women": None, "non_youth_women": None, "men": 7, "youth_men": None, "non_youth_men": None,
        "geolocation": None, "other_quantitative_measures": None}
-INDICATIVE = {"status": "available", "fieldKey": "general.result_type", "suggestionId": "s", "signal": "indicative",
+INDICATIVE = {"status": "available", "fieldKey": "general.result_type", "suggestionId": "00000000000000000000000000000000", "signal": "indicative",
               "explanation": "e", "evidenceSource": None, "promptVersion": "v1-1.0.0", "modelId": "m",
               "quoteVerified": False}
 

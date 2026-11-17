@@ -78,7 +78,7 @@ Proposed entity definitions for `onecgiar_qa` (same pattern as its `resultSnapsh
 | `aiSuggestion` | `{entity: 'aiSuggestion', version: '1', service: 'qa'}` | `RESULT#${resultCode}` | `AI#${snapKey}#${fieldKey}#${promptVersion}` |
 | `aiRun` | `{entity: 'aiRun', version: '1', service: 'qa'}` | `AIRUN#${runId}` | `RUN` |
 
-**Contract version** `2.0.0` (`CONTRACT_VERSION` in `app/contract/messages.py`; `x-contractVersion` in every schema). 2.0.0 adds the indicative fields, `valueKind`, a typed `suggestedValue`, `coversFieldKeys` and the signal `indicative`.
+**Contract version** `2.0.1` (`CONTRACT_VERSION` in `app/contract/messages.py`; `x-contractVersion` in every schema). 2.0.0 adds the indicative fields, `valueKind`, a typed `suggestedValue`, `coversFieldKeys` and the signal `indicative`; 2.0.1 fixes `suggestionId` to 32 lowercase hex characters (`^[0-9a-f]{32}$`, no hyphens).
 
 **Production versions** are per field: `prompts/manifest.json` `production`, published with each field's value kind, signal type and scale in `contract/production.json`, so the API does not hard-code them. December 2026: `v2-1.0.0` for the 5 Impact Areas, IRL and IUL; `v1-1.0.0` for the two indicative fields.
 

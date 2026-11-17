@@ -397,6 +397,7 @@
       "title": "Suggestedvalue"
     },
     "suggestionId": {
+      "pattern": "^[0-9a-f]{32}$",
       "title": "Suggestionid",
       "type": "string"
     },
@@ -456,5 +457,5 @@
   ],
   "title": "AiSuggestionItem",
   "type": "object",
-  "x-contractVersion": "2.0.0"
+  "x-contractVersion": "2.0.1"
 }

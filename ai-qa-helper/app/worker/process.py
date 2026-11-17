@@ -165,7 +165,7 @@ class _Job:
                 "snapKey": self.msg.snapKey,
                 "fieldKey": self.msg.fieldKey,
                 "promptVersion": self.msg.promptVersion,
-                "suggestionId": str(uuid.uuid5(_ID_NAMESPACE, f"{self.pk}|{self.sk}")),
+                "suggestionId": uuid.uuid5(_ID_NAMESPACE, f"{self.pk}|{self.sk}").hex,
                 "runId": self.msg.runId,
                 "createdAt": self.deps.clock().isoformat().replace("+00:00", "Z"),
                 **fields,

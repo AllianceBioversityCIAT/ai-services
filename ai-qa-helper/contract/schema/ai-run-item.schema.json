@@ -67,5 +67,5 @@
   ],
   "title": "AiRunItem",
   "type": "object",
-  "x-contractVersion": "2.0.0"
+  "x-contractVersion": "2.0.1"
 }

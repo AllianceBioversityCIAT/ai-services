@@ -132,6 +132,7 @@
           "title": "Suggestedvalue"
         },
         "suggestionId": {
+          "pattern": "^[0-9a-f]{32}$",
           "title": "Suggestionid",
           "type": "string"
         },
@@ -396,5 +397,5 @@
       "$ref": "#/$defs/PendingSuggestionView"
     }
   ],
-  "x-contractVersion": "2.0.0"
+  "x-contractVersion": "2.0.1"
 }

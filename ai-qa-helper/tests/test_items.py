@@ -40,7 +40,7 @@ def test_item_dumps_electrodb_identifiers():
             "snapKey": SNAP,
             "fieldKey": "general.gender_tag",
             "promptVersion": "v1",
-            "suggestionId": "s-1",
+            "suggestionId": "11111111111111111111111111111111",
             "runId": "R-1",
             "status": "unavailable",
             "unavailableReason": "private_link",
@@ -52,6 +52,19 @@ def test_item_dumps_electrodb_identifiers():
     assert item.keys_consistent()
     with pytest.raises(ValidationError):
         AiSuggestionItem.model_validate({**dumped, "__edb_e__": "other"})
+
+
+@pytest.mark.parametrize("bad", ["11111111-1111-1111-1111-111111111111", "1" * 31, "A" * 32])
+def test_suggestion_id_is_32_lowercase_hex(bad):
+    base = {
+        "pk": suggestion_pk(4521), "sk": suggestion_sk(SNAP, "general.gender_tag", "v1"),
+        "__edb_e__": "aiSuggestion", "__edb_v__": "1", "resultCode": 4521, "snapKey": SNAP,
+        "fieldKey": "general.gender_tag", "promptVersion": "v1", "runId": "R-1", "status": "unavailable",
+        "unavailableReason": "private_link", "createdAt": "2026-11-11T00:00:00Z",
+    }
+    assert AiSuggestionItem.model_validate({**base, "suggestionId": "a" * 32})
+    with pytest.raises(ValidationError):
+        AiSuggestionItem.model_validate({**base, "suggestionId": bad})
 
 
 def test_run_completion_rule():
