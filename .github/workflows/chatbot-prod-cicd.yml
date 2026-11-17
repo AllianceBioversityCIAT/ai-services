@@ -1,0 +1,207 @@
+# AI CHATBOT SERVICE PROD (ai-services, branch main-chatbot-service, directory chatbot-service): CI on GitHub Actions,
+# deploy on Jenkins (CD-only job chatbot-service-cd).
+#
+#   GitHub Actions (build + image by digest)  ->  chatbot-service-cd (Jenkins: verify + legacy Lambda update)  ->  AWS Lambda
+#
+# Why (owner decision, 2026-11-17): the legacy job chatbot-service (devops PIPES/IA/chatbot/prod/Jenkinsfile) runs
+# `docker build` on the Jenkins agent. The build moves here (Docker runs on the GitHub runner); Jenkins keeps the legacy
+# deploy (SSH to the microservices PROD server, `aws lambda update-function-code --image-uri`) with the image referenced
+# by its verified digest instead of the mutable tag `latest`, and no longer needs Docker. The legacy job is not changed
+# and stays available in Jenkins for manual recovery (jenkins-trigger-chatbot-service-prod.yml, workflow_dispatch only).
+#
+# Triggers: push to main-chatbot-service (the service PROD branch) and workflow_dispatch. No pull_request trigger: the
+# build reads the PROD secret, which is never given to pull request code. On other branches (this file reaches staging
+# and main through the normal merges) the push filter never matches: the file is inert there.
+#
+# Build (the legacy stage Startup, unchanged): the legacy secret is written to chatbot-service/.env (CR removed), then
+# the ORIGINAL Dockerfile is built in chatbot-service/ (`docker build .`) without AWS credentials. The legacy job runs no
+# lint and no tests (none added).
+# The job names are part of the Jenkins contract (stage "Verify CI Run"): `CI script checks (bash -n, ShellCheck)` and
+# `publish image (chatbot)`. Rename them only together with the Jenkinsfile.
+#
+# Slack (Reporting Tool format, title AI-CHATBOT SERVICE NEW ENVIRONMENT, label PROD as the legacy messages):
+#   started     this workflow, at the start of the run (no `needs`)
+#   failed      this workflow, when the run failed BEFORE Jenkins accepted the request
+#   succeeded / failed (deploy)   Jenkins chatbot-service-cd
+#   SLACK_NOTIFICATIONS_WEBHOOK_URL (organization secret). Without it the notification is skipped with a warning.
+#
+# GitHub Environment chatbot-prod (publish and hand-over): deployment branch main-chatbot-service only; administrators
+# cannot bypass it.
+#   Variables: CICD_BOUND_REF (refs/heads/main-chatbot-service), CICD_AWS_REGION, CICD_ECR_REPOSITORY (ai-chatbot-service).
+#   Secrets: CICD_BUILD_ROLE_ARN, CICD_ENV_SECRET_ID (the legacy secret id, unchanged). They are identifiers, not
+#   credentials; they are secrets only so GitHub masks them in these public logs.
+#   The build role trusts only this repository, the environment chatbot-prod and the ref refs/heads/main-chatbot-service;
+#   it can read only that secret and push only to ai-chatbot-service (no Lambda permission: the deploy stays in Jenkins).
+#   Repository secrets JENKINS_USERNAME / JENKINS_API_TOKEN (the same as the Jenkins triggers).
+#
+# Secret handling (only the service .env, as in the Jenkins job):
+#   * OIDC with `output-env-credentials: false`: credentials are never exported to the job; only the secret-read step
+#     and the push step receive them, through their own `env:`.
+#   * The AWS CLI writes the secret straight to the git-ignored chatbot-service/.env; its values are also registered as
+#     log masks. Never echoed, never an output, never uploaded, never cached; the file is removed by an `if: always()`
+#     step. No `set -x`.
+#   * The docker build runs through .github/scripts/without-oidc.sh: no AWS credential and no OIDC request variable.
+#   * As today, the Dockerfile copies .env into the image (known risk, unchanged by this migration).
+#
+# Action pinning: every `uses:` is a full commit SHA (same SHAs as the other migrated pipelines):
+#   actions/checkout                       v7.0.1  3d3c42e5aac5ba805825da76410c181273ba90b1
+#   aws-actions/configure-aws-credentials  v6.3.0  e1253824e5c10ff9df46874f81ed3ec929e19cfd
+# The local reusable workflows (./.github/workflows/*.reusable.yml) run from this same commit.
+name: chatbot-prod-cicd
+
+on:
+  push:
+    branches: [main-chatbot-service]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: chatbot-prod-cicd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------- start notification
+  notify-start:
+    name: notify start (Slack)
+    permissions: {}
+    uses: ./.github/workflows/slack-notify.reusable.yml
+    with:
+      status: started
+      title: AI-CHATBOT SERVICE NEW ENVIRONMENT
+      project: AI-CHATBOT SERVICE
+      environment-label: PROD
+    secrets:
+      SLACK_NOTIFICATIONS_WEBHOOK_URL: ${{ secrets.SLACK_NOTIFICATIONS_WEBHOOK_URL }}
+
+  # ---------------------------------------------------------------- mandatory checks
+  # The legacy job runs no lint and no tests (none added). Only the CI scripts are checked.
+  ci-script-checks:
+    name: CI script checks (bash -n, ShellCheck)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Syntax
+        run: |
+          for f in .github/scripts/*.sh; do bash -n "$f"; done
+      - name: ShellCheck (preinstalled on the runner)
+        run: shellcheck --severity=warning .github/scripts/*.sh
+
+  # ---------------------------------------------------------------- build + publish
+  publish-image:
+    name: publish image (chatbot)
+    needs: ci-script-checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: chatbot-prod
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      DOCKER_BUILDKIT: '1'
+      LOCAL_IMAGE: local/chatbot:${{ github.run_id }}-${{ github.run_attempt }}
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - name: Enforce bound ref
+        env:
+          BOUND_REF: ${{ vars.CICD_BOUND_REF }}
+          CURRENT_REF: ${{ github.ref }}
+        run: |
+          if [ -z "${BOUND_REF:-}" ] || [ "$CURRENT_REF" != "$BOUND_REF" ]; then echo "::error::ref is not the bound ref (fail closed)"; exit 1; fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Assume the build role through OIDC for the secret read (credentials not exported to the job)
+        id: aws-config
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.CICD_BUILD_ROLE_ARN }}
+          aws-region: ${{ vars.CICD_AWS_REGION }}
+          role-session-name: chatbot-prod-ci-${{ github.run_id }}
+          mask-aws-account-id: true
+          output-env-credentials: false
+          output-credentials: true
+      - name: Chatbot .env from Secrets Manager (git-ignored file, as the legacy job)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ steps.aws-config.outputs.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.aws-config.outputs.aws-secret-access-key }}
+          AWS_SESSION_TOKEN: ${{ steps.aws-config.outputs.aws-session-token }}
+          AWS_REGION: ${{ vars.CICD_AWS_REGION }}
+          SECRET_ID: ${{ secrets.CICD_ENV_SECRET_ID }}
+        run: bash .github/scripts/write-chatbot-env.sh
+      # Original Dockerfile and build context, as `dir('chatbot-service') { docker build -t ai-chatbot-service-prod:<n> . }`
+      # in the legacy job; only the provenance labels checked by Jenkins (stage "Verify Image") are added.
+      - name: Build image (original Dockerfile)
+        working-directory: chatbot-service
+        run: >-
+          bash ../.github/scripts/without-oidc.sh docker build
+          --label "org.opencontainers.image.revision=${{ github.sha }}"
+          --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}"
+          --label "org.cgiar.cicd.run=${{ github.run_id }}-${{ github.run_attempt }}"
+          --label org.cgiar.cicd.unit=chatbot
+          --tag "$LOCAL_IMAGE" .
+      - name: Remove the chatbot .env
+        if: always()
+        run: bash .github/scripts/remove-chatbot-env.sh
+      - name: Assume the build role through OIDC for the push (credentials not exported to the job)
+        id: aws
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.CICD_BUILD_ROLE_ARN }}
+          aws-region: ${{ vars.CICD_AWS_REGION }}
+          role-session-name: chatbot-prod-ci-${{ github.run_id }}
+          mask-aws-account-id: true
+          output-env-credentials: false
+          output-credentials: true
+      - name: Push image and capture its digest
+        id: push
+        env:
+          AWS_ACCESS_KEY_ID: ${{ steps.aws.outputs.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.aws.outputs.aws-secret-access-key }}
+          AWS_SESSION_TOKEN: ${{ steps.aws.outputs.aws-session-token }}
+          AWS_REGION: ${{ vars.CICD_AWS_REGION }}
+          REPOSITORY: ${{ vars.CICD_ECR_REPOSITORY }}
+          LOCAL: ${{ env.LOCAL_IMAGE }}
+          TAG: gha-${{ github.run_id }}-${{ github.run_attempt }}
+        run: bash .github/scripts/push-image.sh
+
+  # ---------------------------------------------------------------- CD hand-over to Jenkins
+  deploy:
+    name: deploy (Jenkins chatbot-service-cd)
+    needs: publish-image
+    if: needs.publish-image.result == 'success' && needs.publish-image.outputs.digest != ''
+    permissions: {}
+    uses: ./.github/workflows/jenkins-cd.reusable.yml
+    with:
+      jenkins-job: chatbot-service-cd
+      environment: chatbot-prod
+      dry-run: false # real deploy from the first run (as the other migrated pipelines); true = validation only
+      artifacts: chatbot=${{ needs.publish-image.outputs.digest }}
+    secrets:
+      JENKINS_USERNAME: ${{ secrets.JENKINS_USERNAME }}
+      JENKINS_API_TOKEN: ${{ secrets.JENKINS_API_TOKEN }}
+
+  # ---------------------------------------------------------------- CI failure notification
+  notify-ci-failure:
+    name: notify CI failure (Slack)
+    needs: [ci-script-checks, publish-image, deploy]
+    if: ${{ always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) }}
+    permissions: {}
+    uses: ./.github/workflows/slack-notify.reusable.yml
+    with:
+      status: failed
+      title: AI-CHATBOT SERVICE NEW ENVIRONMENT
+      project: AI-CHATBOT SERVICE
+      environment-label: PROD
+      detail: >-
+        ci-script-checks=${{ needs.ci-script-checks.result }},
+        publish-image=${{ needs.publish-image.result }},
+        jenkins-hand-over=${{ needs.deploy.result }}
+    secrets:
+      SLACK_NOTIFICATIONS_WEBHOOK_URL: ${{ secrets.SLACK_NOTIFICATIONS_WEBHOOK_URL }}

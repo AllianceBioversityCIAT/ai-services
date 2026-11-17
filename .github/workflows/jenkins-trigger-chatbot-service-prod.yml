@@ -1,12 +1,9 @@
 name: Trigger Jenkins Job QA Service DEV
 
+# Cutover (owner decision, 2026-11-17): pushes to main-chatbot-service are built by chatbot-prod-cicd.yml and deployed
+# by the Jenkins CD-only job chatbot-service-cd. The push and pull_request triggers of the legacy job chatbot-service are
+# removed; workflow_dispatch stays for manual recovery with the legacy job.
 on:
-  push:
-    branches:
-      - "main-chatbot-service"
-  pull_request:
-    branches:
-      - "main-chatbot-service"
   workflow_dispatch:
 
 jobs:
