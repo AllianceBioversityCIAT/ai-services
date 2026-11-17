@@ -4,12 +4,17 @@ All map to the same ``NormalizedSuggestion``; the signal colour is computed in c
 
 v1 keeps the previous helper's JSON keys exactly as its prompts ask for them (aliases below), so
 the prompt text and the enforced schema agree. ``Evidence Quote`` is the only key added: the signal
-needs a passage that can be checked against the evidence.
+needs a passage that can be checked against the evidence. The indicative prompts (06 result category,
+09 use numbers) keep their keys with nothing added: they ask the model not to quote, and indicative
+fields carry no quote (decision of 2026-11-17).
 """
 
 from dataclasses import dataclass
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.contract.messages import SuggestedValue, UseNumberRow
 
 MAX_EXPLANATION_WORDS = 50
 
@@ -25,7 +30,8 @@ _V1_QUOTE = (
 
 @dataclass(frozen=True)
 class NormalizedSuggestion:
-    value: int
+    value: SuggestedValue
+    """level int; ResultCategory str; or list of UseNumberRow for use numbers."""
     explanation: str
     """Shown to the assessor (v1: Short Justification)."""
     evidence_quote: str
@@ -100,12 +106,59 @@ class SuggestionOutputV2(BaseModel):
         )
 
 
-SuggestionOutput = V1ImpactAreaOutput | V1ReadinessOutput | V1UseOutput | SuggestionOutputV2
+class V1ResultCategoryOutput(_V1Base):
+    """Prompt 06 (Is innovation? v1). The prompt asks for the strings "True"/"False"."""
+
+    is_innovation: Literal["True", "False"] = Field(alias="is_innovation", description="True | False")
+    predicted_category_if_not: (
+        Literal["Knowledge Product", "Capacity Sharing for Development", "Routine Activity", "Other"] | None
+    ) = Field(
+        alias="predicted_category_if_not",
+        description="Knowledge Product | Capacity Sharing for Development | Routine Activity | Other",
+    )
+    justification: str = Field(alias="justification", description="Concise evidence-based justification")
+
+    def normalized(self) -> NormalizedSuggestion:
+        if self.is_innovation == "True":
+            value = "Innovation"
+        elif self.predicted_category_if_not is None:
+            raise ValueError("is_innovation False without predicted_category_if_not")
+        else:
+            value = self.predicted_category_if_not
+        return NormalizedSuggestion(value, self.justification, "", None, None)
+
+
+class V1UseNumbersOutput(_V1Base):
+    """Prompt 09 (Innovation Use Numbers v3). An empty list means no valid use numbers were reported."""
+
+    innovation_user_numbers: list[UseNumberRow] = Field(alias="innovation_user_numbers")
+    justification: str = Field(
+        alias="justification",
+        description=(
+            "Quote or paraphrase the evidence (doc title, page/slide/para) that supports the innovation "
+            "usage number/measure. Always start with the total identified numbers sum across all categories."
+        ),
+    )
+
+    def normalized(self) -> NormalizedSuggestion:
+        return NormalizedSuggestion(list(self.innovation_user_numbers), self.justification, "", None, None)
+
+
+SuggestionOutput = (
+    V1ImpactAreaOutput
+    | V1ReadinessOutput
+    | V1UseOutput
+    | V1ResultCategoryOutput
+    | V1UseNumbersOutput
+    | SuggestionOutputV2
+)
 
 OUTPUT_MODELS: dict[str, type[SuggestionOutput]] = {
     "v1_impact_area": V1ImpactAreaOutput,
     "v1_readiness_level": V1ReadinessOutput,
     "v1_use_level": V1UseOutput,
+    "v1_result_category": V1ResultCategoryOutput,
+    "v1_use_numbers": V1UseNumbersOutput,
     "v2": SuggestionOutputV2,
 }
 

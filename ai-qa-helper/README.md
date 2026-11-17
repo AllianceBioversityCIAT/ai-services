@@ -78,7 +78,18 @@ Proposed entity definitions for `onecgiar_qa` (same pattern as its `resultSnapsh
 | `aiSuggestion` | `{entity: 'aiSuggestion', version: '1', service: 'qa'}` | `RESULT#${resultCode}` | `AI#${snapKey}#${fieldKey}#${promptVersion}` |
 | `aiRun` | `{entity: 'aiRun', version: '1', service: 'qa'}` | `AIRUN#${runId}` | `RUN` |
 
-**Production version.** `prompts/manifest.json` `production` names the promptVersion the QA API puts on every job (`v2-1.0.0` since 2026-11-17, all 7 fields). `contract/production.json` publishes it with the field keys and scales, so the API does not hard-code them.
+**Contract version** `2.0.0` (`CONTRACT_VERSION` in `app/contract/messages.py`; `x-contractVersion` in every schema). 2.0.0 adds the indicative fields, `valueKind`, a typed `suggestedValue`, `coversFieldKeys` and the signal `indicative`.
+
+**Production versions** are per field: `prompts/manifest.json` `production`, published with each field's value kind, signal type and scale in `contract/production.json`, so the API does not hard-code them. December 2026: `v2-1.0.0` for the 5 Impact Areas, IRL and IUL; `v1-1.0.0` for the two indicative fields.
+
+**Indicative fields** (signal `indicative`: no colour, no quote, value always present):
+
+| Field (catalog 2026.30) | Prompt | `suggestedValue` | `reportedValue` |
+| --- | --- | --- | --- |
+| `general.result_type` (all result types) | 06, verbatim | `"Innovation"` or the alternative category of prompt 06 (`Knowledge Product`, `Capacity Sharing for Development`, `Routine Activity`, `Other`) | catalog result-type key, e.g. `innovation_development` (from `ResultTypeEnum` id; ids 3 and 11 have no key) |
+| `innovation_use.current_use.actors` | 09, verbatim | list of prompt 09 user groups (`user`, `user_type`, `user_subtype`, `quantity`, sex/age disaggregation, `geolocation`, `other_quantitative_measures`); may be empty | `{actors, organizations, measures}`: the three `innovation_use.current_use.*` lists of the snapshot (not `projection_2030`) |
+
+The use-numbers suggestion covers actors, organizations and measures: `coversFieldKeys` lists the other two, and the chip must say so. For it to be enqueued, `innovation_use.current_use.actors` must be marked as AI input in the QA field config.
 
 **Events** (`contract/schema/ai-suggestion-event.schema.json`, discriminated by `action`):
 
@@ -109,7 +120,7 @@ one (snapshot, field, promptVersion):
 2. **Criteria.** A field without a prompt in that version is stored as `no_criteria_for_field`.
 3. **Snapshot.** `RESULT#<code>` / `SNAP#<snapKey>`, written by `onecgiar_qa`. The worker reads the title, the description, the reported value and the evidence links ([`app/worker/snapshot.py`](app/worker/snapshot.py)). It uses the links flagged for the field (`evidence.items[].<area>_related`); if none are flagged, it uses all of the result's links, up to 5.
 4. **Evidence.** Nothing readable means `unavailable` with its reason, and no model call.
-5. **Model.** A truncated answer is retried once with a higher cap. A refusal is stored as `model_declined`; invalid JSON or an out-of-range value as `invalid_output`. IRL and IUL also need a quote found verbatim in the evidence, because the assessor UI shows them as "Evidence explicitly supports level X" with the quote; without one the field is stored as `no_supporting_quote`. In the 2025 sample this applied to 16 of 65 v2 IRL/IUL answers.
+5. **Model.** A truncated answer is retried once with a higher cap. A refusal is stored as `model_declined`; invalid JSON or an out-of-range value as `invalid_output`. Indicative fields skip the signal and the quote. IRL and IUL also need a quote found verbatim in the evidence, because the assessor UI shows them as "Evidence explicitly supports level X" with the quote; without one the field is stored as `no_supporting_quote`. In the 2025 sample this applied to 16 of 65 v2 IRL/IUL answers.
 6. **Signal and write.** One DynamoDB transaction puts the suggestion, conditional on the key, and adds 1 to the `AiRun` counter.
 
 Transient errors (throttling, 5xx, timeouts, a snapshot not found yet) are retried by SQS. On the

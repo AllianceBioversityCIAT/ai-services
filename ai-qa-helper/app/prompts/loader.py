@@ -61,9 +61,14 @@ def get_prompt(prompt_version: str, field_key: str, prompts_dir: Path = PROMPTS_
     )
 
 
-def production_version(prompts_dir: Path = PROMPTS_DIR) -> str:
-    """The promptVersion the QA API puts on every job (``manifest.json`` ``production``)."""
-    return _manifest(prompts_dir)["production"]
+def production_version(field_key: str, prompts_dir: Path = PROMPTS_DIR) -> str:
+    """The promptVersion the QA API puts on this field's jobs (``manifest.json`` ``production``).
+
+    December 2026: v2-1.0.0 for the 5 Impact Areas, IRL and IUL; v1-1.0.0 (previous helper's prompts
+    verbatim) for result category and innovation use numbers.
+    """
+    production = _manifest(prompts_dir)["production"]
+    return production["fields"].get(field_key, production["default"])
 
 
 def prompt_versions(prompts_dir: Path = PROMPTS_DIR) -> list[str]:

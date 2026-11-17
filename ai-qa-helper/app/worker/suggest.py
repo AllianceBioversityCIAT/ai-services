@@ -43,7 +43,7 @@ def suggest(
     prompt: PromptSpec,
     spec: FieldSpec,
     result: ResultContext,
-    reported: int | None,
+    reported: object,
     evidence: EvidenceOutcome,
     params: SuggestParams,
 ) -> Suggestion:
@@ -60,7 +60,13 @@ def suggest(
     if res.kind != "ok" or res.output is None:
         return Suggestion("invalid_output", res.model_id, usage)
 
-    norm = res.output.normalized()
+    try:
+        norm = res.output.normalized()
+    except ValueError:
+        return Suggestion("invalid_output", res.model_id, usage)
+    if spec.indicative:
+        # No colour and no quote (prompts 06 and 09 ask the model not to quote).
+        return Suggestion("ok", res.model_id, usage, norm, "indicative", False, None, None)
     verified = is_quote_in_evidence(norm.evidence_quote, built.evidence_text)
     try:
         signal = compute_signal(SignalInput(spec, reported, norm.value, verified, evidence.partial))

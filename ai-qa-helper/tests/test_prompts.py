@@ -34,11 +34,27 @@ def test_manifest_hashes_match_the_files():
     assert check_manifest([]) == 0
 
 
-def test_both_versions_cover_every_ai_field():
+SCORED = [k for k, s in AI_FIELDS.items() if not s.indicative]
+INDICATIVE = [k for k, s in AI_FIELDS.items() if s.indicative]
+
+
+def test_both_versions_cover_every_scored_field_and_only_v1_the_indicative_ones():
     assert prompt_versions() == ["v1-1.0.0", "v2-1.0.0"]
+    assert len(SCORED) == 7 and INDICATIVE == ["general.result_type", "innovation_use.current_use.actors"]
     for version in prompt_versions():
-        for field in AI_FIELDS:
+        for field in SCORED:
             assert get_prompt(version, field) is not None, (version, field)
+    for field in INDICATIVE:
+        assert get_prompt("v1-1.0.0", field) is not None
+        assert get_prompt("v2-1.0.0", field) is None
+
+
+def test_indicative_prompts_are_the_previous_helper_text():
+    category = get_prompt("v1-1.0.0", "general.result_type")
+    assert category.text.startswith("**Role**\nYou are an AI assistant supporting Assessors")
+    assert "{context}" in category.text and "Do not quote verbatim." in category.text
+    numbers = get_prompt("v1-1.0.0", "innovation_use.current_use.actors")
+    assert "\"innovation_user_numbers\": [" in numbers.text and numbers.label == "Innovation use numbers"
 
 
 def test_v1_keeps_the_previous_helper_text_and_its_empty_placeholders():
@@ -100,7 +116,7 @@ def test_v2_request_has_cached_rubric_tagged_evidence_and_no_reported_value():
 
 
 def test_v2_criteria_drop_the_previous_input_and_output_instructions():
-    for field in AI_FIELDS:
+    for field in SCORED:
         text = get_prompt("v2-1.0.0", field).text
         for stale in ("Output Format (Strict)", "{core_innovation}", "{context}", "explicity flagged", "\\n"):
             assert stale not in text, (field, stale)

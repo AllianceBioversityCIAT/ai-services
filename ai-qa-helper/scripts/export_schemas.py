@@ -11,7 +11,12 @@ from pydantic import TypeAdapter
 
 from app.contract.fields import AI_FIELDS
 from app.contract.items import AiRunItem, AiSuggestionItem, suggestion_pk, suggestion_sk
-from app.contract.messages import AiJobMessage, AiSuggestionEvent, AiSuggestionView
+from app.contract.messages import (
+    CONTRACT_VERSION,
+    AiJobMessage,
+    AiSuggestionEvent,
+    AiSuggestionView,
+)
 from app.prompts.loader import get_prompt, production_version
 
 ROOT = Path(__file__).resolve().parent.parent / "contract"
@@ -45,9 +50,78 @@ EXAMPLES = {
             "evidenceQuote": "trained 1,200 women farmers in climate-smart practices",
             "evidenceSource": "https://example.org/evidence.pdf",
             "evidenceSourceIndex": 0,
+            "valueKind": "level",
             "suggestedValue": 1,
             "reportedValue": 1,
             "quoteVerified": True,
+            "partialEvidence": False,
+            "modelId": "anthropic.claude-haiku-5-5",
+            "evidenceHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "createdAt": "2026-11-20T12:00:00Z",
+        }
+    ),
+    "ai-suggestion-item.result-category": AiSuggestionItem.model_validate(
+        {
+            "pk": suggestion_pk(1002),
+            "sk": suggestion_sk(_SNAP, "general.result_type", "v1-1.0.0"),
+            "__edb_e__": "aiSuggestion",
+            "__edb_v__": "1",
+            "resultCode": 1002,
+            "snapKey": _SNAP,
+            "fieldKey": "general.result_type",
+            "promptVersion": "v1-1.0.0",
+            "suggestionId": "1b2c3d4e5f60718293a4b5c6d7e8f901",
+            "runId": "run-example",
+            "status": "available",
+            "signal": "indicative",
+            "explanation": "- Novelty: a new seed-certification process. - Improvement and positive change are described.",
+            "valueKind": "category",
+            "suggestedValue": "Innovation",
+            "reportedValue": "innovation_development",
+            "quoteVerified": False,
+            "partialEvidence": False,
+            "modelId": "anthropic.claude-haiku-5-5",
+            "evidenceHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "createdAt": "2026-11-20T12:00:00Z",
+        }
+    ),
+    "ai-suggestion-item.use-numbers": AiSuggestionItem.model_validate(
+        {
+            "pk": suggestion_pk(1003),
+            "sk": suggestion_sk(_SNAP, "innovation_use.current_use.actors", "v1-1.0.0"),
+            "__edb_e__": "aiSuggestion",
+            "__edb_v__": "1",
+            "resultCode": 1003,
+            "snapKey": _SNAP,
+            "fieldKey": "innovation_use.current_use.actors",
+            "promptVersion": "v1-1.0.0",
+            "suggestionId": "2c3d4e5f60718293a4b5c6d7e8f90a12",
+            "runId": "run-example",
+            "status": "available",
+            "signal": "indicative",
+            "explanation": "Total 1,250: 1,200 farmers and 50 hectares reported in the 2025 project report.",
+            "valueKind": "use_numbers",
+            "suggestedValue": [
+                {
+                    "user": "actors", "user_type": "Farmers/ (agro)pastoralist/ herders/ fishers",
+                    "user_subtype": None, "quantity": 1200, "women": 700, "youth_women": None,
+                    "non_youth_women": None, "men": 500, "youth_men": None, "non_youth_men": None,
+                    "geolocation": "Kenya", "other_quantitative_measures": None,
+                },
+                {
+                    "user": "other type", "user_type": "hectares", "user_subtype": None, "quantity": 50.5,
+                    "women": None, "youth_women": None, "non_youth_women": None, "men": None,
+                    "youth_men": None, "non_youth_men": None, "geolocation": None,
+                    "other_quantitative_measures": None,
+                },
+            ],
+            "reportedValue": {
+                "actors": [{"actor_type": 1, "how_many": 1000, "women": 600, "men": 400}],
+                "organizations": [],
+                "measures": [{"unit_of_measure": "hectares", "quantity": 40}],
+            },
+            "coversFieldKeys": ["innovation_use.current_use.organizations", "innovation_use.current_use.measures"],
+            "quoteVerified": False,
             "partialEvidence": False,
             "modelId": "anthropic.claude-haiku-5-5",
             "evidenceHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -75,20 +149,35 @@ EXAMPLES = {
 
 
 def production() -> dict:
-    """What the QA API needs to enqueue jobs: the promptVersion and the fields that have criteria in it."""
-    version = production_version()
-    return {
-        "promptVersion": version,
-        "fieldKeys": [k for k in AI_FIELDS if get_prompt(version, k) is not None],
-        "fieldScales": {k: {"min": s.min, "max": s.max} for k, s in AI_FIELDS.items() if get_prompt(version, k)},
-    }
+    """What the QA API needs to enqueue jobs and render the chip, per AI field with criteria in production."""
+    fields = {}
+    for key, spec in AI_FIELDS.items():
+        version = production_version(key)
+        if get_prompt(version, key) is None:
+            continue
+        entry = {
+            "promptVersion": version,
+            "valueKind": spec.value_kind,
+            "signal": "indicative" if spec.indicative else "scored",
+        }
+        if spec.value_kind == "level":
+            entry["scale"] = {"min": spec.min, "max": spec.max}
+        if spec.covers:
+            entry["coversFieldKeys"] = list(spec.covers)
+        fields[key] = entry
+    return {"contractVersion": CONTRACT_VERSION, "fields": fields}
 
 
 def render() -> dict[Path, str]:
     out: dict[Path, str] = {}
     for name, adapter in SCHEMAS.items():
         schema = adapter.json_schema(by_alias=True)
-        schema = {"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": f"{name}.schema.json", **schema}
+        schema = {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": f"{name}.schema.json",
+            "x-contractVersion": CONTRACT_VERSION,
+            **schema,
+        }
         out[ROOT / "schema" / f"{name}.schema.json"] = json.dumps(schema, indent=2, sort_keys=True) + "\n"
     out[ROOT / "production.json"] = json.dumps(production(), indent=2) + "\n"
     for name, model in EXAMPLES.items():

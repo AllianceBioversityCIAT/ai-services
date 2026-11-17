@@ -8,7 +8,12 @@ The worker loads a prompt by `promptVersion` (from the SQS job) and `fieldKey`. 
 | `<fieldKey>/v1.txt` | v1: the previous helper's production prompt, byte for byte |
 | `<fieldKey>/v2.criteria.md` | v2: the criteria of the same prompt, without its input and output instructions |
 | `common/v2.system.md` | v2: the common frame the criteria are inserted into |
-| `inactive/` | Prompts 06 (is innovation) and 09 (use numbers): reference only, not AI-input fields in this batch |
+| `result_category/v1.txt`, `innovation_use_numbers/v1.txt` | Prompts 06 and 09, v1 only (indicative fields) |
+
+**Production (December 2026)**, `manifest.json` `production`: v2-1.0.0 for the 5 Impact Areas, IRL and
+IUL; v1-1.0.0 for the two indicative fields, result category (`general.result_type`, prompt 06) and
+innovation use numbers (`innovation_use.current_use.actors`, prompt 09). Scope change approved by the
+QA coordinator on 2026-11-17. `contract/production.json` publishes this per field for the QA API.
 
 A version never changes once released. The loader checks every file against the sha256 pinned in the
 manifest and refuses to run on a mismatch. To change a prompt, add a version with new files, then
@@ -44,6 +49,14 @@ Differences, all mechanical:
 
 Prompt 08 asks for a paraphrase and no verbatim excerpts, which conflicts with `Evidence Quote`.
 Expect a lower share of verified quotes for IUL in v1.
+
+**Prompts 06 and 09 (indicative).** Added to v1-1.0.0 on 2026-11-17 (additive: no released prompt of
+that version changed). Both say "Do not quote verbatim", so they get **no** `Evidence Quote` key: their
+structured output has exactly the keys they ask for, and the suggestion is shown without a quote and
+without a colour (signal `indicative`). Prompt 06's `is_innovation` is the string "True"/"False", as the
+prompt asks. Known defects kept as is (verbatim): prompt 06 sends `{context}` unfilled; prompt 09 has a
+cut sentence ("If the numbers for women, men,"), a 50/50 youth rule that contradicts "do not
+calculate disaggregation", and announces a "Core Innovation Statement" that the context does not carry.
 
 ## v2-1.0.0: same criteria, new frame
 

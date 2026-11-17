@@ -9,6 +9,7 @@ overwrites it (condition: still failed) and moves its count from ``failed`` to t
 the same transaction.
 """
 
+from decimal import Decimal
 from typing import Any, Literal, Protocol
 
 from boto3.dynamodb.types import TypeSerializer
@@ -35,8 +36,19 @@ class SuggestionStore(Protocol):
         ...
 
 
+def _dynamo_safe(v: Any) -> Any:
+    """DynamoDB numbers are Decimal: floats (use numbers, e.g. hectares) are converted exactly as printed."""
+    if isinstance(v, float):
+        return Decimal(repr(v))
+    if isinstance(v, dict):
+        return {k: _dynamo_safe(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_dynamo_safe(x) for x in v]
+    return v
+
+
 def _av(doc: dict[str, Any]) -> dict[str, Any]:
-    return {k: _ser.serialize(v) for k, v in doc.items()}
+    return {k: _ser.serialize(_dynamo_safe(v)) for k, v in doc.items()}
 
 
 class DynamoSuggestionStore:

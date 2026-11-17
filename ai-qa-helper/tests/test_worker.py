@@ -11,7 +11,7 @@ from app.contract.items import AiSuggestionItem, suggestion_pk, suggestion_sk
 from app.contract.messages import AiJobMessage
 from app.evidence.extractor import EvidenceSource, summarize
 from app.handlers.worker import handler
-from app.llm.output_schema import SuggestionOutputV2
+from app.llm.output_schema import SuggestionOutputV2, V1ResultCategoryOutput, V1UseNumbersOutput
 from app.llm.provider import LlmUsage, RetryableLlmError, SuggestionResult
 from app.worker.process import JobDeps, RetryLater, process_job
 from app.worker.snapshot import DynamoSnapshotReader, read_field_input
@@ -188,6 +188,76 @@ def test_unverified_quote_is_amber():
     assert stored(d).signal == "amber" and stored(d).quoteVerified is False
 
 
+CATEGORY = "general.result_type"
+USE_NUMBERS = "innovation_use.current_use.actors"
+ROW = {"user": "actors", "user_type": "Farmers/ (agro)pastoralist/ herders/ fishers", "user_subtype": None,
+       "quantity": 1200, "women": 700, "youth_women": None, "non_youth_women": None, "men": 500, "youth_men": None,
+       "non_youth_men": None, "geolocation": "Kenya", "other_quantitative_measures": None}
+INNOVATION_VALUES = {
+    **VALUES,
+    CATEGORY: {"value": 7},
+    "innovation_use.current_use.actors": [{"actor_type": 1, "how_many": 1000}],
+    "innovation_use.current_use.measures": [{"unit_of_measure": "hectares", "quantity": 40.5}],
+    "innovation_use.projection_2030.actors": [{"actor_type": 1, "how_many": 99999}],
+}
+
+
+def v1_result(model, data):
+    return SuggestionResult("ok", "anthropic.claude-haiku-5-5", LlmUsage(100, 20), model.model_validate(data))
+
+
+def test_result_category_is_indicative_with_the_prompt_06_category():
+    data = {"Reasoning": "r", "is_innovation": "False", "predicted_category_if_not": "Knowledge Product",
+            "justification": "- A synthesis report, no new solution."}
+    d = deps(FakeLlmProvider().enqueue(v1_result(V1ResultCategoryOutput, data)), snapshots=FakeSnapshots(INNOVATION_VALUES))
+    assert process_job(job(field=CATEGORY, version="v1-1.0.0"), d, False).outcome == "produced"
+    item = stored(d, field=CATEGORY, version="v1-1.0.0")
+    assert (item.signal, item.valueKind, item.suggestedValue) == ("indicative", "category", "Knowledge Product")
+    assert item.reportedValue == "innovation_development" and item.evidenceQuote is None
+    assert item.explanation.startswith("- A synthesis report") and item.quoteVerified is False
+
+
+def test_result_category_innovation_and_invalid_combination():
+    yes = {"Reasoning": "r", "is_innovation": "True", "predicted_category_if_not": None, "justification": "j"}
+    d = deps(FakeLlmProvider().enqueue(v1_result(V1ResultCategoryOutput, yes)), snapshots=FakeSnapshots(INNOVATION_VALUES))
+    process_job(job(field=CATEGORY, version="v1-1.0.0"), d, False)
+    assert stored(d, field=CATEGORY, version="v1-1.0.0").suggestedValue == "Innovation"
+
+    no_category = {**yes, "is_innovation": "False"}
+    d = deps(FakeLlmProvider().enqueue(v1_result(V1ResultCategoryOutput, no_category)))
+    process_job(job(field=CATEGORY, version="v1-1.0.0"), d, False)
+    assert stored(d, field=CATEGORY, version="v1-1.0.0").unavailableReason == "invalid_output"
+
+
+def test_use_numbers_are_indicative_and_reported_as_the_three_current_use_lists():
+    data = {"Reasoning": "r", "innovation_user_numbers": [ROW, {**ROW, "user": "other type", "user_type": "hectares",
+            "quantity": 50.5, "women": None, "men": None}], "justification": "Total 1,250.5 ..."}
+    d = deps(FakeLlmProvider().enqueue(v1_result(V1UseNumbersOutput, data)), snapshots=FakeSnapshots(INNOVATION_VALUES))
+    process_job(job(field=USE_NUMBERS, version="v1-1.0.0"), d, False)
+    item = stored(d, field=USE_NUMBERS, version="v1-1.0.0")
+    assert item.signal == "indicative" and item.valueKind == "use_numbers"
+    assert [r.quantity for r in item.suggestedValue] == [1200, 50.5]
+    assert item.reportedValue == {  # projection_2030 is not part of it
+        "actors": [{"actor_type": 1, "how_many": 1000}],
+        "measures": [{"unit_of_measure": "hectares", "quantity": 40.5}],
+    }
+    assert item.coversFieldKeys == ["innovation_use.current_use.organizations", "innovation_use.current_use.measures"]
+
+
+def test_use_numbers_empty_list_is_a_valid_suggestion():
+    data = {"Reasoning": "r", "innovation_user_numbers": [], "justification": "No valid use numbers."}
+    d = deps(FakeLlmProvider().enqueue(v1_result(V1UseNumbersOutput, data)))
+    process_job(job(field=USE_NUMBERS, version="v1-1.0.0"), d, False)
+    item = stored(d, field=USE_NUMBERS, version="v1-1.0.0")
+    assert item.status == "available" and item.suggestedValue == [] and item.reportedValue is None
+
+
+def test_indicative_fields_have_no_v2_criteria():
+    d = deps()
+    process_job(job(field=CATEGORY, version="v2-1.0.0"), d, False)
+    assert stored(d, field=CATEGORY).unavailableReason == "no_criteria_for_field"
+
+
 IRL = "innovation_dev.readiness_level"
 
 
@@ -353,6 +423,21 @@ def _item(**over):
     return AiSuggestionItem.model_validate({"__edb_e__": "aiSuggestion", "__edb_v__": "1", **base})
 
 
+def test_store_writes_use_numbers_with_decimal_quantities():
+    client = _client()
+    calls = []
+    client.transact_write_items = lambda **kw: calls.append(kw) or {}
+    item = _item(sk=suggestion_sk(SNAP, USE_NUMBERS, "v1-1.0.0"), fieldKey=USE_NUMBERS, promptVersion="v1-1.0.0",
+                 status="available", unavailableReason=None, signal="indicative", valueKind="use_numbers",
+                 suggestedValue=[{**ROW, "quantity": 50.5}], reportedValue={"measures": [{"quantity": 40.5}]},
+                 explanation="e", quoteVerified=False)
+    assert DynamoSuggestionStore("cgiar-qa-test", client).write(item, "produced") is True
+    put = calls[0]["TransactItems"][0]["Put"]["Item"]
+    assert put["suggestedValue"]["L"][0]["M"]["quantity"] == {"N": "50.5"}
+    assert put["suggestedValue"]["L"][0]["M"]["women"] == {"N": "700"}
+    assert put["reportedValue"]["M"]["measures"]["L"][0]["M"]["quantity"] == {"N": "40.5"}
+
+
 def test_store_writes_item_and_counter_in_one_conditional_transaction():
     client = _client()
     calls = []
@@ -395,3 +480,11 @@ def test_store_lookup_distinguishes_failed_items():
         stub.add_response("get_item", {"Item": {"pk": {"S": "x"}, "unavailableReason": {"S": "failed"}}})
         stub.add_response("get_item", {"Item": {"pk": {"S": "x"}}})
         assert [store.lookup("p", "s") for _ in range(3)] == ["absent", "failed", "done"]
+
+
+def test_reported_result_type_maps_catalogued_ids_only():
+    spec = AI_FIELDS["general.result_type"]
+    assert read_field_input({"general.result_type": {"value": 7}}, "general.result_type", spec).reported == "innovation_development"
+    assert read_field_input({"general.result_type": 2}, "general.result_type", spec).reported == "innovation_use"
+    for not_catalogued in (3, 11, 99, None):  # capacity change, complementary innovation: no catalog key
+        assert read_field_input({"general.result_type": not_catalogued}, "general.result_type", spec).reported is None

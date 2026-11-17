@@ -34,7 +34,7 @@ EVENT = TypeAdapter(AiSuggestionEvent)
 def test_available_view_carries_the_level_and_quote_flag():
     base = {"status": "available", "fieldKey": "innovation_dev.readiness_level", "suggestionId": "s",
             "signal": "amber", "explanation": "e", "evidenceQuote": "q", "evidenceSource": None,
-            "promptVersion": "v2-1.0.0", "modelId": "m", "quoteVerified": True}
+            "promptVersion": "v2-1.0.0", "modelId": "m", "quoteVerified": True, "valueKind": "level"}
     with pytest.raises(ValidationError):
         VIEW.validate_python(base)
     assert VIEW.validate_python({**base, "suggestedValue": 6}).suggestedValue == 6
@@ -65,7 +65,41 @@ def test_validated_above_ai_event():
     assert len(EVENT.validate_python({**ev, "reason": "x" * 200}).reason) == 200
 
 
-def test_production_version_covers_the_seven_fields():
-    version = production_version()
-    assert version == "v2-1.0.0"
-    assert all(get_prompt(version, k) is not None for k in AI_FIELDS) and len(AI_FIELDS) == 7
+def test_production_versions_per_field():
+    assert {k: production_version(k) for k in AI_FIELDS} == {
+        **{k: "v2-1.0.0" for k, s in AI_FIELDS.items() if not s.indicative},
+        "general.result_type": "v1-1.0.0",
+        "innovation_use.current_use.actors": "v1-1.0.0",
+    }
+    assert all(get_prompt(production_version(k), k) is not None for k in AI_FIELDS) and len(AI_FIELDS) == 9
+
+
+ROW = {"user": "actors", "user_type": "Researchers", "user_subtype": None, "quantity": 12, "women": 5,
+       "youth_women": None, "non_youth_women": None, "men": 7, "youth_men": None, "non_youth_men": None,
+       "geolocation": None, "other_quantitative_measures": None}
+INDICATIVE = {"status": "available", "fieldKey": "general.result_type", "suggestionId": "s", "signal": "indicative",
+              "explanation": "e", "evidenceSource": None, "promptVersion": "v1-1.0.0", "modelId": "m",
+              "quoteVerified": False}
+
+
+def test_indicative_views_carry_a_value_and_no_quote():
+    cat = VIEW.validate_python({**INDICATIVE, "valueKind": "category", "suggestedValue": "Knowledge Product"})
+    assert cat.suggestedValue == "Knowledge Product" and cat.evidenceQuote is None
+    nums = VIEW.validate_python({
+        **INDICATIVE, "fieldKey": "innovation_use.current_use.actors", "valueKind": "use_numbers",
+        "suggestedValue": [ROW, {**ROW, "user": "other type", "user_type": "hectares", "quantity": 2.5}],
+        "coversFieldKeys": ["innovation_use.current_use.organizations", "innovation_use.current_use.measures"],
+    })
+    assert nums.suggestedValue[1].quantity == 2.5
+    for bad in (
+        {"valueKind": "category", "suggestedValue": "Banana"},  # not a prompt 06 category
+        {"valueKind": "category"},  # value is required
+        {"valueKind": "category", "suggestedValue": None},
+        {"valueKind": "use_numbers", "suggestedValue": "Innovation"},  # kind mismatch
+        {"valueKind": "use_numbers", "suggestedValue": [{**ROW, "extra": 1}]},
+        {"valueKind": "level", "suggestedValue": 3},  # indicative signal with a level
+    ):
+        with pytest.raises(ValidationError):
+            VIEW.validate_python({**INDICATIVE, **bad})
+    with pytest.raises(ValidationError):  # scored field cannot be indicative-free of colour mismatch
+        VIEW.validate_python({**INDICATIVE, "signal": "green", "valueKind": "category", "suggestedValue": "Other"})

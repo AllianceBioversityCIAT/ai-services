@@ -22,11 +22,17 @@ Proposed ElectroDB definitions for onecgiar_qa (keys must match these templates 
 """
 
 import re
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.contract.messages import Signal, UnavailableReason
+from app.contract.messages import (
+    Signal,
+    SuggestedValue,
+    UnavailableReason,
+    ValueKind,
+    check_value_kind,
+)
 
 ELECTRODB_ENTITY_SUGGESTION = "aiSuggestion"
 ELECTRODB_ENTITY_RUN = "aiRun"
@@ -78,14 +84,23 @@ class AiSuggestionItem(BaseModel):
     evidenceQuote: str | None = None
     evidenceSource: str | None = None
     evidenceSourceIndex: int | None = None
-    suggestedValue: int | None = None
-    reportedValue: int | None = None
+    valueKind: ValueKind | None = None
+    suggestedValue: SuggestedValue | None = None
+    reportedValue: int | str | dict[str, Any] | None = None
+    """level: 0-9; category: catalog result-type key (e.g. ``innovation_development``); use_numbers:
+    ``{"actors": [...], "organizations": [...], "measures": [...]}`` as in the snapshot."""
+    coversFieldKeys: list[str] | None = None
     quoteVerified: bool | None = None
     partialEvidence: bool | None = None
     unavailableReason: UnavailableReason | None = None
     modelId: str | None = None
     evidenceHash: str | None = None
     createdAt: str
+
+    @model_validator(mode="after")
+    def _kind_matches(self) -> "AiSuggestionItem":
+        check_value_kind(self.valueKind, self.suggestedValue)
+        return self
 
     def keys_consistent(self) -> bool:
         return self.pk == suggestion_pk(self.resultCode) and self.sk == suggestion_sk(

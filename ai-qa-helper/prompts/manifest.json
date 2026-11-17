@@ -1,5 +1,11 @@
 {
-  "production": "v2-1.0.0",
+  "production": {
+    "default": "v2-1.0.0",
+    "fields": {
+      "general.result_type": "v1-1.0.0",
+      "innovation_use.current_use.actors": "v1-1.0.0"
+    }
+  },
   "versions": {
     "v1-1.0.0": {
       "family": "v1",
@@ -53,6 +59,20 @@
           "output": "v1_use_level",
           "label": "Innovation Use Level",
           "source": "08-innovation-use-level.md (Innovation Use Level (variant J) v5)"
+        },
+        "general.result_type": {
+          "file": "result_category/v1.txt",
+          "sha256": "fc99c8c942edaaac8af2df8874a1090d7262c3afb7a1dedba8717cd4a7979c87",
+          "output": "v1_result_category",
+          "label": "Result category (is it an innovation?)",
+          "source": "06-is-innovation.md (Is innovation? v1)"
+        },
+        "innovation_use.current_use.actors": {
+          "file": "innovation_use_numbers/v1.txt",
+          "sha256": "4c0627324ad929d3648058bc97c9e2ca92328dcd06f206e0e8ac6a99df815b4f",
+          "output": "v1_use_numbers",
+          "label": "Innovation use numbers",
+          "source": "09-innovation-use-numbers.md (Innovation Use Numbers v3)"
         }
       }
     },
@@ -128,20 +148,6 @@
           "explanation": "Reference the concrete evidence (document title and page or section when available), say why the level fits and what critical evidence is missing for a higher level."
         }
       }
-    }
-  },
-  "inactive": {
-    "is_innovation": {
-      "file": "inactive/is_innovation.v1.txt",
-      "sha256": "fc99c8c942edaaac8af2df8874a1090d7262c3afb7a1dedba8717cd4a7979c87",
-      "source": "06-is-innovation.md",
-      "note": "Not an AI-input field in the December 2026 batch; kept for reference only."
-    },
-    "innovation_use_numbers": {
-      "file": "inactive/innovation_use_numbers.v1.txt",
-      "sha256": "4c0627324ad929d3648058bc97c9e2ca92328dcd06f206e0e8ac6a99df815b4f",
-      "source": "09-innovation-use-numbers.md",
-      "note": "Not an AI-input field in the December 2026 batch; kept for reference only."
     }
   }
 }

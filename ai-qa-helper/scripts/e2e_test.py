@@ -50,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--profile", default=None)
     p.add_argument("--region", default="us-east-1")
     p.add_argument("--env", default="test")
-    p.add_argument("--prompt-version", default=production_version())
+    p.add_argument("--prompt-version", default=None, help="default: production version of each field")
     p.add_argument("--job", action="append", default=[], help="resultCode:snapKey:fieldKey")
     p.add_argument("--fixture", action="store_true")
     p.add_argument("--timeout", type=int, default=900, help="seconds to wait for the worker")
@@ -62,6 +62,7 @@ def main(argv: list[str] | None = None) -> int:
     queue_url = sqs.get_queue_url(QueueName=f"qa-ai-suggestions-{a.env}")["QueueUrl"]
 
     jobs = [parse_job(j) for j in a.job]
+    version = (lambda field: a.prompt_version or production_version(field))
     if a.fixture:
         ddb.put_item(TableName=table, Item=_fixture_item())
         jobs += [(FIXTURE_CODE, FIXTURE_SNAP, f) for f in FIXTURE_FIELDS]
@@ -70,9 +71,9 @@ def main(argv: list[str] | None = None) -> int:
 
     run_id = f"e2e-{uuid.uuid4().hex[:12]}"
     for code, snap, field in jobs:
-        msg = AiJobMessage(runId=run_id, resultCode=str(code), snapKey=snap, fieldKey=field, promptVersion=a.prompt_version)
+        msg = AiJobMessage(runId=run_id, resultCode=str(code), snapKey=snap, fieldKey=field, promptVersion=version(field))
         sqs.send_message(QueueUrl=queue_url, MessageBody=msg.model_dump_json())
-    print(f"run {run_id}: {len(jobs)} jobs enqueued ({a.prompt_version})")
+    print(f"run {run_id}: {len(jobs)} jobs enqueued ({sorted({version(f) for _, _, f in jobs})})")
 
     deadline = time.time() + a.timeout
     found: dict[tuple[int, str, str], dict[str, Any]] = {}
@@ -83,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
             code, snap, field = job
             item = ddb.get_item(
                 TableName=table,
-                Key={"pk": {"S": suggestion_pk(code)}, "sk": {"S": suggestion_sk(snap, field, a.prompt_version)}},
+                Key={"pk": {"S": suggestion_pk(code)}, "sk": {"S": suggestion_sk(snap, field, version(field))}},
                 ConsistentRead=True,
             ).get("Item")
             if item:
@@ -104,8 +105,9 @@ def main(argv: list[str] | None = None) -> int:
             "status": item["status"]["S"],
             "signal": item.get("signal", {}).get("S"),
             "reason": item.get("unavailableReason", {}).get("S"),
-            "suggested": item.get("suggestedValue", {}).get("N"),
-            "reported": item.get("reportedValue", {}).get("N"),
+            "valueKind": item.get("valueKind", {}).get("S"),
+            "suggested": _brief(item.get("suggestedValue")),
+            "reported": _brief(item.get("reportedValue")),
             "quoteVerified": item.get("quoteVerified", {}).get("BOOL"),
             "explanationWords": len(item.get("explanation", {}).get("S", "").split()),
         })
@@ -124,12 +126,25 @@ def main(argv: list[str] | None = None) -> int:
     if a.fixture:
         for code, snap, field in jobs:
             if code == FIXTURE_CODE:
-                ddb.delete_item(TableName=table, Key={"pk": {"S": suggestion_pk(code)}, "sk": {"S": suggestion_sk(snap, field, a.prompt_version)}})
+                ddb.delete_item(TableName=table, Key={"pk": {"S": suggestion_pk(code)}, "sk": {"S": suggestion_sk(snap, field, version(field))}})
         ddb.delete_item(TableName=table, Key={"pk": {"S": f"RESULT#{FIXTURE_CODE}"}, "sk": {"S": f"SNAP#{FIXTURE_SNAP}"}})
         if all(code == FIXTURE_CODE for code, _, _ in jobs):
             ddb.delete_item(TableName=table, Key={"pk": {"S": run_pk(run_id)}, "sk": {"S": "RUN"}})
         print("fixture items deleted (snapshot, suggestions and run counters)")
     return 0 if complete else 1
+
+
+def _brief(av: dict[str, Any] | None) -> Any:
+    """Level or category as is; lists and maps as their size (use numbers)."""
+    if not av:
+        return None
+    if "N" in av or "S" in av:
+        return av.get("N", av.get("S"))
+    if "L" in av:
+        return f"{len(av['L'])} rows"
+    if "M" in av:
+        return {k: len(v.get("L", [])) for k, v in av["M"].items()}
+    return None
 
 
 def _fixture_item() -> dict[str, Any]:

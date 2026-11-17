@@ -15,7 +15,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
-from app.contract.fields import FieldSpec
+from app.contract.fields import USE_NUMBERS_PREFIX, FieldSpec
 
 LEVEL_MAPS: dict[str, dict[int, int]] = {
     # Confirmed by Reporting (2026-11-12): tag_levels from the Reporting code; the other two from
@@ -24,6 +24,21 @@ LEVEL_MAPS: dict[str, dict[int, int]] = {
     "readiness_levels": {11 + level: level for level in range(10)},  # 11 Idea ... 20 Proven Innovation
     "innovation_use_levels": {1 + level: level for level in range(10)},  # 1 No use ... 10 End-user
 }
+
+RESULT_TYPE_KEYS: dict[int, str] = {
+    # onecgiar_pr ResultTypeEnum id -> catalog result_types key (qa-catalog/definitions/result-type-ids.ts).
+    1: "policy_change",
+    2: "innovation_use",
+    4: "other_outcome",
+    5: "capacity_sharing",
+    6: "knowledge_product",
+    7: "innovation_development",
+    8: "other_output",
+    9: "impact_contribution",
+    10: "innovation_package",
+}
+
+USE_NUMBER_LISTS = ("actors", "organizations", "measures")
 
 MAX_LINKS = 5
 """Same cap as qa-service ``enhance_prms_context(max_evidences=5)``."""
@@ -35,7 +50,8 @@ EvidenceScope = Literal["field", "result", "none"]
 class FieldInput:
     title: str
     description: str
-    reported: int | None
+    reported: int | str | dict[str, Any] | None
+    """level: 0-9; result category: result-type key; use numbers: the three lists. None: not reported."""
     links: list[str]
     evidence_scope: EvidenceScope
     """field: links flagged for this field; result: no flagged link, all the result's links."""
@@ -61,7 +77,11 @@ def text(values: dict[str, Any], key: str) -> str:
     return v.strip() if isinstance(v, str) else ""
 
 
-def reported_value(values: dict[str, Any], field_key: str, spec: FieldSpec) -> int | None:
+def reported_value(values: dict[str, Any], field_key: str, spec: FieldSpec) -> int | str | dict[str, Any] | None:
+    if spec.kind == "use_numbers":
+        lists = {name: values.get(f"{USE_NUMBERS_PREFIX}.{name}") for name in USE_NUMBER_LISTS}
+        lists = {k: v for k, v in lists.items() if isinstance(v, list)}
+        return lists or None
     raw = scalar(values.get(field_key))
     if raw is None or isinstance(raw, bool):
         return None
@@ -69,6 +89,8 @@ def reported_value(values: dict[str, Any], field_key: str, spec: FieldSpec) -> i
         control_id = int(raw)
     except (TypeError, ValueError):
         return None
+    if spec.kind == "result_category":
+        return RESULT_TYPE_KEYS.get(control_id)
     return LEVEL_MAPS.get(spec.control_list, {}).get(control_id)
 
 
