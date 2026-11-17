@@ -78,6 +78,15 @@ Proposed entity definitions for `onecgiar_qa` (same pattern as its `resultSnapsh
 | `aiSuggestion` | `{entity: 'aiSuggestion', version: '1', service: 'qa'}` | `RESULT#${resultCode}` | `AI#${snapKey}#${fieldKey}#${promptVersion}` |
 | `aiRun` | `{entity: 'aiRun', version: '1', service: 'qa'}` | `AIRUN#${runId}` | `RUN` |
 
+**Production version.** `prompts/manifest.json` `production` names the promptVersion the QA API puts on every job (`v2-1.0.0` since 2026-11-17, all 7 fields). `contract/production.json` publishes it with the field keys and scales, so the API does not hard-code them.
+
+**Events** (`contract/schema/ai-suggestion-event.schema.json`, discriminated by `action`):
+
+- `shown`, `copied`, `comment_saved` (with `commentId`): usage. The API computes whether the comment was edited.
+- `validated_above_ai`: the assessor validated a level 2 or more above the AI's. Body `{aiLevel, validatedLevel, reason}`, levels 0–9, `reason` one line of at most 200 characters. The API checks the difference and that `aiLevel` equals the stored `suggestedValue`.
+
+Events measure the AI only (AC9) and are never aggregated per reviewer.
+
 Every key uses `field: 'pk'` / `'sk'` and `casing: 'none'`. `fieldKey` and `promptVersion` never contain `#`, so a `begins_with` query on `AI#${snapKey}#` returns exactly one snapshot's suggestions. The `onecgiar_qa` contract test should load `contract/examples/*.json` through its entities and validate its API responses against `contract/schema/ai-suggestion-view.schema.json`.
 
 ## Evidence extraction
@@ -100,7 +109,7 @@ one (snapshot, field, promptVersion):
 2. **Criteria.** A field without a prompt in that version is stored as `no_criteria_for_field`.
 3. **Snapshot.** `RESULT#<code>` / `SNAP#<snapKey>`, written by `onecgiar_qa`. The worker reads the title, the description, the reported value and the evidence links ([`app/worker/snapshot.py`](app/worker/snapshot.py)). It uses the links flagged for the field (`evidence.items[].<area>_related`); if none are flagged, it uses all of the result's links, up to 5.
 4. **Evidence.** Nothing readable means `unavailable` with its reason, and no model call.
-5. **Model.** A truncated answer is retried once with a higher cap. A refusal is stored as `model_declined`; invalid JSON or an out-of-range value as `invalid_output`.
+5. **Model.** A truncated answer is retried once with a higher cap. A refusal is stored as `model_declined`; invalid JSON or an out-of-range value as `invalid_output`. IRL and IUL also need a quote found verbatim in the evidence, because the assessor UI shows them as "Evidence explicitly supports level X" with the quote; without one the field is stored as `no_supporting_quote`. In the 2025 sample this applied to 16 of 65 v2 IRL/IUL answers.
 6. **Signal and write.** One DynamoDB transaction puts the suggestion, conditional on the key, and adds 1 to the `AiRun` counter.
 
 Transient errors (throttling, 5xx, timeouts, a snapshot not found yet) are retried by SQS. On the

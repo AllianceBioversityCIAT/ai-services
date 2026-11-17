@@ -58,6 +58,10 @@
           "title": "Promptversion",
           "type": "string"
         },
+        "quoteVerified": {
+          "title": "Quoteverified",
+          "type": "boolean"
+        },
         "signal": {
           "enum": [
             "green",
@@ -72,6 +76,12 @@
           "title": "Status",
           "type": "string"
         },
+        "suggestedValue": {
+          "maximum": 9,
+          "minimum": 0,
+          "title": "Suggestedvalue",
+          "type": "integer"
+        },
         "suggestionId": {
           "title": "Suggestionid",
           "type": "string"
@@ -82,8 +92,10 @@
         "fieldKey",
         "suggestionId",
         "signal",
+        "suggestedValue",
         "explanation",
         "evidenceQuote",
+        "quoteVerified",
         "evidenceSource",
         "promptVersion",
         "modelId"
@@ -130,6 +142,7 @@
             "model_declined",
             "invalid_output",
             "no_criteria_for_field",
+            "no_supporting_quote",
             "out_of_scope_funding",
             "failed"
           ],

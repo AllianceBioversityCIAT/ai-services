@@ -208,6 +208,7 @@
             "model_declined",
             "invalid_output",
             "no_criteria_for_field",
+            "no_supporting_quote",
             "out_of_scope_funding",
             "failed"
           ],

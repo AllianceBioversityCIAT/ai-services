@@ -23,6 +23,7 @@ import boto3
 
 from app.contract.items import run_pk, suggestion_pk, suggestion_sk
 from app.contract.messages import AiJobMessage
+from app.prompts.loader import production_version
 
 FIXTURE_CODE = 999001
 FIXTURE_SNAP = "2026#000000#00000000#0000000001"
@@ -49,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--profile", default=None)
     p.add_argument("--region", default="us-east-1")
     p.add_argument("--env", default="test")
-    p.add_argument("--prompt-version", default="v2-1.0.0")
+    p.add_argument("--prompt-version", default=production_version())
     p.add_argument("--job", action="append", default=[], help="resultCode:snapKey:fieldKey")
     p.add_argument("--fixture", action="store_true")
     p.add_argument("--timeout", type=int, default=900, help="seconds to wait for the worker")

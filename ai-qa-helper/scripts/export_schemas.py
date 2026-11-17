@@ -9,8 +9,10 @@ from pathlib import Path
 
 from pydantic import TypeAdapter
 
+from app.contract.fields import AI_FIELDS
 from app.contract.items import AiRunItem, AiSuggestionItem, suggestion_pk, suggestion_sk
 from app.contract.messages import AiJobMessage, AiSuggestionEvent, AiSuggestionView
+from app.prompts.loader import get_prompt, production_version
 
 ROOT = Path(__file__).resolve().parent.parent / "contract"
 
@@ -72,12 +74,23 @@ EXAMPLES = {
 }
 
 
+def production() -> dict:
+    """What the QA API needs to enqueue jobs: the promptVersion and the fields that have criteria in it."""
+    version = production_version()
+    return {
+        "promptVersion": version,
+        "fieldKeys": [k for k in AI_FIELDS if get_prompt(version, k) is not None],
+        "fieldScales": {k: {"min": s.min, "max": s.max} for k, s in AI_FIELDS.items() if get_prompt(version, k)},
+    }
+
+
 def render() -> dict[Path, str]:
     out: dict[Path, str] = {}
     for name, adapter in SCHEMAS.items():
         schema = adapter.json_schema(by_alias=True)
         schema = {"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": f"{name}.schema.json", **schema}
         out[ROOT / "schema" / f"{name}.schema.json"] = json.dumps(schema, indent=2, sort_keys=True) + "\n"
+    out[ROOT / "production.json"] = json.dumps(production(), indent=2) + "\n"
     for name, model in EXAMPLES.items():
         out[ROOT / "examples" / f"{name}.json"] = (
             json.dumps(model.model_dump(by_alias=True, exclude_none=True), indent=2, sort_keys=True) + "\n"

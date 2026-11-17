@@ -4,9 +4,9 @@ Published as JSON Schema in ``contract/schema/`` (see ``scripts/export_schemas.p
 NestJS side can validate its copy in a contract test.
 """
 
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Signal = Literal["green", "amber", "red"]
 
@@ -16,6 +16,7 @@ UnavailableReason = Literal[
     "model_declined",
     "invalid_output",
     "no_criteria_for_field",
+    "no_supporting_quote",
     "out_of_scope_funding",
     "failed",
 ]
@@ -40,8 +41,12 @@ class AvailableSuggestionView(_Strict):
     fieldKey: str
     suggestionId: str
     signal: Signal
+    suggestedValue: int = Field(ge=0, le=9)
+    """Level on the field's scale: Impact Areas 0-2, IRL/IUL 0-9 (level number, not a catalog id)."""
     explanation: str
     evidenceQuote: str
+    """For IRL/IUL always non-empty and found verbatim in the evidence (else the field is unavailable)."""
+    quoteVerified: bool
     evidenceSource: str | None
     promptVersion: str
     modelId: str
@@ -62,7 +67,7 @@ class PendingSuggestionView(_Strict):
 
 
 AiSuggestionView = Annotated[
-    Union[AvailableSuggestionView, UnavailableSuggestionView, PendingSuggestionView],
+    AvailableSuggestionView | UnavailableSuggestionView | PendingSuggestionView,
     Field(discriminator="status"),
 ]
 """One item of ``GET /results/:code/snapshots/:snapKey/ai-suggestions`` (served by the QA API).
@@ -71,8 +76,33 @@ A user whose only role on the result is PPU gets 403 and no body.
 """
 
 
-class AiSuggestionEvent(_Strict):
-    """``POST /ai-suggestions/:suggestionId/events``. Whether the comment was edited is computed server-side."""
+class AiUsageEvent(_Strict):
+    """Copy/comment usage. Whether the comment was edited is computed server-side."""
 
     action: Literal["shown", "copied", "comment_saved"]
     commentId: str | None = None
+
+
+class AiValidatedAboveEvent(_Strict):
+    """The assessor validated a level at least 2 above the AI's level (IRL/IUL).
+
+    Requires ``validatedLevel - aiLevel >= 2`` (JSON Schema cannot express it: the API must check it,
+    and that ``aiLevel`` equals the suggestion's stored ``suggestedValue``). Measures the AI only (AC9):
+    never aggregated per reviewer.
+    """
+
+    action: Literal["validated_above_ai"]
+    aiLevel: int = Field(ge=0, le=9)
+    validatedLevel: int = Field(ge=0, le=9)
+    reason: str = Field(min_length=1, max_length=200, pattern=r"^[^\r\n]+$")
+    """One line, at most 200 characters."""
+
+    @model_validator(mode="after")
+    def _at_least_two_above(self) -> "AiValidatedAboveEvent":
+        if self.validatedLevel - self.aiLevel < 2:
+            raise ValueError("validatedLevel must be at least 2 above aiLevel")
+        return self
+
+
+AiSuggestionEvent = Annotated[AiUsageEvent | AiValidatedAboveEvent, Field(discriminator="action")]
+"""``POST /ai-suggestions/:suggestionId/events``."""

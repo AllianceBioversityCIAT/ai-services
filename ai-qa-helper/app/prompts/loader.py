@@ -61,6 +61,11 @@ def get_prompt(prompt_version: str, field_key: str, prompts_dir: Path = PROMPTS_
     )
 
 
+def production_version(prompts_dir: Path = PROMPTS_DIR) -> str:
+    """The promptVersion the QA API puts on every job (``manifest.json`` ``production``)."""
+    return _manifest(prompts_dir)["production"]
+
+
 def prompt_versions(prompts_dir: Path = PROMPTS_DIR) -> list[str]:
     return sorted(_manifest(prompts_dir)["versions"])
 

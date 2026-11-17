@@ -27,6 +27,10 @@ class FieldSpec:
     """Catalog control list of the reported value (single_select)."""
     evidence_flag: str = ""
     """``evidence.items`` subfield that marks a link as evidence for this field."""
+    requires_verified_quote: bool = False
+    """Show the suggestion only with a quote found verbatim in the evidence; otherwise it is stored as
+    unavailable (``no_supporting_quote``). The assessor UI shows IRL/IUL as "Evidence explicitly
+    supports level X" next to the quote, so the quote must exist."""
 
 
 def _ia(flag: str) -> FieldSpec:
@@ -40,10 +44,10 @@ AI_FIELDS: dict[str, FieldSpec] = {
     "general.environment_tag": _ia("environment_related"),
     "general.poverty_tag": _ia("poverty_related"),
     "innovation_dev.readiness_level": FieldSpec(
-        "readiness_level", 0, 9, "readiness_levels", "innovation_readiness_related"
+        "readiness_level", 0, 9, "readiness_levels", "innovation_readiness_related", requires_verified_quote=True
     ),
     "innovation_use.use_level.innovation_use_level": FieldSpec(
-        "readiness_level", 0, 9, "innovation_use_levels", "innovation_use_related"
+        "readiness_level", 0, 9, "innovation_use_levels", "innovation_use_related", requires_verified_quote=True
     ),
 }
 

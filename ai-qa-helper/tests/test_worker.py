@@ -188,6 +188,27 @@ def test_unverified_quote_is_amber():
     assert stored(d).signal == "amber" and stored(d).quoteVerified is False
 
 
+IRL = "innovation_dev.readiness_level"
+
+
+@pytest.mark.parametrize("quote", ["A sentence that is not in the evidence at all.", "", "   "])
+def test_irl_iul_without_a_verified_quote_is_unavailable(quote):
+    for field in (IRL, "innovation_use.use_level.innovation_use_level"):
+        d = deps(FakeLlmProvider().enqueue(ok(value=4, quote=quote)))
+        rep = process_job(job(field=field), d, False)
+        item = stored(d, field=field)
+        assert rep.outcome == "unavailable" and item.unavailableReason == "no_supporting_quote"
+        assert item.suggestedValue is None and item.modelId == "anthropic.claude-haiku-5-5"
+
+
+def test_irl_with_a_verified_quote_has_level_and_quote():
+    d = deps(FakeLlmProvider().enqueue(ok(value=6)))
+    process_job(job(field=IRL), d, False)
+    item = stored(d, field=IRL)
+    assert item.status == "available" and item.suggestedValue == 6
+    assert item.evidenceQuote == QUOTE and item.quoteVerified is True
+
+
 @pytest.mark.parametrize(
     ("sources", "reason"),
     [

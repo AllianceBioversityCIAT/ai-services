@@ -28,7 +28,7 @@ class SuggestParams:
 
 @dataclass
 class Suggestion:
-    kind: Literal["ok", "model_declined", "invalid_output"]
+    kind: Literal["ok", "model_declined", "invalid_output", "no_supporting_quote"]
     model_id: str = ""
     usage: list[LlmUsage] = field(default_factory=list)
     output: NormalizedSuggestion | None = None
@@ -66,6 +66,8 @@ def suggest(
         signal = compute_signal(SignalInput(spec, reported, norm.value, verified, evidence.partial))
     except ValueError:
         return Suggestion("invalid_output", res.model_id, usage)
+    if spec.requires_verified_quote and not (verified and norm.evidence_quote.strip()):
+        return Suggestion("no_supporting_quote", res.model_id, usage)
     index, url = quote_source(norm.evidence_source_index, norm.evidence_quote, evidence)
     return Suggestion("ok", res.model_id, usage, norm, signal, verified, index, url)
 
