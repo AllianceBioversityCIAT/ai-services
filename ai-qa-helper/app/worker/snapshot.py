@@ -129,10 +129,16 @@ def read_field_input(values: dict[str, Any], field_key: str, spec: FieldSpec) ->
 
 
 def _url(item: dict[str, Any]) -> str:
+    """http(s) links as is; ``www.`` links without a scheme (as submitters often type them) get https://."""
     for key in ("link", "file_url"):
         v = scalar(item.get(key))
-        if isinstance(v, str) and v.strip().lower().startswith(("http://", "https://")):
-            return v.strip()
+        if not isinstance(v, str):
+            continue
+        v = v.strip()
+        if v.lower().startswith(("http://", "https://")):
+            return v
+        if v.lower().startswith("www.") and " " not in v:
+            return f"https://{v}"
     return ""
 
 

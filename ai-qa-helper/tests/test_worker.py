@@ -488,3 +488,9 @@ def test_reported_result_type_maps_catalogued_ids_only():
     assert read_field_input({"general.result_type": 2}, "general.result_type", spec).reported == "innovation_use"
     for not_catalogued in (3, 11, 99, None):  # capacity change, complementary innovation: no catalog key
         assert read_field_input({"general.result_type": not_catalogued}, "general.result_type", spec).reported is None
+
+
+def test_www_links_without_scheme_get_https_and_other_text_is_ignored():
+    spec = AI_FIELDS[GENDER]
+    items = [{"link": "www.example.org/report"}, {"link": "see attached"}, {"file_url": "example.org"}]
+    assert read_field_input({"evidence.items": items}, GENDER, spec).links == ["https://www.example.org/report"]
