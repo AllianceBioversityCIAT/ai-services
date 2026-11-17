@@ -108,6 +108,8 @@ Every key uses `field: 'pk'` / `'sk'` and `casing: 'none'`. `fieldKey` and `prom
 - **Guarded HTTP.** Each redirect hop passes an SSRF check (public addresses, default ports, http/https only). Downloads are capped at 25 MB and 45 s, and nothing is written to disk.
 - **OCR fallback.** A PDF without a text layer is sent to the model as a `document` block when it is 10 MB or smaller.
 - **Private links.** 401/403 responses and Microsoft or Google login pages count as private.
+- **DOIs that land on CGSpace.** The DOI is resolved first; if it ends on a CGSpace item, the CGSpace API is used (metadata and public PDF), as for `hdl.handle.net` links. Other DOIs keep Crossref, then the landing page.
+- **Login heuristics.** The "login/error words in the content" check applies only to HTML pages shorter than 5,000 characters. PDFs, office files, API records and long pages are never rejected as `likely_auth_page`; the title checks still apply.
 
 The extractor gives each link one of five statuses: `text`, `pdf_ocr`, `private`, `unreadable` or `error`. Transient errors are not cached, so a retry fetches them again. When no link is readable, the job stores `unavailable` without calling the model: the reason is `private_link` if any link was private, otherwise `no_readable_evidence`.
 

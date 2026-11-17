@@ -23,10 +23,15 @@ Changed, and why:
   - Google Drive/Docs links are rewritten to their export URL (qa-service appended download=1).
   - CGSpace ``/items/<uuid>`` links use the API too (qa-service sent them to the browser).
   - Docx and pptx are read (qa-service supported only pdf and xlsx).
+  - A DOI is resolved first: when it lands on a CGSpace item, the CGSpace API path is used
+    (metadata + public PDF) instead of the JavaScript-only landing page.
+  - The login/error indicators of _validate_content apply only to short HTML pages
+    (SHORT_HTML_MAX_CHARS), never to documents or API records.
 """
 
 import re
 from dataclasses import dataclass
+from typing import Literal
 from urllib.parse import parse_qs, urlsplit
 
 from bs4 import BeautifulSoup
@@ -35,6 +40,13 @@ from app.evidence.documents import is_pdf, office_kind, office_text, pdf_text
 from app.evidence.http import Fetched, HttpClient
 
 MIN_CONTENT_LENGTH = 100
+SHORT_HTML_MAX_CHARS = 5_000
+"""Login/error-indicator heuristics run only on HTML pages shorter than this. A real login or error
+page is short; a long page, a PDF or an office document that mentions "login" or "404" a few times
+is content (CGSpace PDFs were rejected as ``likely_auth_page`` before)."""
+
+ContentKind = Literal["html", "document", "record"]
+"""html: a fetched web page; document: PDF/office/text file; record: API metadata (CGSpace, Crossref)."""
 
 AUTH_INDICATORS = [
     "sign in", "log in", "login", "authenticate", "auth0",
@@ -55,6 +67,10 @@ ERROR_INDICATORS = [
 
 CGSPACE_API = "https://cgspace.cgiar.org/server/api"
 CROSSREF_API = "https://api.crossref.org/works"
+PAGE_ACCEPT = "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8"
+CGSPACE_ITEM = re.compile(
+    r"^https://cgspace\.cgiar\.org/(?:handle/\d+/\d+|items/[0-9a-f-]{36})(?:[/?#]|$)", re.IGNORECASE
+)
 LOGIN_HOSTS = ("login.microsoftonline.com", "login.live.com", "accounts.google.com")
 
 
@@ -71,23 +87,28 @@ class ScrapeResult:
     """Set for a scanned PDF (no text layer): input for the OCR fallback."""
 
 
-def validate_content(content: str, title: str) -> tuple[bool, str, str]:
-    """qa-service ``_validate_content``; warnings are dropped (they were only logged)."""
+def validate_content(content: str, title: str, kind: ContentKind = "html") -> tuple[bool, str, str]:
+    """qa-service ``_validate_content``; warnings are dropped (they were only logged).
+
+    The title checks always apply; the indicators counted in the content only for short HTML pages.
+    """
     if not content or not content.strip():
         return False, "empty_content", "No content extracted from the page"
     if len(content.strip()) < MIN_CONTENT_LENGTH:
         return False, "insufficient_content", f"Content too short ({len(content.strip())} chars)"
-    content_lower, title_lower = content.lower(), title.lower()
+    scan_content = kind == "html" and len(content.strip()) < SHORT_HTML_MAX_CHARS
+    content_lower = content.lower() if scan_content else ""
+    title_lower = title.lower()
     warnings = 0
     for indicator in AUTH_INDICATORS:
         if indicator in title_lower:
             return False, "authentication_required", f'Title contains "{indicator}"'
-        if indicator in content_lower:
+        if scan_content and indicator in content_lower:
             warnings += 1
     for indicator in ERROR_INDICATORS:
         if indicator in title_lower:
             return False, "error_page", f'Title contains "{indicator}"'
-        if indicator in content_lower:
+        if scan_content and indicator in content_lower:
             if len(content.strip()) < 500:
                 return False, "error_page", f'Short content contains "{indicator}"'
             warnings += 1
@@ -190,7 +211,7 @@ class EvidenceScraper:
                     parts.append(f"{label}: " + "; ".join(v.get("value", "") for v in md[k]))
                     break
         content = "\n\n".join(parts)
-        ok, reason, msg = validate_content(content, title)
+        ok, reason, msg = validate_content(content, title, "record")
         return ScrapeResult(url, "cgspace_metadata", title, content, ok, reason, msg)
 
     def _cgspace_pdf(self, item_uuid: str) -> str | None:
@@ -216,6 +237,15 @@ class EvidenceScraper:
 
     # ---- DOI: Crossref, then the landing page over plain HTTP ----
     def _scrape_doi(self, url: str) -> ScrapeResult:
+        # Resolve the DOI first: a CGSpace item is read through its API (metadata + public PDF),
+        # because its landing page needs JavaScript.
+        try:
+            landing: Fetched | None = self.http.get(url, accept=PAGE_ACCEPT)
+        except Exception:  # noqa: BLE001 - fall back to Crossref, as before
+            landing = None
+        if landing is not None and landing.status == 200 and CGSPACE_ITEM.match(landing.url or ""):
+            return self._scrape_cgspace(landing.url)
+
         m = re.search(r"doi\.org/(10\.\S+)", url)
         crossref: ScrapeResult | None = None
         has_abstract = False
@@ -226,16 +256,14 @@ class EvidenceScraper:
                 crossref = None
         if crossref and has_abstract:
             return crossref
-        try:
-            page = self._scrape_web_page(url)
-            if page.is_valid and (page.pdf_bytes or len(page.content) > len(crossref.content if crossref else "")):
-                return page
+        if landing is None:
             if crossref is None:
-                return page
-        except Exception:  # noqa: BLE001
-            if crossref is None:
-                raise
-        return crossref
+                raise RuntimeError("DOI could not be resolved")
+            return crossref
+        page = self._page_from(url, landing)
+        if page.is_valid and (page.pdf_bytes or len(page.content) > len(crossref.content if crossref else "")):
+            return page
+        return page if crossref is None else crossref
 
     def _crossref(self, url: str, doi: str) -> tuple[ScrapeResult | None, bool]:
         r = self.http.get(f"{CROSSREF_API}/{doi}", accept="application/json")
@@ -259,7 +287,7 @@ class EvidenceScraper:
         authors = m.get("author", [])
         if authors:
             parts.append("Authors: " + "; ".join(f"{a.get('given', '')} {a.get('family', '')}".strip() for a in authors[:20]))
-        _, reason, msg = validate_content("\n\n".join(parts), title)
+        _, reason, msg = validate_content("\n\n".join(parts), title, "record")
         return ScrapeResult(url, "doi_article", title, "\n\n".join(parts), True, reason, msg), has_abstract
 
     # ---- SharePoint / OneDrive / Google Drive ----
@@ -275,7 +303,9 @@ class EvidenceScraper:
 
     # ---- generic page (plain HTTP instead of Playwright) ----
     def _scrape_web_page(self, url: str) -> ScrapeResult:
-        f = self.http.get(url, accept="text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8")
+        return self._page_from(url, self.http.get(url, accept=PAGE_ACCEPT))
+
+    def _page_from(self, url: str, f: Fetched) -> ScrapeResult:
         if f.status in (401, 403) or _is_login(f):
             return ScrapeResult(url, "web_page", "", "", False, "authentication_required", f"HTTP {f.status}")
         if f.status >= 400:
@@ -308,16 +338,16 @@ class EvidenceScraper:
             pdf = pdf_text(body)
             if pdf.scanned:
                 return ScrapeResult(url, f"{kind}_scanned_pdf", title, "", True, "scanned_pdf", pdf_bytes=body)
-            ok, reason, msg = validate_content(pdf.text, title)
+            ok, reason, msg = validate_content(pdf.text, title, "document")
             return ScrapeResult(url, f"{kind}_pdf", title, pdf.text, ok, reason, msg)
         office = office_kind(body)
         if office:
             text = office_text(body, office)
-            ok, reason, msg = validate_content(text, title)
+            ok, reason, msg = validate_content(text, title, "document")
             return ScrapeResult(url, f"{kind}_{office}", title, text, ok, reason, msg)
         if f.content_type.startswith("text/plain") or "csv" in f.content_type:
             text = body.decode("utf-8", errors="replace")
-            ok, reason, msg = validate_content(text, title)
+            ok, reason, msg = validate_content(text, title, "document")
             return ScrapeResult(url, f"{kind}_text", title, text, ok, reason, msg)
         if _is_html(f):
             return ScrapeResult(url, kind, title, "", False, "authentication_required" if _is_login(f) else "unsupported_format")

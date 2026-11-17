@@ -1,4 +1,11 @@
-from app.evidence.scraper import CGSPACE_API, CROSSREF_API, EvidenceScraper, shared_download_url
+from app.evidence.scraper import (
+    CGSPACE_API,
+    CROSSREF_API,
+    SHORT_HTML_MAX_CHARS,
+    EvidenceScraper,
+    shared_download_url,
+    validate_content,
+)
 from tests.evidence_fixtures import LONG_TEXT, FakeHttp, as_json, html, make_pdf, resp
 
 UUID = "508ee655-9907-4b4c-ab16-a65ac5459d2c"
@@ -80,7 +87,8 @@ def test_doi_uses_crossref_abstract():
     http = FakeHttp({f"{CROSSREF_API}/10.1000/xyz": as_json({"message": {"title": ["Paper"], "abstract": f"<jats:p>{LONG_TEXT}</jats:p>"}})})
     r = EvidenceScraper(http).scrape_url("https://doi.org/10.1000/xyz")
     assert r.type == "doi_article" and "Abstract:" in r.content
-    assert http.requested == [f"{CROSSREF_API}/10.1000/xyz"]
+    # The DOI is resolved first (here it does not land on CGSpace), then Crossref.
+    assert http.requested == ["https://doi.org/10.1000/xyz", f"{CROSSREF_API}/10.1000/xyz"]
 
 
 def test_doi_without_abstract_tries_the_landing_page():
@@ -91,3 +99,80 @@ def test_doi_without_abstract_tries_the_landing_page():
     })
     r = EvidenceScraper(http).scrape_url("https://doi.org/10.1000/xyz")
     assert r.type == "web_page" and r.is_valid
+
+
+# ---- DOI resolving to CGSpace (shape of result 10105: an IWMI DOI landing on a CGSpace item) ----
+
+DOI_10105 = "https://doi.org/10.5337/2024.201"
+ITEM_URL = f"https://cgspace.cgiar.org/items/{UUID}"
+SPA_SHELL = "<html><head><title>CGSpace</title></head><body><main><p>Loading...</p></main></body></html>"
+
+
+def doi_to_cgspace_routes(final_url: str, with_pdf: bool = True):
+    routes = cgspace_routes(with_pdf)
+    routes[DOI_10105] = html(SPA_SHELL, url=final_url)  # what plain HTTP gets after the redirects
+    routes[f"{CGSPACE_API}/core/items/{UUID}"] = as_json(ITEM)
+    return routes
+
+
+def test_doi_landing_on_a_cgspace_item_reads_its_public_pdf_through_the_api():
+    http = FakeHttp(doi_to_cgspace_routes(ITEM_URL))
+    r = EvidenceScraper(http).scrape_url(DOI_10105)
+    assert r.is_valid and r.type == "cgspace_pdf_pdf" and "women farmers" in r.content
+    assert not any(u.startswith(CROSSREF_API) for u in http.requested)
+
+
+def test_doi_landing_on_a_cgspace_handle_uses_the_same_path():
+    http = FakeHttp(doi_to_cgspace_routes("https://cgspace.cgiar.org/handle/10568/132132"))
+    r = EvidenceScraper(http).scrape_url(DOI_10105)
+    assert r.type == "cgspace_pdf_pdf" and r.is_valid
+
+
+def test_doi_landing_on_a_cgspace_item_without_public_pdf_gives_the_metadata_record():
+    routes = doi_to_cgspace_routes(ITEM_URL, with_pdf=False)
+    routes[f"{CGSPACE_API}/core/bitstreams/f1/content"] = resp(status=401, content_type="text/html")
+    r = EvidenceScraper(FakeHttp(routes)).scrape_url(DOI_10105)
+    assert r.type == "cgspace_metadata" and r.is_valid and "Abstract:" in r.content
+
+
+def test_doi_on_another_site_keeps_crossref_then_landing():
+    page = f"<html><head><title>Paper</title></head><body><article><p>{LONG_TEXT} {LONG_TEXT}</p></article></body></html>"
+    http = FakeHttp({
+        DOI_10105: html(page, url="https://publisher.example.org/paper"),
+        f"{CROSSREF_API}/10.5337/2024.201": as_json({"message": {"title": ["Paper"]}}),
+    })
+    r = EvidenceScraper(http).scrape_url(DOI_10105)
+    assert r.type == "web_page" and r.is_valid
+    assert http.requested.count(DOI_10105) == 1  # the landing page is fetched once
+
+
+# ---- likely_auth_page only on short HTML ----
+
+MANY_INDICATORS = "Please log in to the portal. Sign in required. Unauthorized access is logged."
+
+
+def test_short_html_login_page_is_still_rejected():
+    page = f"{MANY_INDICATORS} {LONG_TEXT} {LONG_TEXT} {LONG_TEXT}"  # 500-5000 chars
+    assert 500 <= len(page) < SHORT_HTML_MAX_CHARS
+    assert validate_content(page, "Portal")[:2] == (False, "likely_auth_page")
+
+
+def test_long_html_or_documents_with_login_words_are_content():
+    long_page = (LONG_TEXT + " ") * (SHORT_HTML_MAX_CHARS // len(LONG_TEXT) + 1) + MANY_INDICATORS
+    assert len(long_page) >= SHORT_HTML_MAX_CHARS
+    assert validate_content(long_page, "Report")[0] is True
+    short_doc = f"{MANY_INDICATORS} {LONG_TEXT}"
+    assert validate_content(short_doc, "report.pdf", "document")[0] is True
+    assert validate_content(short_doc, "Item", "record")[0] is True
+
+
+def test_pdf_mentioning_login_several_times_is_read():
+    text = f"{LONG_TEXT} Users log in to the app. Farmers sign in weekly. Unauthorized use is tracked."
+    routes = cgspace_routes(False)
+    routes[CONTENT] = resp(make_pdf(text), content_type="application/pdf")
+    r = EvidenceScraper(FakeHttp(routes)).scrape_url("https://hdl.handle.net/10568/132132")
+    assert r.is_valid and r.type == "cgspace_pdf_pdf"
+
+
+def test_title_checks_still_apply_to_documents():
+    assert validate_content(LONG_TEXT, "Access denied", "document")[:2] == (False, "authentication_required")
