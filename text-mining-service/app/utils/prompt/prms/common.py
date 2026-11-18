@@ -44,8 +44,16 @@ A mention is NOT a result. Do NOT return results for:
     • Internal governance or management arrangements (steering committees, boards, staffing, office openings).
     • Background, context, or literature statements that are not achievements of the work being reported.
     • A single sentence or figure in a long report that names an activity without describing it.
+    • Intermediate research or project steps: experiments, trials, or demonstration sites set up; samples collected or shipped; protocols drafted or under testing; students enrolled; study tours, field visits, or exposure visits. These are activities, not results, unless the source reports a finished product, a completed training with participants, or a measured change.
+    • Knowledge gained, lessons learned, or "insights" by the project team itself.
+    • Investments, loans, or projects of other organizations that merely include or mention the work, unless the source states that a policy, budget, or investment decision was made because of it — and then report it once, as Policy Change.
 
-Long reports (annual, progress, or donor reports) list many activities. Return only the strongest, best-documented achievements — do not turn every paragraph or figure into a result.
+How many results to return:
+    • Fewer, stronger results are better. Return only the achievements a reviewer would clearly want to report.
+    • A short document (about 2–3 pages: a brief, a policy note, a short report) usually supports 1 to 3 results.
+    • Long reports (annual, progress, or donor reports) list many activities. Return only the strongest, best-documented achievements — do not turn every paragraph or figure into a result.
+    • Do not split one achievement into several results (for example, one programme's trainings by session or district, or one innovation's adoption by country) unless the source reports them as clearly separate achievements.
+    • Do not return an aggregate programme-wide figure (total jobs, total people trained, total farmers reached) as a separate result when the specific achievements behind it are already returned.
 
 ⸻
 
@@ -56,6 +64,11 @@ Provenance and confidence (required on every result)
         • "high": the source explicitly reports the completed achievement with specifics that fill most fields for its indicator.
         • "medium": the source explicitly reports the completed achievement, but some key details are missing.
         • "low": the achievement is implied, planned, partial, or only mentioned. Low-confidence results are discarded — prefer omitting them.
+    • stated_fields and inferred_fields — together, list EVERY MDS field you filled for the result, each in exactly one of the two arrays:
+        • Count these fields when you fill them: lead_center, geo_focus, contributing_center, contributing_partners, evidence, and each field inside the type-specific block written as "<block>.<field>" (e.g., "capacity_sharing.number_people_trained", "policy_change.policy_stage", "innovation_development.innovation_readiness_level"). Do not list title, description, supporting_quote, or confidence.
+        • stated_fields: the source explicitly states the value (the number, name, place, date, or stage is written in the source).
+        • inferred_fields: you derived, estimated, classified, or assumed the value because the source does not state it.
+        • Be honest: a classification the source does not state (for example, a readiness level or policy stage you judged yourself) is inferred. Results whose fields are mostly inferred are discarded automatically — prefer omitting an inferred field over guessing it.
 """
 
 PRMS_INDICATOR_CONTEXT = """
@@ -169,6 +182,8 @@ Required and mandatory fields:
 • geo_focus
 • supporting_quote
 • confidence
+• stated_fields
+• inferred_fields
 
 Do not:
 • Add text before or after the JSON.
@@ -219,7 +234,9 @@ Follow this envelope for every result in results[]:
             "contributing_partners": [{"name": "<partner name>"}, {"acronym": "<partner acronym>"}],
             "evidence": [{"link": "https://...", "description": "<string>"}],
             "supporting_quote": "<verbatim passage copied from the source>",
-            "confidence": "<high | medium | low>"
+            "confidence": "<high | medium | low>",
+            "stated_fields": ["<field the source states explicitly>", "..."],
+            "inferred_fields": ["<field you inferred>", "..."]
         }
     ]
 }

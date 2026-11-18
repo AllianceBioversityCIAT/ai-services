@@ -1,5 +1,6 @@
 from app.text_mining.prms_mining.grounding import (
     assign_candidate_ids,
+    mds_support_ratio,
     build_source_index,
     evaluate_candidate,
     format_supporting_excerpts,
@@ -42,8 +43,16 @@ def _candidate(quote, confidence="high", title="Seed certification guideline ado
     return candidate
 
 
-def _evaluate(candidate, content=SOURCE_TEXT):
-    return evaluate_candidate(candidate, build_source_index(_source(content)), context_chars=80)
+def _evaluate(candidate, content=SOURCE_TEXT, min_mds_support=0.0):
+    return evaluate_candidate(
+        candidate,
+        build_source_index(_source(content)),
+        context_chars=80,
+        min_mds_support=min_mds_support,
+    )
+
+
+GROUNDED_QUOTE = "the Ministry of Agriculture adopted the national seed certification guideline"
 
 
 def test_exact_quote_is_grounded_with_surrounding_context():
@@ -160,8 +169,52 @@ def test_strip_internal_fields_removes_only_provenance():
                 "confidence": "high",
                 "candidate_id": "c1",
                 "source_id": "source-1",
+                "stated_fields": ["geo_focus"],
+                "inferred_fields": [],
             },
             "not-a-dict",
         ]
     )
     assert cleaned == [{"indicator": "Other Output", "title": "t"}]
+
+
+def test_mds_support_ratio_counts_fields_listed_in_both_arrays_as_inferred():
+    candidate = {
+        "stated_fields": ["geo_focus", "lead_center", "policy_change.policy_stage"],
+        "inferred_fields": ["policy_change.policy_stage", "policy_change.policy_type"],
+    }
+    # stated: geo_focus, lead_center; inferred: policy_stage, policy_type.
+    assert mds_support_ratio(candidate) == 0.5
+    assert mds_support_ratio({"stated_fields": [], "inferred_fields": []}) is None
+    assert mds_support_ratio({"stated_fields": "geo_focus"}) is None
+
+
+def test_mds_support_gate_drops_mostly_inferred_and_unassessed_candidates():
+    supported = {
+        **_candidate(GROUNDED_QUOTE),
+        "stated_fields": ["geo_focus", "lead_center", "policy_change.policy_type"],
+        "inferred_fields": ["policy_change.policy_stage"],
+    }
+    mostly_inferred = {
+        **_candidate(GROUNDED_QUOTE),
+        "stated_fields": ["geo_focus"],
+        "inferred_fields": ["policy_change.policy_type", "policy_change.policy_stage"],
+    }
+    unassessed = _candidate(GROUNDED_QUOTE)
+
+    assert _evaluate(supported, min_mds_support=0.75).kept
+    decision = _evaluate(mostly_inferred, min_mds_support=0.75)
+    assert (decision.kept, decision.reason) == (False, "low_mds_support")
+    decision = _evaluate(unassessed, min_mds_support=0.75)
+    assert (decision.kept, decision.reason) == (False, "missing_mds_support")
+    # A disabled gate keeps the grounded candidate without field lists.
+    assert _evaluate(unassessed, min_mds_support=0.0).kept
+
+
+def test_mds_support_gate_runs_after_the_quote_check():
+    fabricated = {
+        **_candidate("The minister announced a new fertilizer subsidy for all districts in 2025."),
+        "stated_fields": ["geo_focus"],
+        "inferred_fields": [],
+    }
+    assert _evaluate(fabricated, min_mds_support=0.75).reason == "quote_not_in_source"

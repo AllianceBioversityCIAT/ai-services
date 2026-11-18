@@ -68,6 +68,9 @@ The URL is a placeholder. AWS credentials must be available to boto3, such as th
 | `PRMS_MAX_AUDIO_SECONDS` | Optional duration limit; no limit configured by default |
 | `PRMS_GROUNDING_MODE` | `enforce` (default) drops PRMS candidates whose supporting quote is missing, not found in the source, or rated low confidence; `log_only` keeps them and only logs |
 | `PRMS_GROUNDING_CONTEXT_CHARS` | Characters of source text shown to final validation on each side of a verified quote; default `600` |
+| `PRMS_MIN_MDS_SUPPORT` | Minimum share (0–1) of a candidate's MDS fields that the source states explicitly; candidates below it are dropped like unsupported ones; default `0.75`, `0` disables |
+| `PRMS_RESULT_CAP_TIERS` | Maximum results by total source pages, as `max_pages:max_results` pairs; default `3:3,10:5,25:8` |
+| `PRMS_MAX_RESULTS` | Maximum results for sources longer than the last tier; default `10` |
 
 PRMS limits and configurable defaults are detailed in the [integration guide](docs/prms-integration-guide.md#61-limits-summary). Audio requires access to Amazon Transcribe and the S3 media. Text-only PRMS requests do not require a request bucket, but still use Bedrock and may invoke mapping.
 

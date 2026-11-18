@@ -28,12 +28,22 @@ from app.utils.config.config_util import (
     PRMS_EXTRACTION_MAX_WORKERS,
     PRMS_GROUNDING_CONTEXT_CHARS,
     PRMS_GROUNDING_MODE,
+    PRMS_MAX_RESULTS,
+    PRMS_MIN_MDS_SUPPORT,
+    PRMS_RESULT_CAP_TIERS,
 )
 from app.text_mining.prms_mining.grounding import (
     assign_candidate_ids,
     format_supporting_excerpts,
     ground_source_candidates,
     strip_internal_fields,
+)
+from app.text_mining.prms_mining.selection import (
+    cap_results,
+    estimate_pages,
+    max_results_for_pages,
+    parse_cap_tiers,
+    score_candidates,
 )
 
 from app.text_mining.prms_mining.models import (
@@ -68,6 +78,7 @@ from app.schemas.prms_mining_schemas import (
 
 
 logger = get_logger()
+RESULT_CAP_TIERS = parse_cap_tiers(PRMS_RESULT_CAP_TIERS)
 
 
 def _source_counts(extracted: list[ExtractedPrmsSource]) -> SourceCounts:
@@ -274,6 +285,7 @@ def _extract_results_from_source(
         source,
         context_chars=PRMS_GROUNDING_CONTEXT_CHARS,
         enforce=PRMS_GROUNDING_MODE == "enforce",
+        min_mds_support=PRMS_MIN_MDS_SUPPORT,
     )
     logger.info(
         "✅ PRMS per-source extraction complete source=%s label=%s duration=%.2fs "
@@ -664,6 +676,7 @@ def process_document_prms(
         merged_results, candidate_excerpts = assign_candidate_ids(
             merged_results, grounding_contexts
         )
+        candidate_scores = score_candidates(merged_results)
         json_content = {"results": merged_results}
         pre_validation_count = len(merged_results)
         supporting_excerpts = format_supporting_excerpts(candidate_excerpts)
@@ -685,7 +698,19 @@ def process_document_prms(
         else:
             logger.info("🔍 PRMS final validation skipped — no grounded candidates")
             response_text = json.dumps(json_content)
-        json_content["results"] = strip_internal_fields(json_content.get("results") or [])
+        validated_results = json_content.get("results") or []
+        source_pages = estimate_pages(extracted)
+        result_limit = max_results_for_pages(source_pages, RESULT_CAP_TIERS, PRMS_MAX_RESULTS)
+        capped_results = cap_results(validated_results, candidate_scores, result_limit)
+        if len(capped_results) < len(validated_results):
+            logger.info(
+                "✂️ PRMS result cap applied pages~=%s limit=%s results=%s→%s",
+                source_pages,
+                result_limit,
+                len(validated_results),
+                len(capped_results),
+            )
+        json_content["results"] = strip_internal_fields(capped_results)
         stages.final_validation = time.time() - val_start
         post_validation_count = len(json_content.get("results") or [])
         processing_steps.append("final_validation")
