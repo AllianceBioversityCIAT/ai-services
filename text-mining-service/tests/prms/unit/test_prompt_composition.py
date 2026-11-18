@@ -48,3 +48,23 @@ def test_prompt_excludes_knowledge_product_and_toc():
     assert "Do NOT identify or return Knowledge Product" in body
     assert "Do NOT extract Theory of Change" in body
     assert '• "Knowledge Product"' not in body
+
+
+def test_prompt_requires_selectivity_and_provenance():
+    body = compose_extraction_prompt_body()
+    assert "extract all results" not in body
+    assert "Separate multiple results even if they share a source." not in body
+    assert "A mention is NOT a result" in body
+    assert "supporting_quote" in body
+    assert '"confidence": "<high | medium | low>"' in body
+    assert "report each achievement only ONCE" in body
+
+
+def test_prompt_excludes_agreements_launches_and_concept_notes():
+    body = compose_extraction_prompt_body()
+    assert "Memoranda of understanding (MoUs)" in body
+    assert "Project or programme launches" in body
+    assert "A project, grant, or agreement whose implementer or recipient is the CGIAR center itself is NOT a policy change" in body
+    assert "Concept notes, proposals, bids, or funding applications" in body
+    assert "Creation of the project's own governance or management structures" in body
+    assert "One training programme, course, or event series is ONE result" in body

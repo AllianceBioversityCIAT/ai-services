@@ -13,6 +13,11 @@ When to use "Other Output":
     • Network coordination deliverables, cross-center learning products, or operational outputs explicitly framed as project outputs.
     • Technical or analytical deliverables that are not innovation-development results in the PRMS sense.
 
+Do NOT use "Other Output" for:
+    • Concept notes, proposals, bids, or funding applications — these are resource mobilization, not outputs.
+    • Signed MoUs, agreements, contracts, or grants, and project launches or inception events.
+    • Routine project management products (work plans, internal reports, meeting minutes) unless the source presents them as a substantive deliverable for external users.
+
 Output shape:
     • No type-specific block — include only the common MDS fields (title, description, lead_center, geo_focus, contributing_center, contributing_partners, evidence).
     • Capture what the output is in title and description using source-supported language.

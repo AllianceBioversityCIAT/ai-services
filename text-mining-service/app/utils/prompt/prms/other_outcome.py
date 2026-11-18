@@ -13,6 +13,12 @@ When to use "Other Outcome":
     • Behavioral, organizational, or systemic changes explicitly reported as outcomes in project language.
     • Intermediate or cross-cutting outcomes (e.g., improved coordination, strengthened partnerships with measurable effect) that are not policy enactment or innovation adoption.
 
+Do NOT use "Other Outcome" for:
+    • Creation of the project's own governance or management structures (steering committees, advisory boards, coordination units, offices).
+    • Host-country, collaboration, or partnership agreements and MoUs — signing an agreement is not an observed change.
+    • Funding secured, grants awarded, or projects launched.
+    • A partnership is an outcome only when the source describes a measurable effect it produced.
+
 Output shape:
     • No type-specific block — include only the common MDS fields (title, description, lead_center, geo_focus, contributing_center, contributing_partners, evidence).
     • Capture the outcome or change in title and description using source-supported language.
