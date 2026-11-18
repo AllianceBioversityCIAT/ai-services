@@ -26,6 +26,24 @@ from app.utils.config.config_util import (
     PRMS_BUCKET_KEY_NAME,
     PRMS_CONTEXT_TOKEN_BUDGET,
     PRMS_EXTRACTION_MAX_WORKERS,
+    PRMS_GROUNDING_CONTEXT_CHARS,
+    PRMS_GROUNDING_MODE,
+    PRMS_MAX_RESULTS,
+    PRMS_MIN_MDS_SUPPORT,
+    PRMS_RESULT_CAP_TIERS,
+)
+from app.text_mining.prms_mining.grounding import (
+    assign_candidate_ids,
+    format_supporting_excerpts,
+    ground_source_candidates,
+    strip_internal_fields,
+)
+from app.text_mining.prms_mining.selection import (
+    cap_results,
+    estimate_pages,
+    max_results_for_pages,
+    parse_cap_tiers,
+    score_candidates,
 )
 
 from app.text_mining.prms_mining.models import (
@@ -60,6 +78,7 @@ from app.schemas.prms_mining_schemas import (
 
 
 logger = get_logger()
+RESULT_CAP_TIERS = parse_cap_tiers(PRMS_RESULT_CAP_TIERS)
 
 
 def _source_counts(extracted: list[ExtractedPrmsSource]) -> SourceCounts:
@@ -111,9 +130,15 @@ TEXT TO CONVERT:
 """
 
 
-def _run_final_validation(candidates: dict) -> tuple[dict, ModelUsage, str]:
+def _run_final_validation(
+    candidates: dict,
+    supporting_excerpts: str = "",
+) -> tuple[dict, ModelUsage, str]:
     """Run final validation with JSON-only constraints and one repair retry."""
-    validation_prompt = build_final_validation_prompt(candidates=candidates)
+    validation_prompt = build_final_validation_prompt(
+        candidates=candidates,
+        supporting_excerpts=supporting_excerpts,
+    )
     validation_result = invoke_model(
         validation_prompt,
         temperature=0,
@@ -196,8 +221,8 @@ def _extract_results_from_source(
     reference_for_prompt: str,
     request_id: str,
     context_budget: int,
-) -> tuple[list[dict], ModelUsage, ContextBuildResult]:
-    """Run one extraction model call for a single source."""
+) -> tuple[list[dict], ModelUsage, ContextBuildResult, dict[str, str]]:
+    """Run one extraction model call for a single source, then ground its candidates."""
     label = _source_label(source)
     logger.info(
         "📎 PRMS building context source=%s label=%s type=%s chars=%s budget_tokens=%s",
@@ -254,20 +279,28 @@ def _extract_results_from_source(
     model_duration = time.time() - model_start
 
     payload = _preliminary_discriminator_check(_parse_model_json(extraction_result.text))
-    results = payload.get("results") or []
+    raw_count = len(payload.get("results") or [])
+    results, grounding_contexts = ground_source_candidates(
+        payload.get("results") or [],
+        source,
+        context_chars=PRMS_GROUNDING_CONTEXT_CHARS,
+        enforce=PRMS_GROUNDING_MODE == "enforce",
+        min_mds_support=PRMS_MIN_MDS_SUPPORT,
+    )
     logger.info(
         "✅ PRMS per-source extraction complete source=%s label=%s duration=%.2fs "
-        "results=%s indicators=[%s] tokens=%s/%s trimmed=%s",
+        "raw_results=%s grounded_results=%s indicators=[%s] tokens=%s/%s trimmed=%s",
         source.source_id,
         label,
         model_duration,
+        raw_count,
         len(results),
         _indicator_summary(results),
         extraction_result.usage.input_tokens,
         extraction_result.usage.output_tokens,
         context_result.trimmed,
     )
-    return results, extraction_result.usage, context_result
+    return results, extraction_result.usage, context_result, grounding_contexts
 
 
 def _parallel_per_source_extraction(
@@ -277,10 +310,10 @@ def _parallel_per_source_extraction(
     request_id: str,
     context_budget: int,
     max_workers: int,
-) -> tuple[list[dict], ModelUsage, list[ContextBuildResult], int]:
+) -> tuple[list[dict], ModelUsage, list[ContextBuildResult], int, dict[str, str]]:
     """Extract PRMS candidates from each source in parallel."""
     if not sources:
-        return [], ModelUsage(), [], 0
+        return [], ModelUsage(), [], 0, {}
 
     ordered_sources = sorted(sources, key=lambda item: item.source_index)
 
@@ -289,7 +322,7 @@ def _parallel_per_source_extraction(
             "🤖 PRMS starting single-source model extraction source=%s",
             ordered_sources[0].source_id,
         )
-        results, usage, context_result = _extract_results_from_source(
+        results, usage, context_result, grounding_contexts = _extract_results_from_source(
             ordered_sources[0],
             reference_for_prompt=reference_for_prompt,
             request_id=request_id,
@@ -301,12 +334,13 @@ def _parallel_per_source_extraction(
                 reference_section=reference_for_prompt,
             )
         )
-        return results, usage, [context_result], prompt_tokens
+        return results, usage, [context_result], prompt_tokens, grounding_contexts
 
     results_by_source: dict[str, list[dict]] = {}
     usages_by_source: dict[str, ModelUsage] = {}
     context_by_source: dict[str, ContextBuildResult] = {}
     prompt_tokens_by_source: dict[str, int] = {}
+    grounding_contexts: dict[str, str] = {}
     worker_count = max(1, min(max_workers, len(ordered_sources)))
     logger.info(
         "🤖 PRMS starting parallel model extraction sources=%s workers=%s request_id=%s",
@@ -328,8 +362,9 @@ def _parallel_per_source_extraction(
         }
         for future in as_completed(future_to_source):
             source = future_to_source[future]
-            results, usage, context_result = future.result()
+            results, usage, context_result, source_contexts = future.result()
             results_by_source[source.source_id] = results
+            grounding_contexts.update(source_contexts)
             usages_by_source[source.source_id] = usage
             context_by_source[source.source_id] = context_result
             prompt_tokens_by_source[source.source_id] = estimate_tokens(
@@ -372,7 +407,7 @@ def _parallel_per_source_extraction(
         max_prompt_tokens,
     )
 
-    return merged_results, merged_usage, context_results, max_prompt_tokens
+    return merged_results, merged_usage, context_results, max_prompt_tokens, grounding_contexts
 
 
 def _summarize_user_input(extracted: list[ExtractedPrmsSource], counts: SourceCounts) -> str:
@@ -603,7 +638,13 @@ def process_document_prms(
         )
 
         model_start = time.time()
-        merged_results, extraction_usage, context_results, prompt_estimated_tokens = (
+        (
+            merged_results,
+            extraction_usage,
+            context_results,
+            prompt_estimated_tokens,
+            grounding_contexts,
+        ) = (
             _parallel_per_source_extraction(
                 extracted,
                 reference_for_prompt=reference_for_prompt,
@@ -632,17 +673,44 @@ def process_document_prms(
             context_trimmed,
         )
 
+        merged_results, candidate_excerpts = assign_candidate_ids(
+            merged_results, grounding_contexts
+        )
+        candidate_scores = score_candidates(merged_results)
         json_content = {"results": merged_results}
         pre_validation_count = len(merged_results)
+        supporting_excerpts = format_supporting_excerpts(candidate_excerpts)
 
         logger.info(
-            "🔍 PRMS starting final validation candidates=%s indicators=[%s] model=%s json_mode=strict",
+            "🔍 PRMS starting final validation candidates=%s indicators=[%s] "
+            "supporting_excerpts=%s model=%s json_mode=strict",
             pre_validation_count,
             _indicator_summary(merged_results),
+            len(candidate_excerpts),
             DEFAULT_MODEL_ID,
         )
         val_start = time.time()
-        json_content, validation_usage, response_text = _run_final_validation(json_content)
+        if merged_results:
+            json_content, validation_usage, response_text = _run_final_validation(
+                json_content,
+                supporting_excerpts,
+            )
+        else:
+            logger.info("🔍 PRMS final validation skipped — no grounded candidates")
+            response_text = json.dumps(json_content)
+        validated_results = json_content.get("results") or []
+        source_pages = estimate_pages(extracted)
+        result_limit = max_results_for_pages(source_pages, RESULT_CAP_TIERS, PRMS_MAX_RESULTS)
+        capped_results = cap_results(validated_results, candidate_scores, result_limit)
+        if len(capped_results) < len(validated_results):
+            logger.info(
+                "✂️ PRMS result cap applied pages~=%s limit=%s results=%s→%s",
+                source_pages,
+                result_limit,
+                len(validated_results),
+                len(capped_results),
+            )
+        json_content["results"] = strip_internal_fields(capped_results)
         stages.final_validation = time.time() - val_start
         post_validation_count = len(json_content.get("results") or [])
         processing_steps.append("final_validation")

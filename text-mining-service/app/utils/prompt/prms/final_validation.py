@@ -3,11 +3,13 @@
 FINAL_VALIDATION_RULES = """
 You are the final refinement stage for PRMS mining output.
 
-You receive ONLY candidate JSON with a results array produced by an earlier extraction step.
-You do NOT have access to source documents. Do not infer, invent, or restore content from memory.
+You receive:
+    • Candidate JSON with a results array produced by an earlier extraction step. Each candidate has a candidate_id, a supporting_quote (already verified to exist verbatim in its source), and a confidence level.
+    • SUPPORTING SOURCE EXCERPTS: for each candidate_id, the source text surrounding its supporting_quote.
 
-Your job is to decide which results to keep, merge, fix, or remove using structural and internal consistency rules.
-Apply minimal edits. Prefer keeping a valid result over removing it when a small correction suffices.
+You do NOT have the full source documents — only these excerpts. Do not infer, invent, or restore content from memory.
+
+Your job is to decide which results to keep, merge, fix, or remove. Users review every kept result as a draft, so precision matters more than recall: remove a candidate when its excerpt does not support it as a reportable result. When a small correction makes a supported result valid, correct it instead of removing it.
 
 ⸻
 
@@ -37,12 +39,31 @@ Candidates may come from several independent sources (documents, free text, audi
 
 Decision order (apply in this sequence for each result)
 
+0. Support — does its supporting excerpt show the achievement actually happened?
 1. Eligibility — should this result stay in the array at all?
 2. Duplication — does it duplicate another result in this same response?
 3. Indicator fit — does indicator match title, description, and type-specific content?
 4. Type-specific block — is the correct block present and are forbidden blocks absent?
 5. Field consistency — enums, counts, conditional fields, geo_focus shape.
 6. Cleanup — remove nulls, empty strings, empty arrays, and legacy/forbidden fields.
+
+⸻
+
+0. Support — remove the result when its supporting excerpt
+
+    • does not describe the achievement claimed in title/description (the title or description states facts — numbers, actors, places, outcomes — that the excerpt does not contain or contradicts);
+    • describes a plan, intention, target, proposal, upcoming or ongoing activity rather than a completed achievement;
+    • describes the signing of an MoU or a collaboration, partnership, grant, funding, financing, or host-country agreement;
+    • describes a project, programme, or initiative launch, inception meeting, kick-off, or new funding secured or awarded to the project;
+    • describes a concept note, proposal, or bid;
+    • describes the project's own governance or management arrangements (committees, boards, staffing, offices);
+    • only mentions the activity in passing, without enough detail to fill the result's core fields;
+    • describes an intermediate step rather than an achievement: experiments, trials, or demonstration sites set up; samples collected or shipped; protocols drafted or under testing; students enrolled; study tours or field visits; knowledge or lessons gained by the project team itself.
+
+If no excerpt is available for a candidate, judge it on its supporting_quote alone; remove it if the quote does not show a completed achievement.
+
+Do not "rescue" an unsupported candidate by changing its indicator — an MoU is not an Other Outcome, a concept note is not an Other Output.
+When the excerpt supports the achievement but title or description overstate it, correct the text using only what the excerpt states.
 
 ⸻
 
@@ -63,13 +84,16 @@ Two or more results in the same response clearly describe the same achievement. 
     • same or near-identical title (minor wording differences, same core noun phrase).
     • same indicator AND overlapping description (same actors, geography, deliverable, or policy).
     • same type-specific signature (e.g., identical capacity_sharing counts and delivery method; same policy_type + policy_stage; same innovation title + typology).
+    • supporting quotes or excerpts that describe the same event, agreement, deliverable, or change.
+
+The same achievement reported under DIFFERENT indicators is also a duplicate (e.g., one agreement returned as both Innovation Use and Policy Change). Keep only the entry whose indicator best fits the excerpt, and remove the others.
 
 When merging duplicates:
     • Keep the most complete entry (more populated fields, richer description).
     • Combine non-conflicting arrays (contributing_center, contributing_partners, evidence) without creating duplicates inside arrays.
     • Do not merge results that share a topic but represent distinct achievements (e.g., two separate training events, two different policies).
 
-When uncertain whether two results are distinct, keep both.
+When two results share a topic but their excerpts describe different events or deliverables, keep both.
 
 ⸻
 
@@ -168,6 +192,8 @@ Other Output / Other Outcome:
 7. Global prohibitions
 
     • Never add a new result that was not in the candidate JSON.
+    • Never copy the supporting excerpts into the output. You may omit supporting_quote, confidence, source_id, stated_fields, and inferred_fields from kept results.
+    • Always keep candidate_id on every kept result, unchanged. When merging duplicates, keep the candidate_id of the retained entry.
     • Never remove a candidate solely because it appears thematically unrelated to other candidates in the batch.
     • Never add new field values not already present in the candidate JSON (you may relocate, merge, rename for consistency, or remove — not invent).
     • Never introduce Knowledge Product, Theory of Change, or audit/identity fields listed above.

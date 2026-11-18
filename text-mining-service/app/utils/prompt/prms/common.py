@@ -1,5 +1,5 @@
 COMMON_RULES = """
-Analyze the provided source excerpts and extract all results related ONLY to these indicators:
+Analyze the provided source excerpts and extract ONLY the reportable results that the source substantively supports, for these indicators:
     • "Capacity Sharing for Development"
     • "Policy Change"
     • "Innovation Development"
@@ -22,11 +22,53 @@ Source roles:
 
 General rules:
     • Do not fabricate fields unsupported by the sources.
-    • Separate multiple results even if they share a source.
+    • Separate distinct achievements even if they share a source, but report each achievement only ONCE — never return the same event, agreement, deliverable, or change under two different indicators. Choose the single best-fitting indicator.
     • Do not merge results solely because titles or keywords are similar.
     • Use exact indicator discriminator values listed above.
     • Omit unsupported optional fields rather than inventing defaults.
     • Return raw JSON only — no markdown fences, no prose outside JSON.
+
+⸻
+
+Selectivity — quality over quantity
+
+Users review every result you return as a draft. Returning weak results costs them time and erodes trust, so precision matters more than recall. An empty results array is a correct answer when the source has no substantive result.
+
+Return a result ONLY when the source states that the achievement actually happened (delivered, produced, adopted, enacted, changed) and gives concrete detail about it (what, who, where, and — when relevant — how many).
+
+A mention is NOT a result. Do NOT return results for:
+    • Plans, intentions, targets, proposals, upcoming or ongoing activities without a completed achievement.
+    • Signing of memoranda of understanding (MoUs), collaboration, partnership, grant, funding, or host-country agreements.
+    • Project, programme, or initiative launches, inception meetings, kick-offs, and announcements of new funding.
+    • Concept notes, proposals, bids, and resource-mobilization figures (amounts raised or awarded to the project itself).
+    • Internal governance or management arrangements (steering committees, boards, staffing, office openings).
+    • Background, context, or literature statements that are not achievements of the work being reported.
+    • A single sentence or figure in a long report that names an activity without describing it.
+    • Intermediate research or project steps: experiments, trials, or demonstration sites set up; samples collected or shipped; protocols drafted or under testing; students enrolled; study tours, field visits, or exposure visits. These are activities, not results, unless the source reports a finished product, a completed training with participants, or a measured change.
+    • Knowledge gained, lessons learned, or "insights" by the project team itself.
+    • Investments, loans, or projects of other organizations that merely include or mention the work, unless the source states that a policy, budget, or investment decision was made because of it — and then report it once, as Policy Change.
+
+How many results to return:
+    • Fewer, stronger results are better. Return only the achievements a reviewer would clearly want to report.
+    • A short document (about 2–3 pages: a brief, a policy note, a short report) usually supports 1 to 3 results.
+    • Long reports (annual, progress, or donor reports) list many activities. Return only the strongest, best-documented achievements — do not turn every paragraph or figure into a result.
+    • Do not split one achievement into several results (for example, one programme's trainings by session or district, or one innovation's adoption by country) unless the source reports them as clearly separate achievements.
+    • Do not return an aggregate programme-wide figure (total jobs, total people trained, total farmers reached) as a separate result when the specific achievements behind it are already returned.
+
+⸻
+
+Provenance and confidence (required on every result)
+
+    • supporting_quote — a VERBATIM passage copied exactly from the source excerpts (one or two consecutive sentences, ideally 15–60 words) that most directly shows the achievement happened. Do not paraphrase, translate, summarize, or stitch together text from different places. Results whose quote cannot be found in the source are discarded automatically.
+    • confidence — one of "high", "medium", "low":
+        • "high": the source explicitly reports the completed achievement with specifics that fill most fields for its indicator.
+        • "medium": the source explicitly reports the completed achievement, but some key details are missing.
+        • "low": the achievement is implied, planned, partial, or only mentioned. Low-confidence results are discarded — prefer omitting them.
+    • stated_fields and inferred_fields — together, list EVERY MDS field you filled for the result, each in exactly one of the two arrays:
+        • Count these fields when you fill them: lead_center, geo_focus, contributing_center, contributing_partners, evidence, and each field inside the type-specific block written as "<block>.<field>" (e.g., "capacity_sharing.number_people_trained", "policy_change.policy_stage", "innovation_development.innovation_readiness_level"). Do not list title, description, supporting_quote, or confidence.
+        • stated_fields: the source explicitly states the value (the number, name, place, date, or stage is written in the source).
+        • inferred_fields: you derived, estimated, classified, or assumed the value because the source does not state it.
+        • Be honest: a classification the source does not state (for example, a readiness level or policy stage you judged yourself) is inferred. Results whose fields are mostly inferred are discarded automatically — prefer omitting an inferred field over guessing it.
 """
 
 PRMS_INDICATOR_CONTEXT = """
@@ -131,13 +173,17 @@ Output Format
 
 Return dates in YYYY-MM-DD format when available.
 For partial or missing participant data, follow the partial participant rule above.
-Your output must be a single valid JSON object with a results array, and must not include any additional text, comments, footnotes, citations, or explanations.
+Your output must be a single valid JSON object with a results array, and must not include any additional text, comments, footnotes, or explanations outside the JSON fields defined here.
 
 Required and mandatory fields:
 • indicator
 • title
 • description
 • geo_focus
+• supporting_quote
+• confidence
+• stated_fields
+• inferred_fields
 
 Do not:
 • Add text before or after the JSON.
@@ -186,7 +232,11 @@ Follow this envelope for every result in results[]:
                 }
             ],
             "contributing_partners": [{"name": "<partner name>"}, {"acronym": "<partner acronym>"}],
-            "evidence": [{"link": "https://...", "description": "<string>"}]
+            "evidence": [{"link": "https://...", "description": "<string>"}],
+            "supporting_quote": "<verbatim passage copied from the source>",
+            "confidence": "<high | medium | low>",
+            "stated_fields": ["<field the source states explicitly>", "..."],
+            "inferred_fields": ["<field you inferred>", "..."]
         }
     ]
 }

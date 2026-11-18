@@ -61,6 +61,31 @@ PRMS_CONTEXT_TOKEN_BUDGET = _positive_int("PRMS_CONTEXT_TOKEN_BUDGET", 300_000)
 PRMS_FULL_SOURCE_MAX_CHARS = _positive_int("PRMS_FULL_SOURCE_MAX_CHARS", 50_000)
 PRMS_RETRIEVAL_TOP_K_PER_SOURCE = _positive_int("PRMS_RETRIEVAL_TOP_K_PER_SOURCE", 8)
 
+# Grounding: "enforce" drops candidates whose supporting quote is missing, not
+# found in the source, or rated low confidence; "log_only" keeps them and logs.
+PRMS_GROUNDING_MODE = (os.getenv("PRMS_GROUNDING_MODE") or "enforce").strip().lower()
+if PRMS_GROUNDING_MODE not in {"enforce", "log_only"}:
+    raise ValueError(
+        f"PRMS_GROUNDING_MODE must be 'enforce' or 'log_only', got {PRMS_GROUNDING_MODE!r}"
+    )
+PRMS_GROUNDING_CONTEXT_CHARS = _positive_int("PRMS_GROUNDING_CONTEXT_CHARS", 600)
+
+# Minimum share (0-1) of a candidate's MDS fields that the source must state
+# explicitly; candidates below it are treated like unsupported ones. 0 disables.
+_raw_min_mds_support = (os.getenv("PRMS_MIN_MDS_SUPPORT") or "0.75").strip()
+try:
+    PRMS_MIN_MDS_SUPPORT = float(_raw_min_mds_support)
+except ValueError as exc:
+    raise ValueError(
+        f"PRMS_MIN_MDS_SUPPORT must be a number between 0 and 1, got {_raw_min_mds_support!r}"
+    ) from exc
+if not 0 <= PRMS_MIN_MDS_SUPPORT <= 1:
+    raise ValueError(f"PRMS_MIN_MDS_SUPPORT must be between 0 and 1, got {PRMS_MIN_MDS_SUPPORT}")
+
+# Result cap by source length: "max_pages:max_results" tiers, then an overall ceiling.
+PRMS_RESULT_CAP_TIERS = (os.getenv("PRMS_RESULT_CAP_TIERS") or "3:3,10:5,25:8").strip()
+PRMS_MAX_RESULTS = _positive_int("PRMS_MAX_RESULTS", 10)
+
 PRMS_AUDIO_TRANSCRIBER = (os.getenv("PRMS_AUDIO_TRANSCRIBER") or "").strip()
 PRMS_MAX_AUDIO_SECONDS = _optional_positive_int("PRMS_MAX_AUDIO_SECONDS")
 PRMS_TRANSCRIBE_LANGUAGE_CODE = (os.getenv("PRMS_TRANSCRIBE_LANGUAGE_CODE") or "").strip()

@@ -362,6 +362,20 @@ For very long documents, the service may use semantic retrieval instead of sendi
 
 If a single source is still too large after retrieval, the request may fail with **`413`**. Prefer splitting oversized reports before upload when possible.
 
+### 6.6 Result selectivity and grounding (service behavior)
+
+The service returns only results that a source substantively supports. During extraction, the model must quote, for each candidate, a verbatim passage from the source and rate its confidence. Before final validation, the service checks each quote against the source text. Differences in case, punctuation, line breaks, and PDF hyphenation are tolerated. Candidates are dropped when the quote is missing, not found in the source, or rated low confidence. Final validation then receives each remaining candidate with the source text around its quote. It removes candidates the excerpt does not support, and removes duplicates of the same achievement, even when they were reported under different indicators.
+
+Mentions, plans, MoUs and other agreements, project launches, concept notes, and governance arrangements are not returned as results. A request can legitimately return `{"results": []}`.
+
+Intermediate steps are not results either: experiments or trial sites set up, samples collected, protocols drafted or under testing, students enrolled, study visits, and knowledge gained by the project team.
+
+For each candidate the model also lists which MDS fields the source states explicitly and which it inferred. Candidates with less than 75% of their fields stated by the source (`PRMS_MIN_MDS_SUPPORT`) are dropped, so a draft is proposed only when the evidence fills most of its MDS.
+
+The number of results is capped by the total length of the sources: up to 3 results for 3 pages or less, 5 up to 10 pages, 8 up to 25 pages, and 10 beyond (`PRMS_RESULT_CAP_TIERS`, `PRMS_MAX_RESULTS`). Pages are estimated from characters when a file has no page count (DOCX, free text, audio). When there are more candidates than the cap, the service keeps the high-confidence ones first, then those with the largest share of stated fields, and returns them in document order.
+
+The quote, confidence, and field lists are internal: they are removed before the response is returned, so the response shape is unchanged. `PRMS_GROUNDING_MODE=log_only` disables dropping (for diagnosis) without changing prompts; the cap still applies.
+
 ## 7. HTTP status codes and error bodies
 
 FastAPI error responses use:
