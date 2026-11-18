@@ -32,7 +32,7 @@ A Next.js-based administration dashboard for managing all AI services in the pla
 - User registration and role management
 - Prompt management with access control
 - Authenticated admin interface with session handling
-- **Stack**: Next.js 15, TypeScript, Tailwind CSS, AWS DynamoDB.
+- **Stack**: Next.js 15, TypeScript, Tailwind CSS, AWS DynamoDB
 
 ---
 
