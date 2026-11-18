@@ -63,6 +63,15 @@ PRMS_CONTEXT_TOKEN_BUDGET = _positive_int("PRMS_CONTEXT_TOKEN_BUDGET", 300_000)
 PRMS_FULL_SOURCE_MAX_CHARS = _positive_int("PRMS_FULL_SOURCE_MAX_CHARS", 50_000)
 PRMS_RETRIEVAL_TOP_K_PER_SOURCE = _positive_int("PRMS_RETRIEVAL_TOP_K_PER_SOURCE", 8)
 
+# Grounding: "enforce" drops candidates whose supporting quote is missing, not
+# found in the source, or rated low confidence; "log_only" keeps them and logs.
+PRMS_GROUNDING_MODE = (os.getenv("PRMS_GROUNDING_MODE") or "enforce").strip().lower()
+if PRMS_GROUNDING_MODE not in {"enforce", "log_only"}:
+    raise ValueError(
+        f"PRMS_GROUNDING_MODE must be 'enforce' or 'log_only', got {PRMS_GROUNDING_MODE!r}"
+    )
+PRMS_GROUNDING_CONTEXT_CHARS = _positive_int("PRMS_GROUNDING_CONTEXT_CHARS", 600)
+
 PRMS_AUDIO_TRANSCRIBER = (os.getenv("PRMS_AUDIO_TRANSCRIBER") or "").strip()
 PRMS_MAX_AUDIO_SECONDS = _optional_positive_int("PRMS_MAX_AUDIO_SECONDS")
 PRMS_TRANSCRIBE_LANGUAGE_CODE = (os.getenv("PRMS_TRANSCRIBE_LANGUAGE_CODE") or "").strip()

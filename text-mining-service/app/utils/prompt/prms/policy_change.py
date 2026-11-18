@@ -16,6 +16,11 @@ What typically does NOT qualify (do not classify as Policy Change):
 • Policy recommendations or position papers produced by CGIAR alone, without evidence of uptake or enactment.
 • Policy changes internal to CGIAR centers.
 • Very localized policy changes with negligible scope (unless sources clearly treat them as significant outcomes).
+• Memoranda of understanding (MoUs), collaboration, partnership, or host-country agreements signed by a CGIAR center or project.
+• Grant, funding, or financing agreements and contracts signed between a CGIAR center/project and a donor, government, or partner — including the amount awarded to the project itself.
+• Project or programme launches, inception workshops, and new-project announcements, even when a government co-signs or attends.
+• Concept notes, proposals, and resource-mobilization results.
+None of the above is a Policy Change, and none of them should be reclassified to another indicator just to keep it — omit them unless the source separately reports a substantive achievement.
 
 Title and description context:
 • A strong policy-change title is stand-alone: what changed, who implemented it, and where — include budget/investment in USD when explicitly stated.
@@ -25,6 +30,7 @@ Policy type guidance:
 • Policy or strategy — written decisions on, or commitments to, a particular course of action by an institution (policy); or a high-level plan outlining how that course of action will be carried out (strategy). Examples: country growth strategies, country agricultural policies, organization strategic plans or road maps, information campaigns for improved diets. These set goalposts but require other instruments for implementation.
 • Legal instrument — laws (bills passed into law by parliament/congress or equivalent) or regulations (rules or norms adopted by a government) that dictate specific required or prohibited actions, often with implications for non-compliance.
 • Program, budget or investment — implementing mechanisms that often follow from a strategy, policy or law, with defined actions over a period and often a budgetary amount. Examples: National Agricultural Investment Plans, ministry budgets, private-sector investments, programs launched by public, private and NGO sectors.
+    • The program, budget, or investment must be adopted by a third party (government, public agency, private company, NGO) and its design or allocation must be informed by CGIAR / Alliance research. A project, grant, or agreement whose implementer or recipient is the CGIAR center itself is NOT a policy change of this type.
 
 
 Type-specific block: policy_change (object, required for this indicator when type-specific data exists)

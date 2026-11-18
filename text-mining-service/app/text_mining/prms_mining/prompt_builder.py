@@ -67,12 +67,25 @@ SOURCE EXCERPTS (single source — extract results supported by this source only
 def build_final_validation_prompt(
     *,
     candidates: dict,
+    supporting_excerpts: str = "",
 ) -> str:
+    """
+    Compose the final validation prompt.
+
+    ``supporting_excerpts`` holds only the short source window around each
+    candidate's verified quote (not the full corpus), keyed by candidate_id.
+    """
     candidate_json = json.dumps(candidates, ensure_ascii=False, indent=2)
+    excerpts_text = supporting_excerpts.strip() or "(no supporting excerpts available)"
     return f"""{FINAL_VALIDATION_RULES}
 
 {"=" * 80}
 CANDIDATE RESULTS JSON:
 {"=" * 80}
 {candidate_json}
+
+{"=" * 80}
+SUPPORTING SOURCE EXCERPTS (one per candidate_id; source text around the verified supporting_quote):
+{"=" * 80}
+{excerpts_text}
 """

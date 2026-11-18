@@ -362,6 +362,14 @@ For very long documents, the service may use semantic retrieval instead of sendi
 
 If a single source is still too large after retrieval, the request may fail with **`413`**. Prefer splitting oversized reports before upload when possible.
 
+### 6.6 Result selectivity and grounding (service behavior)
+
+The service returns only results that a source substantively supports. During extraction, the model must quote, for each candidate, a verbatim passage from the source and rate its confidence. Before final validation, the service checks each quote against the source text. Differences in case, punctuation, line breaks, and PDF hyphenation are tolerated. Candidates are dropped when the quote is missing, not found in the source, or rated low confidence. Final validation then receives each remaining candidate with the source text around its quote. It removes candidates the excerpt does not support, and removes duplicates of the same achievement, even when they were reported under different indicators.
+
+Mentions, plans, MoUs and other agreements, project launches, concept notes, and governance arrangements are not returned as results. A request can legitimately return `{"results": []}`.
+
+The quote and confidence are internal: they are removed before the response is returned, so the response shape is unchanged. `PRMS_GROUNDING_MODE=log_only` disables dropping (for diagnosis) without changing prompts.
+
 ## 7. HTTP status codes and error bodies
 
 FastAPI error responses use:

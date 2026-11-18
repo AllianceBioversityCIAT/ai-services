@@ -66,6 +66,8 @@ The URL is a placeholder. AWS credentials must be available to boto3, such as th
 | `MS_NAME` | Authentication-notification service label |
 | `PRMS_AUDIO_TRANSCRIBER` | Set `amazon_transcribe` to enable PRMS audio; disabled by default |
 | `PRMS_MAX_AUDIO_SECONDS` | Optional duration limit; no limit configured by default |
+| `PRMS_GROUNDING_MODE` | `enforce` (default) drops PRMS candidates whose supporting quote is missing, not found in the source, or rated low confidence; `log_only` keeps them and only logs |
+| `PRMS_GROUNDING_CONTEXT_CHARS` | Characters of source text shown to final validation on each side of a verified quote; default `600` |
 
 PRMS limits and configurable defaults are detailed in the [integration guide](docs/prms-integration-guide.md#61-limits-summary). Audio requires access to Amazon Transcribe and the S3 media. Text-only PRMS requests do not require a request bucket, but still use Bedrock and may invoke mapping.
 
