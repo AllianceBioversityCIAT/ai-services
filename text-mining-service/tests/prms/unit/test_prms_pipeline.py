@@ -22,7 +22,20 @@ def _free_text_source(content: str, source_index: int = 0) -> ExtractedPrmsSourc
     )
 
 
-def _capacity_result(title: str, women: int, quote: str | None = None) -> dict:
+STATED_CAPACITY_FIELDS = [
+    "geo_focus",
+    "capacity_sharing.number_people_trained",
+    "capacity_sharing.length_training",
+    "capacity_sharing.delivery_method",
+]
+
+
+def _capacity_result(
+    title: str,
+    women: int,
+    quote: str | None = None,
+    inferred: list[str] | None = None,
+) -> dict:
     result = {
         "indicator": "Capacity Sharing for Development",
         "title": title,
@@ -41,6 +54,11 @@ def _capacity_result(title: str, women: int, quote: str | None = None) -> dict:
     if quote is not None:
         result["supporting_quote"] = quote
         result["confidence"] = "high"
+        inferred_fields = inferred or []
+        result["stated_fields"] = [
+            field for field in STATED_CAPACITY_FIELDS if field not in inferred_fields
+        ]
+        result["inferred_fields"] = inferred_fields
     return result
 
 
@@ -188,6 +206,16 @@ def test_process_document_prms_drops_ungrounded_candidates_and_strips_provenance
         **_capacity_result("Inception meeting", 5, quote="The team also held an inception meeting with partners."),
         "confidence": "low",
     }
+    mostly_inferred = _capacity_result(
+        "Background regional programme",
+        7,
+        quote="Background on the region. " + KENYA_TEXT,
+        inferred=[
+            "capacity_sharing.number_people_trained",
+            "capacity_sharing.length_training",
+            "capacity_sharing.delivery_method",
+        ],
+    )
     # The validator echoes the provenance fields back; they must not reach the response.
     validation_invocation = _model_invocation(
         [{**grounded, "candidate_id": "c1", "source_id": "source-1"}]
@@ -205,7 +233,7 @@ def test_process_document_prms_drops_ungrounded_candidates_and_strips_provenance
         patch(
             "app.text_mining.prms_mining.mining.invoke_model",
             side_effect=[
-                _model_invocation([grounded, hallucinated, low_confidence]),
+                _model_invocation([grounded, hallucinated, low_confidence, mostly_inferred]),
                 validation_invocation,
             ],
         ) as mock_invoke,
@@ -222,12 +250,20 @@ def test_process_document_prms_drops_ungrounded_candidates_and_strips_provenance
     assert "Kenya seed storage training" in validation_prompt
     assert "Regional training of 500 agents" not in validation_prompt
     assert "Inception meeting" not in validation_prompt
+    assert "Background regional programme" not in validation_prompt
     assert '<excerpt candidate_id="c1" source_id="source-1">' in validation_prompt
     assert "Background on the region." in validation_prompt
 
     results = result["json_content"]["results"]
     assert [item["title"] for item in results] == ["Kenya seed storage training"]
-    for field in ("supporting_quote", "confidence", "candidate_id", "source_id"):
+    for field in (
+        "supporting_quote",
+        "confidence",
+        "candidate_id",
+        "source_id",
+        "stated_fields",
+        "inferred_fields",
+    ):
         assert field not in results[0]
 
 
@@ -265,3 +301,59 @@ def test_process_document_prms_skips_validation_when_nothing_is_grounded():
 
     assert mock_invoke.call_count == 1
     assert result["json_content"]["results"] == []
+
+
+def test_process_document_prms_caps_results_for_a_short_source():
+    sentences = [
+        f"Training number {number} reached {number + 10} women farmers in Kenya on seed storage."
+        for number in range(1, 6)
+    ]
+    source_text = " ".join(sentences)
+    extracted = [_free_text_source(source_text)]
+    per_source_context = ContextBuildResult(
+        excerpts=source_text,
+        retrieval_version="prms-retrieval-v1",
+        chunks_processed=0,
+        estimated_tokens=10,
+        trimmed=False,
+    )
+    candidates = [
+        _capacity_result(f"Training {number}", number + 10, quote=sentence)
+        for number, sentence in enumerate(sentences, start=1)
+    ]
+    # Candidates 2 and 4 are medium confidence; 5 has one inferred field (3/4 support).
+    candidates[1]["confidence"] = "medium"
+    candidates[3]["confidence"] = "medium"
+    candidates[4]["stated_fields"] = STATED_CAPACITY_FIELDS[:-1]
+    candidates[4]["inferred_fields"] = [STATED_CAPACITY_FIELDS[-1]]
+    validated = [
+        {**candidate, "candidate_id": f"c{number}"}
+        for number, candidate in enumerate(candidates, start=1)
+    ]
+
+    with (
+        patch(
+            "app.text_mining.prms_mining.mining.extract_sources",
+            return_value=extracted,
+        ),
+        patch(
+            "app.text_mining.prms_mining.mining.build_single_source_excerpts",
+            return_value=per_source_context,
+        ),
+        patch(
+            "app.text_mining.prms_mining.mining.invoke_model",
+            side_effect=[_model_invocation(candidates), _model_invocation(validated)],
+        ),
+        patch(
+            "app.text_mining.prms_mining.mining.map_fields_with_opensearch",
+            side_effect=lambda result, *_args, **_kwargs: result,
+        ),
+        patch("app.text_mining.prms_mining.mining.RESULT_CAP_TIERS", [(3, 3)]),
+    ):
+        from app.text_mining.prms_mining.mining import process_document_prms
+
+        result = process_document_prms(text=source_text)
+
+    titles = [item["title"] for item in result["json_content"]["results"]]
+    # High confidence first, then MDS support: 1 and 3 (full support) beat 5 (3/4).
+    assert titles == ["Training 1", "Training 3", "Training 5"]

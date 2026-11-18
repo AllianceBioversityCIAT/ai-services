@@ -57,7 +57,8 @@ Decision order (apply in this sequence for each result)
     • describes a project, programme, or initiative launch, inception meeting, kick-off, or new funding secured or awarded to the project;
     • describes a concept note, proposal, or bid;
     • describes the project's own governance or management arrangements (committees, boards, staffing, offices);
-    • only mentions the activity in passing, without enough detail to fill the result's core fields.
+    • only mentions the activity in passing, without enough detail to fill the result's core fields;
+    • describes an intermediate step rather than an achievement: experiments, trials, or demonstration sites set up; samples collected or shipped; protocols drafted or under testing; students enrolled; study tours or field visits; knowledge or lessons gained by the project team itself.
 
 If no excerpt is available for a candidate, judge it on its supporting_quote alone; remove it if the quote does not show a completed achievement.
 
@@ -191,7 +192,8 @@ Other Output / Other Outcome:
 7. Global prohibitions
 
     • Never add a new result that was not in the candidate JSON.
-    • Never copy the supporting excerpts into the output. You may omit candidate_id, supporting_quote, confidence, and source_id from kept results.
+    • Never copy the supporting excerpts into the output. You may omit supporting_quote, confidence, source_id, stated_fields, and inferred_fields from kept results.
+    • Always keep candidate_id on every kept result, unchanged. When merging duplicates, keep the candidate_id of the retained entry.
     • Never remove a candidate solely because it appears thematically unrelated to other candidates in the batch.
     • Never add new field values not already present in the candidate JSON (you may relocate, merge, rename for consistency, or remove — not invent).
     • Never introduce Knowledge Product, Theory of Change, or audit/identity fields listed above.
