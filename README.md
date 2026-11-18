@@ -25,17 +25,21 @@ ai-services/
 ## 🚀 Available Services
 
 ### 🖥️ Admin Module ([`admin-module`](admin-module))
+
 A Next.js-based administration dashboard for managing all AI services in the platform. Provides:
+
 - Product and project management with DynamoDB backend
 - User registration and role management
 - Prompt management with access control
 - Authenticated admin interface with session handling
-- **Stack**: Next.js 15, TypeScript, Tailwind CSS, AWS DynamoDB
+- **Stack**: Next.js 15, TypeScript, Tailwind CSS, AWS DynamoDB.
 
 ---
 
 ### 📝 AI Feedback Service ([`ai-feedback-service`](ai-feedback-service))
+
 A service-agnostic feedback collection and analytics platform designed to gather and analyze user feedback across all AI services. Features:
+
 - Cross-service feedback collection with flexible metadata
 - Real-time performance monitoring and user satisfaction tracking
 - Auto-registration of new AI services
@@ -45,7 +49,9 @@ A service-agnostic feedback collection and analytics platform designed to gather
 ---
 
 ### 📊 AR Generator Service ([`ar-generator-service`](ar-generator-service))
+
 An AI-powered service for generating comprehensive annual reports for AICCRA (Accelerating Impacts of CGIAR Climate Research for Africa). Features include:
+
 - Automated report generation using AWS Bedrock Claude 3.7 Sonnet
 - Support for multiple performance indicators (IPI and PDO)
 - Vector database integration with OpenSearch
@@ -55,7 +61,9 @@ An AI-powered service for generating comprehensive annual reports for AICCRA (Ac
 ---
 
 ### 💬 Chatbot Service ([`chatbot-service`](chatbot-service))
+
 An intelligent conversational AI service for exploring AICCRA data and insights through natural language. Key capabilities:
+
 - AWS Bedrock Agents with persistent memory across sessions
 - Smart filtering by phase, indicator, and section
 - Rich citations linking to relevant documents and reports
@@ -66,7 +74,9 @@ An intelligent conversational AI service for exploring AICCRA data and insights 
 ---
 
 ### 🔗 CLARISA-Agresso Service ([`clarisa-agresso-service`](clarisa-agresso-service))
+
 Institution mapping service that provides automated matching between Agresso and CLARISA institution databases. Features:
+
 - Vector-based semantic matching using AWS Bedrock embeddings
 - Support for multiple matching approaches (Supabase and OpenSearch)
 - Batch processing capabilities
@@ -76,7 +86,9 @@ Institution mapping service that provides automated matching between Agresso and
 ---
 
 ### ⚡ Fast Response Service ([`fast-response-service`](fast-response-service))
+
 A lightweight, general-purpose microservice that accepts any prompt and input text and returns an LLM-generated response. Ideal for:
+
 - Text summarization and rewriting
 - Writing improvement and style adaptation
 - Contextual automatic response generation
@@ -86,7 +98,9 @@ A lightweight, general-purpose microservice that accepts any prompt and input te
 ---
 
 ### 🗂️ Mapping Service ([`mapping-service`](mapping-service))
+
 A semantic field-mapping service that resolves free-text staff names and institution names to their canonical CLARISA/system IDs using vector search. Features:
+
 - Supports `staff` and `institution` entity types
 - OpenSearch-powered semantic matching
 - Environment-aware routing (test/prod)
@@ -95,7 +109,9 @@ A semantic field-mapping service that resolves free-text staff names and institu
 ---
 
 ### 🤝 Partner Request Support ([`partner-request-support`](partner-request-support))
+
 A full-stack enterprise platform for validating and matching partner institution requests against the CLARISA database using hybrid AI search. Features:
+
 - Hybrid search combining AI semantic embeddings + fuzzy string matching + multilingual support
 - Excel file upload and direct CLARISA API integration
 - Automated web research fallback for unmatched institutions
@@ -106,7 +122,9 @@ A full-stack enterprise platform for validating and matching partner institution
 ---
 
 ### 🔍 QA Service ([`qa-service`](qa-service))
+
 An LLM-powered quality assurance service for PRMS (Performance and Results Management System) result metadata. Key features:
+
 - Generates improved titles, descriptions, and short names using AWS Bedrock Claude
 - Intelligent prompt generation based on result type and level (Output, Outcome, Impact)
 - Optional interaction tracking for analytics
@@ -116,7 +134,9 @@ An LLM-powered quality assurance service for PRMS (Performance and Results Manag
 ---
 
 ### 🔎 Text Mining Service ([`text-mining-service`](text-mining-service))
+
 Intelligent document processing microservice that extracts structured information from various document formats. Key capabilities:
+
 - Document ingestion from S3 buckets
 - Semantic chunking and vector embeddings with LanceDB
 - AI-powered content analysis using Claude 3 Sonnet
@@ -128,17 +148,17 @@ Intelligent document processing microservice that extracts structured informatio
 
 ## 🛠️ Common Technology Stack
 
-| Category | Technologies |
-|---|---|
-| **AI/ML** | AWS Bedrock, Claude 3.7 Sonnet, OpenAI API, Vector Embeddings |
-| **Databases** | OpenSearch, LanceDB, Supabase, MySQL, SQL Server, AWS DynamoDB |
-| **Cloud** | AWS S3, AWS Bedrock Knowledge Base, AWS Lambda |
-| **APIs** | FastAPI, Next.js API Routes, RESTful services |
-| **Frontend** | Next.js 15, React, Tailwind CSS, Streamlit |
-| **Data Processing** | Pandas, NumPy, Pydantic |
-| **Package Management** | uv (Python), pnpm (Node.js) |
-| **Authentication** | AWS IAM, CLARISA integration, NextAuth |
-| **Deployment** | AWS Lambda via Mangum, Docker |
+| Category               | Technologies                                                   |
+| ---------------------- | -------------------------------------------------------------- |
+| **AI/ML**              | AWS Bedrock, Claude 3.7 Sonnet, OpenAI API, Vector Embeddings  |
+| **Databases**          | OpenSearch, LanceDB, Supabase, MySQL, SQL Server, AWS DynamoDB |
+| **Cloud**              | AWS S3, AWS Bedrock Knowledge Base, AWS Lambda                 |
+| **APIs**               | FastAPI, Next.js API Routes, RESTful services                  |
+| **Frontend**           | Next.js 15, React, Tailwind CSS, Streamlit                     |
+| **Data Processing**    | Pandas, NumPy, Pydantic                                        |
+| **Package Management** | uv (Python), pnpm (Node.js)                                    |
+| **Authentication**     | AWS IAM, CLARISA integration, NextAuth                         |
+| **Deployment**         | AWS Lambda via Mangum, Docker                                  |
 
 ## 📋 Prerequisites
 
@@ -169,6 +189,7 @@ pnpm dev
 ## 🔒 Security & Configuration
 
 All services follow consistent security practices:
+
 - Environment variable configuration (`.env` files, never committed)
 - AWS IAM-based authentication
 - Secure API endpoints with proper validation
@@ -187,6 +208,7 @@ Each service accepts contributions independently. Please:
 ## 📊 Monitoring & Logging
 
 All services implement comprehensive logging:
+
 - Structured logging with rotating file handlers
 - Console and file output
 - Error tracking and debugging information
