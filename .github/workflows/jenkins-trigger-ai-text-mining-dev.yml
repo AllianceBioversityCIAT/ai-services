@@ -1,9 +1,9 @@
 name: Trigger Jenkins Job AI Text Mining Microservice
 
+# Cutover (owner decision, 2026-11-18): pushes to dev-text-mining are built by text-mining-dev-cicd.yml and deployed by
+# the Jenkins CD-only job ai-text-mining-service-dev-cd. The push trigger of the legacy job ai-text-mining-service-dev is
+# removed; workflow_dispatch stays for manual recovery with the legacy job.
 on:
-  push:
-    branches:
-      - "dev-text-mining"
   workflow_dispatch:
 
 jobs:
